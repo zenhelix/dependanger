@@ -9,6 +9,8 @@
 Этот раздел содержит описание всех функциональных возможностей системы Dependanger.
 Фичи организованы по архитектурному потоку данных и приоритету (P1 = критичные для MVP).
 
+Доменная модель: xref:../01-concepts/domain-model.adoc[Концепции → Доменная модель].
+
 == Архитектурный поток
 
 [mermaid,target=architecture-flow,format=svg]
@@ -70,7 +72,7 @@ flowchart TD
 | ID | Название | Приоритет | Статус
 
 | xref:F001-registry-dsl.adoc[F001]
-| Registry DSL — Kotlin DSL для определения libraries, plugins, bundles, versions, platforms, distributions, compatibility
+| Registry DSL — Kotlin DSL для определения libraries, plugins, bundles, versions, bomImports, targetPlatforms, distributions, compatibility, settings
 | P1
 | 🔴 Не начат
 
@@ -82,7 +84,7 @@ flowchart TD
 | xref:F003-processing-pipeline.adoc[F003]
 | Processing Pipeline — многоэтапная обработка через процессоры
 | P1
-| 🔴 Не начат
+| 🟢 Готов
 
 | xref:F004-toml-generation.adoc[F004]
 | TOML Generation — генерация Gradle Version Catalog
@@ -121,7 +123,7 @@ flowchart TD
 
 Без этих фич продукт не имеет ценности.
 
-* **F001: Registry DSL** — основа всей системы, Kotlin DSL
+* **F001: Registry DSL** — основа всей системы, Kotlin DSL (включая settings)
 * **F002: Metadata Serialization** — промежуточное хранение
 * **F003: Processing Pipeline** — трансформация данных
 * **F004: TOML Generation** — основной выходной формат

@@ -6,7 +6,7 @@
 
 [abstract]
 --
-Импорт версий из внешних Maven BOM/Platform (Spring Boot BOM, Kotlin BOM и др.).
+Импорт версий из внешних Maven BOM (Spring Boot BOM, Kotlin BOM и др.).
 Опциональный процессор в pipeline (order: 15).
 --
 
@@ -40,9 +40,25 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно указать BOM в `platforms { }` блоке
-* Библиотеки без явной версии получают версию из BOM
-* Явно указанные версии имеют приоритет над BOM
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| BOM `spring-boot-dependencies:3.4.0` указан в `bomImports { }`
+| Pipeline обрабатывает библиотеку `org.springframework:spring-web` без явной версии
+| Библиотека получает версию из BOM (например, `6.2.1`), `versionSource = BOM_IMPORT`
+
+| AC-001-2
+| BOM указан в `bomImports { }`, библиотека имеет явную версию `5.0.0`
+| Pipeline обрабатывает библиотеку
+| Используется явная версия `5.0.0`, `versionSource = DECLARED`
+
+| AC-001-3
+| BOM указан в `bomImports { }`, библиотека `com.example:unknown` отсутствует в BOM
+| Pipeline обрабатывает библиотеку без явной версии
+| WARNING в логе, версия остаётся null (или ERROR в strict mode)
+|===
 
 === US-002: Несколько BOM с приоритетом
 
@@ -53,23 +69,68 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно указать несколько BOM
-* Первый BOM с версией для библиотеки выигрывает
-* Порядок определяется порядком в DSL
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| BOM-1 (Spring Boot) и BOM-2 (AWS) указаны в порядке: Spring, AWS
+| Библиотека `com.fasterxml.jackson.core:jackson-core` есть в обоих BOM
+| Версия берётся из Spring Boot BOM (первый в списке)
+
+| AC-002-2
+| BOM-1 (Spring Boot) и BOM-2 (AWS) указаны
+| Библиотека `software.amazon.awssdk:s3` есть только в AWS BOM
+| Версия берётся из AWS BOM
+
+| AC-002-3
+| Три BOM указаны: A, B, C
+| Библиотека есть в B и C, но не в A
+| Версия берётся из B (первый содержащий)
+|===
+
+=== US-003: Кеширование BOM
+
+[quote]
+____
+Как разработчик, я хочу чтобы BOM файлы кешировались локально, чтобы ускорить повторные сборки и работать офлайн.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| BOM скачан менее 24 часов назад
+| Pipeline запускается повторно
+| BOM читается из кеша, сетевой запрос не выполняется
+
+| AC-003-2
+| BOM в кеше старше 24 часов, сеть доступна
+| Pipeline запускается
+| BOM скачивается заново, кеш обновляется
+
+| AC-003-3
+| BOM в кеше старше 24 часов, сеть недоступна
+| Pipeline запускается
+| Используется устаревший кеш, WARNING в логе
+|===
 
 == DSL синтаксис
 
 [source,kotlin]
 ----
-dsl.platforms {
+dsl.bomImports {
     // Spring Boot BOM - высший приоритет
-    platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
-    
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
+
     // Kotlin BOM
-    platform("org.jetbrains.kotlin:kotlin-bom:2.1.20")
-    
-    // AWS BOM
-    platform("software.amazon.awssdk:bom:2.20.0")
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+
+    // AWS BOM с ссылкой на version alias
+    bom("aws-bom", "software.amazon.awssdk:bom", version = versionRef("aws"))
 }
 
 dsl.libraries {
@@ -77,13 +138,52 @@ dsl.libraries {
     library("spring-web", "org.springframework:spring-web") {
         tags("spring", "web")
     }
-    
+
     // Явная версия имеет приоритет над BOM
     library("jackson-core", "com.fasterxml.jackson.core:jackson-core:2.16.0") {
         tags("json")
     }
 }
 ----
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА импортировать версии из Maven BOM, указанных в `bomImports { }`
+
+| FR-002
+| MUST
+| При наличии явной версии (`DECLARED`) система ДОЛЖНА игнорировать версию из BOM
+
+| FR-003
+| MUST
+| При нескольких BOM система ДОЛЖНА использовать версию из первого BOM, содержащего библиотеку
+
+| FR-004
+| MUST
+| Система ДОЛЖНА корректно парсить секцию `<dependencyManagement>` Maven POM
+
+| FR-005
+| SHOULD
+| Система ДОЛЖНА кешировать скачанные BOM файлы
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА использовать кеш при недоступности сети
+
+| FR-007
+| MAY
+| TTL кеша МОЖЕТ быть настраиваемым (по умолчанию 24 часа)
+
+| FR-008
+| MUST
+| В strict mode система ДОЛЖНА завершаться с ERROR при неразрешённой версии
+|===
 
 == Поведение
 
@@ -105,11 +205,50 @@ DECLARED > BOM_IMPORT
 
 Версия, полученная из BOM, имеет `source = BOM_IMPORT` и хранит ссылку на исходный BOM в `originalRef`.
 
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Невалидный BOM
+| BOM POM файл содержит синтаксическую ошибку XML
+| ERROR с указанием BOM и причины, pipeline останавливается
+
+| BOM недоступен
+| Сетевая ошибка при скачивании BOM, кеш пуст
+| ERROR "Cannot fetch BOM: {coordinates}", pipeline останавливается
+
+| BOM недоступен, есть кеш
+| Сетевая ошибка, но есть закешированный BOM
+| WARNING, используется кеш, pipeline продолжается
+
+| Циклическая зависимость BOM
+| BOM-A импортирует BOM-B, который импортирует BOM-A
+| ERROR "Circular BOM dependency detected", pipeline останавливается
+
+| BOM без dependencyManagement
+| BOM POM не содержит секции `<dependencyManagement>`
+| WARNING "BOM has no dependencyManagement section", BOM игнорируется
+
+| Property placeholder в версии
+| BOM содержит версию `${spring.version}`
+| Резолвить property из `<properties>` того же POM
+
+| Parent BOM
+| BOM наследует `<dependencyManagement>` от parent
+| Резолвить parent и объединить dependencyManagement
+
+| Пустой bomImports
+| Блок `bomImports { }` пуст или отсутствует
+| Процессор пропускается, никаких изменений
+|===
+
 == SPI: BomImportProcessor
 
 `BomImportProcessor` — опциональный процессор (order: 15), который:
 
-1. Получает список platforms из metadata
+1. Получает список `bomImports` из metadata
 2. Для каждого BOM скачивает и парсит секцию `<dependencyManagement>`
 3. Для библиотек без версии находит соответствующую версию в BOM
 4. Устанавливает `ResolvedVersion` с `source = BOM_IMPORT`
@@ -121,8 +260,8 @@ DECLARED > BOM_IMPORT
 [source,kotlin]
 ----
 val result = Dependanger.fromDsl {
-    platforms {
-        platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+    bomImports {
+        bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
     }
     libraries {
         library("spring-web", "org.springframework:spring-web")
@@ -137,12 +276,13 @@ val result = Dependanger.fromDsl {
 == Кеширование
 
 * BOM файлы кешируются в `~/.dependanger/cache/bom/`
-* TTL кеша: 24 часа (настраивается)
-* При отсутствии сети используется кеш
+* TTL кеша: 24 часа (настраивается через `settings { bomCache { ttl = 48.hours } }`)
+* При отсутствии сети используется кеш с WARNING в логе
+* Кеш инвалидируется при изменении версии BOM
 
 == Связи
 
-* **Входные данные:** `platforms` из DependangerMetadata
+* **Входные данные:** `bomImports` из DependangerMetadata
 * **Выходные данные:** Обогащённые версии в ProcessingContext
 * **Предыдущий этап:** F002 (Metadata), ExtractedVersions processor (order: 12)
 * **Следующий этап:** LibraryFilter processor (order: 20)
@@ -150,4 +290,5 @@ val result = Dependanger.fromDsl {
 == Связанные документы
 
 * xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline
-* xref:../01-concepts/domain-model.adoc[Platform] — сущность Platform
+* xref:../01-concepts/domain-model.adoc#_bomimport[Доменная модель — BomImport] — сущность BomImport
+* xref:F001-registry-dsl.adoc#_блок_bomimports[F001: Registry DSL — блок bomImports] — DSL синтаксис

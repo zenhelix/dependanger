@@ -26,7 +26,11 @@
 == Описание
 
 Processing Pipeline выполняет многоэтапную обработку метаданных:
-* Резолвинг версий (из alias, BOM, Maven) * Применение фильтров (distribution profile) * Валидация * Опциональные проверки (updates, compatibility)
+
+* Резолвинг версий (из alias, BomImport, Maven)
+* Применение фильтров (distribution profile)
+* Валидация
+* Опциональные проверки (updates, compatibility)
 
 Результат — `EffectiveMetadata`, готовый для генерации артефактов.
 
@@ -40,7 +44,10 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Версии из alias резолвятся в конкретные значения * Версии из BOM импортируются автоматически * Указывается источник версии (VersionSource)
+
+* Версии из alias резолвятся в конкретные значения
+* Версии из BomImport импортируются автоматически
+* Указывается источник версии (VersionSource)
 
 === US-002: Фильтрация по профилю
 
@@ -50,7 +57,10 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Distribution profile фильтрует библиотеки и бандлы * excludeLibraries исключает конкретные библиотеки * includeBundles включает только указанные бандлы
+
+* Distribution profile фильтрует библиотеки и бандлы
+* excludeLibraries исключает конкретные библиотеки
+* includeBundles включает только указанные бандлы
 
 === US-003: Расширение pipeline
 
@@ -60,7 +70,10 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Можно добавить процессор через SPI * Процессор имеет приоритет (order) * Процессор получает и возвращает ProcessingMetadata
+
+* Можно добавить процессор через SPI
+* Процессор имеет приоритет (order)
+* Процессор получает и возвращает ProcessingContext
 
 == SPI: EffectiveMetadataProcessor
 
@@ -101,7 +114,7 @@ ____
 
 | 15
 | `bom-import`
-| Импорт версий из внешних BOM
+| Импорт версий из BomImport
 | ✅
 | xref:F006-bom-import.adoc[F006]
 
@@ -207,7 +220,7 @@ DECLARED > BOM_IMPORT
 
 | 2 (низший)
 | BOM_IMPORT
-| Импортирована из Maven BOM/Platform
+| Импортирована из BomImport через BomImportProcessor
 |===
 
 == Strict Mode
@@ -215,14 +228,16 @@ DECLARED > BOM_IMPORT
 [source,kotlin]
 ----
 dependanger {
-    processing {
+    settings {
         strictVersionResolution = true  // ERROR при неразрешённых версиях
     }
 }
 ----
 
 При `strictVersionResolution = true`:
-* Неразрешённая версия → ERROR (остановка pipeline) * При `false` → WARNING (продолжение с пустой версией)
+
+* Неразрешённая версия → ERROR (остановка pipeline)
+* При `false` → WARNING (продолжение с пустой версией)
 
 == Parallel Pipeline Execution
 
@@ -294,7 +309,7 @@ dependanger {
 [mermaid,target=pipeline-flow,format=svg]
 ----
 flowchart TD
-    Input["DependencyMetadata<br/>(input)"]
+    Input["DependangerMetadata<br/>(input)"]
 
     subgraph Pipeline["Processing Pipeline"]
         Loop["for processor in processors.sortedBy { it.order }:<br/>if processor.isEnabled(context):<br/>metadata = processor.process(metadata, context)"]

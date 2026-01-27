@@ -8,6 +8,8 @@
 --
 Документ описывает ключевые сущности системы Dependanger на трёх уровнях абстракции:
 DSL Model (в памяти), Metadata Model (сериализованная), Effective Model (готовая к генерации).
+
+Краткие определения терминов: xref:../00-overview.adoc#_глоссарий[Глоссарий в Overview].
 --
 
 == Уровни моделей
@@ -51,7 +53,6 @@ ____
 ** Поддержка DSL блоков (`@DependangerDslMarker`)
 ** Версии могут быть неразрешёнными (ссылки на alias)
 ** Валидация на уровне DSL
-** Методы: `versions {}`, `libraries {}`, `bundles {}`, `plugins {}`, `platforms {}`, `distributions {}`, `compatibility {}`
 
 === Metadata Model
 
@@ -67,7 +68,6 @@ ____
 ** Абстрагирован через `SerializationFormat<T>` SPI
 ** JSON как основной формат (расширяемо до YAML)
 ** Хранит полную информацию из DSL
-** Используется для кеширования и инкрементальной обработки
 ** Файл: `metadata.json`
 
 === Effective Model
@@ -86,7 +86,6 @@ ____
 ** Содержит результаты валидации
 ** Опционально: update report, compatibility report
 ** Файл: `effective-{distribution}.json`
-** Готов для передачи в генераторы (TOML, BOM)
 
 == Обзор модели (DSL Level)
 
@@ -97,9 +96,11 @@ erDiagram
     DependangerDsl ||--o{ Plugin : contains
     DependangerDsl ||--o{ Version : defines
     DependangerDsl ||--o{ Bundle : contains
-    DependangerDsl ||--o{ Platform : imports
+    DependangerDsl ||--o{ BomImport : imports
+    DependangerDsl ||--o{ TargetPlatform : defines
     DependangerDsl ||--o{ Distribution : contains
     DependangerDsl ||--o{ CompatibilityRule : contains
+    DependangerDsl ||--|| Settings : has
     Bundle ||--o{ Library : includes
     Bundle ||--o{ Bundle : extends
     Library }o--o| Version : references
@@ -110,9 +111,11 @@ erDiagram
         Libraries libraries
         Bundles bundles
         Plugins plugins
-        Platforms platforms
+        BomImports bomImports
+        TargetPlatforms targetPlatforms
         Distributions distributions
         Compatibility compatibility
+        Settings settings
     }
 
     Library {
@@ -142,10 +145,17 @@ erDiagram
         list extends
     }
 
-    Platform {
+    BomImport {
+        string alias PK
         string group
         string name
         string version
+    }
+
+    TargetPlatform {
+        string name PK
+        JdkConstraints jdk
+        KotlinTargets targets
     }
 
     Distribution {
@@ -159,6 +169,12 @@ erDiagram
         string message
         Severity severity
     }
+
+    Settings {
+        ValidationSettings validation
+        TomlSettings toml
+        BomSettings bom
+    }
 ----
 
 == Сущности
@@ -171,7 +187,7 @@ ____
 Содержит все определения для генерации артефактов (TOML, BOM).
 ____
 
-NOTE: Полная документация по DSL синтаксису: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
+NOTE: Полная спецификация DSL синтаксиса: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
 
 ==== DSL блоки
 
@@ -185,7 +201,7 @@ NOTE: Полная документация по DSL синтаксису: xref:
 
 | `libraries { }`
 | LibrariesDsl
-| Библиотеки и BOM с Maven координатами
+| Библиотеки с Maven координатами
 
 | `plugins { }`
 | PluginsDsl
@@ -195,9 +211,13 @@ NOTE: Полная документация по DSL синтаксису: xref:
 | BundlesDsl
 | Группы библиотек
 
-| `platforms { }`
-| PlatformsDsl
-| Целевые платформы (JDK, Android, Kotlin targets) и импорт внешних BOM
+| `bomImports { }`
+| BomImportsDsl
+| Импорт версий из внешних Maven BOM
+
+| `targetPlatforms { }`
+| TargetPlatformsDsl
+| Целевые платформы с ограничениями (JDK, Kotlin targets)
 
 | `distributions { }`
 | DistributionsDsl
@@ -207,13 +227,12 @@ NOTE: Полная документация по DSL синтаксису: xref:
 | CompatibilityDsl
 | Правила совместимости
 
-| `presets { }`
-| PresetsDsl
-| Именованные presets с предустановленными настройками
-
 | `settings { }`
 | SettingsDsl
-| Глобальные настройки валидации и поведения
+| Глобальные настройки валидации и генерации
+|===
+
+NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings`
 |===
 
 ==== Пример DSL
@@ -242,8 +261,24 @@ dsl.bundles {
     }
 }
 
-dsl.platforms {
-    platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+dsl.plugins {
+    plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm",
+        version = versionRef("kotlin"))
+}
+
+dsl.bomImports {
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+
+dsl.targetPlatforms {
+    platform("jvm17") {
+        jdk { min = 17; max = 21 }
+    }
+    platform("android-min21") {
+        android { minSdk = 21; targetSdk = 34 }
+    }
 }
 
 dsl.distributions {
@@ -255,11 +290,21 @@ dsl.distributions {
         }
     }
 }
+
+dsl.settings {
+    validation {
+        onCompatibilityViolation = ValidationAction.FAIL
+        onUnresolvedVersion = ValidationAction.WARN
+    }
+    toml {
+        filename = "libs.versions.toml"
+    }
+}
 ----
 
 ==== Правила валидации
 
-* Все alias (библиотек, плагинов, версий, бандлов) должны быть уникальны
+* Все alias (библиотек, плагинов, версий, бандлов, BOM) должны быть уникальны
 * Alias должен соответствовать паттерну `[a-z][a-z0-9-]*`
 * Ссылки на версии должны указывать на существующие version aliases
 
@@ -296,7 +341,7 @@ ____
 | version
 | VersionReference
 | Нет
-| Ссылка на version alias (`Reference`), inline значение (`Literal`), или диапазон (`Range`). Может быть унаследована из Platform
+| Ссылка на version alias (`Reference`), inline значение (`Literal`), или диапазон (`Range`). Может быть унаследована из BomImport
 
 | tags
 | Set<String>
@@ -336,7 +381,7 @@ libraries {
         tags("logging")
     }
 
-    // Без версии (будет взята из Platform)
+    // Без версии (будет взята из BomImport)
     library("spring-web", "org.springframework:spring-web") {
         tags("web", "spring")
         requires {
@@ -574,20 +619,72 @@ bundles {
 
 ---
 
-=== Platform
+=== BomImport
+
+[quote]
+____
+Импорт версий из внешнего Maven BOM/Platform.
+Позволяет наследовать версии из Spring Boot BOM, Kotlin BOM и других.
+____
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| alias
+| String
+| Да
+| Уникальный идентификатор BOM
+
+| group
+| String
+| Да
+| Maven groupId BOM (например: `org.springframework.boot`)
+
+| name
+| String
+| Да
+| Maven artifactId BOM (например: `spring-boot-dependencies`)
+
+| version
+| VersionReference
+| Да
+| Версия BOM (ссылка или literal)
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+bomImports {
+    // С ссылкой на version alias
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+
+    // С inline версией
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+----
+
+==== Поведение
+
+* Версии из BOM импортируются во время processing pipeline (BomImportProcessor, order: 15)
+* Приоритет: DECLARED (явная версия в DSL) > BOM_IMPORT (из BomImport)
+* Порядок BomImport имеет значение: первый BOM с версией для библиотеки выигрывает
+
+---
+
+=== TargetPlatform
 
 [quote]
 ____
 Целевая платформа с ограничениями по JDK, Android и поддерживаемыми Kotlin targets.
-Также используется для импорта версий из внешних Maven BOM.
+Используется для валидации совместимости библиотек с целевым окружением.
 ____
 
-Platform имеет два основных use case:
-
-1. **Target Platform** — определение целевой среды выполнения (JDK constraints, Android SDK, Kotlin targets)
-2. **BOM Import** — импорт версий из внешних Maven BOM (Spring Boot BOM, Kotlin BOM)
-
-==== Атрибуты (Target Platform)
+==== Атрибуты
 
 [cols="1,1,1,3",options="header"]
 |===
@@ -614,11 +711,11 @@ Platform имеет два основных use case:
 | Поддерживаемые Kotlin Multiplatform targets
 |===
 
-==== DSL синтаксис (Target Platform)
+==== DSL синтаксис
 
 [source,kotlin]
 ----
-platforms {
+targetPlatforms {
     // Платформа с JDK constraints
     platform("jvm17") {
         jdk { min = 17; max = 21 }
@@ -637,27 +734,6 @@ platforms {
     }
 }
 ----
-
-==== DSL синтаксис (BOM Import)
-
-[source,kotlin]
-----
-platforms {
-    // Spring Boot BOM для импорта версий
-    platform("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
-        version = versionRef("spring-boot")
-    }
-
-    // Kotlin BOM
-    platform("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
-}
-----
-
-==== Поведение BOM Import
-
-* Версии из BOM импортируются во время processing pipeline (BomImportProcessor, order: 15)
-* Приоритет: DECLARED (явная версия в DSL) > BOM_IMPORT (из Platform)
-* Порядок Platform имеет значение: первый BOM с версией для библиотеки выигрывает
 
 ==== SupportedTargets
 
@@ -778,8 +854,6 @@ distributions {
 
 ==== Логика комбинирования фильтров
 
-Фильтры в `FilterSpec` применяются по следующим правилам:
-
 [cols="1,3",options="header"]
 |===
 | Комбинация | Логика
@@ -796,21 +870,6 @@ distributions {
 | Несколько разных фильтров (`byTags` + `byGroups`)
 | **AND** — библиотека должна пройти все фильтры
 |===
-
-[source,kotlin]
-----
-distributions {
-    distribution("example") {
-        spec {
-            filter {
-                // AND: библиотека должна иметь тег "core" И не быть в группе "org.test"
-                byTags { include { anyOf("core") } }
-                byGroups { exclude { matching("org.test:*") } }
-            }
-        }
-    }
-}
-----
 
 ===== Алгоритм фильтрации
 
@@ -894,73 +953,6 @@ compatibility {
 * Отфильтрованные библиотеки не триггерят правила
 * Если правило ссылается на отфильтрованные библиотеки — генерируется WARNING о неполном правиле
 * Правило всё равно проверяется для оставшихся библиотек
-
----
-
-=== Platform Library
-
-[quote]
-____
-Библиотека типа Platform/BOM для экспорта в TOML Version Catalog.
-Отличается от обычной библиотеки: экспортируется с типом `pom` и используется потребителями через `platform()`.
-____
-
-NOTE: Не путать с `platform()` в блоке `platforms {}`, который используется для *импорта* версий из внешних BOM.
-`platformLibrary()` — для *экспорта* BOM-зависимости в генерируемый TOML.
-
-==== DSL синтаксис
-
-[source,kotlin]
-----
-libraries {
-    // Обычная библиотека
-    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
-        version = versionRef("kotlin"))
-
-    // Platform library — экспортируется в TOML как library с type=pom
-    platformLibrary("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
-        version = versionRef("spring-boot"))
-}
-----
-
-==== Отличия от library()
-
-* В генерируемом TOML отображается с типом `pom`
-* Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
-* Не имеет `supportedTargets` (не является runtime dependency)
-
----
-
-=== Preset
-
-[quote]
-____
-Именованный preset с предустановленными настройками.
-Позволяет группировать настройки для разных сценариев использования.
-____
-
-==== DSL синтаксис
-
-[source,kotlin]
-----
-presets {
-    preset("strict") {
-        validation {
-            onCompatibilityViolation = ValidationAction.FAIL
-            onDeprecatedLibrary = ValidationAction.WARN
-            onUnresolvedVersion = ValidationAction.FAIL
-        }
-    }
-
-    preset("lenient") {
-        validation {
-            onCompatibilityViolation = ValidationAction.WARN
-            onDeprecatedLibrary = ValidationAction.INFO
-            onUnresolvedVersion = ValidationAction.WARN
-        }
-    }
-}
-----
 
 ---
 
@@ -1097,6 +1089,40 @@ settings {
 
 ---
 
+=== Platform Library
+
+[quote]
+____
+Библиотека типа Platform/BOM для экспорта в TOML Version Catalog.
+Отличается от обычной библиотеки: экспортируется с типом `pom` и используется потребителями через `platform()`.
+____
+
+NOTE: Не путать с `bomImports {}`, который используется для *импорта* версий из внешних BOM.
+`platformLibrary()` — для *экспорта* BOM-зависимости в генерируемый TOML.
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+libraries {
+    // Обычная библиотека
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin"))
+
+    // Platform library — экспортируется в TOML как library с type=pom
+    platformLibrary("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+}
+----
+
+==== Отличия от library()
+
+* В генерируемом TOML отображается с типом `pom`
+* Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
+* Не имеет `supportedTargets` (не является runtime dependency)
+
+---
+
 == Сущности Effective Model
 
 === EffectiveMetadata
@@ -1174,7 +1200,7 @@ ____
 
 | 2 (низший)
 | BOM_IMPORT
-| Импортирована из Platform (Maven BOM) через BomImportProcessor
+| Импортирована из BomImport через BomImportProcessor
 |===
 
 ==== Примеры VersionSource
@@ -1217,9 +1243,13 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | 1:N
 | DSL содержит множество бандлов
 
-| DependangerDsl → Platform
+| DependangerDsl → BomImport
 | 1:N
 | DSL импортирует внешние BOM
+
+| DependangerDsl → TargetPlatform
+| 1:N
+| DSL определяет целевые платформы
 
 | DependangerDsl → Distribution
 | 1:N
@@ -1228,6 +1258,10 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | DependangerDsl → CompatibilityRule
 | 1:N
 | DSL содержит правила совместимости
+
+| DependangerDsl → Settings
+| 1:1
+| DSL содержит глобальные настройки
 
 | Bundle → Library
 | N:M
@@ -1278,6 +1312,6 @@ effective-{distribution}.json
 == Связанные документы
 
 * xref:architecture.adoc[Архитектура] — модули, SPI интерфейсы
-* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — детали DSL синтаксиса
+* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — полная спецификация DSL синтаксиса
 * xref:../02-features/F002-metadata-serialization.adoc[F002: Metadata Serialization] — SerializationFormat SPI
 * xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] — процессоры и их порядок

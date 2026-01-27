@@ -8,6 +8,8 @@
 --
 Документ описывает архитектуру системы Dependanger:
 архитектурные слои, модули, потоки данных и ключевые SPI интерфейсы.
+
+Системный контекст: xref:../00-overview.adoc#_системный_контекст[Overview → Контекст].
 --
 
 == Принципы архитектуры
@@ -35,7 +37,7 @@
 | Генераторы артефактов добавляются через `ArtifactGenerator<T>` SPI
 
 | Экспортный слой на границе
-| Генераторы — точка экспорта. Артефакты (TOML, BOM) публикуются для использования в других проектах
+| Генераторы — точка экспорта. Артефакты (TOML, BOM) публикуются для внешних проектов
 |===
 
 == Архитектурные слои
@@ -64,7 +66,7 @@
 | Слой | Описание | Модули
 
 | INTERFACES
-| Два равноправных входа для пользователей: CLI выполняет CRUD операции напрямую с metadata.json, Gradle Plugin парсит Kotlin DSL и создаёт metadata.json.
+| Два равноправных входа: CLI выполняет операции с metadata.json, Gradle Plugin парсит Kotlin DSL.
 | `dependanger-gradle-plugin`, `dependanger-cli`
 
 | API
@@ -72,7 +74,7 @@
 | `dependanger-api`
 
 | MODEL
-| Доменные модели: Core (DSL, сущности), metadata.json (ВСЕГДА создаётся как промежуточный артефакт), EffectiveMetadata (результат pipeline с updateReport и compatibilityReport).
+| Доменные модели: Core (DSL, сущности), metadata.json, EffectiveMetadata.
 | `dependanger-core`, `dependanger-metadata-json`, `dependanger-effective`
 
 | FEATURES
@@ -80,7 +82,7 @@
 | `dependanger-maven-resolver`, `dependanger-updates`, `dependanger-analysis`
 
 | EXPORT
-| Экспортный слой — точка выхода артефактов для внешних проектов. Генераторы преобразуют `EffectiveMetadata` в стандартные форматы (TOML, BOM) через `ArtifactGenerator` SPI. Артефакты публикуются и используются в других Gradle/Maven проектах.
+| Экспортный слой — генераторы преобразуют `EffectiveMetadata` в TOML/BOM через `ArtifactGenerator` SPI.
 | `dependanger-generator-toml`, `dependanger-generator-bom`
 |===
 
@@ -299,7 +301,7 @@ flowchart TB
 | INTERFACES
 |===
 
-NOTE: Все модули находятся в `components/` директории: `components/core/`, `components/features/`, `components/generators/`.
+NOTE: Все модули находятся в `components/` директории.
 
 === Пакетная структура
 
@@ -307,8 +309,8 @@ NOTE: Все модули находятся в `components/` директори
 ----
 io.github.zenhelix.dependanger/
 ├── core/
-│   ├── model/          # Library, Bundle, Version, Plugin...
-│   ├── dsl/            # DependangerDsl, VersionsDsl, LibrariesDsl...
+│   ├── model/          # Library, Bundle, Version, Plugin, BomImport, TargetPlatform...
+│   ├── dsl/            # DependangerDsl, VersionsDsl, LibrariesDsl, SettingsDsl...
 │   ├── metadata/       # DependangerMetadata (serializable)
 │   ├── validation/     # Validators
 │   └── filter/         # LibraryFilter, TagFilter, CompositeFilter
@@ -491,6 +493,12 @@ val result = Dependanger.fromDsl {
     libraries {
         library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
             version = versionRef("kotlin"))
+    }
+    bomImports {
+        bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
+    }
+    settings {
+        toml { filename = "libs.versions.toml" }
     }
 }.build()
 

@@ -12,13 +12,13 @@
 | Раздел | Описание
 
 | xref:00-overview.adoc[00. Обзор проекта]
-| Цели, глоссарий, контекст, стейкхолдеры
+| Цели, глоссарий (краткий), контекст, стейкхолдеры, границы системы
 
 | xref:01-concepts/index.adoc[01. Концепции]
-| Доменная модель, архитектура, Constitution, Guidelines, Fitness Functions
+| Доменная модель (Library, Bundle, BomImport, TargetPlatform, Settings и др.), архитектура, Constitution, Guidelines, Fitness Functions
 
 | xref:02-features/index.adoc[02. Функциональные требования]
-| Описание фич по приоритету с acceptance criteria
+| Описание фич по приоритету с acceptance criteria (F001-F009)
 
 | xref:03-interfaces/index.adoc[03. Интерфейсы]
 | Gradle Plugin, CLI, API — точки входа в систему
@@ -29,6 +29,20 @@
 | xref:05-decisions/index.adoc[05. Архитектурные решения]
 | ADR (Architecture Decision Records)
 |===
+
+== Структура уровней документации
+
+[source]
+----
+00-overview.adoc         → ЧТО делает система, ЗАЧЕМ, для КОГО
+                            (высокоуровневый обзор, краткий глоссарий)
+
+01-concepts/             → КАК устроена система
+                            (доменная модель, архитектура, правила)
+
+02-features/             → ЧТО ИМЕННО реализовано
+                            (функциональность, user stories, AC)
+----
 
 == Как работать с документацией
 
@@ -41,11 +55,16 @@ docs/
 ├── 00-overview.adoc              # Обзор проекта
 ├── 01-concepts/
 │   ├── index.adoc
-│   ├── domain-model.adoc
-│   └── architecture.adoc
+│   ├── domain-model.adoc         # Сущности: Library, Bundle, BomImport, TargetPlatform, Settings...
+│   ├── architecture.adoc         # Архитектурные слои, модули, SPI
+│   ├── constitution.adoc         # Обязательные правила (MUST)
+│   ├── guidelines.adoc           # Рекомендации (SHOULD)
+│   └── fitness-functions.adoc    # Автоматические проверки
 ├── 02-features/
 │   ├── index.adoc
-│   ├── F001-registry-dsl.adoc
+│   ├── F001-registry-dsl.adoc    # Kotlin DSL
+│   ├── F002-metadata-serialization.adoc
+│   ├── F003-processing-pipeline.adoc
 │   └── ...
 ├── 03-interfaces/
 │   ├── index.adoc
@@ -66,3 +85,9 @@ docs/
 * **Фичи**: `F###` — порядковый номер по приоритету
 * **ADR**: `ADR-###` — хронологический порядок
 * **Требования**: `FR-###`, `NFR-###` — в рамках документа
+
+=== Ключевые принципы
+
+* **DRY** — не повторять контент, использовать `xref:` для ссылок
+* **Согласованность** — терминология едина во всех документах
+* **Иерархия** — 00 (обзор) → 01 (концепции) → 02 (детали фич)

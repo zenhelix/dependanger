@@ -24,7 +24,6 @@
 [cols="1,2"]
 |===
 | Тип | [Gradle Plugin / CLI / REST API / Library API]
-| Статус | 🔴 Draft (L0) / 🟡 In Progress (L1) / 🟢 Complete (L2)
 | Версия | 0.1-draft
 | Автор | [Имя]
 | Дата создания | [YYYY-MM-DD]

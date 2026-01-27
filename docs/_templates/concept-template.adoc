@@ -23,7 +23,6 @@
 [cols="1,2"]
 |===
 | Тип | Concept / Architecture / Constitution / Guidelines
-| Статус | 🔴 Draft (L0) / 🟡 In Progress (L1) / 🟢 Complete (L2)
 | Автор | [Имя]
 | Последнее обновление | [YYYY-MM-DD]
 |===

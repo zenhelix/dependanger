@@ -320,17 +320,6 @@ Then:  spring-web.version = "6.2.0" (из BOM)
 * [ ] Все stakeholder questions (см. выше) получили ответы
 * [ ] Документ прошёл peer review
 
-=== Визуальный индикатор
-
-В документах используйте статус в метаданных:
-
-[source,asciidoc]
-----
-| Статус | 🔴 Draft (L0)
-| Статус | 🟡 Development Ready (L2)
-| Статус | 🟢 Complete (L3)
-----
-
 == Когда документ избыточен (Over-documented)
 
 === Признаки избыточности

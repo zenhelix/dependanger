@@ -1118,7 +1118,7 @@ libraries {
 
 * В генерируемом TOML отображается с типом `pom`
 * Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
-* Не имеет `supportedTargets` (не является runtime dependency)
+* Не содержит `supportedTargets` (это не runtime dependency)
 
 ---
 

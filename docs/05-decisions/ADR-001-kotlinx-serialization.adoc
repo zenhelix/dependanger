@@ -1,0 +1,141 @@
+= ADR-001: Выбор kotlinx-serialization для сериализации
+:icons: font
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| Статус | 🟢 Принято
+| Дата | 2026-01-15
+| Авторы | Dependanger Team
+| Затронутые компоненты | dependanger-core, dependanger-metadata-json
+|===
+
+== Контекст
+
+Системе Dependanger требуется механизм сериализации/десериализации для:
+
+* Сохранения DSL конфигурации в JSON (metadata.json)
+* Сохранения обработанных данных (effective-*.json)
+* Генерации отчётов в JSON формате
+
+Рассматривались альтернативы:
+
+1. **Jackson** — де-факто стандарт в Java экосистеме
+2. **Gson** — простая библиотека от Google
+3. **Moshi** — современная альтернатива Gson от Square
+4. **kotlinx-serialization** — официальная библиотека от JetBrains
+
+== Решение
+
+Выбран **kotlinx-serialization** как основная библиотека сериализации.
+
+== Обоснование
+
+=== Преимущества kotlinx-serialization
+
+[cols="1,2"]
+|===
+| Критерий | Обоснование
+
+| Native Kotlin support
+| Встроенная поддержка Kotlin типов: `data class`, `sealed class`, `value class`, null safety
+
+| Compile-time safety
+| Генерация сериализаторов на этапе компиляции, ошибки обнаруживаются раньше
+
+| Multiplatform ready
+| Возможность переиспользования моделей в Kotlin/JS, Kotlin/Native в будущем
+
+| Performance
+| Высокая производительность благодаря compile-time генерации
+
+| Идиоматичность
+| Естественное API для Kotlin разработчиков
+
+| Поддержка polymorphism
+| Встроенная поддержка sealed classes и полиморфизма
+|===
+
+=== Недостатки альтернатив
+
+**Jackson:**
+
+* Требует дополнительного kotlin-module
+* Reflection-based, что медленнее
+* Сложнее настраивать для Kotlin специфичных типов
+
+**Gson:**
+
+* Устаревшая библиотека с минимальным развитием
+* Плохая поддержка Kotlin null safety
+* Проблемы с generic типами
+
+**Moshi:**
+
+* Хорошая библиотека, но не первый выбор для чистых Kotlin проектов
+* Меньше integration с Kotlin ecosystem
+
+== Последствия
+
+=== Положительные
+
+* Простая работа с Kotlin типами без дополнительной конфигурации
+* Type-safe serialization с проверкой на этапе компиляции
+* Лёгкое тестирование с kotlinx-serialization-json
+* Возможность кастомизации через custom serializers
+
+=== Отрицательные
+
+* Требует плагин компилятора (`kotlin("plugin.serialization")`)
+* Менее знакома Java-разработчикам
+* Меньше примеров в сообществе по сравнению с Jackson
+
+=== Нейтральные
+
+* Дополнительная зависимость `kotlinx-serialization-json`
+* Аннотации `@Serializable` на всех data классах
+
+== Реализация
+
+=== Зависимости
+
+[source,kotlin]
+----
+plugins {
+    kotlin("plugin.serialization") version "2.1.20"
+}
+
+dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+}
+----
+
+=== Пример использования
+
+[source,kotlin]
+----
+@Serializable
+data class DependangerMetadata(
+    val versions: Map<String, VersionDeclaration> = emptyMap(),
+    val libraries: Map<String, LibraryDeclaration> = emptyMap(),
+    val plugins: Map<String, PluginDeclaration> = emptyMap()
+)
+
+// Сериализация
+val json = Json { prettyPrint = true }
+val jsonString = json.encodeToString(metadata)
+
+// Десериализация
+val metadata = json.decodeFromString<DependangerMetadata>(jsonString)
+----
+
+== Связанные решения
+
+* Формат JSON выбран как основной формат обмена данными
+* SPI `SerializationFormat<T>` позволяет подключать альтернативные форматы
+
+== Ссылки
+
+* https://github.com/Kotlin/kotlinx.serialization[kotlinx.serialization GitHub]
+* https://kotlinlang.org/docs/serialization.html[Kotlin Serialization Guide]

@@ -1,0 +1,191 @@
+= F009: Report Generation
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Генерация единого JSON отчёта о зависимостях, обновлениях и совместимости.
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F009
+| Название | Report Generation
+| Приоритет | P3 (желательно)
+| Статус | 🔴 Не начат
+| Модуль | `dependanger-report`
+| Зависит от | F003, F007, F008
+| Блокирует | —
+|===
+
+== Описание
+
+Report Generation создаёт единый JSON отчёт, объединяющий информацию о:
+
+* Всех библиотеках с их версиями и источниками
+* Доступных обновлениях (из F007)
+* Проблемах совместимости (из F008)
+* Валидационных ошибках и предупреждениях
+
+Отчёт предназначен для машинного парсинга в CI/CD, дашбордах и инструментах анализа.
+
+== User Stories
+
+=== US-001: Единый отчёт для CI
+
+[quote]
+____
+Как DevOps инженер, я хочу получать единый JSON отчёт о состоянии зависимостей, чтобы интегрировать его в CI/CD pipeline и дашборды.
+____
+
+**Acceptance Criteria:**
+
+* JSON формат с предсказуемой схемой
+* Включает все библиотеки, обновления, проблемы
+* Можно генерировать через CLI и Gradle
+
+== API использование
+
+[source,kotlin]
+----
+val result = Dependanger.fromDsl {
+    // ... DSL config
+}
+.withUpdateCheck()
+.withCompatibilityAnalysis(targetJdk = 17)
+.build()
+
+// Генерация отчёта
+val report = result.generateReport()
+
+// Запись в файл
+result.writeReportTo(Path.of("dependanger-report.json"))
+----
+
+== Структура отчёта
+
+[source,json]
+----
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-01-27T10:30:00Z",
+  "distribution": "backend",
+  "summary": {
+    "libraryCount": 45,
+    "pluginCount": 5,
+    "bundleCount": 8,
+    "updatesAvailable": 12,
+    "compatibilityIssues": 2,
+    "validationErrors": 0,
+    "validationWarnings": 3
+  },
+  "libraries": [
+    {
+      "alias": "kotlin-stdlib",
+      "group": "org.jetbrains.kotlin",
+      "name": "kotlin-stdlib",
+      "version": "2.1.20",
+      "versionSource": "DECLARED",
+      "tags": ["kotlin", "core"],
+      "update": {
+        "latestStable": "2.1.21",
+        "updateType": "PATCH"
+      }
+    }
+  ],
+  "plugins": [
+    {
+      "alias": "kotlin-jvm",
+      "id": "org.jetbrains.kotlin.jvm",
+      "version": "2.1.20",
+      "versionSource": "DECLARED"
+    }
+  ],
+  "bundles": [
+    {
+      "name": "kotlin-core",
+      "libraries": ["kotlin-stdlib", "kotlin-reflect"]
+    }
+  ],
+  "updates": [
+    {
+      "library": "spring-web",
+      "currentVersion": "6.1.0",
+      "latestStable": "6.2.0",
+      "updateType": "MINOR",
+      "repository": "https://repo.maven.apache.org/maven2"
+    }
+  ],
+  "compatibility": [
+    {
+      "ruleId": "spring-jdk17",
+      "severity": "WARNING",
+      "message": "Spring 6.x requires JDK 17+",
+      "affectedLibraries": ["spring-web", "spring-data-jpa"]
+    }
+  ],
+  "validation": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "UNUSED_VERSION",
+        "message": "Version 'old-lib' is defined but not used"
+      }
+    ]
+  }
+}
+----
+
+== CLI команда
+
+[source,bash]
+----
+dependanger report [--output=report.json] [--include-updates] [--include-compatibility]
+----
+
+== Gradle Task
+
+[source,bash]
+----
+./gradlew dependangerReport
+----
+
+Результат: `build/dependanger/dependanger-report.json`
+
+== Интеграции
+
+=== GitHub Actions
+
+[source,yaml]
+----
+- name: Generate dependency report
+  run: ./gradlew dependangerReport
+
+- name: Upload report
+  uses: actions/upload-artifact@v4
+  with:
+    name: dependency-report
+    path: build/dependanger/dependanger-report.json
+----
+
+=== Slack/Teams уведомления
+
+Отчёт можно парсить и отправлять уведомления о:
+
+* Критических обновлениях безопасности
+* Нарушениях совместимости
+* Доступных major обновлениях
+
+== Связи
+
+* **Входные данные:** `EffectiveMetadata`, `ProcessingDiagnostics`
+* **Выходные данные:** `dependanger-report.json`
+
+== Связанные документы
+
+* xref:F007-update-check.adoc[F007: Update Check] — данные об обновлениях
+* xref:F008-compatibility-analysis.adoc[F008: Compatibility Analysis] — данные о совместимости

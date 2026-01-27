@@ -1,0 +1,540 @@
+= Архитектура системы
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Документ описывает архитектуру системы Dependanger:
+архитектурные слои, модули, потоки данных и ключевые SPI интерфейсы.
+--
+
+== Принципы архитектуры
+
+[cols="1,3",options="header"]
+|===
+| Принцип | Описание
+
+| Направление зависимостей
+| Зависимости направлены от периферии к ядру: interfaces → api → features → core
+
+| Изоляция домена
+| Core модуль не зависит от инфраструктуры (HTTP, файловая система, форматы)
+
+| Расширяемость через SPI
+| Новый функционал добавляется через реализацию интерфейсов, без изменения core
+
+| Единая точка входа
+| Весь функционал доступен через API фасад, интерфейсы (CLI, Gradle) — тонкие обёртки
+
+| Абстракция форматов
+| Сериализация модели абстрагирована через `SerializationFormat<T>` SPI
+
+| Расширяемая генерация
+| Генераторы артефактов добавляются через `ArtifactGenerator<T>` SPI
+
+| Экспортный слой на границе
+| Генераторы — точка экспорта. Артефакты (TOML, BOM) публикуются для использования в других проектах
+|===
+
+== Архитектурные слои
+
+Система организована в 5 архитектурных слоёв:
+
+[source]
+----
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. INTERFACES — точки входа (CLI, Gradle Plugin)                │
+├─────────────────────────────────────────────────────────────────┤
+│ 2. API — фасад Dependanger, координация                         │
+├─────────────────────────────────────────────────────────────────┤
+│ 3. MODEL — core (DSL), metadata (сериализация), effective       │
+├─────────────────────────────────────────────────────────────────┤
+│ 4. FEATURES — опциональные процессоры (resolver, updates, etc.) │
+├─────────────────────────────────────────────────────────────────┤
+│ 5. EXPORT — генераторы артефактов для внешних проектов (SPI)    │
+└─────────────────────────────────────────────────────────────────┘
+----
+
+=== Описание слоёв
+
+[cols="1,2,2",options="header"]
+|===
+| Слой | Описание | Модули
+
+| INTERFACES
+| Два равноправных входа для пользователей: CLI выполняет CRUD операции напрямую с metadata.json, Gradle Plugin парсит Kotlin DSL и создаёт metadata.json.
+| `dependanger-gradle-plugin`, `dependanger-cli`
+
+| API
+| Фасад и координация. Единая точка входа для всего функционала.
+| `dependanger-api`
+
+| MODEL
+| Доменные модели: Core (DSL, сущности), metadata.json (ВСЕГДА создаётся как промежуточный артефакт), EffectiveMetadata (результат pipeline с updateReport и compatibilityReport).
+| `dependanger-core`, `dependanger-metadata-json`, `dependanger-effective`
+
+| FEATURES
+| Опциональные процессоры pipeline. Могут быть отключены.
+| `dependanger-maven-resolver`, `dependanger-updates`, `dependanger-analysis`
+
+| EXPORT
+| Экспортный слой — точка выхода артефактов для внешних проектов. Генераторы преобразуют `EffectiveMetadata` в стандартные форматы (TOML, BOM) через `ArtifactGenerator` SPI. Артефакты публикуются и используются в других Gradle/Maven проектах.
+| `dependanger-generator-toml`, `dependanger-generator-bom`
+|===
+
+== C4 Диаграммы
+
+=== Level 1: System Context
+
+См. xref:../00-overview.adoc#_системный_контекст[Системный контекст в Overview].
+
+=== Level 2: Container
+
+[mermaid,target=c4-container,format=svg]
+----
+flowchart TB
+    subgraph interfaces ["Interfaces Layer"]
+        plugin["Gradle Plugin"]
+        cli["CLI"]
+    end
+
+    subgraph api ["API Layer"]
+        facade["Dependanger<br/>DependangerBuilder"]
+    end
+
+    subgraph model ["Model Layer"]
+        core["dependanger-core<br/><i>DSL, Models</i>"]
+        meta["dependanger-metadata-json<br/><i>Serialization</i>"]
+        eff["dependanger-effective<br/><i>Pipeline</i>"]
+    end
+
+    subgraph features ["Features Layer"]
+        resolver["maven-resolver<br/><i>BOM Import</i>"]
+        updates["updates<br/><i>Update Check</i>"]
+        analysis["analysis<br/><i>Compatibility</i>"]
+    end
+
+    subgraph export ["Export Layer"]
+        toml["generator-toml"]
+        bom["generator-bom"]
+    end
+
+    subgraph external ["External"]
+        maven[(Maven Repos)]
+    end
+
+    plugin --> facade
+    cli --> facade
+
+    facade --> core
+    facade --> eff
+    facade --> toml
+    facade --> bom
+
+    eff --> core
+    eff --> meta
+    eff -.-> resolver
+    eff -.-> updates
+    eff -.-> analysis
+
+    resolver --> maven
+    updates --> maven
+----
+
+=== Level 3: Component (API Module)
+
+[mermaid,target=c4-component,format=svg]
+----
+flowchart TB
+    subgraph api ["dependanger-api"]
+        builder["DependangerBuilder<br/><i>Fluent configuration</i>"]
+        facade["Dependanger<br/><i>Main facade</i>"]
+        result["DependangerResult<br/><i>Build result</i>"]
+    end
+
+    subgraph core ["dependanger-core"]
+        dsl["DependangerDsl"]
+        models["Domain Models"]
+    end
+
+    subgraph effective ["dependanger-effective"]
+        pipeline["EffectiveMetadataBuilder"]
+        processors["Processors"]
+    end
+
+    builder -->|"fromDsl()"| dsl
+    builder -->|"build()"| facade
+    facade -->|"uses"| pipeline
+    facade -->|"returns"| result
+    pipeline -->|"runs"| processors
+    result -->|"toToml()"| toml["TOML"]
+    result -->|"toBom()"| bom["BOM"]
+----
+
+== Структура модулей
+
+=== Обзор
+
+[mermaid,target=module-deps,format=svg]
+----
+flowchart TB
+    subgraph interfaces [Interfaces Layer]
+        gradle-plugin[gradle-plugin]
+        cli[cli]
+    end
+
+    subgraph apiLayer [API Layer]
+        api[api]
+    end
+
+    subgraph modelLayer [Model Layer]
+        effective[effective]
+        metadata-json[metadata-json]
+        core[core]
+    end
+
+    subgraph exportLayer [Export Layer]
+        generator-toml[generator-toml]
+        generator-bom[generator-bom]
+    end
+
+    subgraph features [Features Layer]
+        maven-resolver[maven-resolver]
+        updates[updates]
+        analysis[analysis]
+        report[report]
+    end
+
+    gradle-plugin --> api
+    cli --> api
+
+    api --> effective
+    api --> generator-toml
+    api --> generator-bom
+
+    effective --> core
+    effective --> metadata-json
+    effective --> maven-resolver
+    effective --> updates
+    effective --> analysis
+
+    metadata-json --> core
+
+    generator-toml --> core
+    generator-bom --> core
+    maven-resolver --> core
+    updates --> core
+    analysis --> core
+    report --> core
+    report --> effective
+
+    style interfaces fill:#ADD8E6
+    style apiLayer fill:#F08080
+    style modelLayer fill:#98FB98
+    style exportLayer fill:#FFFFE0
+    style features fill:#DDA0DD
+----
+
+=== Описание модулей
+
+[cols="1,2,2,1",options="header"]
+|===
+| Модуль | Описание | Зависит от | Слой
+
+| `dependanger-core`
+| Доменные модели, DSL (`DependangerDsl`), валидация, фильтрация
+| —
+| MODEL
+
+| `dependanger-metadata-json`
+| JSON сериализация через `SerializationFormat` SPI
+| core
+| MODEL
+
+| `dependanger-effective`
+| Processing Pipeline (`EffectiveMetadataBuilder`), резолвинг версий
+| core, metadata-json
+| MODEL
+
+| `dependanger-api`
+| Фасад `Dependanger`, `DependangerBuilder`, `DependangerResult`
+| core, effective, generators, features
+| API
+
+| `dependanger-generator-toml`
+| Генерация Gradle Version Catalog (TOML)
+| core
+| EXPORT
+
+| `dependanger-generator-bom`
+| Генерация Maven BOM (XML)
+| core
+| EXPORT
+
+| `dependanger-maven-resolver`
+| BOM import процессор (order: 15)
+| core
+| FEATURES
+
+| `dependanger-updates`
+| Update check процессор (order: 70)
+| core
+| FEATURES
+
+| `dependanger-analysis`
+| Compatibility analysis процессор (order: 75)
+| core
+| FEATURES
+
+| `dependanger-gradle-plugin`
+| Gradle Plugin с DSL extension и tasks
+| api
+| INTERFACES
+
+| `dependanger-cli`
+| CLI на Clikt (generate, validate, check-updates, analyze)
+| api
+| INTERFACES
+|===
+
+NOTE: Все модули находятся в `components/` директории: `components/core/`, `components/features/`, `components/generators/`.
+
+=== Пакетная структура
+
+[source]
+----
+io.github.zenhelix.dependanger/
+├── core/
+│   ├── model/          # Library, Bundle, Version, Plugin...
+│   ├── dsl/            # DependangerDsl, VersionsDsl, LibrariesDsl...
+│   ├── metadata/       # DependangerMetadata (serializable)
+│   ├── validation/     # Validators
+│   └── filter/         # LibraryFilter, TagFilter, CompositeFilter
+├── effective/
+│   ├── model/          # EffectiveMetadata, ProcessingContext
+│   ├── builder/        # EffectiveMetadataBuilder
+│   ├── pipeline/       # ProcessingPipeline
+│   └── processor/      # Built-in processors
+├── api/
+│   ├── Dependanger.kt
+│   ├── DependangerBuilder.kt
+│   └── DependangerResult.kt
+├── generator/
+│   ├── toml/           # TomlGenerator
+│   └── bom/            # BomGenerator
+├── features/
+│   ├── resolver/       # BomImportProcessor
+│   ├── updates/        # UpdateCheckProcessor
+│   └── analysis/       # CompatibilityCheckProcessor
+├── gradle/plugin/      # GradlePlugin, Extension, Tasks
+└── cli/                # Clikt commands
+----
+
+== Поток данных
+
+=== Обзор
+
+[source]
+----
+Gradle Plugin / CLI
+        │
+        ▼
+DependangerDsl (in-memory)
+        │
+        ▼ toMetadata()
+metadata.json
+        │
+        ▼ Processing Pipeline
+EffectiveMetadata
+        │
+        ▼ ArtifactGenerator
+libs.versions.toml / bom.pom.xml
+        │
+        ▼ Publish
+Gradle/Maven Projects (consumers)
+----
+
+=== Файлы артефактов
+
+[cols="1,2,2",options="header"]
+|===
+| Файл | Описание | Создаётся
+
+| `metadata.json`
+| Сериализованная конфигурация из DSL
+| `dependangerGenerateMetadata` task
+
+| `effective-{dist}.json`
+| Обработанная модель для distribution
+| `dependangerGenerateEffective` task
+
+| `libs.versions.toml`
+| Gradle Version Catalog
+| `dependangerGenerateToml` task
+
+| `dependanger-bom.pom`
+| Maven BOM
+| `dependangerGenerateBom` task
+|===
+
+=== Version Source Priority
+
+При резолвинге версий:
+
+[source]
+----
+DECLARED > BOM_IMPORT
+----
+
+См. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] для деталей.
+
+== SPI Интерфейсы
+
+Система использует Service Provider Interface (SPI) для расширяемости.
+
+=== SerializationFormat
+
+Абстракция формата сериализации `DependangerMetadata`.
+
+[source,kotlin]
+----
+interface SerializationFormat<T> {
+    val formatId: String  // "json", "yaml"
+    val fileExtension: String  // ".json", ".yaml"
+
+    fun serialize(metadata: DependangerMetadata): T
+    fun deserialize(input: T): DependangerMetadata
+    fun write(metadata: DependangerMetadata, path: Path)
+    fun read(path: Path): DependangerMetadata
+}
+----
+
+**Встроенные реализации:** `JsonSerializationFormat` (`dependanger-metadata-json`)
+
+---
+
+=== EffectiveMetadataProcessor
+
+Процессор в pipeline обработки.
+
+[source,kotlin]
+----
+interface EffectiveMetadataProcessor {
+    val order: Int          // Порядок выполнения (меньше = раньше)
+    val processorId: String // Уникальный идентификатор
+    val phase: ProcessingPhase
+    val isOptional: Boolean // Можно ли отключить
+
+    suspend fun process(context: ProcessingContext): ProcessingContext
+}
+----
+
+**Встроенные процессоры:** см. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline]
+
+---
+
+=== ArtifactGenerator
+
+Генератор выходных артефактов.
+
+[source,kotlin]
+----
+interface ArtifactGenerator<T> {
+    val generatorId: String  // "toml", "bom"
+
+    fun generate(effective: EffectiveMetadata): T
+    fun write(artifact: T, output: Path)
+}
+----
+
+**Встроенные реализации:** `TomlGenerator`, `BomGenerator`
+
+---
+
+=== LibraryFilter
+
+Стратегия фильтрации библиотек.
+
+[source,kotlin]
+----
+interface LibraryFilter {
+    fun filter(libraries: Collection<Library>): Collection<Library>
+}
+----
+
+**Встроенные реализации:** `TagFilter`, `CompositeLibraryFilter`
+
+== SPI Discovery
+
+Модули регистрируют реализации через `ServiceLoader`:
+
+[source]
+----
+META-INF/services/
+├── io.github.zenhelix.dependanger.core.spi.SerializationFormat
+├── io.github.zenhelix.dependanger.effective.spi.EffectiveMetadataProcessor
+└── io.github.zenhelix.dependanger.generator.spi.ArtifactGenerator
+----
+
+== Программное использование
+
+=== Базовое использование
+
+[source,kotlin]
+----
+val result = Dependanger.fromDsl {
+    versions {
+        version("kotlin", "2.1.20")
+    }
+    libraries {
+        library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+            version = versionRef("kotlin"))
+    }
+}.build()
+
+// Генерация артефактов
+val toml = result.toToml()
+val bom = result.toBom()
+
+// Запись в файлы
+result.writeTomlTo(Path.of("gradle/libs.versions.toml"))
+result.writeBomTo(Path.of("build/dependanger-bom.pom"))
+----
+
+=== Builder Pattern
+
+[source,kotlin]
+----
+val result = Dependanger.fromDsl {
+    // DSL конфигурация...
+}
+.withBomImport()                         // Включить BOM import
+.withUpdateCheck()                       // Включить проверку обновлений
+.withCompatibilityAnalysis(targetJdk = 17) // Включить анализ совместимости
+.forDistribution("android")              // Для конкретного distribution
+.build()
+
+// Проверка результата
+if (result.diagnostics.hasErrors()) {
+    result.diagnostics.errors.forEach { println(it.message) }
+}
+----
+
+=== Загрузка из файла
+
+[source,kotlin]
+----
+val result = Dependanger.fromFile(Path.of("metadata.json"))
+    .forDistribution("backend")
+    .build()
+----
+
+== Связанные документы
+
+* xref:domain-model.adoc[Доменная модель] — сущности DSL, Metadata, Effective
+* xref:constitution.adoc[Constitution] — архитектурные ограничения (MUST)
+* xref:guidelines.adoc[Guidelines] — рекомендации (SHOULD)
+* xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] — детали pipeline
+* xref:../03-interfaces/index.adoc[Интерфейсы] — Gradle Plugin, CLI, API

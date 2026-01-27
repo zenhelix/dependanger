@@ -1,0 +1,327 @@
+= F003: Processing Pipeline
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Многоэтапный pipeline обработки метаданных через процессоры с приоритетами.
+Преобразует Metadata в EffectiveMetadata.
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F003
+| Название | Processing Pipeline
+| Приоритет | P1 (критично для MVP)
+| Статус | 🟢 Готов
+| Модуль | `dependanger-effective`
+| Зависит от | F002 (Metadata Serialization)
+| Блокирует | F004 (TOML Generation), F005 (BOM Generation)
+|===
+
+== Описание
+
+Processing Pipeline выполняет многоэтапную обработку метаданных:
+* Резолвинг версий (из alias, BOM, Maven) * Применение фильтров (distribution profile) * Валидация * Опциональные проверки (updates, compatibility)
+
+Результат — `EffectiveMetadata`, готовый для генерации артефактов.
+
+== User Stories
+
+=== US-001: Резолвинг версий
+
+[quote]
+____
+Как разработчик, я хочу чтобы версии резолвились автоматически из разных источников, чтобы не указывать версию для каждой библиотеки вручную.
+____
+
+**Acceptance Criteria:**
+* Версии из alias резолвятся в конкретные значения * Версии из BOM импортируются автоматически * Указывается источник версии (VersionSource)
+
+=== US-002: Фильтрация по профилю
+
+[quote]
+____
+Как team lead, я хочу генерировать разные наборы библиотек для разных профилей, чтобы production и development использовали разные зависимости.
+____
+
+**Acceptance Criteria:**
+* Distribution profile фильтрует библиотеки и бандлы * excludeLibraries исключает конкретные библиотеки * includeBundles включает только указанные бандлы
+
+=== US-003: Расширение pipeline
+
+[quote]
+____
+Как продвинутый пользователь, я хочу добавить кастомный процессор в pipeline, чтобы обогатить метаданные своими данными.
+____
+
+**Acceptance Criteria:**
+* Можно добавить процессор через SPI * Процессор имеет приоритет (order) * Процессор получает и возвращает ProcessingMetadata
+
+== SPI: EffectiveMetadataProcessor
+
+=== Описание интерфейса
+
+Интерфейс `EffectiveMetadataProcessor` предоставляет точку расширения для добавления кастомных процессоров в pipeline.
+
+**Основные возможности:**
+
+* `order` — порядок выполнения (меньше = раньше)
+* `processorId` — уникальный идентификатор процессора
+* `isOptional` — можно ли отключить процессор (по умолчанию `false`)
+* `process()` — suspend-функция обработки метаданных
+
+=== Стандартные процессоры
+
+[cols="1,1,2,1,1",options="header"]
+|===
+| Order | Processor ID | Описание | Optional | Фича
+
+| 5
+| `profile`
+| Применение distribution profile
+| ❌
+| —
+
+| 10
+| `metadata-conversion`
+| Конвертация из DependangerMetadata
+| ❌
+| —
+
+| 12
+| `extracted-versions`
+| Извлечение версий из libraries
+| ❌
+| —
+
+| 15
+| `bom-import`
+| Импорт версий из внешних BOM
+| ✅
+| xref:F006-bom-import.adoc[F006]
+
+| 20
+| `library-filter`
+| Фильтрация библиотек по distribution spec
+| ❌
+| —
+
+| 25
+| `version-fallback`
+| Применение fallback версий по условиям (JDK, Kotlin, environment)
+| ❌
+| —
+
+| 30
+| `version-resolver`
+| Резолвинг версий (alias → value)
+| ❌
+| —
+
+| 40
+| `bundle-filter`
+| Фильтрация и раскрытие бандлов
+| ❌
+| —
+
+| 45
+| `plugin-filter`
+| Фильтрация плагинов по distribution spec
+| ❌
+| —
+
+| 50
+| `plugin`
+| Обработка версий плагинов
+| ❌
+| —
+
+| 60
+| `used-versions`
+| Удаление неиспользуемых версий
+| ❌
+| —
+
+| 65
+| `validation`
+| Валидация модели
+| ❌
+| —
+
+| 66
+| `compat-rules`
+| Проверка правил совместимости
+| ❌
+| —
+
+| 70
+| `update-check`
+| Проверка обновлений в Maven repos
+| ✅
+| xref:F007-update-check.adoc[F007]
+
+| 75
+| `compatibility-analysis`
+| Анализ совместимости
+| ✅
+| xref:F008-compatibility-analysis.adoc[F008]
+|===
+
+NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`
+
+== Processing Context
+
+`ProcessingContext` содержит информацию об окружении, которая используется процессорами для принятия решений.
+
+=== Параметры контекста
+
+* `jdkVersion` — версия JDK (для условий fallback)
+* `kotlinVersion` — версия Kotlin (опционально)
+* `gradleVersion` — версия Gradle (опционально)
+* `distributionProfile` — активный distribution profile
+* `environment` — переменные окружения
+* `strictVersionResolution` — режим строгой резолюции версий
+* `enabledProcessors` / `disabledProcessors` — управление процессорами
+
+== Version Source Priority
+
+При резолвинге версий применяется приоритет:
+
+[source]
+----
+DECLARED > BOM_IMPORT
+----
+
+[cols="1,1,3",options="header"]
+|===
+| Приоритет | Source | Описание
+
+| 1 (высший)
+| DECLARED
+| Явно указана в DSL (включая inline версию в coordinates)
+
+| 2 (низший)
+| BOM_IMPORT
+| Импортирована из Maven BOM/Platform
+|===
+
+== Strict Mode
+
+[source,kotlin]
+----
+dependanger {
+    processing {
+        strictVersionResolution = true  // ERROR при неразрешённых версиях
+    }
+}
+----
+
+При `strictVersionResolution = true`:
+* Неразрешённая версия → ERROR (остановка pipeline) * При `false` → WARNING (продолжение с пустой версией)
+
+== Parallel Pipeline Execution
+
+Pipeline поддерживает параллельное выполнение процессоров через фазы:
+
+* **SEQUENTIAL** — строго последовательное выполнение
+* **PARALLEL_IO** — параллельно I/O-bound операции (сетевые запросы)
+* **PARALLEL_COMPUTE** — параллельно CPU-bound операции (валидация)
+
+=== Фазы выполнения
+
+[cols="1,2,2",options="header"]
+|===
+| Фаза | Процессоры | Описание
+
+| SEQUENTIAL
+| profile, metadata-conversion, extracted-versions, version-fallback, version-resolver
+| Требуют последовательного выполнения (зависят от результатов предыдущих)
+
+| PARALLEL_IO
+| bom-import, update-check
+| I/O-bound операции (сетевые запросы к Maven Central)
+
+| PARALLEL_COMPUTE
+| validation, compat-rules, compatibility-analysis
+| CPU-bound операции (могут выполняться параллельно)
+|===
+
+== Pipeline Presets
+
+Предустановленные конфигурации pipeline:
+
+[cols="1,2,2",options="header"]
+|===
+| Preset | Описание | Включённые процессоры
+
+| `DEFAULT`
+| Стандартная конфигурация
+| Все обязательные + bom-import
+
+| `MINIMAL`
+| Минимальный набор без опциональных
+| Только обязательные процессоры
+
+| `STRICT`
+| Все проверки включены
+| Все процессоры + strictVersionResolution
+
+| `DISTRIBUTION`
+| Для генерации артефактов
+| Обязательные + profile фильтрация
+|===
+
+[source,kotlin]
+----
+dependanger {
+    processing {
+        preset = ProcessingPreset.STRICT
+        // или кастомная настройка:
+        withBomImport()
+        withUpdateCheck()
+        withoutCompatibilityAnalysis()
+    }
+}
+----
+
+== Pipeline Flow
+
+[mermaid,target=pipeline-flow,format=svg]
+----
+flowchart TD
+    Input["DependencyMetadata<br/>(input)"]
+
+    subgraph Pipeline["Processing Pipeline"]
+        Loop["for processor in processors.sortedBy { it.order }:<br/>if processor.isEnabled(context):<br/>metadata = processor.process(metadata, context)"]
+    end
+
+    Output["EffectiveMetadata<br/>(output)"]
+    File["effective-{distribution}.json"]
+
+    Input --> Pipeline
+    Pipeline --> Output
+    Output --> File
+
+    style Input fill:#E6E6FA
+    style Output fill:#90EE90
+    style File fill:#FFFFE0
+----
+
+== Связи
+
+* **Входные данные:** `metadata.json` от xref:F002-metadata-serialization.adoc[F002]
+* **Выходные данные:** `EffectiveMetadata` (effective-*.json)
+* **Следующий этап:**
+** xref:F004-toml-generation.adoc[F004: TOML Generation]
+** xref:F005-bom-generation.adoc[F005: BOM Generation]
+
+== Связанные документы
+
+* xref:../01-concepts/domain-model.adoc[Доменная модель — Effective Model]
+* xref:../01-concepts/architecture.adoc[Архитектура — EffectiveMetadataProcessor SPI]
+* xref:../03-interfaces/gradle-plugin.adoc#_блок_processing[Gradle Plugin — Блок processing]

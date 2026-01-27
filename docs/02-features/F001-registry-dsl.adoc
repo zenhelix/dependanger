@@ -1,0 +1,273 @@
+= F001: Registry DSL
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Kotlin DSL для определения библиотек, версий, бандлов, плагинов, платформ и правил совместимости.
+Основа всей системы Dependanger.
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F001
+| Название | Registry DSL
+| Приоритет | P1 (критично для MVP)
+| Статус | 🔴 Не начат
+| Модуль | `dependanger-core`
+| Зависит от | —
+| Блокирует | F002 (Metadata Serialization)
+|===
+
+== Описание
+
+Registry DSL предоставляет Kotlin DSL (`DependangerDsl`) для определения централизованного каталога зависимостей.
+Пользователь описывает библиотеки, версии, бандлы и правила совместимости в декларативном стиле.
+
+== User Stories
+
+=== US-001: Определение библиотеки
+
+[quote]
+____
+Как разработчик, я хочу определить библиотеку с Maven координатами и метаданными, чтобы она была включена в генерируемый каталог.
+____
+
+**Acceptance Criteria:**
+* Можно указать group, artifact, version * Можно добавить description, tags, links * Можно пометить библиотеку как deprecated с указанием замены
+
+=== US-002: Определение версии с fallback
+
+[quote]
+____
+Как разработчик, я хочу определить версию с условными fallback, чтобы использовать разные версии в зависимости от окружения.
+____
+
+**Acceptance Criteria:**
+* Можно определить именованную версию (alias) * Можно указать fallback с условием (jdkBelow, kotlinVersion, etc.) * Версия резолвится корректно в зависимости от контекста
+
+=== US-003: Определение бандла
+
+[quote]
+____
+Как team lead, я хочу определить бандл — группу библиотек для конкретной роли, чтобы разработчики могли подключить готовый набор.
+____
+
+**Acceptance Criteria:**
+* Можно создать именованный бандл * Бандл может включать библиотеки по alias * Бандлы могут включать другие бандлы (композиция)
+
+== Спецификация DSL
+
+=== Базовая структура
+
+[source,kotlin]
+----
+val dsl = DependangerDsl()
+
+dsl.versions {
+    version("kotlin", "2.1.20")
+    version("spring-boot", "3.4.0") {
+        fallback("2.7.18") { jdkBelow(17) }
+    }
+}
+
+dsl.libraries {
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin")) {
+        tags("kotlin", "core")
+    }
+
+    library("spring-web", "org.springframework:spring-web") {
+        tags("spring", "web")
+        requires { jdk { min = 17 } }
+    }
+}
+
+dsl.bundles {
+    bundle("kotlin-core") {
+        libraries("kotlin-stdlib", "kotlin-reflect")
+    }
+
+    bundle("spring-backend") {
+        libraries("spring-web", "spring-data-jpa")
+        extends("kotlin-core")
+    }
+}
+
+dsl.plugins {
+    plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm",
+        version = versionRef("kotlin"))
+}
+
+dsl.platforms {
+    platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+    platform("org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+
+dsl.distributions {
+    distribution("android") {
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+            }
+        }
+    }
+
+    distribution("backend") {
+        spec {
+            filter {
+                byBundles { include("spring-backend") }
+            }
+        }
+    }
+}
+
+dsl.compatibility {
+    jdkRequirement("spring-jdk17") {
+        matches = "org.springframework:*"
+        minJdk = 17
+    }
+
+    mutualExclusion("json-libs") {
+        libraries("jackson-core", "gson")
+        severity = WARNING
+    }
+}
+----
+
+=== DSL Marker
+
+[source,kotlin]
+----
+@DslMarker
+@Target(AnnotationTarget.CLASS, AnnotationTarget.TYPE)
+annotation class DependangerDslMarker
+----
+
+=== Builder Pattern
+
+[cols="1,2",options="header"]
+|===
+| Метод | Описание
+
+| `withX(value)`
+| Установить значение
+
+| `withoutX()`
+| Отключить опцию
+
+| `x { }`
+| DSL блок для вложенной конфигурации
+
+| `build()`
+| Создать экземпляр
+|===
+
+== Условия (Conditions)
+
+[cols="1,2",options="header"]
+|===
+| Условие | Описание
+
+| `jdkBelow(version)`
+| JDK версия ниже указанной
+
+| `jdkAtLeast(version)`
+| JDK версия не ниже указанной
+
+| `jdkBetween(min, max)`
+| JDK версия в диапазоне
+
+| `kotlinVersionBelow(version)`
+| Kotlin версия ниже указанной
+
+| `kotlinVersionAtLeast(version)`
+| Kotlin версия не ниже указанной
+
+| `gradleVersionAtLeast(version)`
+| Gradle версия не ниже указанной
+
+| `gradleVersionBelow(version)`
+| Gradle версия ниже указанной
+
+| `distribution(name)`
+| Активен указанный distribution profile
+
+| `environment(key, value)`
+| Переменная окружения равна значению
+
+| `all(conditions...)`
+| Все условия выполнены
+
+| `any(conditions...)`
+| Хотя бы одно условие выполнено
+
+| `not(condition)`
+| Условие не выполнено
+|===
+
+== Модель данных
+
+=== DependangerDsl
+
+Корневая точка входа DSL, содержащая блоки:
+
+* `versions { }` — именованные версии с fallback
+* `libraries { }` — библиотеки с Maven координатами
+* `plugins { }` — Gradle plugins
+* `bundles { }` — группы библиотек
+* `platforms { }` — внешние BOM для импорта версий
+* `distributions { }` — профили генерации с фильтрацией
+* `compatibility { }` — правила совместимости
+
+=== Ключевые сущности
+
+* **Library** — `alias`, `group:name`, `version`, `tags`, `requires`
+* **Plugin** — `alias`, `id`, `version`
+* **Version** — `name`, `value`, `fallbacks`
+* **Bundle** — `name`, `libraries`, `extends`
+* **Platform** — `group:name:version` (внешний BOM)
+* **Distribution** — `name`, `spec` (фильтры)
+
+См. xref:../01-concepts/domain-model.adoc[Доменная модель] для полного описания.
+
+== Валидация
+
+[cols="1,2,1",options="header"]
+|===
+| Правило | Описание | Severity
+
+| Уникальность alias
+| Все alias уникальны в рамках Registry
+| ERROR
+
+| Валидные Maven координаты
+| group и artifact соответствуют формату
+| ERROR
+
+| Существующие ссылки
+| versionRef ссылается на существующий alias
+| ERROR
+
+| Нет циклов в бандлах
+| Бандлы не создают циклических зависимостей
+| ERROR
+
+| Deprecated замена существует
+| replacedBy указывает на существующую библиотеку
+| WARNING
+|===
+
+== Связи
+
+* **Выходные данные:** `DependangerDsl` → `DependangerMetadata` (через `toMetadata()`)
+* **Следующий этап:** xref:F002-metadata-serialization.adoc[F002: Metadata Serialization]
+
+== Связанные документы
+
+* xref:../01-concepts/domain-model.adoc[Доменная модель] — детальное описание сущностей
+* xref:../01-concepts/architecture.adoc[Архитектура] — модуль `dependanger-core`

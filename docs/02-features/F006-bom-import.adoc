@@ -1,0 +1,153 @@
+= F006: BOM Import
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Импорт версий из внешних Maven BOM/Platform (Spring Boot BOM, Kotlin BOM и др.).
+Опциональный процессор в pipeline (order: 15).
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F006
+| Название | BOM Import
+| Приоритет | P2 (важно)
+| Статус | 🔴 Не начат
+| Модуль | `dependanger-maven-resolver`
+| Зависит от | F003 (Processing Pipeline)
+| Блокирует | —
+|===
+
+== Описание
+
+BOM Import позволяет импортировать версии из внешних Maven BOM (Bill of Materials).
+Это избавляет от необходимости дублировать версии, которые уже определены в популярных BOM:
+Spring Boot Dependencies, Kotlin BOM, AWS SDK BOM и др.
+
+== User Stories
+
+=== US-001: Импорт версий из Spring Boot BOM
+
+[quote]
+____
+Как разработчик Spring приложения, я хочу импортировать версии из Spring Boot Dependencies BOM, чтобы не указывать версии для каждой Spring библиотеки вручную.
+____
+
+**Acceptance Criteria:**
+
+* Можно указать BOM в `platforms { }` блоке
+* Библиотеки без явной версии получают версию из BOM
+* Явно указанные версии имеют приоритет над BOM
+
+=== US-002: Несколько BOM с приоритетом
+
+[quote]
+____
+Как разработчик, я хочу использовать несколько BOM одновременно, с предсказуемым порядком приоритета.
+____
+
+**Acceptance Criteria:**
+
+* Можно указать несколько BOM
+* Первый BOM с версией для библиотеки выигрывает
+* Порядок определяется порядком в DSL
+
+== DSL синтаксис
+
+[source,kotlin]
+----
+dsl.platforms {
+    // Spring Boot BOM - высший приоритет
+    platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+    
+    // Kotlin BOM
+    platform("org.jetbrains.kotlin:kotlin-bom:2.1.20")
+    
+    // AWS BOM
+    platform("software.amazon.awssdk:bom:2.20.0")
+}
+
+dsl.libraries {
+    // Версия будет из Spring Boot BOM
+    library("spring-web", "org.springframework:spring-web") {
+        tags("spring", "web")
+    }
+    
+    // Явная версия имеет приоритет над BOM
+    library("jackson-core", "com.fasterxml.jackson.core:jackson-core:2.16.0") {
+        tags("json")
+    }
+}
+----
+
+== Поведение
+
+=== Version Source Priority
+
+[source]
+----
+DECLARED > BOM_IMPORT
+----
+
+=== Алгоритм резолвинга
+
+1. Если библиотека имеет явную версию (`DECLARED`, включая inline в coordinates) — использовать её
+2. Иначе искать в BOM по порядку их объявления
+3. Первый BOM, содержащий `<dependency>` с matching `groupId:artifactId`, даёт версию
+4. Если версия не найдена — WARNING (или ERROR в strict mode)
+
+=== Resolved Version
+
+Версия, полученная из BOM, имеет `source = BOM_IMPORT` и хранит ссылку на исходный BOM в `originalRef`.
+
+== SPI: BomImportProcessor
+
+`BomImportProcessor` — опциональный процессор (order: 15), который:
+
+1. Получает список platforms из metadata
+2. Для каждого BOM скачивает и парсит секцию `<dependencyManagement>`
+3. Для библиотек без версии находит соответствующую версию в BOM
+4. Устанавливает `ResolvedVersion` с `source = BOM_IMPORT`
+
+Включается через `withBomImport()` в builder API.
+
+== API использование
+
+[source,kotlin]
+----
+val result = Dependanger.fromDsl {
+    platforms {
+        platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+    }
+    libraries {
+        library("spring-web", "org.springframework:spring-web")
+    }
+}
+.withBomImport()  // Включить BOM import процессор
+.build()
+
+// spring-web будет иметь версию из Spring Boot BOM
+----
+
+== Кеширование
+
+* BOM файлы кешируются в `~/.dependanger/cache/bom/`
+* TTL кеша: 24 часа (настраивается)
+* При отсутствии сети используется кеш
+
+== Связи
+
+* **Входные данные:** `platforms` из DependangerMetadata
+* **Выходные данные:** Обогащённые версии в ProcessingContext
+* **Предыдущий этап:** F002 (Metadata), ExtractedVersions processor (order: 12)
+* **Следующий этап:** LibraryFilter processor (order: 20)
+
+== Связанные документы
+
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline
+* xref:../01-concepts/domain-model.adoc[Platform] — сущность Platform

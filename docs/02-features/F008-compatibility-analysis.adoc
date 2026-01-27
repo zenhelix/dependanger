@@ -1,0 +1,195 @@
+= F008: Compatibility Analysis
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Анализ совместимости библиотек на основе определённых правил.
+Опциональный процессор в pipeline (order: 75).
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F008
+| Название | Compatibility Analysis
+| Приоритет | P3 (желательно)
+| Статус | 🔴 Не начат
+| Модуль | `dependanger-analysis`
+| Зависит от | F003 (Processing Pipeline)
+| Блокирует | —
+|===
+
+== Описание
+
+Compatibility Analysis проверяет совместимость библиотек между собой и с целевым окружением (JDK, Kotlin).
+Использует правила, определённые в `compatibility { }` блоке DSL.
+
+== User Stories
+
+=== US-001: Проверка требований JDK
+
+[quote]
+____
+Как разработчик, я хочу получать предупреждения если библиотека требует более новую версию JDK, чем указана в проекте.
+____
+
+**Acceptance Criteria:**
+
+* Можно определить правило `jdkRequirement`
+* При нарушении генерируется ERROR или WARNING
+* Сообщение указывает какой JDK требуется
+
+=== US-002: Взаимоисключающие библиотеки
+
+[quote]
+____
+Как team lead, я хочу определить что Jackson и Gson не должны быть в проекте одновременно, чтобы избежать конфликтов JSON библиотек.
+____
+
+**Acceptance Criteria:**
+
+* Можно определить правило `mutualExclusion`
+* При наличии обеих библиотек — WARNING
+* Сообщение указывает какие библиотеки конфликтуют
+
+== DSL синтаксис
+
+[source,kotlin]
+----
+dsl.compatibility {
+    // Требование к JDK
+    jdkRequirement("spring-jdk17") {
+        matches = "org.springframework:*"
+        minJdk = 17
+        message = "Spring 6.x requires JDK 17+"
+        severity = ERROR
+    }
+    
+    // Взаимоисключающие библиотеки
+    mutualExclusion("json-libs") {
+        libraries("jackson-core", "gson")
+        severity = WARNING
+        message = "Consider using only one JSON library"
+    }
+    
+    // Требование одинаковых версий
+    versionConstraint("kotlin-sync") {
+        libraries("kotlin-stdlib", "kotlin-reflect", "kotlinx-coroutines-core")
+        constraint = SAME_MAJOR_MINOR
+        message = "Kotlin libraries should use compatible versions"
+    }
+    
+    // Кастомное правило
+    customRule("spring-boot-kotlin") {
+        condition = { ctx ->
+            ctx.hasLibrary("spring-boot-starter") && 
+            ctx.kotlinVersion?.let { it < "1.9" } == true
+        }
+        message = "Spring Boot 3.x works best with Kotlin 1.9+"
+        severity = INFO
+    }
+}
+----
+
+== Типы правил
+
+[cols="1,3",options="header"]
+|===
+| Тип | Описание
+
+| `jdkRequirement`
+| Проверка минимальной версии JDK для библиотек
+
+| `mutualExclusion`
+| Проверка что взаимоисключающие библиотеки не используются вместе
+
+| `versionConstraint`
+| Проверка что версии связанных библиотек совместимы
+
+| `customRule`
+| Произвольное условие на основе context
+|===
+
+== API использование
+
+[source,kotlin]
+----
+val result = Dependanger.fromDsl {
+    // ... DSL config
+}
+.withCompatibilityAnalysis(targetJdk = 17)  // Целевой JDK
+.build()
+
+// Получить проблемы совместимости
+val issues = result.diagnostics.all
+    .filterIsInstance<CompatibilityIssue>()
+
+issues.forEach { issue ->
+    println("[${issue.severity}] ${issue.ruleId}: ${issue.message}")
+}
+----
+
+== CompatibilityIssue
+
+Информация о проблеме совместимости содержит:
+
+* `ruleId` — идентификатор сработавшего правила
+* `ruleType` — тип правила (jdkRequirement, mutualExclusion, versionConstraint)
+* `message` — сообщение об ошибке
+* `severity` — уровень серьёзности (ERROR, WARNING, INFO)
+* `affectedLibraries` — затронутые библиотеки
+* `suggestion` — предложение по исправлению
+
+== SPI: CompatibilityCheckProcessor
+
+`CompatibilityCheckProcessor` — опциональный процессор (order: 75, phase: PARALLEL_COMPUTE), который:
+
+1. Получает правила совместимости из metadata
+2. Проверяет каждое правило против effective библиотек
+3. Добавляет `CompatibilityIssue` в diagnostics
+4. При ERROR в strict mode — останавливает pipeline
+
+Включается через `withCompatibilityAnalysis()` в builder API.
+
+NOTE: Правила проверяются только против **effective** (отфильтрованных) библиотек.
+Отфильтрованные библиотеки не триггерят правила.
+
+=== Неполные правила (Incomplete Rules)
+
+Если правило ссылается на библиотеки, которые были отфильтрованы текущим distribution:
+
+* Система генерирует **WARNING** о неполном правиле
+* Правило всё равно проверяется для оставшихся библиотек
+* В diagnostics добавляется `IncompleteRuleWarning` с информацией о недостающих библиотеках
+
+Пример: правило `mutualExclusion("jackson-core", "gson")` при distribution, где `gson` отфильтрован, выдаст warning о том, что правило применяется неполностью.
+
+== CLI команда
+
+[source,bash]
+----
+dependanger analyze [--target-jdk=17] [--json]
+----
+
+== Gradle Task
+
+[source,bash]
+----
+./gradlew dependangerAnalyze
+----
+
+== Связи
+
+* **Входные данные:** `EffectiveMetadata`, правила из `compatibility { }`
+* **Выходные данные:** `CompatibilityIssue` в diagnostics
+* **Позиция в pipeline:** order 75 (после UpdateCheck)
+
+== Связанные документы
+
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* xref:../01-concepts/domain-model.adoc[CompatibilityRule] — определение правил
+* xref:F009-report-generation.adoc[F009: Report Generation] — включает compatibility issues

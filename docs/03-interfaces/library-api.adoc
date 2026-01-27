@@ -1,0 +1,638 @@
+= Library API
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+
+== Обзор
+
+Library API предоставляет программный доступ к функциональности Dependanger для интеграции с другими инструментами и создания кастомных решений.
+
+[cols="1,2",options="header"]
+|===
+| Характеристика | Значение
+
+| Главный класс
+| `io.github.zenhelix.dependanger.api.Dependanger`
+
+| Минимальная версия JDK
+| 17
+
+| Целевая аудитория
+| Разработчики инструментов
+|===
+
+== Подключение
+
+=== Gradle (Kotlin DSL)
+
+[source,kotlin]
+----
+dependencies {
+    implementation("io.github.zenhelix:dependanger-api:<version>")
+}
+----
+
+=== Maven
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.github.zenhelix</groupId>
+    <artifactId>dependanger-api</artifactId>
+    <version>${dependanger.version}</version>
+</dependency>
+----
+
+== Основные концепции
+
+=== Dependanger
+
+Главный фасад для всех операций.
+Создаётся через `Dependanger.create()` или `Dependanger.builder()`.
+
+=== DependangerBuilder
+
+Builder для настройки Dependanger с кастомными процессорами, фильтрами и конфигурацией.
+
+=== DependangerResult
+
+Unified result type для обработки успеха/ошибок с type-safe API.
+
+== Быстрый старт
+
+=== Базовое использование
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.Dependanger
+import java.io.File
+
+fun main() {
+    // Создание с дефолтными настройками
+    val dependanger = Dependanger.create()
+    
+    // Загрузка metadata из файла
+    val metadata = dependanger.loadMetadata(File("dependanger-metadata.json"))
+    
+    // Build effective metadata для default дистрибуции
+    val effective = dependanger.buildEffective(metadata)
+    
+    // Генерация TOML
+    dependanger.generateToml(effective, File("libs.versions.toml"))
+    
+    // Генерация BOM
+    dependanger.generateBom(
+        effective, 
+        File("bom.xml"),
+        groupId = "com.example",
+        artifactId = "my-bom",
+        version = "1.0.0"
+    )
+}
+----
+
+=== Использование DSL
+
+[source,kotlin]
+----
+val dependanger = Dependanger.create()
+
+val metadata = dependanger.fromDsl {
+    versions {
+        version("kotlin", "2.1.20")
+        version("spring-boot", "3.4.1")
+    }
+    
+    libraries {
+        library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+            version = versionRef("kotlin")
+        }
+        library("spring-boot-starter", "org.springframework.boot:spring-boot-starter") {
+            version = versionRef("spring-boot")
+            tags("spring", "core")
+        }
+    }
+    
+    bundles {
+        bundle("kotlin-core") {
+            libraries("kotlin-stdlib", "kotlin-reflect")
+        }
+    }
+}
+
+val effective = dependanger.buildEffective(metadata)
+----
+
+== DependangerBuilder
+
+=== Конфигурация через Builder
+
+[source,kotlin]
+----
+val dependanger = Dependanger.builder()
+    // Feature processors
+    .withUpdateChecking(enabled = true, failOnMajorUpdates = true)
+    .withCompatibilityAnalysis(enabled = true, targetJdk = 17)
+    .withBomImport(enabled = true)
+    .withReporting(enabled = true)
+    
+    // Custom processors
+    .withProcessor(MyCustomProcessor())
+    
+    // Custom filters
+    .withLibraryFilter(MyLibraryFilter())
+    .withBundleProcessor(MyBundleProcessor())
+    
+    // JSON format
+    .withPrettyJson(encodeDefaults = false)
+    
+    // Callbacks
+    .withCallback(object : ProcessingCallback {
+        override fun onProcessorStart(name: String) {
+            println("Starting: $name")
+        }
+        override fun onProcessorComplete(name: String) {
+            println("Completed: $name")
+        }
+    })
+    
+    .build()
+----
+
+=== Отключение features
+
+[source,kotlin]
+----
+// Отключить конкретные features
+val dependanger = Dependanger.builder()
+    .withoutUpdateChecking()
+    .withoutCompatibilityAnalysis()
+    .withoutBomImport()
+    .build()
+
+// Отключить все features (минимальная конфигурация)
+val minimal = Dependanger.builder()
+    .withoutAllFeatures()
+    .build()
+----
+
+=== DSL-style конфигурация
+
+[source,kotlin]
+----
+val dependanger = Dependanger.builder()
+    .updateChecking {
+        enabled = true
+        failOnMajorUpdates = true
+        config = UpdateConfig(
+            checkInterval = Duration.ofHours(24)
+        )
+    }
+    .compatibilityAnalysis {
+        enabled = true
+        targetJdk = 17
+        failOnErrors = false
+    }
+    .bomImport {
+        enabled = true
+        failOnError = false
+    }
+    .reporting {
+        enabled = true
+        defaultConfig {
+            includeUpdates = true
+            includeCompatibility = true
+        }
+    }
+    .build()
+----
+
+== Работа с дистрибуциями
+
+=== DistributionSelection
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.effective.builder.DistributionSelection
+
+// Default: если settings.defaultDistribution не задан — все библиотеки без фильтрации
+val effective1 = dependanger.buildEffective(metadata, DistributionSelection.Default)
+
+// Конкретная дистрибуция по имени
+val effective2 = dependanger.buildEffective(metadata, DistributionSelection.Named("android"))
+
+// Все дистрибуции
+val allEffective: Map<String, EffectiveMetadata> = dependanger.buildAllEffective(metadata)
+----
+
+=== Прямая конвертация (без пайплайна)
+
+[source,kotlin]
+----
+// Конвертация без pipeline processors (без фильтрации и обогащения)
+val direct = dependanger.convertDirect(metadata, DistributionSelection.Named("core"))
+
+// Конвертация всех дистрибуций напрямую
+val allDirect = dependanger.convertAllDirect(metadata)
+----
+
+== Result API
+
+=== DependangerResult
+
+Type-safe обработка результатов:
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.result.DependangerResult
+
+val result: DependangerResult<EffectiveMetadata> = 
+    dependanger.buildEffectiveAsResult(metadata, DistributionSelection.Named("android"))
+
+// Pattern matching style
+when (result) {
+    is DependangerResult.Success -> {
+        val effective = result.value
+        println("Built ${effective.libraries.size} libraries")
+    }
+    is DependangerResult.Failure -> {
+        result.errors.forEach { error ->
+            println("Error: ${error.message}")
+        }
+    }
+}
+
+// Callback style
+result
+    .onSuccess { effective ->
+        println("Success: ${effective.libraries.size} libraries")
+    }
+    .onFailure { errors ->
+        errors.forEach { println("Error: ${it.message}") }
+    }
+
+// Get or throw
+val effective = result.getOrThrow()
+
+// Get or default
+val effectiveOrEmpty = result.getOrElse { EffectiveMetadata.EMPTY }
+----
+
+=== Валидация с Result
+
+[source,kotlin]
+----
+// Валидация metadata
+dependanger.validateAsResult(metadata)
+    .onSuccess { validated ->
+        println("Metadata is valid")
+    }
+    .onFailure { errors ->
+        errors.forEach { println("Validation error: ${it.message}") }
+    }
+
+// Валидация effective metadata
+dependanger.validateAsResult(effective)
+    .onSuccess { validated ->
+        // Proceed with generation
+    }
+    .onFailure { errors ->
+        // Handle errors
+    }
+----
+
+== Генераторы артефактов
+
+=== Прямой доступ к генераторам
+
+[source,kotlin]
+----
+// TOML генератор
+val tomlContent: String = dependanger.toml.generate(effective)
+
+// BOM генератор
+val bomContent: String = dependanger.bom.generate(effective, BomConfig(
+    groupId = "com.example",
+    artifactId = "my-bom",
+    version = "1.0.0"
+))
+
+// Список всех генераторов
+dependanger.generators.forEach { generator ->
+    println("Generator: ${generator.formatName}")
+}
+----
+
+=== Удобные методы
+
+[source,kotlin]
+----
+// Генерация в файл
+dependanger.generateToml(effective, File("libs.versions.toml"))
+
+dependanger.generateBom(
+    effective,
+    File("bom.xml"),
+    groupId = "com.example",
+    artifactId = "my-bom",
+    version = "1.0.0"
+)
+
+// Convenience: load + build + generate в одном вызове
+val result = dependanger.processToToml(
+    metadataFile = File("metadata.json"),
+    outputFile = File("libs.versions.toml"),
+    distribution = DistributionSelection.Named("core")
+)
+
+val bomResult = dependanger.processToBom(
+    metadataFile = File("metadata.json"),
+    outputFile = File("bom.xml"),
+    groupId = "com.example",
+    artifactId = "my-bom",
+    version = "1.0.0",
+    distribution = DistributionSelection.Default
+)
+----
+
+== Reporting Service
+
+=== Генерация отчётов
+
+[source,kotlin]
+----
+// Проверка доступности
+if (dependanger.isReportingEnabled) {
+    val reportService = dependanger.reporting!!
+    
+    val report = reportService.generateReport(
+        metadata = metadata,
+        effective = effective,
+        config = ReportConfig(
+            includeUpdates = true,
+            includeCompatibility = true,
+            targetJdk = 17
+        )
+    )
+    
+    // Сохранение отчёта
+    reportService.saveReport(report, File("dependanger-report.json"))
+}
+
+// Или с throw при отключенном reporting
+val reportService = dependanger.reportingOrThrow()
+----
+
+== Filter Preview
+
+Предпросмотр результатов фильтрации:
+
+[source,kotlin]
+----
+val preview = dependanger.previewFilter(
+    metadata = metadata,
+    distribution = DistributionSelection.Named("android")
+)
+
+println("Included libraries: ${preview.includedLibraries.map { it.alias }}")
+println("Excluded libraries: ${preview.excludedLibraries.map { it.alias }}")
+println("Included bundles: ${preview.includedBundles.map { it.name }}")
+----
+
+== Custom Processors
+
+=== Создание кастомного процессора
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
+
+class MyCustomProcessor : EffectiveMetadataProcessor {
+    override val name: String = "my-custom-processor"
+    override val order: Int = 80  // После compatibility analysis (75)
+    
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext
+    ): EffectiveMetadata {
+        // Кастомная логика обработки
+        val enrichedLibraries = metadata.libraries.map { library ->
+            library.copy(
+                metadata = library.metadata + ("customField" to "customValue")
+            )
+        }
+        
+        return metadata.copy(libraries = enrichedLibraries)
+    }
+}
+----
+
+=== Регистрация процессора
+
+[source,kotlin]
+----
+val dependanger = Dependanger.builder()
+    .withProcessor(MyCustomProcessor())
+    .build()
+----
+
+== Custom Filters
+
+=== LibraryFilter
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.filter.LibraryFilter
+import io.github.zenhelix.dependanger.metadata.Library
+import io.github.zenhelix.dependanger.metadata.FilterSpec
+
+class SecurityLibraryFilter : LibraryFilter {
+    override fun filter(
+        libraries: List<Library>,
+        filterSpec: FilterSpec?
+    ): List<Library> {
+        return libraries.filter { library ->
+            // Исключаем библиотеки с известными уязвимостями
+            !isVulnerable(library)
+        }
+    }
+    
+    private fun isVulnerable(library: Library): Boolean {
+        // Логика проверки уязвимостей
+        return false
+    }
+}
+
+val dependanger = Dependanger.builder()
+    .withLibraryFilter(SecurityLibraryFilter())
+    .build()
+----
+
+== Сериализация
+
+=== Кастомные форматы
+
+[source,kotlin]
+----
+// Compact JSON (без pretty printing)
+val dependanger = Dependanger.builder()
+    .withCompactJson()
+    .build()
+
+// Pretty JSON с defaults
+val dependanger2 = Dependanger.builder()
+    .withPrettyJson(encodeDefaults = true)
+    .build()
+
+// Кастомный формат
+val dependanger3 = Dependanger.builder()
+    .withMetadataFormat(MyCustomFormat())
+    .withEffectiveMetadataFormat(MyCustomEffectiveFormat())
+    .build()
+----
+
+=== Прямой доступ к converter
+
+[source,kotlin]
+----
+// Конвертер для прямого преобразования без пайплайна
+val converter = dependanger.converter
+
+val effective = converter.convert(metadata, DistributionSelection.Named("android"))
+val all = converter.convertAll(metadata)
+----
+
+== Обработка ошибок
+
+=== BuildResult с диагностикой
+
+[source,kotlin]
+----
+val result = dependanger.buildEffectiveWithDiagnostics(metadata, DistributionSelection.Default)
+
+println("Success: ${result.isSuccess}")
+println("Has errors: ${result.hasErrors}")
+println("Has warnings: ${result.hasWarnings}")
+
+result.errors.forEach { error ->
+    println("ERROR [${error.processor}]: ${error.message}")
+}
+
+result.warnings.forEach { warning ->
+    println("WARNING [${warning.processor}]: ${warning.message}")
+}
+
+// Доступ к metadata (даже при наличии ошибок)
+val effective = result.metadata
+----
+
+== Полный пример
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.effective.builder.DistributionSelection
+import java.io.File
+
+fun main() {
+    // 1. Создание Dependanger с кастомной конфигурацией
+    val dependanger = Dependanger.builder()
+        .withUpdateChecking(enabled = true, failOnMajorUpdates = false)
+        .withCompatibilityAnalysis(enabled = true, targetJdk = 17)
+        .withBomImport(enabled = true)
+        .withReporting(enabled = true)
+        .withPrettyJson()
+        .build()
+    
+    // 2. Создание metadata через DSL
+    val metadata = dependanger.fromDsl {
+        versions {
+            version("kotlin", "2.1.20")
+            version("spring-boot", "3.4.1")
+        }
+        
+        libraries {
+            library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+                version = versionRef("kotlin")
+                tags("core", "kotlin")
+            }
+            library("spring-boot-starter", "org.springframework.boot:spring-boot-starter") {
+                version = versionRef("spring-boot")
+                tags("spring", "core")
+            }
+        }
+        
+        platforms {
+            platform("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
+                version = versionRef("spring-boot")
+            }
+        }
+        
+        distributions {
+            distribution("core") {
+                filter {
+                    includeTags("core")
+                }
+            }
+        }
+        
+        compatibility {
+            jdkRequirement("spring-boot-3x") {
+                libraries("spring-boot-starter")
+                minJdk = 17
+            }
+        }
+    }
+    
+    // 3. Валидация
+    dependanger.validateAsResult(metadata)
+        .onFailure { errors ->
+            errors.forEach { println("Validation error: ${it.message}") }
+            return
+        }
+    
+    // 4. Build effective metadata с диагностикой
+    val result = dependanger.buildEffectiveAsResult(
+        metadata, 
+        DistributionSelection.Named("core")
+    )
+    
+    result
+        .onSuccess { effective ->
+            println("Built ${effective.libraries.size} libraries")
+            
+            // 5. Генерация артефактов
+            dependanger.generateToml(effective, File("build/libs.versions.toml"))
+            dependanger.generateBom(
+                effective,
+                File("build/bom.xml"),
+                groupId = "com.example",
+                artifactId = "my-bom",
+                version = "1.0.0"
+            )
+            
+            // 6. Генерация отчёта
+            if (dependanger.isReportingEnabled) {
+                val report = dependanger.reporting!!.generateReport(metadata, effective)
+                dependanger.reporting!!.saveReport(report, File("build/report.json"))
+            }
+            
+            println("Generation completed!")
+        }
+        .onFailure { errors ->
+            errors.forEach { println("Build error: ${it.message}") }
+        }
+}
+----
+
+== Связи с другими разделами
+
+* xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — описание DSL синтаксиса
+* xref:../02-features/F003-processing-pipeline.adoc[F003 Processing Pipeline] — пайплайн обработки
+* xref:../01-concepts/architecture.adoc[Архитектура] — SPI и интерфейсы расширения
+* xref:gradle-plugin.adoc[Gradle Plugin] — альтернативный интерфейс
+* xref:cli.adoc[CLI] — командный интерфейс

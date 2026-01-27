@@ -1,0 +1,1283 @@
+= Доменная модель
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Документ описывает ключевые сущности системы Dependanger на трёх уровнях абстракции:
+DSL Model (в памяти), Metadata Model (сериализованная), Effective Model (готовая к генерации).
+--
+
+== Уровни моделей
+
+Система использует три уровня представления данных:
+
+[mermaid,target=model-levels,format=svg]
+----
+flowchart LR
+    subgraph DSL["DSL Model"]
+        direction TB
+        DSL_TECH["DependangerDsl<br/><i>In-memory</i>"]
+    end
+
+    subgraph META["Metadata Model"]
+        direction TB
+        META_TECH["DependangerMetadata<br/><i>metadata.json</i>"]
+    end
+
+    subgraph EFF["Effective Model"]
+        direction TB
+        EFF_TECH["EffectiveMetadata<br/><i>effective-*.json</i>"]
+    end
+
+    DSL -->|"toMetadata()"| META
+    META -->|"Pipeline"| EFF
+----
+
+=== DSL Model
+
+[quote]
+____
+То, что пишет пользователь в Kotlin DSL.
+Модель в памяти, создаваемая через builder pattern.
+____
+
+* **Модуль:** `dependanger-core`
+* **Главная сущность:** `DependangerDsl`
+* **Характеристики:**
+** Fluent API для удобного определения
+** Поддержка DSL блоков (`@DependangerDslMarker`)
+** Версии могут быть неразрешёнными (ссылки на alias)
+** Валидация на уровне DSL
+** Методы: `versions {}`, `libraries {}`, `bundles {}`, `plugins {}`, `platforms {}`, `distributions {}`, `compatibility {}`
+
+=== Metadata Model
+
+[quote]
+____
+Сериализуемое представление модели.
+Промежуточный формат для хранения и передачи.
+____
+
+* **Модуль:** `dependanger-metadata-json` (и другие форматы через SPI)
+* **Главная сущность:** `DependangerMetadata`
+* **Характеристики:**
+** Абстрагирован через `SerializationFormat<T>` SPI
+** JSON как основной формат (расширяемо до YAML)
+** Хранит полную информацию из DSL
+** Используется для кеширования и инкрементальной обработки
+** Файл: `metadata.json`
+
+=== Effective Model
+
+[quote]
+____
+Результат обработки pipeline.
+Все версии разрешены, фильтры применены, готов для генерации.
+____
+
+* **Модуль:** `dependanger-effective`
+* **Главная сущность:** `EffectiveMetadata`
+* **Характеристики:**
+** Все версии разрешены с указанием `VersionSource`
+** Применены фильтры (distribution profile)
+** Содержит результаты валидации
+** Опционально: update report, compatibility report
+** Файл: `effective-{distribution}.json`
+** Готов для передачи в генераторы (TOML, BOM)
+
+== Обзор модели (DSL Level)
+
+[mermaid,target=domain-model,format=svg]
+----
+erDiagram
+    DependangerDsl ||--o{ Library : contains
+    DependangerDsl ||--o{ Plugin : contains
+    DependangerDsl ||--o{ Version : defines
+    DependangerDsl ||--o{ Bundle : contains
+    DependangerDsl ||--o{ Platform : imports
+    DependangerDsl ||--o{ Distribution : contains
+    DependangerDsl ||--o{ CompatibilityRule : contains
+    Bundle ||--o{ Library : includes
+    Bundle ||--o{ Bundle : extends
+    Library }o--o| Version : references
+    Plugin }o--o| Version : references
+
+    DependangerDsl {
+        Versions versions
+        Libraries libraries
+        Bundles bundles
+        Plugins plugins
+        Platforms platforms
+        Distributions distributions
+        Compatibility compatibility
+    }
+
+    Library {
+        string alias PK
+        string group
+        string name
+        VersionRef version
+        set tags
+        Requirements requires
+    }
+
+    Plugin {
+        string alias PK
+        string id
+        VersionRef version
+    }
+
+    Version {
+        string name PK
+        string value
+        list fallbacks
+    }
+
+    Bundle {
+        string name PK
+        list libraries
+        list extends
+    }
+
+    Platform {
+        string group
+        string name
+        string version
+    }
+
+    Distribution {
+        string name PK
+        FilterSpec spec
+    }
+
+    CompatibilityRule {
+        string id PK
+        RuleType type
+        string message
+        Severity severity
+    }
+----
+
+== Сущности
+
+=== DependangerDsl
+
+[quote]
+____
+Корневая точка входа Kotlin DSL для конфигурации зависимостей.
+Содержит все определения для генерации артефактов (TOML, BOM).
+____
+
+NOTE: Полная документация по DSL синтаксису: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
+
+==== DSL блоки
+
+[cols="1,2,2",options="header"]
+|===
+| Блок | Тип | Описание
+
+| `versions { }`
+| VersionsDsl
+| Именованные версии с fallback условиями
+
+| `libraries { }`
+| LibrariesDsl
+| Библиотеки и BOM с Maven координатами
+
+| `plugins { }`
+| PluginsDsl
+| Gradle plugins
+
+| `bundles { }`
+| BundlesDsl
+| Группы библиотек
+
+| `platforms { }`
+| PlatformsDsl
+| Целевые платформы (JDK, Android, Kotlin targets) и импорт внешних BOM
+
+| `distributions { }`
+| DistributionsDsl
+| Профили генерации с фильтрацией
+
+| `compatibility { }`
+| CompatibilityDsl
+| Правила совместимости
+
+| `presets { }`
+| PresetsDsl
+| Именованные presets с предустановленными настройками
+
+| `settings { }`
+| SettingsDsl
+| Глобальные настройки валидации и поведения
+|===
+
+==== Пример DSL
+
+[source,kotlin]
+----
+val dsl = DependangerDsl()
+
+dsl.versions {
+    version("kotlin", "2.1.20")
+    version("spring-boot", "3.4.0") {
+        fallback("2.7.18") { jdkBelow(17) }
+    }
+}
+
+dsl.libraries {
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin")) {
+        tags("core", "kotlin")
+    }
+}
+
+dsl.bundles {
+    bundle("kotlin-core") {
+        libraries("kotlin-stdlib", "kotlin-reflect")
+    }
+}
+
+dsl.platforms {
+    platform("org.springframework.boot:spring-boot-dependencies:3.4.0")
+}
+
+dsl.distributions {
+    distribution("android") {
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+            }
+        }
+    }
+}
+----
+
+==== Правила валидации
+
+* Все alias (библиотек, плагинов, версий, бандлов) должны быть уникальны
+* Alias должен соответствовать паттерну `[a-z][a-z0-9-]*`
+* Ссылки на версии должны указывать на существующие version aliases
+
+'''
+
+=== Library
+
+[quote]
+____
+Зависимость с Maven координатами и метаданными для фильтрации.
+____
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| alias
+| String
+| Да
+| Уникальный идентификатор для ссылок в DSL и генерируемом TOML
+
+| group
+| String
+| Да
+| Maven groupId (например: `org.jetbrains.kotlin`)
+
+| name
+| String
+| Да
+| Maven artifactId (например: `kotlin-stdlib`)
+
+| version
+| VersionReference
+| Нет
+| Ссылка на version alias (`Reference`), inline значение (`Literal`), или диапазон (`Range`). Может быть унаследована из Platform
+
+| tags
+| Set<String>
+| Нет
+| Теги для фильтрации и группировки (например: `testing`, `database`, `spring`)
+
+| requires
+| Requirements
+| Нет
+| Требования к окружению (JDK версия, Kotlin версия)
+|===
+
+==== VersionReference
+
+[source,kotlin]
+----
+sealed class VersionReference {
+    data class Literal(val version: String) : VersionReference()
+    data class Reference(val name: String) : VersionReference()
+    data class Range(val range: VersionRange) : VersionReference()
+}
+----
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+libraries {
+    // С ссылкой на version alias
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin")) {
+        tags("core", "kotlin")
+    }
+
+    // С inline версией
+    library("slf4j-api", "org.slf4j:slf4j-api:2.0.9") {
+        tags("logging")
+    }
+
+    // Без версии (будет взята из Platform)
+    library("spring-web", "org.springframework:spring-web") {
+        tags("web", "spring")
+        requires {
+            jdk { min = 17 }
+        }
+    }
+}
+----
+
+==== Правила валидации
+
+* `alias` уникален, соответствует паттерну `[a-z][a-z0-9-]*`
+* `group:name` формируют валидные Maven координаты
+* `versionRef()` должен ссылаться на существующий version alias
+
+---
+
+=== Plugin
+
+[quote]
+____
+Gradle plugin — определяется через alias, plugin ID и версию.
+Публикуется в Version Catalog секции `[plugins]`.
+____
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| alias
+| String
+| Да
+| Уникальный идентификатор для ссылок в DSL и генерируемом TOML
+
+| id
+| String
+| Да
+| Gradle Plugin ID (например: `org.jetbrains.kotlin.jvm`)
+
+| version
+| VersionReference
+| Нет
+| Ссылка на version alias или inline значение
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+plugins {
+    plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm",
+        version = versionRef("kotlin"))
+
+    plugin("ksp", "com.google.devtools.ksp:2.1.20-1.0.29")
+}
+----
+
+==== Правила валидации
+
+* `alias` уникален (среди всех alias: libraries, plugins, bundles)
+* `id` должен быть валидным Gradle Plugin ID
+
+---
+
+=== Version
+
+[quote]
+____
+Именованная версия для переиспользования несколькими библиотеками.
+Поддерживает условные fallback'и.
+____
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| name
+| String
+| Да
+| Уникальный идентификатор версии (например: `kotlin`, `spring-boot`)
+
+| value
+| String
+| Да
+| Значение версии по умолчанию (например: `2.1.20`)
+
+| fallbacks
+| List<VersionFallback>
+| Нет
+| Условные альтернативные версии
+|===
+
+==== VersionFallback
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| value
+| String
+| Альтернативное значение версии
+
+| condition
+| FallbackCondition
+| Условие, при котором используется fallback
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+versions {
+    version("kotlin", "2.1.20")
+
+    version("spring-boot", "3.4.0") {
+        fallback("2.7.18") { jdkBelow(17) }
+        fallback("3.2.0") { kotlinVersionBelow("1.9") }
+    }
+}
+----
+
+==== Доступные условия
+
+[cols="1,3",options="header"]
+|===
+| Условие | Описание
+
+| `jdkBelow(version)`
+| JDK версия < указанной
+
+| `jdkAtLeast(version)`
+| JDK версия >= указанной
+
+| `jdkBetween(min, max)`
+| JDK версия в диапазоне [min, max]
+
+| `kotlinVersionBelow(version)`
+| Kotlin версия < указанной
+
+| `kotlinVersionAtLeast(version)`
+| Kotlin версия >= указанной
+
+| `gradleVersionAtLeast(version)`
+| Gradle версия >= указанной
+
+| `gradleVersionBelow(version)`
+| Gradle версия < указанной
+
+| `distribution(name)`
+| Активен указанный distribution profile
+
+| `environment(key, value)`
+| Переменная окружения равна значению
+
+| `all(conditions...)`
+| Все условия выполнены (AND)
+
+| `any(conditions...)`
+| Хотя бы одно условие выполнено (OR)
+
+| `not(condition)`
+| Условие не выполнено (NOT)
+|===
+
+==== Правила валидации
+
+* `name` уникален
+* `value` должен быть валидной версией
+* Fallback условия оцениваются по порядку, первое подходящее выигрывает
+
+---
+
+=== Bundle
+
+[quote]
+____
+Именованная группа библиотек для переиспользования.
+Может наследовать библиотеки из других бандлов.
+Публикуется в Version Catalog секции `[bundles]`.
+____
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| name
+| String
+| Да
+| Уникальный идентификатор бандла
+
+| libraries
+| List<String>
+| Нет
+| Alias'ы включаемых библиотек
+
+| extends
+| List<String>
+| Нет
+| Имена бандлов для наследования (композиция)
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+bundles {
+    bundle("kotlin-core") {
+        libraries("kotlin-stdlib", "kotlin-reflect")
+    }
+
+    bundle("kotlin-serialization") {
+        libraries("kotlinx-serialization-core", "kotlinx-serialization-json")
+        extends("kotlin-core")  // Включает библиотеки из kotlin-core
+    }
+
+    bundle("spring-backend") {
+        libraries("spring-web", "spring-data-jpa")
+        extends("kotlin-core", "kotlin-serialization")
+    }
+}
+----
+
+==== Правила валидации
+
+* `name` уникален
+* Все ссылки в `libraries` должны указывать на существующие библиотеки
+* Все ссылки в `extends` должны указывать на существующие бандлы
+* Не допускаются циклические зависимости между бандлами
+
+---
+
+=== Platform
+
+[quote]
+____
+Целевая платформа с ограничениями по JDK, Android и поддерживаемыми Kotlin targets.
+Также используется для импорта версий из внешних Maven BOM.
+____
+
+Platform имеет два основных use case:
+
+1. **Target Platform** — определение целевой среды выполнения (JDK constraints, Android SDK, Kotlin targets)
+2. **BOM Import** — импорт версий из внешних Maven BOM (Spring Boot BOM, Kotlin BOM)
+
+==== Атрибуты (Target Platform)
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| name
+| String
+| Да
+| Уникальный идентификатор платформы
+
+| jdkConstraints
+| JdkConstraints
+| Нет
+| Ограничения по версии JDK (min, max)
+
+| androidConstraints
+| AndroidConstraints
+| Нет
+| Ограничения для Android (minSdk, targetSdk)
+
+| supportedTargets
+| SupportedTargets
+| Нет
+| Поддерживаемые Kotlin Multiplatform targets
+|===
+
+==== DSL синтаксис (Target Platform)
+
+[source,kotlin]
+----
+platforms {
+    // Платформа с JDK constraints
+    platform("jvm17") {
+        jdk { min = 17; max = 21 }
+        targets { jvm() }
+    }
+
+    // Платформа для Android
+    platform("android-min21") {
+        android { minSdk = 21; targetSdk = 34 }
+        targets { android() }
+    }
+
+    // KMP платформа
+    platform("kmp-mobile") {
+        targets { android(); ios() }
+    }
+}
+----
+
+==== DSL синтаксис (BOM Import)
+
+[source,kotlin]
+----
+platforms {
+    // Spring Boot BOM для импорта версий
+    platform("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
+        version = versionRef("spring-boot")
+    }
+
+    // Kotlin BOM
+    platform("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+----
+
+==== Поведение BOM Import
+
+* Версии из BOM импортируются во время processing pipeline (BomImportProcessor, order: 15)
+* Приоритет: DECLARED (явная версия в DSL) > BOM_IMPORT (из Platform)
+* Порядок Platform имеет значение: первый BOM с версией для библиотеки выигрывает
+
+==== SupportedTargets
+
+Для Kotlin Multiplatform доступны следующие targets:
+
+[cols="1,2",options="header"]
+|===
+| Target | Описание
+
+| `jvm()`
+| JVM target
+
+| `js()`
+| JavaScript (Browser, Node)
+
+| `android()`
+| Android
+
+| `ios()`
+| iOS (arm64, x64, simulatorArm64)
+
+| `macos()`
+| macOS
+
+| `linux()`
+| Linux
+
+| `mingw()`
+| Windows (MinGW)
+
+| `native()`
+| Все native targets
+
+| `wasmJs()`, `wasmWasi()`
+| WebAssembly
+|===
+
+---
+
+=== Distribution
+
+[quote]
+____
+Профиль генерации артефактов с фильтрацией библиотек.
+Определяет какие библиотеки включить в генерируемый TOML/BOM.
+____
+
+NOTE: **Поведение по умолчанию:** Если distribution не указан (или используется `DistributionSelection.Default`), все библиотеки включаются без фильтрации.
+
+==== Атрибуты
+
+[cols="1,1,1,3",options="header"]
+|===
+| Атрибут | Тип | Обязательность | Описание
+
+| name
+| String
+| Да
+| Уникальный идентификатор профиля
+
+| spec
+| FilterSpec
+| Нет
+| Спецификация фильтрации
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+distributions {
+    distribution("android") {
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+                byGroups { exclude { matching("org.springframework:*") } }
+            }
+        }
+    }
+
+    distribution("backend") {
+        spec {
+            filter {
+                byTags { include { anyOf("server", "web", "database") } }
+                byBundles { include("spring-backend", "kotlin-core") }
+            }
+        }
+    }
+
+    distribution("minimal") {
+        spec {
+            filter {
+                byBundles { include("kotlin-core") }
+            }
+        }
+    }
+}
+----
+
+==== Типы фильтров
+
+[cols="1,3",options="header"]
+|===
+| Фильтр | Описание
+
+| `byTags`
+| Фильтрация по тегам библиотек
+
+| `byGroups`
+| Фильтрация по Maven group pattern
+
+| `byAliases`
+| Фильтрация по alias библиотек
+
+| `byBundles`
+| Включение содержимого бандлов
+|===
+
+==== Логика комбинирования фильтров
+
+Фильтры в `FilterSpec` применяются по следующим правилам:
+
+[cols="1,3",options="header"]
+|===
+| Комбинация | Логика
+
+| Несколько `include` в одном фильтре
+| **OR** — библиотека включается, если подходит под любой include
+
+| Несколько `exclude` в одном фильтре
+| **OR** — библиотека исключается, если подходит под любой exclude
+
+| `include` + `exclude` в одном фильтре
+| `include` применяется первым, затем из результата удаляются `exclude`
+
+| Несколько разных фильтров (`byTags` + `byGroups`)
+| **AND** — библиотека должна пройти все фильтры
+|===
+
+[source,kotlin]
+----
+distributions {
+    distribution("example") {
+        spec {
+            filter {
+                // AND: библиотека должна иметь тег "core" И не быть в группе "org.test"
+                byTags { include { anyOf("core") } }
+                byGroups { exclude { matching("org.test:*") } }
+            }
+        }
+    }
+}
+----
+
+===== Алгоритм фильтрации
+
+1. Если нет `include` фильтров → все библиотеки потенциально включены
+2. Применяются `include` фильтры → только matching библиотеки остаются
+3. Применяются `exclude` фильтры → matching библиотеки удаляются
+4. Результаты всех фильтров (`byTags`, `byGroups`, `byAliases`) объединяются через **AND**
+
+---
+
+=== CompatibilityRule
+
+[quote]
+____
+Правило проверки совместимости между библиотеками или с окружением.
+____
+
+==== Типы правил
+
+[cols="1,2,2",options="header"]
+|===
+| Тип | Описание | Пример
+
+| `jdkRequirement`
+| Требование к версии JDK
+| Spring Boot 3.x требует JDK 17+
+
+| `mutualExclusion`
+| Взаимоисключающие библиотеки
+| Jackson и Gson не должны быть вместе
+
+| `versionConstraint`
+| Ограничение версий между библиотеками
+| Kotlin stdlib и reflect должны иметь одинаковую версию
+|===
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+compatibility {
+    jdkRequirement("spring-jdk17") {
+        matches = "org.springframework:*"
+        minJdk = 17
+        message = "Spring 6.x requires JDK 17+"
+    }
+
+    mutualExclusion("json-libs") {
+        libraries("jackson-core", "gson")
+        severity = WARNING
+        message = "Consider using only one JSON library"
+    }
+
+    versionConstraint("kotlin-version-sync") {
+        libraries("kotlin-stdlib", "kotlin-reflect", "kotlinx-coroutines-core")
+        constraint = SAME_MAJOR_MINOR
+    }
+}
+----
+
+==== Severity
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| ERROR
+| Нарушение блокирует генерацию
+
+| WARNING
+| Предупреждение, генерация продолжается
+
+| INFO
+| Информационное сообщение
+|===
+
+==== Поведение с отфильтрованными библиотеками
+
+Правила проверяются только против **effective** (отфильтрованных) библиотек:
+
+* Отфильтрованные библиотеки не триггерят правила
+* Если правило ссылается на отфильтрованные библиотеки — генерируется WARNING о неполном правиле
+* Правило всё равно проверяется для оставшихся библиотек
+
+---
+
+=== Platform Library
+
+[quote]
+____
+Библиотека типа Platform/BOM для экспорта в TOML Version Catalog.
+Отличается от обычной библиотеки: экспортируется с типом `pom` и используется потребителями через `platform()`.
+____
+
+NOTE: Не путать с `platform()` в блоке `platforms {}`, который используется для *импорта* версий из внешних BOM.
+`platformLibrary()` — для *экспорта* BOM-зависимости в генерируемый TOML.
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+libraries {
+    // Обычная библиотека
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin"))
+
+    // Platform library — экспортируется в TOML как library с type=pom
+    platformLibrary("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+}
+----
+
+==== Отличия от library()
+
+* В генерируемом TOML отображается с типом `pom`
+* Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
+* Не имеет `supportedTargets` (не является runtime dependency)
+
+---
+
+=== Preset
+
+[quote]
+____
+Именованный preset с предустановленными настройками.
+Позволяет группировать настройки для разных сценариев использования.
+____
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+presets {
+    preset("strict") {
+        validation {
+            onCompatibilityViolation = ValidationAction.FAIL
+            onDeprecatedLibrary = ValidationAction.WARN
+            onUnresolvedVersion = ValidationAction.FAIL
+        }
+    }
+
+    preset("lenient") {
+        validation {
+            onCompatibilityViolation = ValidationAction.WARN
+            onDeprecatedLibrary = ValidationAction.INFO
+            onUnresolvedVersion = ValidationAction.WARN
+        }
+    }
+}
+----
+
+---
+
+=== Settings
+
+[quote]
+____
+Глобальные настройки валидации и поведения системы.
+____
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+settings {
+    // Настройки валидации
+    validation {
+        onCompatibilityViolation = ValidationAction.FAIL
+        onDeprecatedLibrary = ValidationAction.WARN
+        onJdkMismatch = ValidationAction.FAIL
+        onUnresolvedVersion = ValidationAction.WARN
+    }
+
+    // Дефолтная дистрибуция
+    defaultDistribution = "core"
+
+    // Строгий режим резолюции версий
+    strictVersionResolution = true
+
+    // Настройки генерации TOML
+    toml {
+        filename = "libs.versions.toml"
+        includeComments = true
+        sortSections = true
+    }
+
+    // Настройки генерации BOM
+    bom {
+        groupId = "com.example"
+        artifactId = "my-bom"
+        version = "1.0.0"  // или versionRef("bom")
+        includeOptionalDependencies = false
+    }
+}
+----
+
+==== Атрибуты Settings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `defaultDistribution`
+| String?
+| Distribution profile по умолчанию. Если не задан — все библиотеки включаются без фильтрации
+
+| `strictVersionResolution`
+| Boolean
+| При `true` неразрешённая версия вызывает ERROR, при `false` — WARNING
+
+| `validation`
+| ValidationSettings
+| Настройки валидации (см. ValidationAction)
+
+| `toml`
+| TomlSettings
+| Настройки генерации TOML Version Catalog
+
+| `bom`
+| BomSettings
+| Настройки генерации Maven BOM
+|===
+
+==== TomlSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `filename`
+| String
+| Имя выходного файла (default: `libs.versions.toml`)
+
+| `includeComments`
+| Boolean
+| Добавлять комментарии в TOML
+
+| `sortSections`
+| Boolean
+| Сортировать секции и элементы
+|===
+
+==== BomSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `groupId`
+| String
+| Maven groupId для генерируемого BOM
+
+| `artifactId`
+| String
+| Maven artifactId для генерируемого BOM
+
+| `version`
+| String
+| Версия BOM
+
+| `includeOptionalDependencies`
+| Boolean
+| Включать зависимости с `optional=true`
+|===
+
+==== ValidationAction
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| FAIL
+| Ошибка, блокирует обработку
+
+| WARN
+| Предупреждение, обработка продолжается
+
+| INFO
+| Информационное сообщение
+
+| IGNORE
+| Игнорировать
+|===
+
+---
+
+== Сущности Effective Model
+
+=== EffectiveMetadata
+
+[quote]
+____
+Результат обработки pipeline — полностью разрешённая и готовая к генерации модель.
+Создаётся для каждого distribution profile отдельно.
+____
+
+==== Ключевые атрибуты
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| distribution
+| String
+| Имя distribution profile
+
+| libraries
+| Map<String, EffectiveLibrary>
+| Библиотеки с разрешёнными версиями (после фильтрации)
+
+| bundles
+| Map<String, EffectiveBundle>
+| Бандлы (после фильтрации)
+
+| plugins
+| Map<String, EffectivePlugin>
+| Плагины с разрешёнными версиями
+
+| versions
+| Map<String, ResolvedVersion>
+| Используемые версии с указанием источника
+
+| diagnostics
+| ProcessingDiagnostics
+| Результаты валидации, предупреждения, ошибки
+|===
+
+---
+
+=== ResolvedVersion
+
+[quote]
+____
+Версия с информацией об источнике.
+____
+
+==== Атрибуты
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| value
+| String
+| Значение версии (например: `3.4.0`)
+
+| source
+| VersionSource
+| Источник версии
+|===
+
+==== VersionSource (приоритет)
+
+[cols="1,1,3",options="header"]
+|===
+| Приоритет | Значение | Описание
+
+| 1 (высший)
+| DECLARED
+| Явно указана в DSL конфигурации через `version = "1.0.0"`, `versionRef("alias")` или inline в coordinates
+
+| 2 (низший)
+| BOM_IMPORT
+| Импортирована из Platform (Maven BOM) через BomImportProcessor
+|===
+
+==== Примеры VersionSource
+
+[source,kotlin]
+----
+// DECLARED — явно указана версия
+library("guava", "com.google.guava:guava", version = "33.0.0-jre")
+
+// DECLARED — через versionRef
+library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+    version = versionRef("kotlin"))
+
+// DECLARED — inline версия в coordinates
+library("slf4j", "org.slf4j:slf4j-api:2.0.9")
+
+// BOM_IMPORT — версия будет из Spring Boot BOM
+library("spring-web", "org.springframework:spring-web")  // без версии
+----
+
+== Связи между сущностями
+
+[cols="1,1,3",options="header"]
+|===
+| Связь | Кардинальность | Описание
+
+| DependangerDsl → Library
+| 1:N
+| DSL содержит множество библиотек
+
+| DependangerDsl → Plugin
+| 1:N
+| DSL содержит множество plugins
+
+| DependangerDsl → Version
+| 1:N
+| DSL определяет именованные версии
+
+| DependangerDsl → Bundle
+| 1:N
+| DSL содержит множество бандлов
+
+| DependangerDsl → Platform
+| 1:N
+| DSL импортирует внешние BOM
+
+| DependangerDsl → Distribution
+| 1:N
+| DSL содержит профили генерации
+
+| DependangerDsl → CompatibilityRule
+| 1:N
+| DSL содержит правила совместимости
+
+| Bundle → Library
+| N:M
+| Бандл включает библиотеки по alias
+
+| Bundle → Bundle
+| N:M
+| Бандл наследует другие бандлы (extends)
+
+| Library → Version
+| N:1
+| Библиотека ссылается на Version через `versionRef()`
+
+| Plugin → Version
+| N:1
+| Plugin ссылается на Version через `versionRef()`
+|===
+
+== Трансформация моделей
+
+[source]
+----
+DependangerDsl (in-memory)
+       │
+       ▼ toMetadata()
+DependangerMetadata
+       │
+       ▼ SerializationFormat.write()
+metadata.json
+       │
+       ▼ Processing Pipeline
+       │  (version resolution, filtering, validation)
+       │
+       ▼
+EffectiveMetadata
+       │
+       ▼ serialize
+effective-{distribution}.json
+       │
+       ▼ ArtifactGenerator
+       │
+       ├──→ libs.versions.toml (TOML)
+       └──→ dependanger-bom.pom (BOM)
+----
+
+См. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] для деталей pipeline.
+
+== Связанные документы
+
+* xref:architecture.adoc[Архитектура] — модули, SPI интерфейсы
+* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — детали DSL синтаксиса
+* xref:../02-features/F002-metadata-serialization.adoc[F002: Metadata Serialization] — SerializationFormat SPI
+* xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] — процессоры и их порядок

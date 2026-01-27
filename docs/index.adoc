@@ -1,0 +1,68 @@
+= Dependanger: Документация проекта
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+
+== Навигация по документации
+
+[cols="1,3",options="header"]
+|===
+| Раздел | Описание
+
+| xref:00-overview.adoc[00. Обзор проекта]
+| Цели, глоссарий, контекст, стейкхолдеры
+
+| xref:01-concepts/index.adoc[01. Концепции]
+| Доменная модель, архитектура, Constitution, Guidelines, Fitness Functions
+
+| xref:02-features/index.adoc[02. Функциональные требования]
+| Описание фич по приоритету с acceptance criteria
+
+| xref:03-interfaces/index.adoc[03. Интерфейсы]
+| Gradle Plugin, CLI, API — точки входа в систему
+
+| xref:04-nfr.adoc[04. Нефункциональные требования]
+| Производительность, масштабируемость, безопасность
+
+| xref:05-decisions/index.adoc[05. Архитектурные решения]
+| ADR (Architecture Decision Records)
+|===
+
+== Как работать с документацией
+
+=== Структура файлов
+
+[source]
+----
+docs/
+├── index.adoc                    # Этот файл (навигация)
+├── 00-overview.adoc              # Обзор проекта
+├── 01-concepts/
+│   ├── index.adoc
+│   ├── domain-model.adoc
+│   └── architecture.adoc
+├── 02-features/
+│   ├── index.adoc
+│   ├── F001-registry-dsl.adoc
+│   └── ...
+├── 03-interfaces/
+│   ├── index.adoc
+│   ├── gradle-plugin.adoc
+│   └── cli.adoc
+├── 04-nfr.adoc
+├── 05-decisions/
+│   ├── index.adoc
+│   └── ADR-001-*.adoc
+└── _templates/                   # Шаблоны документов
+    ├── feature-template.adoc
+    ├── interface-template.adoc
+    └── adr-template.adoc
+----
+
+=== Правила нумерации
+
+* **Фичи**: `F###` — порядковый номер по приоритету
+* **ADR**: `ADR-###` — хронологический порядок
+* **Требования**: `FR-###`, `NFR-###` — в рамках документа

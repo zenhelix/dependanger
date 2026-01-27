@@ -1,0 +1,848 @@
+= CLI (Command Line Interface)
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: highlight.js
+
+== Обзор
+
+CLI предоставляет standalone интерфейс для Dependanger без зависимости от Gradle.
+Построен на базе https://ajalt.github.io/clikt/[Clikt].
+
+[cols="1,2",options="header"]
+|===
+| Характеристика | Значение
+
+| Бинарное имя
+| `dependanger`
+
+| Формат входных данных
+| JSON (metadata.json)
+
+| Целевая аудитория
+| DevOps, CI/CD
+|===
+
+== Установка
+
+=== Homebrew (macOS/Linux)
+
+[source,bash]
+----
+brew install zenhelix/tap/dependanger
+----
+
+=== SDKMAN
+
+[source,bash]
+----
+sdk install dependanger
+----
+
+=== Manual
+
+[source,bash]
+----
+# Скачать релиз
+curl -LO https://github.com/zenhelix/dependanger/releases/latest/download/dependanger.zip
+unzip dependanger.zip
+chmod +x dependanger/bin/dependanger
+
+# Добавить в PATH
+export PATH="$PWD/dependanger/bin:$PATH"
+----
+
+== Команды
+
+=== generate
+
+Генерация TOML Version Catalog и/или Maven BOM из metadata.
+
+[source,bash]
+----
+dependanger generate [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--toml`
+| Генерировать TOML Version Catalog
+| `false` (если не указан ни один формат, генерируется TOML)
+
+| `--bom`
+| Генерировать Maven BOM
+| `false`
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `-o, --output <path>`
+| Директория для выходных файлов
+| `.`
+
+| `-d, --distribution <name>`
+| Генерировать только для указанной дистрибуции
+| все
+
+| `--all`
+| Генерировать для всех дистрибуций
+| `false`
+
+| `--toml-name <name>`
+| Имя выходного TOML файла
+| `libs.versions.toml`
+
+| `--group-id <id>`
+| Group ID для BOM
+| `io.github.zenhelix`
+
+| `--artifact-id <id>`
+| Artifact ID для BOM
+| `dependanger-bom`
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Генерация TOML (default)
+dependanger generate --input metadata.json --output ./build
+
+# Генерация BOM
+dependanger generate --bom --input metadata.json \
+    --group-id com.example --artifact-id my-bom
+
+# Генерация TOML и BOM
+dependanger generate --toml --bom --input metadata.json
+
+# Для конкретной дистрибуции
+dependanger generate --toml --distribution android --input metadata.json
+
+# Для всех дистрибуций
+dependanger generate --toml --all --input metadata.json --output ./catalogs
+----
+
+=== validate
+
+Валидация структуры metadata JSON и проверка на ошибки.
+
+[source,bash]
+----
+dependanger validate [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--strict`
+| Строгий режим — ошибка при нерезолвленных версиях
+| `false`
+
+| `--json`
+| Вывод результатов в JSON формате
+| `false`
+
+| `--format <format>`
+| Формат вывода: `text` или `json`
+| `text`
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Валидация успешна
+
+| `1`
+| Есть предупреждения (warnings)
+
+| `2`
+| Есть ошибки (errors)
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Базовая валидация
+dependanger validate --input metadata.json
+
+# Строгий режим
+dependanger validate --strict --input metadata.json
+
+# JSON вывод для CI
+dependanger validate --json --input metadata.json
+----
+
+==== Пример вывода (text)
+
+[source]
+----
+✓ Metadata structure is valid
+✓ All version references resolved
+⚠ Warning: Library 'guava' has no tags defined
+⚠ Warning: Bundle 'testing' contains deprecated library 'junit4'
+
+Validation completed: 0 errors, 2 warnings
+----
+
+==== Пример вывода (JSON)
+
+[source,json]
+----
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "code": "MISSING_TAGS",
+      "library": "guava",
+      "message": "Library 'guava' has no tags defined"
+    },
+    {
+      "code": "DEPRECATED_LIBRARY",
+      "bundle": "testing",
+      "library": "junit4",
+      "message": "Bundle 'testing' contains deprecated library 'junit4'"
+    }
+  ]
+}
+----
+
+=== check-updates
+
+Проверка доступных обновлений версий зависимостей.
+
+[source,bash]
+----
+dependanger check-updates [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--major, --show-major`
+| Показывать major обновления
+| `true`
+
+| `--minor, --show-minor`
+| Показывать minor обновления
+| `true`
+
+| `--patch, --show-patch`
+| Показывать patch обновления
+| `true`
+
+| `--pre-release, --include-pre-release`
+| Включить pre-release версии
+| `false`
+
+| `--json`
+| Вывод результатов в JSON формате
+| `false`
+
+| `--format <format>`
+| Формат вывода: `text` или `json`
+| `text`
+
+| `--fail, --fail-on-major`
+| Exit code 1 при наличии major обновлений
+| `false`
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Проверка всех обновлений
+dependanger check-updates --input metadata.json
+
+# Только major обновления
+dependanger check-updates --major --input metadata.json
+
+# С pre-release версиями
+dependanger check-updates --include-pre-release --input metadata.json
+
+# CI: fail при major обновлениях
+dependanger check-updates --fail-on-major --input metadata.json
+
+# JSON вывод
+dependanger check-updates --json --input metadata.json
+----
+
+==== Пример вывода (text)
+
+[source]
+----
+Available updates:
+
+MAJOR:
+  kotlin: 2.1.20 → 3.0.0
+  
+MINOR:
+  spring-boot: 3.4.1 → 3.5.0
+  guava: 33.0.0-jre → 33.1.0-jre
+  
+PATCH:
+  junit: 5.11.0 → 5.11.1
+
+Summary: 1 major, 2 minor, 1 patch updates available
+----
+
+==== Пример вывода (JSON)
+
+[source,json]
+----
+{
+  "updates": [
+    {
+      "alias": "kotlin",
+      "group": "org.jetbrains.kotlin",
+      "artifact": "kotlin-stdlib",
+      "currentVersion": "2.1.20",
+      "availableVersions": {
+        "major": "3.0.0",
+        "minor": null,
+        "patch": null
+      }
+    },
+    {
+      "alias": "spring-boot",
+      "group": "org.springframework.boot",
+      "artifact": "spring-boot-starter",
+      "currentVersion": "3.4.1",
+      "availableVersions": {
+        "major": null,
+        "minor": "3.5.0",
+        "patch": null
+      }
+    }
+  ],
+  "summary": {
+    "major": 1,
+    "minor": 2,
+    "patch": 1,
+    "total": 4
+  }
+}
+----
+
+=== analyze
+
+Анализ совместимости зависимостей.
+
+[source,bash]
+----
+dependanger analyze [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--jdk, --target-jdk <version>`
+| Целевая версия JDK для анализа
+| `17`
+
+| `--fail, --fail-on-error`
+| Exit code 1 при ошибках совместимости
+| `false`
+
+| `--json`
+| Вывод результатов в JSON формате
+| `false`
+
+| `--format <format>`
+| Формат вывода: `text` или `json`
+| `text`
+
+| `--rules, --rules-file <path>`
+| Внешний файл с правилами совместимости
+| —
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Анализ для JDK 17
+dependanger analyze --target-jdk 17 --input metadata.json
+
+# С внешними правилами
+dependanger analyze --rules-file rules.json --input metadata.json
+
+# CI: fail при ошибках
+dependanger analyze --fail-on-error --input metadata.json
+
+# JSON вывод
+dependanger analyze --json --input metadata.json
+----
+
+==== Пример вывода (text)
+
+[source]
+----
+Compatibility Analysis for JDK 17:
+
+ERRORS:
+  ✗ spring-boot-starter 2.7.18 requires JDK >= 8, but recommend JDK >= 17 for Spring Boot 3.x
+
+WARNINGS:
+  ⚠ slf4j-simple and logback-classic are mutually exclusive
+  ⚠ kotlin-stdlib 1.9.0 is outdated, recommend 2.x for new projects
+
+Summary: 1 error, 2 warnings
+----
+
+==== Пример вывода (JSON)
+
+[source,json]
+----
+{
+  "targetJdk": 17,
+  "issues": [
+    {
+      "severity": "ERROR",
+      "type": "JDK_REQUIREMENT",
+      "rule": "spring-boot-3x",
+      "library": "spring-boot-starter",
+      "version": "2.7.18",
+      "message": "spring-boot-starter 2.7.18 requires JDK >= 8, but recommend JDK >= 17 for Spring Boot 3.x"
+    },
+    {
+      "severity": "WARNING",
+      "type": "MUTUAL_EXCLUSION",
+      "rule": "logging",
+      "libraries": ["slf4j-simple", "logback-classic"],
+      "message": "slf4j-simple and logback-classic are mutually exclusive"
+    }
+  ],
+  "summary": {
+    "errors": 1,
+    "warnings": 2
+  }
+}
+----
+
+== Управление метаданными
+
+Команды для создания и редактирования metadata.json без Gradle.
+
+=== init
+
+Создание нового metadata.json файла.
+
+[source,bash]
+----
+dependanger init [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-o, --output <path>`
+| Путь к выходному файлу
+| `./metadata.json`
+
+| `--name <name>`
+| Название проекта
+| —
+
+| `--kotlin-version <version>`
+| Версия Kotlin (добавляет version alias)
+| —
+
+| `--jdk-version <version>`
+| Целевая версия JDK
+| `17`
+
+| `--force`
+| Перезаписать существующий файл
+| `false`
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Базовая инициализация
+dependanger init --output metadata.json
+
+# С начальными настройками
+dependanger init --name "my-project" --kotlin-version 2.1.20 --jdk-version 21
+
+# Перезаписать существующий
+dependanger init --force --output metadata.json
+----
+
+=== add-version
+
+Добавить новый version alias в metadata.
+
+[source,bash]
+----
+dependanger add-version <alias> <value> [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Путь к metadata.json
+| `./metadata.json`
+
+| `--fallback <condition=value>`
+| Условный fallback (можно указать несколько)
+| —
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Простая версия
+dependanger add-version kotlin 2.1.20
+
+# С fallback
+dependanger add-version spring-boot 3.4.1 --fallback "jdkBelow(17)=2.7.18"
+----
+
+=== add-library
+
+Добавить новую библиотеку в metadata.
+
+[source,bash]
+----
+dependanger add-library <alias> <coordinates> [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Путь к metadata.json
+| `./metadata.json`
+
+| `--version <version>`
+| Inline версия или ссылка на alias (ref:name)
+| —
+
+| `--tags <tags>`
+| Теги через запятую
+| —
+
+| `--requires-jdk <version>`
+| Минимальная версия JDK
+| —
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# С inline версией
+dependanger add-library guava com.google.guava:guava --version 33.0.0-jre --tags core,utils
+
+# С ссылкой на version alias
+dependanger add-library kotlin-stdlib org.jetbrains.kotlin:kotlin-stdlib --version ref:kotlin --tags core,kotlin
+
+# Без версии (будет из BOM)
+dependanger add-library spring-web org.springframework:spring-web --tags web,spring
+----
+
+=== add-plugin
+
+Добавить новый Gradle plugin в metadata.
+
+[source,bash]
+----
+dependanger add-plugin <alias> <plugin-id> [OPTIONS]
+----
+
+==== Примеры
+
+[source,bash]
+----
+dependanger add-plugin kotlin-jvm org.jetbrains.kotlin.jvm --version ref:kotlin
+----
+
+=== add-bundle
+
+Добавить новый bundle в metadata.
+
+[source,bash]
+----
+dependanger add-bundle <name> [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--libraries <aliases>`
+| Alias'ы библиотек через запятую
+| —
+
+| `--extends <bundles>`
+| Имена бандлов для наследования через запятую
+| —
+|===
+
+==== Примеры
+
+[source,bash]
+----
+dependanger add-bundle kotlin-core --libraries kotlin-stdlib,kotlin-reflect
+dependanger add-bundle kotlin-full --extends kotlin-core --libraries kotlinx-coroutines-core
+----
+
+=== add-platform
+
+Добавить новую platform (BOM import) в metadata.
+
+[source,bash]
+----
+dependanger add-platform <coordinates> [OPTIONS]
+----
+
+==== Примеры
+
+[source,bash]
+----
+dependanger add-platform org.springframework.boot:spring-boot-dependencies:3.4.1
+dependanger add-platform org.jetbrains.kotlin:kotlin-bom --version ref:kotlin
+----
+
+=== add-distribution
+
+Добавить новый distribution profile в metadata.
+
+[source,bash]
+----
+dependanger add-distribution <name> [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--include-tags <tags>`
+| Теги для включения (anyOf)
+| —
+
+| `--exclude-tags <tags>`
+| Теги для исключения
+| —
+
+| `--include-bundles <bundles>`
+| Бандлы для включения
+| —
+|===
+
+==== Примеры
+
+[source,bash]
+----
+dependanger add-distribution android --include-tags android,mobile --exclude-tags server
+dependanger add-distribution backend --include-bundles spring-backend,kotlin-core
+----
+
+=== remove-*
+
+Удалить элемент из metadata.
+
+[source,bash]
+----
+dependanger remove-version <alias>
+dependanger remove-library <alias>
+dependanger remove-plugin <alias>
+dependanger remove-bundle <name>
+dependanger remove-platform <coordinates>
+dependanger remove-distribution <name>
+----
+
+==== Примеры
+
+[source,bash]
+----
+dependanger remove-library deprecated-lib
+dependanger remove-bundle old-bundle
+----
+
+=== update-*
+
+Обновить существующий элемент в metadata.
+
+[source,bash]
+----
+dependanger update-version <alias> [OPTIONS]
+dependanger update-library <alias> [OPTIONS]
+----
+
+Опции аналогичны соответствующим `add-*` командам.
+
+==== Примеры
+
+[source,bash]
+----
+# Обновить версию
+dependanger update-version kotlin 2.1.21
+
+# Добавить теги к библиотеке
+dependanger update-library guava --tags core,utils,google
+----
+
+== Глобальные опции
+
+[cols="1,2",options="header"]
+|===
+| Опция | Описание
+
+| `--help`
+| Показать справку
+
+| `--version`
+| Показать версию
+
+| `-v, --verbose`
+| Подробный вывод
+
+| `-q, --quiet`
+| Минимальный вывод (только ошибки)
+|===
+
+== Конфигурационный файл
+
+CLI поддерживает конфигурационный файл `.dependanger.yaml`:
+
+[source,yaml]
+----
+# .dependanger.yaml
+defaults:
+  input: ./dependanger-metadata.json
+  output: ./build/dependanger
+
+generate:
+  toml:
+    filename: libs.versions.toml
+  bom:
+    groupId: com.example
+    artifactId: my-bom
+
+check-updates:
+  include-pre-release: false
+  fail-on-major: true
+
+analyze:
+  target-jdk: 17
+  fail-on-error: true
+----
+
+== CI/CD Интеграция
+
+=== GitHub Actions
+
+[source,yaml]
+----
+name: Dependency Check
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Каждый понедельник в 8:00
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Dependanger
+        run: |
+          curl -LO https://github.com/zenhelix/dependanger/releases/latest/download/dependanger.zip
+          unzip dependanger.zip
+          echo "$PWD/dependanger/bin" >> $GITHUB_PATH
+      
+      - name: Validate metadata
+        run: dependanger validate --strict --input metadata.json
+      
+      - name: Check for updates
+        run: dependanger check-updates --json --input metadata.json > updates.json
+      
+      - name: Analyze compatibility
+        run: dependanger analyze --fail-on-error --target-jdk 17 --input metadata.json
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-report
+          path: updates.json
+----
+
+=== GitLab CI
+
+[source,yaml]
+----
+dependency-check:
+  image: eclipse-temurin:17-jdk
+  stage: test
+  script:
+    - curl -LO https://github.com/zenhelix/dependanger/releases/latest/download/dependanger.zip
+    - unzip dependanger.zip
+    - ./dependanger/bin/dependanger validate --strict --input metadata.json
+    - ./dependanger/bin/dependanger check-updates --fail-on-major --input metadata.json
+    - ./dependanger/bin/dependanger analyze --fail-on-error --input metadata.json
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+----
+
+== Связи с другими разделами
+
+* xref:../02-features/F002-metadata-serialization.adoc[F002 Metadata Serialization] — формат metadata.json
+* xref:../02-features/F007-update-check.adoc[F007 Update Check] — проверка обновлений
+* xref:../02-features/F008-compatibility-analysis.adoc[F008 Compatibility Analysis] — анализ совместимости
+* xref:gradle-plugin.adoc[Gradle Plugin] — альтернативный интерфейс для Gradle проектов
+* xref:library-api.adoc[Library API] — программный API

@@ -1,0 +1,214 @@
+= ADR-003: Distribution-based подход к фильтрации
+:icons: font
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| Статус | 🟢 Принято
+| Дата | 2026-01-15
+| Авторы | Dependanger Team
+| Затронутые компоненты | dependanger-core, dependanger-effective
+|===
+
+== Контекст
+
+Многие проекты требуют разные наборы зависимостей для разных целей:
+
+* **Android** приложение использует AndroidX, Compose
+* **Backend** сервис использует Spring, JDBC драйверы
+* **Shared** модуль использует только Kotlin stdlib и kotlinx библиотеки
+* **Full** — все зависимости для монорепозитория
+
+Необходим механизм, позволяющий:
+
+1. Определять наборы зависимостей декларативно
+2. Генерировать разные TOML/BOM для разных целей
+3. Избегать дублирования определений библиотек
+
+== Решение
+
+Введена концепция **Distribution** — именованный профиль генерации с фильтрами.
+
+[source,kotlin]
+----
+distributions {
+    distribution("android") {
+        filter {
+            includeTags("android", "core")
+            excludeLibraries("jdbc-driver", "spring-*")
+        }
+    }
+    
+    distribution("backend") {
+        filter {
+            includeTags("backend", "core")
+            excludeTags("android", "ios")
+        }
+    }
+}
+----
+
+== Обоснование
+
+=== Рассмотренные альтернативы
+
+**1. Отдельные DSL блоки для каждой цели:**
+
+[source,kotlin]
+----
+androidLibraries { ... }
+backendLibraries { ... }
+----
+
+*Недостаток:* Дублирование shared библиотек, сложность поддержки.
+
+**2. Наследование конфигураций:**
+
+[source,kotlin]
+----
+distribution("android") extends "core" { ... }
+----
+
+*Недостаток:* Сложность понимания итогового набора, неявные зависимости.
+
+**3. Условная компиляция в DSL:**
+
+[source,kotlin]
+----
+library("compose-ui", ...) {
+    onlyFor("android")
+}
+----
+
+*Недостаток:* Смешивание определения и фильтрации, сложность масштабирования.
+
+=== Преимущества выбранного подхода
+
+[cols="1,2"]
+|===
+| Критерий | Обоснование
+
+| Single source of truth
+| Все библиотеки определяются один раз
+
+| Declarative filtering
+| Фильтры описывают ЧТО включить, а не КАК
+
+| Composable
+| Теги позволяют гибко комбинировать критерии
+
+| Preview support
+| Можно предварительно увидеть результат фильтрации
+
+| Independent generation
+| Каждая дистрибуция генерируется независимо
+|===
+
+== Последствия
+
+=== Положительные
+
+* Одно определение библиотеки используется во всех дистрибуциях
+* Чёткое разделение: libraries (что есть) vs distributions (что нужно)
+* Поддержка сложных фильтров через теги
+* Preview API позволяет проверить результат фильтрации до генерации
+
+=== Отрицательные
+
+* Дополнительная концепция для понимания (tags, distributions)
+* Возможность получить пустую дистрибуцию при неправильных фильтрах
+* Необходимость поддерживать теги в актуальном состоянии
+
+=== Нейтральные
+
+* Теги добавляют небольшой overhead при определении библиотек
+* Валидация предупреждает о библиотеках без тегов
+
+== Реализация
+
+=== FilterSpec
+
+[source,kotlin]
+----
+data class FilterSpec(
+    val includeTags: Set<String> = emptySet(),
+    val excludeTags: Set<String> = emptySet(),
+    val includeLibraries: Set<String> = emptySet(),
+    val excludeLibraries: Set<String> = emptySet(),
+    val includePatterns: List<Regex> = emptyList(),
+    val excludePatterns: List<Regex> = emptyList()
+)
+----
+
+=== Логика фильтрации
+
+1. Если `includeTags` не пуст — библиотека должна иметь хотя бы один из тегов
+2. Если библиотека имеет любой тег из `excludeTags` — исключается
+3. `includeLibraries` / `excludeLibraries` — явное включение/исключение по alias
+4. Patterns — regex для гибкой фильтрации
+
+=== Пример использования
+
+[source,kotlin]
+----
+// DSL
+dependanger {
+    libraries {
+        library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+            version = versionRef("kotlin")
+            tags("core", "kotlin")
+        }
+        library("compose-ui", "androidx.compose.ui:ui") {
+            version = "1.6.0"
+            tags("android", "compose", "ui")
+        }
+        library("spring-boot", "org.springframework.boot:spring-boot-starter") {
+            version = versionRef("spring-boot")
+            tags("backend", "spring")
+        }
+    }
+    
+    distributions {
+        distribution("android") {
+            filter {
+                includeTags("android", "core")
+            }
+        }
+        // Результат: kotlin-stdlib, compose-ui
+        
+        distribution("backend") {
+            filter {
+                includeTags("backend", "core")
+            }
+        }
+        // Результат: kotlin-stdlib, spring-boot
+    }
+}
+----
+
+=== Preview API
+
+[source,kotlin]
+----
+val preview = dependanger.previewFilter(
+    metadata = metadata,
+    distribution = DistributionSelection.Named("android")
+)
+
+println("Included: ${preview.includedLibraries.map { it.alias }}")
+// [kotlin-stdlib, compose-ui]
+
+println("Excluded: ${preview.excludedLibraries.map { it.alias }}")
+// [spring-boot]
+----
+
+== Связанные решения
+
+* xref:ADR-002-pipeline-architecture.adoc[ADR-002] — фильтрация реализована как processor в pipeline
+* Tag-based approach выбран как основной механизм категоризации
+
+== Ссылки
+
+* xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — синтаксис distributions
+* xref:../01-concepts/domain-model.adoc[Domain Model] — описание сущности Distribution

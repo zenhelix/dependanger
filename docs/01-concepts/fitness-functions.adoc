@@ -1,0 +1,195 @@
+= Architecture Fitness Functions
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+// ============================================================================
+// FITNESS FUNCTIONS — автоматические проверки архитектуры
+// Описывает ЧТО проверять, реализация появится при разработке
+// ============================================================================
+
+[abstract]
+--
+Fitness Functions — автоматизированные тесты, проверяющие соответствие кода архитектурным принципам из Constitution.
+Запускаются в CI и блокируют merge при нарушениях.
+--
+
+== Что такое Fitness Functions
+
+[quote,Building Evolutionary Architectures (O'Reilly)]
+____
+Fitness function: an objective function used to summarize how close a given design solution is to achieving the set aims.
+____
+
+Fitness Functions позволяют:
+
+* Автоматически проверять архитектурные ограничения
+* Обнаруживать нарушения на этапе CI/CD
+* Документировать архитектурные правила в виде кода
+* Отслеживать архитектурный drift со временем
+
+== Инструменты
+
+[cols="1,2,2",options="header"]
+|===
+| Инструмент | Назначение | Правила Constitution
+
+| ArchUnit
+| Проверка зависимостей между модулями, слоями, пакетами
+| M1, M2, M3, E1, T1
+
+| Detekt
+| Статический анализ Kotlin кода
+| C2, X1
+
+| Dependency Analysis Plugin
+| Анализ зависимостей Gradle модулей
+| M1, M2
+
+| JaCoCo
+| Покрытие тестами
+| T3
+
+| Konsist
+| Kotlin-специфичные архитектурные тесты
+| M3, C1
+|===
+
+== Матрица проверок
+
+=== Модульность (M)
+
+[cols="1,2,2",options="header"]
+|===
+| Правило | Что проверяем | Инструмент
+
+| M1: Направление зависимостей
+| interfaces → api → features → core (не наоборот)
+| ArchUnit (layeredArchitecture)
+
+| M2: Изоляция core
+| core не зависит от HTTP, конкретной сериализации, фреймворков
+| ArchUnit (noClasses.dependOnClassesThat)
+
+| M3: Публичный API
+| Внутренние классы в пакете `internal`, не используются снаружи
+| Konsist
+|===
+
+=== Расширяемость (E)
+
+[cols="1,2,2",options="header"]
+|===
+| Правило | Что проверяем | Инструмент
+
+| E1: SPI интерфейсы
+| Генераторы реализуют `ArtifactGenerator`, процессоры — `EffectiveMetadataProcessor`
+| ArchUnit (classes.should.implement)
+|===
+
+=== Тестируемость (T)
+
+[cols="1,2,2",options="header"]
+|===
+| Правило | Что проверяем | Инструмент
+
+| T1: Инъекция зависимостей
+| Нет static mutable полей, сервисы не создают зависимости напрямую
+| ArchUnit (noFields.areStatic.areNotFinal)
+
+| T2: Абстракции
+| Внешние системы (HTTP, FS, время) за интерфейсами
+| Code review + ArchUnit
+
+| T3: Покрытие
+| Coverage > 70%
+| JaCoCo
+|===
+
+=== Код и стиль (C)
+
+[cols="1,2,2",options="header"]
+|===
+| Правило | Что проверяем | Инструмент
+
+| C1: Explicit API
+| Публичные функции/свойства имеют явные типы
+| Kotlin compiler (explicitApi) + Konsist
+
+| C2: Иммутабельность
+| Data классы используют только `val`
+| Konsist + Detekt
+|===
+
+=== Запрещенные практики (X)
+
+[cols="1,2,2",options="header"]
+|===
+| Правило | Что проверяем | Инструмент
+
+| X1: Глобальное состояние
+| Нет `var` в `object`, нет mutable static полей
+| Detekt (custom rule)
+
+| X2: Блокирующий I/O
+| Suspend функции для I/O, явный `Dispatchers.IO`
+| Code review
+
+| X3: Хардкод
+| Нет жестко закодированных путей, URL, credentials
+| Detekt (ForbiddenMethodCall)
+|===
+
+== Метрики и пороги
+
+[cols="1,2,1,1",options="header"]
+|===
+| Метрика | Описание | Порог | Блокирует merge
+
+| Cyclic dependencies
+| Циклические зависимости между модулями
+| 0
+| Да
+
+| Layer violations
+| Нарушения направления зависимостей
+| 0
+| Да
+
+| Test coverage
+| Покрытие кода тестами
+| > 70%
+| Да
+
+| Cyclomatic complexity
+| Сложность методов
+| < 10
+| Нет (warning)
+
+| Public API violations
+| Нарушения explicit API
+| 0
+| Да
+|===
+
+== CI интеграция
+
+Fitness Functions запускаются в CI pipeline:
+
+. **На каждый PR:**
+- ArchUnit тесты
+- Detekt
+- Konsist
+- Dependency Analysis
+
+. **При merge в main:**
+- Все вышеперечисленное
+- JaCoCo coverage verification
+- Публикация метрик в dashboard
+
+== Связанные документы
+
+* xref:constitution.adoc[Constitution] — правила, которые проверяются
+* xref:guidelines.adoc[Guidelines] — рекомендации
+* xref:architecture.adoc[Architecture] — общая структура

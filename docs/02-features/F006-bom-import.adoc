@@ -6,8 +6,7 @@
 
 [abstract]
 --
-Импорт версий из внешних Maven BOM (Spring Boot BOM, Kotlin BOM и др.).
-Опциональный процессор в pipeline (order: 15).
+Импорт версий из внешних Maven BOM (Spring Boot BOM, Kotlin BOM и др.) через опциональный процессор pipeline (order: 15).
 --
 
 == Метаданные

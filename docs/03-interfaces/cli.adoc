@@ -107,6 +107,22 @@ dependanger generate [OPTIONS]
 | `dependanger-bom`
 |===
 
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Генерация успешна
+
+| `1`
+| Ошибка валидации входных данных
+
+| `2`
+| Ошибка записи выходных файлов
+|===
+
 ==== Примеры
 
 [source,bash]
@@ -151,12 +167,8 @@ dependanger validate [OPTIONS]
 | Строгий режим — ошибка при нерезолвленных версиях
 | `false`
 
-| `--json`
-| Вывод результатов в JSON формате
-| `false`
-
 | `--format <format>`
-| Формат вывода: `text` или `json`
+| Формат вывода: `text` или `json`. Алиас: `--json` эквивалентен `--format json`
 | `text`
 |===
 
@@ -260,17 +272,29 @@ dependanger check-updates [OPTIONS]
 | Включить pre-release версии
 | `false`
 
-| `--json`
-| Вывод результатов в JSON формате
-| `false`
-
 | `--format <format>`
-| Формат вывода: `text` или `json`
+| Формат вывода: `text` или `json`. Алиас: `--json` эквивалентен `--format json`
 | `text`
 
 | `--fail, --fail-on-major`
 | Exit code 1 при наличии major обновлений
 | `false`
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Проверка завершена, major обновлений нет (или `--fail-on-major` не указан)
+
+| `1`
+| Есть major обновления (при `--fail-on-major`)
+
+| `2`
+| Ошибка при проверке (невалидный input, сетевая ошибка)
 |===
 
 ==== Примеры
@@ -377,17 +401,29 @@ dependanger analyze [OPTIONS]
 | Exit code 1 при ошибках совместимости
 | `false`
 
-| `--json`
-| Вывод результатов в JSON формате
-| `false`
-
 | `--format <format>`
-| Формат вывода: `text` или `json`
+| Формат вывода: `text` или `json`. Алиас: `--json` эквивалентен `--format json`
 | `text`
 
 | `--rules, --rules-file <path>`
 | Внешний файл с правилами совместимости
 | —
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Анализ завершён, ошибок совместимости нет (или `--fail-on-error` не указан)
+
+| `1`
+| Есть ошибки совместимости (при `--fail-on-error`)
+
+| `2`
+| Ошибка выполнения (невалидный input, ошибка парсинга правил)
 |===
 
 ==== Примеры

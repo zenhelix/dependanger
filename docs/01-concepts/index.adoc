@@ -49,15 +49,13 @@
 
 == Иерархия правил
 
-[source]
+[mermaid,target=concepts-rules-hierarchy,format=svg]
 ----
-Constitution (MUST)     ─── Нарушение = блокировка merge
-       │
-       ▼
-Guidelines (SHOULD)     ─── Нарушение = требует обоснования в PR
-       │
-       ▼
-Fitness Functions       ─── Автоматические проверки в CI
+flowchart TB
+    C["Constitution (MUST)<br/>Нарушение = блокировка merge"]
+    G["Guidelines (SHOULD)<br/>Нарушение = требует обоснования в PR"]
+    F["Fitness Functions<br/>Автоматические проверки в CI"]
+    C --> G --> F
 ----
 
 == Ключевые принципы

@@ -1282,29 +1282,16 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 
 == Трансформация моделей
 
-[source]
+[mermaid,target=domain-model-transformation,format=svg]
 ----
-DependangerDsl (in-memory)
-       │
-       ▼ toMetadata()
-DependangerMetadata
-       │
-       ▼ SerializationFormat.write()
-metadata.json
-       │
-       ▼ Processing Pipeline
-       │  (version resolution, filtering, validation)
-       │
-       ▼
-EffectiveMetadata
-       │
-       ▼ serialize
-effective-{distribution}.json
-       │
-       ▼ ArtifactGenerator
-       │
-       ├──→ libs.versions.toml (TOML)
-       └──→ dependanger-bom.pom (BOM)
+flowchart TB
+    A["DependangerDsl<br/>(in-memory)"]
+    A -->|"toMetadata()"| B["DependangerMetadata"]
+    B -->|"SerializationFormat.write()"| C["metadata.json"]
+    C -->|"Processing Pipeline<br/>(version resolution, filtering, validation)"| D["EffectiveMetadata"]
+    D -->|"serialize"| E["effective-⁠distribution⁠.json"]
+    E -->|"ArtifactGenerator"| F["libs.versions.toml<br/>(TOML)"]
+    E -->|"ArtifactGenerator"| G["dependanger-bom.pom<br/>(BOM)"]
 ----
 
 См. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] для деталей pipeline.

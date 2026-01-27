@@ -44,19 +44,25 @@
 
 Система организована в 5 архитектурных слоёв:
 
-[source]
+[mermaid,target=architecture-layers,format=svg]
 ----
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. INTERFACES — точки входа (CLI, Gradle Plugin)                │
-├─────────────────────────────────────────────────────────────────┤
-│ 2. API — фасад Dependanger, координация                         │
-├─────────────────────────────────────────────────────────────────┤
-│ 3. MODEL — core (DSL), metadata (сериализация), effective       │
-├─────────────────────────────────────────────────────────────────┤
-│ 4. FEATURES — опциональные процессоры (resolver, updates, etc.) │
-├─────────────────────────────────────────────────────────────────┤
-│ 5. EXPORT — генераторы артефактов для внешних проектов (SPI)    │
-└─────────────────────────────────────────────────────────────────┘
+flowchart TB
+    subgraph L1["1. INTERFACES"]
+        I1["CLI, Gradle Plugin"]
+    end
+    subgraph L2["2. API"]
+        A1["Фасад Dependanger, координация"]
+    end
+    subgraph L3["3. MODEL"]
+        M1["core (DSL), metadata, effective"]
+    end
+    subgraph L4["4. FEATURES"]
+        F1["Процессоры: resolver, updates, etc."]
+    end
+    subgraph L5["5. EXPORT"]
+        E1["Генераторы артефактов (SPI)"]
+    end
+    L1 --> L2 --> L3 --> L4 --> L5
 ----
 
 === Описание слоёв
@@ -338,24 +344,14 @@ io.github.zenhelix.dependanger/
 
 === Обзор
 
-[source]
+[mermaid,target=architecture-dataflow,format=svg]
 ----
-Gradle Plugin / CLI
-        │
-        ▼
-DependangerDsl (in-memory)
-        │
-        ▼ toMetadata()
-metadata.json
-        │
-        ▼ Processing Pipeline
-EffectiveMetadata
-        │
-        ▼ ArtifactGenerator
-libs.versions.toml / bom.pom.xml
-        │
-        ▼ Publish
-Gradle/Maven Projects (consumers)
+flowchart TB
+    A["Gradle Plugin / CLI"] --> B["DependangerDsl<br/>(in-memory)"]
+    B -->|"toMetadata()"| C["metadata.json"]
+    C -->|"Processing Pipeline"| D["EffectiveMetadata"]
+    D -->|"ArtifactGenerator"| E["libs.versions.toml<br/>bom.pom.xml"]
+    E -->|"Publish"| F["Gradle/Maven Projects<br/>(consumers)"]
 ----
 
 === Файлы артефактов

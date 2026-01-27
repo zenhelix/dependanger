@@ -455,34 +455,28 @@ processing {
 
 == Интеграция с Gradle Lifecycle
 
-[plantuml,gradle-lifecycle,svg]
+[mermaid,target=gradle-lifecycle,format=svg]
 ----
-@startuml
-skinparam style strictuml
-
-rectangle "Configuration Phase" {
-    (dependanger { }) as dsl
-}
-
-rectangle "Execution Phase" {
-    (generateMetadata) as gm
-    (generateEffective) as ge
-    (generateToml) as gt
-    (generateBom) as gb
-    (validate) as v
-    (checkUpdates) as cu
-    (analyze) as a
-}
-
-dsl --> gm
-gm --> ge
-ge --> gt
-ge --> gb
-gm --> v
-ge --> cu
-ge --> a
-
-@enduml
+flowchart TB
+    subgraph Config["Configuration Phase"]
+        DSL["dependanger { }"]
+    end
+    subgraph Exec["Execution Phase"]
+        GM["generateMetadata"]
+        GE["generateEffective"]
+        GT["generateToml"]
+        GB["generateBom"]
+        V["validate"]
+        CU["checkUpdates"]
+        A["analyze"]
+    end
+    DSL --> GM
+    GM --> GE
+    GE --> GT
+    GE --> GB
+    GM --> V
+    GE --> CU
+    GE --> A
 ----
 
 == Интеграция с Version Catalogs

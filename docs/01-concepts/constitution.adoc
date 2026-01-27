@@ -36,11 +36,12 @@
 ====
 Зависимости между модулями ДОЛЖНЫ быть направлены от периферии к ядру.
 
-[source]
+[mermaid,target=constitution-deps,format=svg]
 ----
-interfaces → api → features → core
-     ↓        ↓        ↓
-   (CLI)   (facade) (processors)
+flowchart LR
+    interfaces["interfaces<br/>(CLI)"] --> api["api<br/>(facade)"]
+    api --> features["features<br/>(processors)"]
+    features --> core["core"]
 ----
 ====
 

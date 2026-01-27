@@ -36,11 +36,12 @@
 ====
 Зависимости между модулями ДОЛЖНЫ быть направлены от периферии к ядру.
 
-```
+[source]
+----
 interfaces → api → features → core
      ↓        ↓        ↓
    (CLI)   (facade) (processors)
-```
+----
 ====
 
 **Запрещено:**
@@ -51,7 +52,7 @@ interfaces → api → features → core
 
 **Проверка:** `ArchUnit: LayeredArchitectureTest`
 
----
+'''
 
 === M2: Изоляция доменной модели
 
@@ -75,7 +76,7 @@ interfaces → api → features → core
 
 **Проверка:** `ArchUnit: DomainModelIsolationTest`
 
----
+'''
 
 === M3: Граница модуля = публичный API
 
@@ -87,13 +88,14 @@ interfaces → api → features → core
 
 **Структура пакетов:**
 
-```
+[source]
+----
 io.github.zenhelix.dependanger.{module}/
 ├── api/           # Публичные интерфейсы
 ├── impl/          # Реализации (internal visibility)
 ├── internal/      # Внутренние классы
 └── spi/           # Service Provider Interface (для расширений)
-```
+----
 
 **Проверка:** `ArchUnit: PublicApiSurfaceTest`
 
@@ -136,7 +138,7 @@ io.github.zenhelix.dependanger.{module}/
 
 **Проверка:** `ArchUnit: ExtensionPointsTest`
 
----
+'''
 
 === E2: Открыт для расширения, закрыт для модификации
 
@@ -181,7 +183,7 @@ class VersionChecker {
 
 **Проверка:** `ArchUnit: DependencyInjectionTest`
 
----
+'''
 
 === T2: Абстракции для внешних систем
 
@@ -211,7 +213,7 @@ class VersionChecker {
 
 **Проверка:** `ArchUnit: ExternalSystemAbstractionsTest`
 
----
+'''
 
 === T3: Пирамида тестирования
 
@@ -226,12 +228,13 @@ class VersionChecker {
 
 **Структура тестов:**
 
-```
+[source]
+----
 src/test/kotlin/
 ├── unit/           # Быстрые, изолированные
 ├── integration/    # С реальными зависимостями
 └── functional/     # E2E сценарии
-```
+----
 
 **Проверка:** `JaCoCo coverage > 70%`, CI pipeline
 
@@ -255,7 +258,7 @@ kotlin {
 
 **Проверка:** Компиляция в CI
 
----
+'''
 
 === C2: Иммутабельность по умолчанию
 
@@ -310,7 +313,7 @@ companion object {
 }
 ----
 
----
+'''
 
 === X2: Блокирующий I/O без маркировки
 
@@ -332,7 +335,7 @@ fun fetchVersions(): List<Version> {
 }
 ----
 
----
+'''
 
 === X3: Жестко закодированные пути и URL
 

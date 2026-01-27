@@ -76,7 +76,8 @@
 
 ==== Пакеты
 
-```
+[source]
+----
 io.github.zenhelix.dependanger.{module}/
 ├── api/           # Публичные интерфейсы и DTO
 ├── impl/          # Реализации (internal)
@@ -84,7 +85,7 @@ io.github.zenhelix.dependanger.{module}/
 ├── spi/           # Service Provider Interfaces
 ├── dsl/           # DSL builders и extensions
 └── model/         # Доменные модели (если специфичны для модуля)
-```
+----
 
 === Kotlin идиомы
 
@@ -342,7 +343,8 @@ class Dependanger private constructor(
 
 === Структура тестов
 
-```
+[source]
+----
 src/test/kotlin/
 ├── unit/                    # Быстрые изолированные тесты
 │   └── {module}/
@@ -351,7 +353,7 @@ src/test/kotlin/
 │   └── {feature}IT.kt
 └── functional/              # E2E тесты
     └── {scenario}FT.kt
-```
+----
 
 === Naming convention для тестов
 

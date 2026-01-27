@@ -492,6 +492,7 @@ libraries {
 }
 ----
 
+[[bom-imports]]
 == Блок bomImports
 
 === Синтаксис

@@ -337,6 +337,7 @@ settings {
 }
 ----
 
+[[processing-block]]
 === Блок processing
 
 Настройки пайплайна обработки.

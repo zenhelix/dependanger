@@ -9,7 +9,7 @@
 Документ описывает ключевые сущности системы Dependanger на трёх уровнях абстракции:
 DSL Model (в памяти), Metadata Model (сериализованная), Effective Model (готовая к генерации).
 
-Краткие определения терминов: xref:../00-overview.adoc#_глоссарий[Глоссарий в Overview].
+Краткие определения терминов: xref:../00-overview.adoc#glossary[Глоссарий в Overview].
 --
 
 == Уровни моделей
@@ -85,7 +85,7 @@ ____
 ** Применены фильтры (distribution profile)
 ** Содержит результаты валидации
 ** Опционально: update report, compatibility report
-** Файл: `effective-{distribution}.json`
+** Файл: `effective-\{distribution\}.json`
 
 == Обзор модели (DSL Level)
 
@@ -396,7 +396,7 @@ libraries {
 * `group:name` формируют валидные Maven координаты
 * `versionRef()` должен ссылаться на существующий version alias
 
----
+'''
 
 === Plugin
 
@@ -445,7 +445,7 @@ plugins {
 * `alias` уникален (среди всех alias: libraries, plugins, bundles)
 * `id` должен быть валидным Gradle Plugin ID
 
----
+'''
 
 === Version
 
@@ -555,7 +555,7 @@ versions {
 * `value` должен быть валидной версией
 * Fallback условия оцениваются по порядку, первое подходящее выигрывает
 
----
+'''
 
 === Bundle
 
@@ -616,8 +616,9 @@ bundles {
 * Все ссылки в `extends` должны указывать на существующие бандлы
 * Не допускаются циклические зависимости между бандлами
 
----
+'''
 
+[[bom-import]]
 === BomImport
 
 [quote]
@@ -673,7 +674,7 @@ bomImports {
 * Приоритет: DECLARED (явная версия в DSL) > BOM_IMPORT (из BomImport)
 * Порядок BomImport имеет значение: первый BOM с версией для библиотеки выигрывает
 
----
+'''
 
 === TargetPlatform
 
@@ -770,7 +771,7 @@ targetPlatforms {
 | WebAssembly
 |===
 
----
+'''
 
 === Distribution
 
@@ -877,7 +878,7 @@ distributions {
 3. Применяются `exclude` фильтры → matching библиотеки удаляются
 4. Результаты всех фильтров (`byTags`, `byGroups`, `byAliases`) объединяются через **AND**
 
----
+'''
 
 === CompatibilityRule
 
@@ -953,7 +954,7 @@ compatibility {
 * Если правило ссылается на отфильтрованные библиотеки — генерируется WARNING о неполном правиле
 * Правило всё равно проверяется для оставшихся библиотек
 
----
+'''
 
 === Settings
 
@@ -1086,7 +1087,7 @@ settings {
 | Игнорировать
 |===
 
----
+'''
 
 === Platform Library
 
@@ -1120,7 +1121,7 @@ libraries {
 * Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
 * Не содержит `supportedTargets` (это не runtime dependency)
 
----
+'''
 
 == Сущности Effective Model
 
@@ -1163,7 +1164,7 @@ ____
 | Результаты валидации, предупреждения, ошибки
 |===
 
----
+'''
 
 === ResolvedVersion
 

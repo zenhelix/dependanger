@@ -133,7 +133,7 @@ interface EffectiveMetadataProcessor {
 
 === Order Convention
 
-Полный список процессоров и их порядок выполнения описан в xref:../02-features/F003-processing-pipeline.adoc#_стандартные_процессоры[F003: Processing Pipeline — Стандартные процессоры].
+Полный список процессоров и их порядок выполнения описан в xref:../02-features/F003-processing-pipeline.adoc#standard-processors[F003: Processing Pipeline — Стандартные процессоры].
 
 === Пример использования
 

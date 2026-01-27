@@ -225,7 +225,7 @@ dependanger [command] [options]
 | TODO: Как исправить
 |===
 
----
+'''
 
 === [Операция 2]
 

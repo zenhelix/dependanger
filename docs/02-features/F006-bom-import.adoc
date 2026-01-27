@@ -243,7 +243,7 @@ DECLARED > BOM_IMPORT
 
 | BOM недоступен
 | Сетевая ошибка при скачивании BOM, кеш пуст
-| ERROR "Cannot fetch BOM: {coordinates}", pipeline останавливается
+| ERROR "Cannot fetch BOM: \{coordinates\}", pipeline останавливается
 
 | BOM недоступен, есть кеш
 | Сетевая ошибка, но есть закешированный BOM
@@ -251,19 +251,19 @@ DECLARED > BOM_IMPORT
 
 | Connection timeout
 | Репозиторий не отвечает в течение таймаута (30s default)
-| ERROR "Connection timeout for BOM: {coordinates}"
+| ERROR "Connection timeout for BOM: \{coordinates\}"
 
 | Read timeout
 | Соединение установлено, но данные не приходят
-| ERROR "Read timeout for BOM: {coordinates}"
+| ERROR "Read timeout for BOM: \{coordinates\}"
 
 | DNS resolution failure
 | Не удаётся разрешить hostname репозитория
-| ERROR "Cannot resolve host: {hostname}"
+| ERROR "Cannot resolve host: \{hostname\}"
 
 | SSL/TLS ошибка
 | Невалидный сертификат, expired certificate, hostname mismatch
-| ERROR "SSL error for {url}: {причина}"
+| ERROR "SSL error for \{url\}: \{причина\}"
 
 | Self-signed certificate
 | Репозиторий использует self-signed сертификат
@@ -271,11 +271,11 @@ DECLARED > BOM_IMPORT
 
 | HTTP 404 Not Found
 | BOM не существует в репозитории
-| ERROR "BOM not found: {coordinates} (HTTP 404)"
+| ERROR "BOM not found: \{coordinates\} (HTTP 404)"
 
 | HTTP 401/403 Unauthorized
 | Репозиторий требует аутентификации
-| ERROR "Authentication required for {url}. Configure credentials in settings"
+| ERROR "Authentication required for \{url\}. Configure credentials in settings"
 
 | HTTP 500 Server Error
 | Внутренняя ошибка репозитория
@@ -287,7 +287,7 @@ DECLARED > BOM_IMPORT
 
 | Redirect loop
 | HTTP redirect зацикливается (A → B → A)
-| ERROR "Redirect loop detected for {url}" после 10 редиректов
+| ERROR "Redirect loop detected for \{url\}" после 10 редиректов
 
 | Redirect to different host
 | Репозиторий редиректит на другой домен
@@ -299,11 +299,11 @@ DECLARED > BOM_IMPORT
 
 | Corrupted download
 | Скачанный файл повреждён (checksum mismatch)
-| ERROR "Checksum mismatch for BOM: expected {x}, got {y}"
+| ERROR "Checksum mismatch for BOM: expected \{x\}, got \{y\}"
 
 | Very large BOM
 | BOM файл > 10MB
-| WARNING "Large BOM file ({size})", загрузка продолжается
+| WARNING "Large BOM file (\{size\})", загрузка продолжается
 
 3+h| Кеширование
 
@@ -404,5 +404,5 @@ val result = Dependanger.fromDsl {
 == Связанные документы
 
 * xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline
-* xref:../01-concepts/domain-model.adoc#_bomimport[Доменная модель — BomImport] — сущность BomImport
-* xref:F001-registry-dsl.adoc#_блок_bomimports[F001: Registry DSL — блок bomImports] — DSL синтаксис
+* xref:../01-concepts/domain-model.adoc#bom-import[Доменная модель — BomImport] — сущность BomImport
+* xref:F001-registry-dsl.adoc#bom-imports[F001: Registry DSL — блок bomImports] — DSL синтаксис

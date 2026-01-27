@@ -121,7 +121,7 @@ ____
 | BOM содержит только 20 библиотек
 
 | AC-003-2
-| Настройка `bom { artifactId = "my-bom-{distribution}" }`
+| Настройка `bom { artifactId = "my-bom-\{distribution\}" }`
 | Генерирую для distribution `backend`
 | `<artifactId>my-bom-backend</artifactId>`
 |===
@@ -185,7 +185,7 @@ ____
 
 **Inputs:**
 
-* `effective-{distribution}.json` от предыдущего таска
+* `effective-\{distribution\}.json` от предыдущего таска
 
 **Outputs:**
 

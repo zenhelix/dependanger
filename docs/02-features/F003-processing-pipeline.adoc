@@ -214,6 +214,7 @@ ____
 * `isOptional` — можно ли отключить процессор (по умолчанию `false`)
 * `process()` — suspend-функция обработки метаданных
 
+[[standard-processors]]
 === Стандартные процессоры
 
 [cols="1,1,2,1,1",options="header"]
@@ -627,4 +628,4 @@ flowchart TD
 
 * xref:../01-concepts/domain-model.adoc[Доменная модель — Effective Model]
 * xref:../01-concepts/architecture.adoc[Архитектура — EffectiveMetadataProcessor SPI]
-* xref:../03-interfaces/gradle-plugin.adoc#_блок_processing[Gradle Plugin — Блок processing]
+* xref:../03-interfaces/gradle-plugin.adoc#processing-block[Gradle Plugin — Блок processing]

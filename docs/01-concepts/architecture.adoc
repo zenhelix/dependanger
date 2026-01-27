@@ -9,7 +9,7 @@
 Документ описывает архитектуру системы Dependanger:
 архитектурные слои, модули, потоки данных и ключевые SPI интерфейсы.
 
-Системный контекст: xref:../00-overview.adoc#_системный_контекст[Overview → Контекст].
+Системный контекст: xref:../00-overview.adoc#system-context[Overview → Контекст].
 --
 
 == Принципы архитектуры
@@ -90,7 +90,7 @@
 
 === Level 1: System Context
 
-См. xref:../00-overview.adoc#_системный_контекст[Системный контекст в Overview].
+См. xref:../00-overview.adoc#system-context[Системный контекст в Overview].
 
 === Level 2: Container
 
@@ -368,7 +368,7 @@ Gradle/Maven Projects (consumers)
 | Сериализованная конфигурация из DSL
 | `dependangerGenerateMetadata` task
 
-| `effective-{dist}.json`
+| `effective-\{dist\}.json`
 | Обработанная модель для distribution
 | `dependangerGenerateEffective` task
 
@@ -415,7 +415,7 @@ interface SerializationFormat<T> {
 
 **Встроенные реализации:** `JsonSerializationFormat` (`dependanger-metadata-json`)
 
----
+'''
 
 === EffectiveMetadataProcessor
 
@@ -435,7 +435,7 @@ interface EffectiveMetadataProcessor {
 
 **Встроенные процессоры:** см. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline]
 
----
+'''
 
 === ArtifactGenerator
 
@@ -453,7 +453,7 @@ interface ArtifactGenerator<T> {
 
 **Встроенные реализации:** `TomlGenerator`, `BomGenerator`
 
----
+'''
 
 === LibraryFilter
 

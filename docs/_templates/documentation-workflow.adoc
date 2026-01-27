@@ -361,6 +361,7 @@ TODO: Описать цель фичи
 
 == Примеры workflow
 
+[[example-new-feature]]
 === Пример 1: Новая фича от начала до Production
 
 [source]

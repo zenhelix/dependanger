@@ -92,7 +92,7 @@ ____
 | Только библиотеки с тегом `android` включены
 
 | AC-002-3
-| Настройка `toml { filename = "libs-{distribution}.versions.toml" }`
+| Настройка `toml { filename = "libs-\{distribution\}.versions.toml" }`
 | Генерирую для distribution `production`
 | Файл называется `libs-production.versions.toml`
 
@@ -180,7 +180,7 @@ TOML ключи = DSL alias без изменений (нижний регист
 
 **Inputs:**
 
-* `effective-{distribution}.json` от предыдущего таска
+* `effective-\{distribution\}.json` от предыдущего таска
 
 **Outputs:**
 

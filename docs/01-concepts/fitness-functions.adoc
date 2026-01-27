@@ -173,6 +173,124 @@ Fitness Functions позволяют:
 | Да
 |===
 
+== Примеры тестов
+
+=== ArchUnit: Проверка слоёв (M1)
+
+[source,kotlin]
+----
+@AnalyzeClasses(packages = ["io.github.zenhelix.dependanger"])
+class LayeredArchitectureTest {
+
+    @ArchTest
+    val `layers should respect dependency direction` = layeredArchitecture()
+        .consideringAllDependencies()
+        .layer("Core").definedBy("..core..")
+        .layer("Features").definedBy("..features..")
+        .layer("Api").definedBy("..api..")
+        .layer("Interfaces").definedBy("..cli..", "..gradle..")
+        .whereLayer("Core").mayNotAccessAnyLayer()
+        .whereLayer("Features").mayOnlyAccessLayers("Core")
+        .whereLayer("Api").mayOnlyAccessLayers("Core", "Features")
+        .whereLayer("Interfaces").mayOnlyAccessLayers("Api")
+}
+----
+
+=== ArchUnit: Изоляция Core (M2)
+
+[source,kotlin]
+----
+@AnalyzeClasses(packages = ["io.github.zenhelix.dependanger.core"])
+class DomainModelIsolationTest {
+
+    @ArchTest
+    val `core should not depend on HTTP clients` = noClasses()
+        .that().resideInAPackage("..core..")
+        .should().dependOnClassesThat()
+        .resideInAnyPackage(
+            "io.ktor.client..",
+            "okhttp3..",
+            "java.net.http.."
+        )
+
+    @ArchTest
+    val `core should not depend on specific serialization` = noClasses()
+        .that().resideInAPackage("..core..")
+        .should().dependOnClassesThat()
+        .resideInAnyPackage(
+            "com.google.gson..",
+            "com.fasterxml.jackson.."
+        )
+}
+----
+
+=== Konsist: Публичный API (M3)
+
+[source,kotlin]
+----
+class PublicApiSurfaceTest {
+
+    @Test
+    fun `internal classes should be in internal package`() {
+        Konsist
+            .scopeFromProduction()
+            .classes()
+            .filter { it.hasInternalModifier }
+            .assertTrue { it.resideInPackage("..internal..") }
+    }
+
+    @Test
+    fun `public classes should have explicit visibility`() {
+        Konsist
+            .scopeFromProduction()
+            .classes()
+            .filter { !it.resideInPackage("..internal..") }
+            .assertTrue { it.hasPublicModifier }
+    }
+}
+----
+
+=== Detekt: Иммутабельность (C2)
+
+[source,yaml]
+----
+# detekt.yml
+style:
+  MutableDataClass:
+    active: true
+    ignoreAnnotated:
+      - 'Builder'
+
+  VarInDataClass:
+    active: true
+    ignoreAnnotated:
+      - 'Builder'
+----
+
+=== JaCoCo: Покрытие (T3)
+
+[source,kotlin]
+----
+// build.gradle.kts
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.70".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf("io.github.zenhelix.dependanger.core.*")
+            limit {
+                counter = "LINE"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+----
+
 == CI интеграция
 
 Fitness Functions запускаются в CI pipeline:
@@ -187,6 +305,52 @@ Fitness Functions запускаются в CI pipeline:
 - Все вышеперечисленное
 - JaCoCo coverage verification
 - Публикация метрик в dashboard
+
+=== GitHub Actions пример
+
+[source,yaml]
+----
+# .github/workflows/fitness-functions.yml
+name: Fitness Functions
+
+on: [pull_request]
+
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run ArchUnit tests
+        run: ./gradlew :test --tests "*ArchitectureTest*"
+
+      - name: Run Konsist tests
+        run: ./gradlew :test --tests "*Konsist*"
+
+      - name: Run Detekt
+        run: ./gradlew detekt
+
+      - name: Verify coverage
+        run: ./gradlew jacocoTestCoverageVerification
+----
+
+=== Ожидаемый вывод при нарушении
+
+[source]
+----
+> Task :test FAILED
+
+LayeredArchitectureTest > layers should respect dependency direction FAILED
+    java.lang.AssertionError: Architecture Violation [Priority: MEDIUM]
+    Rule 'layers should respect dependency direction' was violated (1 times):
+    Layer 'Core' is not allowed to access 'Api', but class
+    io.github.zenhelix.dependanger.core.Library accesses
+    io.github.zenhelix.dependanger.api.Dependanger in (Library.kt:15)
+----
 
 == Связанные документы
 

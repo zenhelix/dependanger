@@ -383,6 +383,212 @@ object TestLibraries {
 }
 ----
 
+== Паттерны тестирования
+
+=== Unit тесты
+
+[source,kotlin]
+----
+class LibraryFilterTest {
+
+    private val sut = TagBasedLibraryFilter()
+
+    @Test
+    fun `should include library when tag matches`() {
+        // Given
+        val library = TestLibraries.kotlinStdlib.copy(tags = setOf("core"))
+        val filter = FilterSpec(includeTags = setOf("core"))
+
+        // When
+        val result = sut.filter(listOf(library), filter)
+
+        // Then
+        assertThat(result).containsExactly(library)
+    }
+
+    @Test
+    fun `should exclude library when no tags match`() {
+        // Given
+        val library = TestLibraries.kotlinStdlib.copy(tags = setOf("core"))
+        val filter = FilterSpec(includeTags = setOf("android"))
+
+        // When
+        val result = sut.filter(listOf(library), filter)
+
+        // Then
+        assertThat(result).isEmpty()
+    }
+}
+----
+
+=== Integration тесты
+
+[source,kotlin]
+----
+@IntegrationTest
+class BomImportProcessorIT {
+
+    @TempDir
+    lateinit var tempDir: Path
+
+    private lateinit var processor: BomImportProcessor
+    private lateinit var mockServer: MockWebServer
+
+    @BeforeEach
+    fun setup() {
+        mockServer = MockWebServer()
+        mockServer.start()
+
+        processor = BomImportProcessor(
+            httpClient = HttpClient(MockEngine),
+            cache = FileBasedCache(tempDir)
+        )
+    }
+
+    @Test
+    fun `should import versions from Spring Boot BOM`() = runTest {
+        // Given
+        mockServer.enqueue(MockResponse().setBody(SPRING_BOOT_BOM_XML))
+
+        val metadata = EffectiveMetadata(
+            libraries = listOf(
+                Library("spring-web", "org.springframework:spring-web")
+            ),
+            bomImports = listOf(
+                BomImport("spring-boot", "org.springframework.boot:spring-boot-dependencies:3.4.0")
+            )
+        )
+
+        // When
+        val result = processor.process(metadata, ProcessingContext())
+
+        // Then
+        assertThat(result.libraries.first().version?.value).isEqualTo("6.2.0")
+        assertThat(result.libraries.first().versionSource).isEqualTo(VersionSource.BOM_IMPORT)
+    }
+}
+----
+
+=== Functional тесты (E2E)
+
+[source,kotlin]
+----
+@FunctionalTest
+class TomlGenerationFT {
+
+    @TempDir
+    lateinit var projectDir: Path
+
+    @Test
+    fun `should generate valid TOML from DSL`() {
+        // Given
+        val dslFile = projectDir.resolve("dependencies.main.kts")
+        dslFile.writeText("""
+            @file:DependsOn("io.github.zenhelix:dependanger-dsl:0.1.0")
+
+            import io.github.zenhelix.dependanger.dsl.*
+
+            dependanger {
+                versions {
+                    version("kotlin", "2.1.0")
+                }
+                libraries {
+                    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+                        version = versionRef("kotlin")
+                    }
+                }
+            }
+        """.trimIndent())
+
+        // When
+        val result = ProcessBuilder("kotlin", dslFile.toString())
+            .directory(projectDir.toFile())
+            .start()
+            .waitFor()
+
+        // Then
+        assertThat(result).isEqualTo(0)
+
+        val tomlFile = projectDir.resolve("libs.versions.toml")
+        assertThat(tomlFile).exists()
+        assertThat(tomlFile.readText()).contains("[versions]")
+        assertThat(tomlFile.readText()).contains("kotlin = \"2.1.0\"")
+    }
+}
+----
+
+=== Тестовые утилиты
+
+[source,kotlin]
+----
+// test-fixtures модуль
+object TestLibraries {
+    val kotlinStdlib = Library(
+        alias = "kotlin-stdlib",
+        coordinates = MavenCoordinates("org.jetbrains.kotlin", "kotlin-stdlib"),
+        version = Version("2.1.0"),
+        tags = setOf("kotlin", "core")
+    )
+
+    val springWeb = Library(
+        alias = "spring-web",
+        coordinates = MavenCoordinates("org.springframework", "spring-web"),
+        version = Version("6.2.0"),
+        tags = setOf("spring", "web")
+    )
+}
+
+object TestBoms {
+    val springBootBom = BomImport(
+        alias = "spring-boot-bom",
+        coordinates = MavenCoordinates(
+            "org.springframework.boot",
+            "spring-boot-dependencies",
+            "3.4.0"
+        )
+    )
+}
+
+// Extension для тестов
+fun Library.withVersion(version: String) = copy(version = Version(version))
+fun Library.withTags(vararg tags: String) = copy(tags = tags.toSet())
+----
+
+=== Аннотации для категоризации
+
+[source,kotlin]
+----
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+@Tag("integration")
+annotation class IntegrationTest
+
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
+@Tag("functional")
+annotation class FunctionalTest
+
+// JUnit 5 конфигурация
+// build.gradle.kts
+tasks.test {
+    useJUnitPlatform {
+        excludeTags("integration", "functional")
+    }
+}
+
+tasks.register<Test>("integrationTest") {
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+}
+
+tasks.register<Test>("functionalTest") {
+    useJUnitPlatform {
+        includeTags("functional")
+    }
+}
+----
+
 == Связанные документы
 
 * xref:constitution.adoc[Constitution] — обязательные правила

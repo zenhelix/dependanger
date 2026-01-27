@@ -357,6 +357,129 @@ fun fetchVersions(): List<Version> {
 * [ ] Модели иммутабельны (C2)
 * [ ] Нет глобального состояния (X1)
 
+== Сводная таблица правил
+
+[cols="1,2,2,1",options="header"]
+|===
+| ID | Правило | Пример нарушения | Автопроверка
+
+| M1
+| Зависимости от периферии к ядру
+| `core` зависит от `cli`
+| ArchUnit
+
+| M2
+| Core без инфраструктурных зависимостей
+| `import io.ktor.client.*` в core
+| ArchUnit
+
+| M3
+| Публичный API в явных пакетах
+| `internal` класс используется снаружи
+| Konsist
+
+| E1
+| Расширения через SPI
+| `class MyGen : TomlGenerator()` (наследование)
+| ArchUnit
+
+| E2
+| OCP — новое без модификации core
+| Изменение `api` для нового генератора
+| Code Review
+
+| T1
+| DI через конструктор
+| `= Singleton.INSTANCE`
+| ArchUnit
+
+| T2
+| Абстракции для внешних систем
+| Прямой вызов `HttpClient()`
+| ArchUnit
+
+| T3
+| Пирамида тестирования
+| Coverage < 70%
+| JaCoCo
+
+| C1
+| Explicit API mode
+| `fun foo()` без явного типа
+| Compiler
+
+| C2
+| Иммутабельность моделей
+| `var` в data class
+| Detekt
+
+| X1
+| Нет глобального mutable state
+| `object { var x = ... }`
+| Detekt
+
+| X2
+| Блокирующий I/O с Dispatchers.IO
+| `fun fetch() = client.get()`
+| Code Review
+
+| X3
+| Нет хардкода путей/URL
+| `"https://repo1.maven.org"`
+| Detekt
+|===
+
+== Примеры нарушений и исправлений
+
+=== M1: Нарушение направления зависимостей
+
+[source,kotlin]
+----
+// ❌ НАРУШЕНИЕ: core зависит от cli
+// core/build.gradle.kts
+dependencies {
+    implementation(project(":cli"))  // ЗАПРЕЩЕНО
+}
+
+// ✅ ПРАВИЛЬНО: cli зависит от core
+// cli/build.gradle.kts
+dependencies {
+    implementation(project(":core"))
+}
+----
+
+=== E1: Нарушение SPI
+
+[source,kotlin]
+----
+// ❌ НАРУШЕНИЕ: наследование от конкретного класса
+class CustomTomlGenerator : EffectiveTomlGenerator() {
+    override fun generate(...) { ... }
+}
+
+// ✅ ПРАВИЛЬНО: реализация интерфейса
+class CustomTomlGenerator : ArtifactGenerator {
+    override fun generate(...) { ... }
+}
+----
+
+=== X1: Глобальное состояние
+
+[source,kotlin]
+----
+// ❌ НАРУШЕНИЕ: mutable state в object
+object VersionCache {
+    var enabled = true  // ЗАПРЕЩЕНО
+    private val cache = mutableMapOf<String, Version>()  // ЗАПРЕЩЕНО
+}
+
+// ✅ ПРАВИЛЬНО: инъекция через конструктор
+class VersionCache(
+    private val enabled: Boolean,
+    private val storage: CacheStorage
+)
+----
+
 == Связанные документы
 
 * xref:architecture.adoc[Архитектура] — реализация принципов

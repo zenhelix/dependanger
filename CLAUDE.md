@@ -25,6 +25,14 @@ docs/
 | `/doc-polish [путь]`           | Финальная редактура                                 |
 | `/doc-status`                  | Статус всей документации                            |
 
+**Пакетный режим:** команды `doc-check`, `doc-iterate`, `doc-polish` принимают путь к папке — обрабатывают все `.adoc` файлы по порядку.
+
+```bash
+/doc-check docs/02-features/     # проверить все features
+/doc-iterate docs/               # итерировать весь docs
+/doc-polish docs/01-concepts/    # редактура всех concepts
+```
+
 ## Ключевые правила
 
 - **Формат:** AsciiDoc (`.adoc`)

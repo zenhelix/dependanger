@@ -16,7 +16,6 @@
 | ID | F009
 | Название | Report Generation
 | Приоритет | P3 (желательно)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-report`
 | Зависит от | F003, F007, F008
 | Блокирует | —
@@ -44,9 +43,127 @@ ____
 
 **Acceptance Criteria:**
 
-* JSON формат с предсказуемой схемой
-* Включает все библиотеки, обновления, проблемы
-* Можно генерировать через CLI и Gradle
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| EffectiveMetadata с 10 библиотеками, 3 плагинами, 2 бандлами
+| Вызываю `result.generateReport()`
+| JSON содержит `libraries` (10), `plugins` (3), `bundles` (2)
+
+| AC-001-2
+| Pipeline выполнен с `withUpdateCheck()`
+| Генерирую отчёт
+| Секция `updates` содержит информацию об обновлениях
+
+| AC-001-3
+| Pipeline выполнен с `withCompatibilityAnalysis()`
+| Генерирую отчёт
+| Секция `compatibility` содержит найденные проблемы
+
+| AC-001-4
+| Сгенерированный отчёт
+| Парсю через `jq` или любой JSON parser
+| Валидный JSON, соответствует схеме
+
+| AC-001-5
+| Gradle task `dependangerReport`
+| Запускаю task
+| Файл создан в `build/dependanger/dependanger-report.json`
+|===
+
+=== US-002: Секция summary
+
+[quote]
+____
+Как менеджер, я хочу видеть сводку состояния зависимостей, чтобы быстро оценить ситуацию.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| 45 библиотек, 12 с обновлениями, 2 проблемы совместимости
+| Генерирую отчёт
+| `summary.libraryCount = 45`, `summary.updatesAvailable = 12`, `summary.compatibilityIssues = 2`
+
+| AC-002-2
+| 3 validation errors, 5 warnings
+| Генерирую отчёт
+| `summary.validationErrors = 3`, `summary.validationWarnings = 5`
+
+| AC-002-3
+| Пустой каталог (0 библиотек)
+| Генерирую отчёт
+| `summary.libraryCount = 0`, все счётчики = 0
+|===
+
+=== US-003: Фильтрация содержимого отчёта
+
+[quote]
+____
+Как DevOps инженер, я хочу выбирать какие секции включать в отчёт, чтобы уменьшить его размер.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Опция `--include-updates=false`
+| Генерирую отчёт
+| Секция `updates` отсутствует или пуста
+
+| AC-003-2
+| Опция `--include-compatibility=false`
+| Генерирую отчёт
+| Секция `compatibility` отсутствует или пуста
+
+| AC-003-3
+| Опция `--summary-only`
+| Генерирую отчёт
+| Только секции `schemaVersion`, `generatedAt`, `distribution`, `summary`
+|===
+
+=== US-004: Форматы вывода
+
+[quote]
+____
+Как разработчик, я хочу получать отчёт в разных форматах, чтобы использовать его в разных инструментах.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| Опция `--format=json` (default)
+| Генерирую отчёт
+| Вывод в JSON формате
+
+| AC-004-2
+| Опция `--format=yaml`
+| Генерирую отчёт
+| Вывод в YAML формате
+
+| AC-004-3
+| Опция `--format=markdown`
+| Генерирую отчёт
+| Вывод в Markdown формате (human-readable)
+
+| AC-004-4
+| API вызов `result.generateReport(ReportFormat.JSON)`
+| Генерирую отчёт
+| Возвращается строка в JSON формате
+|===
 
 == API использование
 
@@ -179,6 +296,150 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 * Критических обновлениях безопасности
 * Нарушениях совместимости
 * Доступных major обновлениях
+
+== Версионирование схемы
+
+[cols="1,3",options="header"]
+|===
+| Версия | Изменения
+
+| 1.0
+| Начальная версия схемы
+
+| 1.1
+| (планируется) Добавлено поле `security` с информацией о CVE
+
+| 1.2
+| (планируется) Добавлено поле `licenses` с информацией о лицензиях
+|===
+
+При парсинге отчёта:
+
+* Клиент ДОЛЖЕН проверять `schemaVersion`
+* Неизвестные поля ДОЛЖНЫ игнорироваться (forward compatibility)
+* Старые версии схемы поддерживаются (backward compatibility)
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА генерировать отчёт в JSON формате
+
+| FR-002
+| MUST
+| Система ДОЛЖНА включать `schemaVersion` для версионирования схемы
+
+| FR-003
+| MUST
+| Система ДОЛЖНА включать `generatedAt` с timestamp генерации (ISO 8601)
+
+| FR-004
+| MUST
+| Система ДОЛЖНА включать секцию `summary` со счётчиками
+
+| FR-005
+| MUST
+| Система ДОЛЖНА включать секцию `libraries` со всеми библиотеками
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА включать секцию `updates` если выполнен UpdateCheck
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА включать секцию `compatibility` если выполнен CompatibilityAnalysis
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА включать секцию `validation` с ошибками и предупреждениями
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА поддерживать фильтрацию секций через опции
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать YAML формат вывода
+
+| FR-011
+| MAY
+| Система МОЖЕТ поддерживать Markdown формат вывода (human-readable)
+
+| FR-012
+| MAY
+| Система МОЖЕТ поддерживать режим `--summary-only` для краткого отчёта
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Пустой каталог
+| EffectiveMetadata без библиотек, плагинов, бандлов
+| Валидный JSON с пустыми массивами, `summary` с нулями
+
+| UpdateCheck не выполнен
+| Pipeline без `withUpdateCheck()`
+| Секция `updates` отсутствует или `"updates": null`
+
+| CompatibilityAnalysis не выполнен
+| Pipeline без `withCompatibilityAnalysis()`
+| Секция `compatibility` отсутствует или `"compatibility": null`
+
+| Нет ошибок валидации
+| Все проверки прошли успешно
+| `validation.errors = []`, `validation.warnings = []`
+
+| Очень большой каталог
+| 1000+ библиотек
+| Отчёт генерируется (возможно большой файл), рекомендуется `--summary-only`
+
+| Библиотека без версии
+| Библиотека с `version = null`
+| `"version": null` в JSON, WARNING в validation
+
+| Специальные символы
+| Библиотека с description содержащим `"`, `\n`, unicode
+| Корректное экранирование в JSON
+
+| Нет прав на запись
+| Директория read-only
+| ERROR: "Cannot write report to [path]: Permission denied"
+
+| Файл уже существует
+| `dependanger-report.json` уже есть
+| Перезаписывается
+
+| distribution не указан
+| Генерация без указания distribution
+| `"distribution": null` или `"distribution": "default"`
+
+| Циклическая ссылка
+| (не должно быть в EffectiveMetadata)
+| Валидация в pipeline предотвращает
+
+| Невалидный формат вывода
+| `--format=xml` (не поддерживается)
+| ERROR: "Unsupported format 'xml'. Supported: json, yaml, markdown"
+
+| Timestamp с timezone
+| Генерация в разных timezone
+| Всегда UTC: `"generatedAt": "2026-01-27T10:30:00Z"`
+
+| Прерывание генерации
+| Ctrl+C во время записи файла
+| Частичный файл удаляется (atomic write через temp file)
+
+| Concurrent генерация
+| Два процесса генерируют в один файл
+| File locking или последний выигрывает с WARNING
+|===
 
 == Связи
 

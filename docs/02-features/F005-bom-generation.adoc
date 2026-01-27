@@ -18,7 +18,6 @@
 | ID | F005
 | Название | BOM Generation
 | Приоритет | P2 (важно)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-generator-bom`
 | Зависит от | F003 (Processing Pipeline)
 | Блокирует | —
@@ -38,7 +37,36 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Генерируется валидный POM файл * Содержит dependencyManagement секцию * Совместим с Maven 3.x
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| EffectiveMetadata с 5 библиотеками (версии резолвлены)
+| Вызываю `BomGenerator.generate(metadata)`
+| Создаётся POM с `<dependencyManagement>` содержащим 5 `<dependency>`
+
+| AC-001-2
+| Настройка `bom { groupId = "com.example"; artifactId = "my-bom"; version = "1.0.0" }`
+| Генерирую BOM
+| POM содержит указанные координаты в корневом элементе
+
+| AC-001-3
+| Сгенерированный BOM файл
+| Валидирую через `mvn validate`
+| Maven успешно парсит POM, ошибок валидации нет
+
+| AC-001-4
+| Gradle task `dependangerGenerateBom`
+| Запускаю task
+| Файл создан в `build/dependanger/bom.pom.xml`
+
+| AC-001-5
+| EffectiveMetadata с библиотекой `kotlin-stdlib:2.1.20`
+| Генерирую BOM
+| `<dependency>` содержит `<groupId>`, `<artifactId>`, `<version>` (не versionRef)
+|===
 
 === US-002: Использование BOM в Gradle
 
@@ -48,8 +76,55 @@ ____
 ____
 
 **Acceptance Criteria:**
-* BOM можно использовать через `platform()`
-* Версии из BOM применяются к зависимостям
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| BOM опубликован в Maven репозиторий
+| Добавляю `implementation(platform("com.example:my-bom:1.0.0"))`
+| Gradle успешно резолвит BOM
+
+| AC-002-2
+| BOM содержит `kotlin-stdlib:2.1.20`
+| Добавляю `implementation("org.jetbrains.kotlin:kotlin-stdlib")` без версии
+| Gradle использует версию `2.1.20` из BOM
+
+| AC-002-3
+| BOM содержит `spring-web:6.2.0`, явно указываю версию `6.1.0`
+| Добавляю `implementation("org.springframework:spring-web:6.1.0")`
+| Используется явная версия `6.1.0` (override)
+
+| AC-002-4
+| BOM импортирован через `platform()`
+| Запускаю `./gradlew dependencies`
+| В дереве зависимостей версии соответствуют BOM
+|===
+
+=== US-003: Генерация для профиля
+
+[quote]
+____
+Как team lead, я хочу генерировать разные BOM для разных профилей, чтобы backend и mobile команды использовали разные наборы версий.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Distribution `backend` с 20 из 50 библиотек
+| Генерирую BOM для distribution `backend`
+| BOM содержит только 20 библиотек
+
+| AC-003-2
+| Настройка `bom { artifactId = "my-bom-{distribution}" }`
+| Генерирую для distribution `backend`
+| `<artifactId>my-bom-backend</artifactId>`
+|===
 
 == SPI: ArtifactGenerator
 
@@ -233,6 +308,120 @@ publishing {
 | Публикация
 | Копирование файла
 | Maven artifact
+|===
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА генерировать валидный Maven POM файл с `<packaging>pom</packaging>`
+
+| FR-002
+| MUST
+| Система ДОЛЖНА включать все библиотеки в секцию `<dependencyManagement><dependencies>`
+
+| FR-003
+| MUST
+| Система ДОЛЖНА использовать резолвленные версии (не versionRef)
+
+| FR-004
+| MUST
+| Система ДОЛЖНА поддерживать настройку координат BOM (groupId, artifactId, version)
+
+| FR-005
+| MUST
+| Система ДОЛЖНА валидировать XML перед записью
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА поддерживать генерацию для конкретного distribution profile
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА добавлять `<name>` и `<description>` в POM
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА сортировать зависимости алфавитно по groupId:artifactId
+
+| FR-009
+| MAY
+| Система МОЖЕТ поддерживать добавление `<scope>` для зависимостей
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать `<exclusions>` для зависимостей
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Пустой каталог
+| EffectiveMetadata без библиотек
+| Генерируется BOM с пустым `<dependencyManagement>` (валидный POM)
+
+| Библиотека без версии
+| Библиотека с `version = null` после pipeline
+| ERROR: "Library 'xxx' has no resolved version for BOM generation"
+
+| Невалидный groupId
+| groupId содержит недопустимые символы: `com.example!`
+| ERROR: "Invalid Maven groupId 'com.example!'"
+
+| Невалидный artifactId
+| artifactId содержит пробелы: `my lib`
+| ERROR: "Invalid Maven artifactId 'my lib'"
+
+| Дубликаты координат
+| Две библиотеки с одинаковыми group:artifact но разными alias
+| ERROR: "Duplicate coordinates 'com.example:lib' from aliases 'lib1' and 'lib2'"
+
+| Очень длинная версия
+| Версия длиной 200+ символов
+| WARNING, генерация продолжается
+
+| Специальные символы в версии
+| Версия `1.0.0-SNAPSHOT+build.123`
+| Корректная сериализация в XML: `<version>1.0.0-SNAPSHOT+build.123</version>`
+
+| XML-unsafe символы
+| Description содержит `<`, `>`, `&`
+| Корректное экранирование: `&lt;`, `&gt;`, `&amp;`
+
+| Плагины в metadata
+| EffectiveMetadata содержит плагины
+| Плагины игнорируются (BOM не поддерживает plugins)
+
+| Бандлы в metadata
+| EffectiveMetadata содержит бандлы
+| Бандлы игнорируются (BOM не поддерживает bundles)
+
+| Нет координат BOM
+| Не указаны groupId/artifactId/version для BOM
+| ERROR: "BOM coordinates not configured. Set bom { groupId, artifactId, version }"
+
+| Файл уже существует
+| `bom.pom.xml` уже есть
+| Перезаписывается
+
+| Нет прав на запись
+| Директория read-only
+| ERROR: "Cannot write to [path]: Permission denied"
+
+| Maven < 3.0
+| Пользователь использует Maven 2.x
+| WARNING: "BOM import requires Maven 3.0+", генерация продолжается
+
+| Classifier в библиотеке
+| Библиотека с classifier (например, `sources`, `javadoc`)
+| Включается `<classifier>` в `<dependency>`
 |===
 
 == Связи

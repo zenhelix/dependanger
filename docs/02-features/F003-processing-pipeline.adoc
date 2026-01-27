@@ -17,7 +17,6 @@
 | ID | F003
 | Название | Processing Pipeline
 | Приоритет | P1 (критично для MVP)
-| Статус | 🟢 Готов
 | Модуль | `dependanger-effective`
 | Зависит от | F002 (Metadata Serialization)
 | Блокирует | F004 (TOML Generation), F005 (BOM Generation)
@@ -45,9 +44,45 @@ ____
 
 **Acceptance Criteria:**
 
-* Версии из alias резолвятся в конкретные значения
-* Версии из BomImport импортируются автоматически
-* Указывается источник версии (VersionSource)
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| Библиотека `kotlin-stdlib` с `versionRef("kotlin")`, версия `kotlin = 2.1.20`
+| Pipeline выполняет version-resolver процессор
+| Библиотека имеет `resolvedVersion = 2.1.20`, `versionSource = DECLARED`
+
+| AC-001-2
+| Библиотека `spring-web` без явной версии, BOM `spring-boot-dependencies:3.4.0` содержит `spring-web:6.2.0`
+| Pipeline выполняет bom-import процессор
+| Библиотека имеет `resolvedVersion = 6.2.0`, `versionSource = BOM_IMPORT`
+
+| AC-001-3
+| Библиотека `spring-web` с явной версией `5.0.0`, BOM содержит `spring-web:6.2.0`
+| Pipeline выполняет резолвинг
+| Используется явная версия `5.0.0`, `versionSource = DECLARED` (DECLARED > BOM_IMPORT)
+
+| AC-001-4
+| Библиотека без версии, BOM не содержит эту библиотеку, `strictVersionResolution = false`
+| Pipeline выполняет резолвинг
+| WARNING в diagnostics, `resolvedVersion = null`, pipeline продолжается
+
+| AC-001-5
+| Библиотека без версии, BOM не содержит эту библиотеку, `strictVersionResolution = true`
+| Pipeline выполняет резолвинг
+| ERROR в diagnostics, pipeline останавливается
+
+| AC-001-6
+| Версия `spring-boot = 3.4.0` с `fallback("2.7.18") { jdkBelow(17) }`, контекст с JDK 11
+| Pipeline выполняет version-fallback процессор
+| Используется fallback версия `2.7.18`
+
+| AC-001-7
+| Версия `spring-boot = 3.4.0` с `fallback("2.7.18") { jdkBelow(17) }`, контекст с JDK 21
+| Pipeline выполняет version-fallback процессор
+| Используется основная версия `3.4.0`
+|===
 
 === US-002: Фильтрация по профилю
 
@@ -58,9 +93,40 @@ ____
 
 **Acceptance Criteria:**
 
-* Distribution profile фильтрует библиотеки и бандлы
-* excludeLibraries исключает конкретные библиотеки
-* includeBundles включает только указанные бандлы
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| 10 библиотек, distribution `backend` с фильтром `byTags { include("server") }`, 3 библиотеки имеют тег `server`
+| Pipeline выполняет library-filter процессор
+| EffectiveMetadata содержит только 3 библиотеки с тегом `server`
+
+| AC-002-2
+| Distribution `android` с фильтром `byGroups { exclude { matching("org.springframework:*") } }`
+| Pipeline выполняет library-filter процессор
+| Все библиотеки с groupId `org.springframework` исключены
+
+| AC-002-3
+| Distribution `minimal` с фильтром `byBundles { include("kotlin-core") }`, бандл `kotlin-core` содержит 2 библиотеки
+| Pipeline выполняет library-filter и bundle-filter процессоры
+| Только библиотеки из бандла `kotlin-core` включены
+
+| AC-002-4
+| Distribution не указан (default)
+| Pipeline выполняется
+| Все библиотеки включены без фильтрации
+
+| AC-002-5
+| 5 бандлов, distribution с фильтром `byBundles { include("spring-backend") }`
+| Pipeline выполняет bundle-filter процессор
+| EffectiveMetadata содержит только бандл `spring-backend`
+
+| AC-002-6
+| Distribution с комбинацией фильтров: `byTags { include("web") }` + `byGroups { exclude("com.legacy:*") }`
+| Pipeline применяет фильтры
+| Включены библиотеки с тегом `web`, кроме тех что в группе `com.legacy`
+|===
 
 === US-003: Расширение pipeline
 
@@ -71,9 +137,69 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно добавить процессор через SPI
-* Процессор имеет приоритет (order)
-* Процессор получает и возвращает ProcessingContext
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Кастомный процессор `MyProcessor` реализует `EffectiveMetadataProcessor` с `order = 35`
+| Регистрирую через ServiceLoader, запускаю pipeline
+| Процессор выполняется между `version-resolver` (30) и `bundle-filter` (40)
+
+| AC-003-2
+| Кастомный процессор с `processorId = "my-enricher"`
+| Запускаю pipeline с `disabledProcessors = ["my-enricher"]`
+| Процессор пропускается, остальные выполняются
+
+| AC-003-3
+| Кастомный процессор с `isOptional = true`
+| Запускаю pipeline без явного включения
+| Процессор не выполняется (требует явного включения)
+
+| AC-003-4
+| Кастомный процессор добавляет поле `customField` в metadata
+| Pipeline завершается
+| EffectiveMetadata содержит `customField`
+
+| AC-003-5
+| Два процессора с одинаковым `order = 50`
+| Запускаю pipeline
+| Оба выполняются, порядок между ними не гарантирован (но стабилен)
+|===
+
+=== US-004: Валидация модели
+
+[quote]
+____
+Как разработчик, я хочу получать ошибки валидации до генерации артефактов, чтобы исправить проблемы заранее.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| Библиотека с невалидными Maven координатами `invalid-coordinates`
+| Pipeline выполняет validation процессор
+| ERROR: "Invalid Maven coordinates format"
+
+| AC-004-2
+| Бандл `test` ссылается на несуществующую библиотеку `unknown-lib`
+| Pipeline выполняет validation процессор
+| ERROR: "Unknown library 'unknown-lib' in bundle 'test'"
+
+| AC-004-3
+| Версия `versionRef("unknown")` ссылается на несуществующий alias
+| Pipeline выполняет validation процессор
+| ERROR: "Unknown version reference 'unknown'"
+
+| AC-004-4
+| Все данные валидны
+| Pipeline выполняет validation процессор
+| Нет ошибок, pipeline продолжается
+|===
 
 == SPI: EffectiveMetadataProcessor
 
@@ -326,6 +452,168 @@ flowchart TD
     style Output fill:#90EE90
     style File fill:#FFFFE0
 ----
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА выполнять процессоры в порядке их `order` (меньше = раньше)
+
+| FR-002
+| MUST
+| Система ДОЛЖНА резолвить версии из `versionRef()` в конкретные значения
+
+| FR-003
+| MUST
+| Система ДОЛЖНА применять приоритет версий: DECLARED > BOM_IMPORT
+
+| FR-004
+| MUST
+| Система ДОЛЖНА указывать `VersionSource` для каждой разрешённой версии
+
+| FR-005
+| MUST
+| Система ДОЛЖНА фильтровать библиотеки согласно активному distribution profile
+
+| FR-006
+| MUST
+| Система ДОЛЖНА валидировать модель и добавлять ошибки в `ProcessingDiagnostics`
+
+| FR-007
+| MUST
+| Система ДОЛЖНА останавливать pipeline при ERROR в strict mode
+
+| FR-008
+| MUST
+| Система ДОЛЖНА поддерживать SPI `EffectiveMetadataProcessor` для расширения
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА применять fallback версии согласно условиям контекста (JDK, Kotlin, environment)
+
+| FR-010
+| SHOULD
+| Система ДОЛЖНА поддерживать параллельное выполнение I/O-bound процессоров (PARALLEL_IO phase)
+
+| FR-011
+| SHOULD
+| Система ДОЛЖНА поддерживать параллельное выполнение CPU-bound процессоров (PARALLEL_COMPUTE phase)
+
+| FR-012
+| SHOULD
+| Система ДОЛЖНА поддерживать presets конфигурации (DEFAULT, MINIMAL, STRICT, DISTRIBUTION)
+
+| FR-013
+| SHOULD
+| Система ДОЛЖНА удалять неиспользуемые версии из EffectiveMetadata
+
+| FR-014
+| SHOULD
+| Система ДОЛЖНА раскрывать бандлы с учётом `extends` (композиция)
+
+| FR-015
+| MAY
+| Система МОЖЕТ поддерживать отключение процессоров через `disabledProcessors`
+
+| FR-016
+| MAY
+| Система МОЖЕТ поддерживать включение опциональных процессоров через `withBomImport()`, `withUpdateCheck()`, etc.
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Пустой metadata
+| `DependangerMetadata` без библиотек, версий, бандлов
+| Pipeline завершается успешно, EffectiveMetadata пустой но валидный
+
+| Несуществующий versionRef
+| Библиотека ссылается на `versionRef("unknown")`
+| ERROR: "Unknown version reference 'unknown' in library 'xxx'"
+
+| Циклические бандлы
+| Бандл A extends B, бандл B extends A
+| ERROR: "Circular bundle dependency detected: A → B → A"
+
+| Несуществующая библиотека в бандле
+| Бандл ссылается на `libraries("unknown-lib")`
+| ERROR: "Unknown library 'unknown-lib' in bundle 'xxx'"
+
+| Несуществующий бандл в extends
+| Бандл с `extends("unknown-bundle")`
+| ERROR: "Unknown bundle 'unknown-bundle' in extends"
+
+| Несуществующий distribution
+| Запрос генерации для `distribution = "unknown"`
+| ERROR: "Unknown distribution profile 'unknown'"
+
+| Дубликат processorId
+| Два процессора с одинаковым `processorId`
+| ERROR: "Duplicate processor ID 'xxx'"
+
+| Процессор выбрасывает исключение
+| `process()` выбрасывает RuntimeException
+| ERROR: "Processor 'xxx' failed: [message]", pipeline останавливается
+
+| Таймаут процессора
+| I/O процессор превышает таймаут (30s default)
+| ERROR: "Processor 'xxx' timed out after 30s"
+
+| Неразрешённая версия в strict mode
+| Библиотека без версии, BOM не содержит, `strictVersionResolution = true`
+| ERROR: "Unresolved version for library 'xxx'"
+
+| Неразрешённая версия в non-strict mode
+| Библиотека без версии, BOM не содержит, `strictVersionResolution = false`
+| WARNING: "Unresolved version for library 'xxx'", `resolvedVersion = null`
+
+| Конфликт fallback условий
+| Две fallback версии с перекрывающимися условиями
+| Используется первая по порядку определения, WARNING в логе
+
+| Пустой distribution spec
+| `distribution("empty") { }` без фильтров
+| Все библиотеки включаются (эквивалент отсутствия фильтрации)
+
+| Фильтр исключает все библиотеки
+| Distribution фильтр не matching ни одной библиотеки
+| WARNING: "Distribution 'xxx' filtered out all libraries", пустой EffectiveMetadata
+
+| Отключённый обязательный процессор
+| `disabledProcessors = ["validation"]` (обязательный)
+| ERROR: "Cannot disable required processor 'validation'"
+
+| Опциональный процессор без включения
+| `bom-import` процессор не включён через `withBomImport()`
+| Процессор пропускается, версии из BOM не импортируются
+
+| Параллельные процессоры с общим состоянием
+| Два PARALLEL_IO процессора модифицируют один объект
+| Использовать thread-safe структуры данных, либо ERROR при data race
+
+| Context без jdkVersion
+| `jdkVersion = null`, версия имеет `jdkBelow()` условие
+| Fallback условия с JDK не применяются, используется основная версия
+
+| Очень большой metadata
+| 10000+ библиотек
+| Pipeline завершается (возможно медленнее), рекомендуется PARALLEL фазы
+
+| Прерывание pipeline
+| Ctrl+C или kill во время выполнения
+| Graceful shutdown, частичные результаты не сохраняются
+
+| Concurrent pipeline executions
+| Два pipeline запущены параллельно для одного metadata
+| Независимое выполнение, каждый создаёт свой EffectiveMetadata
+|===
 
 == Связи
 

@@ -17,7 +17,6 @@
 | ID | F006
 | Название | BOM Import
 | Приоритет | P2 (важно)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-maven-resolver`
 | Зависит от | F003 (Processing Pipeline)
 | Блокирует | —
@@ -211,21 +210,11 @@ DECLARED > BOM_IMPORT
 |===
 | Сценарий | Описание | Ожидаемое поведение
 
+3+h| Ошибки парсинга
+
 | Невалидный BOM
 | BOM POM файл содержит синтаксическую ошибку XML
 | ERROR с указанием BOM и причины, pipeline останавливается
-
-| BOM недоступен
-| Сетевая ошибка при скачивании BOM, кеш пуст
-| ERROR "Cannot fetch BOM: {coordinates}", pipeline останавливается
-
-| BOM недоступен, есть кеш
-| Сетевая ошибка, но есть закешированный BOM
-| WARNING, используется кеш, pipeline продолжается
-
-| Циклическая зависимость BOM
-| BOM-A импортирует BOM-B, который импортирует BOM-A
-| ERROR "Circular BOM dependency detected", pipeline останавливается
 
 | BOM без dependencyManagement
 | BOM POM не содержит секции `<dependencyManagement>`
@@ -235,13 +224,139 @@ DECLARED > BOM_IMPORT
 | BOM содержит версию `${spring.version}`
 | Резолвить property из `<properties>` того же POM
 
+| Неразрешённый property
+| BOM содержит `${unknown.version}`, property не определён
+| ERROR "Unresolved property 'unknown.version' in BOM"
+
 | Parent BOM
 | BOM наследует `<dependencyManagement>` от parent
 | Резолвить parent и объединить dependencyManagement
 
+| Глубокая иерархия parent
+| BOM → parent → grandparent → ... (10+ уровней)
+| Резолвить до корня, WARNING если > 10 уровней
+
+| Циклическая зависимость BOM
+| BOM-A импортирует BOM-B, который импортирует BOM-A
+| ERROR "Circular BOM dependency detected", pipeline останавливается
+
+3+h| Сетевые ошибки
+
+| BOM недоступен
+| Сетевая ошибка при скачивании BOM, кеш пуст
+| ERROR "Cannot fetch BOM: {coordinates}", pipeline останавливается
+
+| BOM недоступен, есть кеш
+| Сетевая ошибка, но есть закешированный BOM
+| WARNING, используется кеш, pipeline продолжается
+
+| Connection timeout
+| Репозиторий не отвечает в течение таймаута (30s default)
+| ERROR "Connection timeout for BOM: {coordinates}"
+
+| Read timeout
+| Соединение установлено, но данные не приходят
+| ERROR "Read timeout for BOM: {coordinates}"
+
+| DNS resolution failure
+| Не удаётся разрешить hostname репозитория
+| ERROR "Cannot resolve host: {hostname}"
+
+| SSL/TLS ошибка
+| Невалидный сертификат, expired certificate, hostname mismatch
+| ERROR "SSL error for {url}: {причина}"
+
+| Self-signed certificate
+| Репозиторий использует self-signed сертификат
+| ERROR по умолчанию; можно отключить проверку через `settings { insecureHosts = [...] }`
+
+| HTTP 404 Not Found
+| BOM не существует в репозитории
+| ERROR "BOM not found: {coordinates} (HTTP 404)"
+
+| HTTP 401/403 Unauthorized
+| Репозиторий требует аутентификации
+| ERROR "Authentication required for {url}. Configure credentials in settings"
+
+| HTTP 500 Server Error
+| Внутренняя ошибка репозитория
+| Retry 3 раза с exponential backoff, затем ERROR
+
+| HTTP 429 Too Many Requests
+| Rate limiting от репозитория
+| Retry с Retry-After header, WARNING в логе
+
+| Redirect loop
+| HTTP redirect зацикливается (A → B → A)
+| ERROR "Redirect loop detected for {url}" после 10 редиректов
+
+| Redirect to different host
+| Репозиторий редиректит на другой домен
+| Следовать редиректу, WARNING если протокол меняется (https → http)
+
+| Partial download
+| Соединение разорвано посреди загрузки
+| Retry, при повторной неудаче — ERROR "Incomplete download"
+
+| Corrupted download
+| Скачанный файл повреждён (checksum mismatch)
+| ERROR "Checksum mismatch for BOM: expected {x}, got {y}"
+
+| Very large BOM
+| BOM файл > 10MB
+| WARNING "Large BOM file ({size})", загрузка продолжается
+
+3+h| Кеширование
+
 | Пустой bomImports
 | Блок `bomImports { }` пуст или отсутствует
 | Процессор пропускается, никаких изменений
+
+| Кеш повреждён
+| Файл в кеше не читается (corrupted)
+| WARNING, удалить из кеша, скачать заново
+
+| Кеш заполнен
+| Директория кеша заполнена (disk full)
+| WARNING, работать без кеша
+
+| Нет прав на запись в кеш
+| Директория `~/.dependanger/cache/` read-only
+| WARNING, работать без кеша
+
+| Concurrent cache access
+| Два процесса одновременно пишут в кеш
+| File locking, второй процесс ждёт или читает после записи
+
+| Кеш с другой версией BOM
+| В кеше `spring-boot:3.3.0`, запрошен `3.4.0`
+| Скачать новую версию, обновить кеш
+
+3+h| Специфичные случаи
+
+| Несколько репозиториев
+| BOM есть в repository-2, но не в repository-1
+| Пробовать репозитории по порядку, использовать первый успешный
+
+| Snapshot версия BOM
+| BOM версия `3.4.0-SNAPSHOT`
+| WARNING "Snapshot BOM versions may be unstable", TTL кеша = 1 час
+
+| Private repository
+| BOM в корпоративном Nexus/Artifactory
+| Использовать credentials из `settings { repositories { maven { credentials { } } } }`
+
+| BOM с classifier
+| BOM координаты включают classifier: `...:bom:pom`
+| Корректно обработать classifier при запросе
+
+| Дубликаты в BOM
+| BOM содержит два `<dependency>` с одинаковыми `groupId:artifactId`
+| WARNING, использовать последний (как Maven)
+
+| Scope/type в BOM dependency
+| `<dependency>` в BOM имеет `<scope>import</scope>`
+| Рекурсивно импортировать вложенный BOM
 |===
 
 == SPI: BomImportProcessor

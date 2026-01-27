@@ -233,7 +233,6 @@ NOTE: Полная спецификация DSL синтаксиса: xref:../02
 |===
 
 NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings`
-|===
 
 ==== Пример DSL
 

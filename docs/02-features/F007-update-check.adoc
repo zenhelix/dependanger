@@ -17,7 +17,6 @@
 | ID | F007
 | Название | Update Check
 | Приоритет | P3 (желательно)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-updates`
 | Зависит от | F003 (Processing Pipeline)
 | Блокирует | —
@@ -39,9 +38,40 @@ ____
 
 **Acceptance Criteria:**
 
-* Показываются minor и major обновления
-* Можно фильтровать по типу обновления
-* Результат включается в diagnostics
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| Библиотека `kotlin-stdlib:2.1.0`, в Maven Central есть `2.1.20`
+| Запускаю pipeline с `withUpdateCheck()`
+| В diagnostics появляется `UpdateAvailableInfo` с `updateType = PATCH`
+
+| AC-001-2
+| Библиотека `spring-boot:3.2.0`, в Maven Central есть `3.4.0`
+| Запускаю проверку обновлений
+| `UpdateAvailableInfo` содержит `currentVersion=3.2.0`, `latestStable=3.4.0`, `updateType=MINOR`
+
+| AC-001-3
+| Библиотека `ktor:2.3.0`, есть `3.0.0`
+| Запускаю проверку обновлений
+| `updateType = MAJOR`
+
+| AC-001-4
+| Библиотека `lib:1.0.0`, есть только `2.0.0-RC1`
+| Запускаю с `includePrerelease = true`
+| `latestAny = 2.0.0-RC1`, `updateType = PRERELEASE`
+
+| AC-001-5
+| Библиотека `lib:1.0.0`, есть только `2.0.0-RC1`
+| Запускаю с `includePrerelease = false` (default)
+| Обновление не показывается (нет стабильной версии новее)
+
+| AC-001-6
+| 10 библиотек в каталоге, 3 имеют обновления
+| Запускаю проверку обновлений
+| В diagnostics ровно 3 `UpdateAvailableInfo`
+|===
 
 === US-002: Интеграция в CI
 
@@ -52,9 +82,59 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно запустить через CLI: `dependanger check-updates`
-* Можно запустить через Gradle: `./gradlew dependangerCheckUpdates`
-* Результат в JSON формате для парсинга
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| Dependanger CLI установлен
+| Запускаю `dependanger check-updates`
+| Выводится список библиотек с доступными обновлениями
+
+| AC-002-2
+| Dependanger CLI установлен
+| Запускаю `dependanger check-updates --json`
+| Вывод в JSON формате, пригодном для парсинга
+
+| AC-002-3
+| Gradle проект с Dependanger plugin
+| Запускаю `./gradlew dependangerCheckUpdates`
+| Task выполняется, результат в консоли и в `build/dependanger/updates.json`
+
+| AC-002-4
+| CI pipeline с проверкой обновлений
+| Есть MAJOR обновления
+| Exit code = 0 (по умолчанию), но можно настроить `failOnMajorUpdates = true`
+|===
+
+=== US-003: Фильтрация обновлений
+
+[quote]
+____
+Как разработчик, я хочу фильтровать обновления по типу и библиотекам, чтобы видеть только релевантные.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| 5 PATCH, 3 MINOR, 2 MAJOR обновлений
+| Запускаю с `minUpdateType = MINOR`
+| Показываются только 3 MINOR + 2 MAJOR (5 записей)
+
+| AC-003-2
+| Обновления для `kotlin-*` и `spring-*` библиотек
+| Запускаю с `excludePatterns = ["org.springframework:*"]`
+| Spring библиотеки исключены из результата
+
+| AC-003-3
+| Библиотека помечена как `ignoreUpdates = true` в DSL
+| Запускаю проверку обновлений
+| Библиотека пропускается
+|===
 
 == API использование
 
@@ -154,6 +234,128 @@ dependanger check-updates [--json] [--include-prerelease]
 ----
 ./gradlew dependangerCheckUpdates
 ----
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА запрашивать доступные версии из Maven репозиториев
+
+| FR-002
+| MUST
+| Система ДОЛЖНА классифицировать обновления по типу (PATCH, MINOR, MAJOR, PRERELEASE)
+
+| FR-003
+| MUST
+| Система ДОЛЖНА добавлять результаты в `ProcessingDiagnostics`
+
+| FR-004
+| MUST
+| Система ДОЛЖНА поддерживать параллельные запросы к репозиториям (PARALLEL_IO phase)
+
+| FR-005
+| SHOULD
+| Система ДОЛЖНА кешировать результаты запросов к репозиториям
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА использовать кеш при недоступности сети
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА поддерживать настройку списка репозиториев
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА поддерживать таймаут на запросы
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА поддерживать фильтрацию по типу обновления (minUpdateType)
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать исключение библиотек по паттерну
+
+| FR-011
+| MAY
+| Система МОЖЕТ поддерживать флаг `ignoreUpdates` на уровне библиотеки
+
+| FR-012
+| MAY
+| Система МОЖЕТ определять security-критичные обновления (через OSV API)
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Репозиторий недоступен
+| Maven Central не отвечает, кеш пуст
+| WARNING: "Cannot reach repository", библиотека пропускается
+
+| Репозиторий недоступен, есть кеш
+| Maven Central не отвечает, есть кеш < TTL
+| Используется кеш, WARNING в логе
+
+| Таймаут запроса
+| Репозиторий отвечает > timeout (30s default)
+| WARNING: "Request timeout for library 'xxx'", библиотека пропускается
+
+| Библиотека не найдена
+| Библиотека с координатами которых нет в репозиториях
+| WARNING: "Library 'xxx' not found in any repository"
+
+| Невалидный формат версии
+| Текущая версия не соответствует SemVer: `1.0.Final`
+| Попытка парсинга, при неудаче — WARNING, сравнение как строки
+
+| Версия с qualifier
+| Версия `1.0.0.RELEASE` vs `1.0.1`
+| Корректное сравнение с учётом qualifier
+
+| Много версий в репозитории
+| Библиотека имеет 500+ версий
+| Запрашиваются только последние N версий (оптимизация)
+
+| Пустой каталог
+| EffectiveMetadata без библиотек
+| Процессор завершается успешно, 0 обновлений
+
+| Все библиотеки актуальны
+| Нет доступных обновлений
+| Пустой список UpdateAvailableInfo, INFO: "All libraries are up to date"
+
+| Prerelease текущая версия
+| Текущая версия `2.0.0-RC1`, есть стабильная `2.0.0`
+| Показывается обновление до `2.0.0` (стабильная > prerelease)
+
+| Downgrade
+| Текущая версия `2.0.0`, в репозитории максимум `1.9.0`
+| Не показывается как обновление (не downgrade)
+
+| Snapshot версия
+| Текущая версия `1.0.0-SNAPSHOT`
+| WARNING: "Snapshot version for 'xxx'", проверяется на обновления
+
+| Private репозиторий
+| Репозиторий требует аутентификации
+| Поддержка через `repositories { maven { url; credentials { } } }`
+
+| Rate limiting
+| Репозиторий возвращает 429 Too Many Requests
+| Exponential backoff, WARNING после N попыток
+
+| Параллельные запросы
+| 100 библиотек для проверки
+| Запросы выполняются параллельно с ограничением (max 10 concurrent)
+|===
 
 == Связи
 

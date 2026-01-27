@@ -16,7 +16,6 @@
 | ID | F002
 | Название | Metadata Serialization
 | Приоритет | P1 (критично для MVP)
-| Статус | 🟢 Готов
 | Модуль | `dependanger-metadata-json` (+ SPI в core)
 | Зависит от | F001 (Registry DSL)
 | Блокирует | F003 (Processing Pipeline)
@@ -25,7 +24,10 @@
 == Описание
 
 Metadata Serialization преобразует `DependangerDsl` (модель в памяти) в сериализуемый `DependangerMetadata` для:
-* Хранения между запусками * Передачи между этапами pipeline * Кеширования для инкрементальной обработки
+
+* Хранения между запусками
+* Передачи между этапами pipeline
+* Кеширования для инкрементальной обработки
 
 == User Stories
 
@@ -37,8 +39,36 @@ ____
 ____
 
 **Acceptance Criteria:**
-* DSL конвертируется в `metadata.json`
-* JSON содержит все данные из DependangerMetadata * Файл читается и десериализуется обратно в модель
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| DSL с определёнными библиотеками, версиями, бандлами
+| Вызываю `dsl.toMetadata()` и `format.write(metadata, path)`
+| Создаётся файл `metadata.json` с валидным JSON
+
+| AC-001-2
+| Файл `metadata.json` существует
+| Вызываю `format.read(path)`
+| Возвращается `DependangerMetadata` с теми же данными
+
+| AC-001-3
+| DSL с 10 библиотеками и 5 версиями
+| Сериализую и десериализую обратно
+| Все 10 библиотек и 5 версий сохранены без потерь (round-trip)
+
+| AC-001-4
+| DSL с fallback условиями в версиях
+| Сериализую в JSON
+| Условия сохранены в структурированном виде: `{"type": "jdkBelow", "version": 17}`
+
+| AC-001-5
+| Gradle task `dependangerGenerateMetadata`
+| Запускаю task
+| Файл создан в `build/dependanger/metadata.json`
+|===
 
 === US-002: Расширение форматами
 
@@ -48,7 +78,31 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Формат определяется через конфигурацию * Можно добавить кастомный формат через SPI * Все форматы поддерживают одинаковую модель данных
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| Реализация `SerializationFormat` для YAML
+| Регистрирую через ServiceLoader
+| Формат доступен по `formatId = "yaml"`
+
+| AC-002-2
+| Настройка `settings { serialization { format = "yaml" } }`
+| Запускаю генерацию метаданных
+| Создаётся файл `metadata.yaml`
+
+| AC-002-3
+| Два формата зарегистрированы: JSON и YAML
+| Сериализую в JSON, десериализую как YAML (после конвертации)
+| Данные идентичны (форматы взаимозаменяемы)
+
+| AC-002-4
+| Кастомный формат `MyFormat` реализует `SerializationFormat<ByteArray>`
+| Регистрирую через ServiceLoader
+| Формат работает с бинарными данными
+|===
 
 == SPI: SerializationFormat
 
@@ -202,8 +256,124 @@ ____
 |===
 
 При десериализации:
+
 * Проверяется `schemaVersion`
-* Поддерживается миграция между версиями * Неизвестные поля игнорируются (forward compatibility)
+* Поддерживается миграция между версиями
+* Неизвестные поля игнорируются (forward compatibility)
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА сериализовать `DependangerMetadata` в JSON формат
+
+| FR-002
+| MUST
+| Система ДОЛЖНА десериализовать JSON обратно в `DependangerMetadata` без потери данных
+
+| FR-003
+| MUST
+| Система ДОЛЖНА включать `schemaVersion` в сериализованные данные
+
+| FR-004
+| MUST
+| Система ДОЛЖНА валидировать `schemaVersion` при десериализации
+
+| FR-005
+| MUST
+| Система ДОЛЖНА поддерживать SPI `SerializationFormat<T>` для расширения форматами
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА игнорировать неизвестные поля при десериализации (forward compatibility)
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА поддерживать миграцию между версиями схемы
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА генерировать human-readable JSON (pretty print)
+
+| FR-009
+| MAY
+| Система МОЖЕТ поддерживать YAML формат через отдельный модуль
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать сжатие сериализованных данных
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Невалидный JSON
+| Файл `metadata.json` содержит синтаксическую ошибку JSON
+| ERROR: "Failed to parse metadata.json: [parse error details]"
+
+| Неизвестная версия схемы
+| `schemaVersion` в файле = "99.0", текущая поддерживаемая = "1.1"
+| ERROR: "Unsupported schema version '99.0'. Supported: 1.0, 1.1"
+
+| Старая версия схемы
+| `schemaVersion` = "1.0", текущая = "1.1"
+| Успешная миграция, WARNING: "Migrating from schema 1.0 to 1.1"
+
+| Отсутствует schemaVersion
+| JSON файл без поля `schemaVersion`
+| ERROR: "Missing required field 'schemaVersion'"
+
+| Неизвестные поля в JSON
+| JSON содержит поле `"unknownField": "value"`
+| Поле игнорируется (forward compatibility), десериализация успешна
+
+| Пустой JSON файл
+| Файл существует, но содержит `{}`
+| ERROR: "Missing required field 'schemaVersion'"
+
+| Файл не существует
+| Путь указывает на несуществующий файл
+| ERROR: "File not found: [path]"
+
+| Нет прав на запись
+| Директория существует, но нет прав на запись
+| ERROR: "Cannot write to [path]: Permission denied"
+
+| Очень большой файл
+| metadata.json содержит 10000+ библиотек
+| Успешная обработка (возможно медленнее)
+
+| Специальные символы в значениях
+| Библиотека с description содержащим unicode, emoji, переносы строк
+| Корректная сериализация с экранированием
+
+| Циклические ссылки в модели
+| (не должно быть возможно по дизайну DSL)
+| Валидация в DSL предотвращает, но если попало — ERROR при сериализации
+
+| Null значения
+| Опциональные поля (tags, requires) = null
+| Поля опускаются в JSON или сериализуются как null (configurable)
+
+| Дубликаты ключей
+| JSON с дубликатами: `{"kotlin": {...}, "kotlin": {...}}`
+| ERROR: "Duplicate key 'kotlin' in libraries"
+
+| Кодировка файла
+| Файл в UTF-16 вместо UTF-8
+| ERROR или автодетект (implementation-specific)
+
+| Concurrent writes
+| Два процесса пишут в один файл одновременно
+| Использовать file locking или atomic write (rename)
+|===
 
 == Связи
 

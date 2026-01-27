@@ -18,7 +18,6 @@
 | ID | F004
 | Название | TOML Generation
 | Приоритет | P1 (критично для MVP)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-generator-toml`
 | Зависит от | F003 (Processing Pipeline)
 | Блокирует | —
@@ -38,8 +37,36 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Генерируется валидный TOML файл * Все секции: [versions], [libraries], [bundles], [plugins]
-* Файл совместим с Gradle 7.0+
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| EffectiveMetadata с 3 библиотеками и 2 версиями
+| Вызываю `TomlGenerator.generate(metadata)`
+| Создаётся TOML с секциями `[versions]` (2 записи), `[libraries]` (3 записи)
+
+| AC-001-2
+| EffectiveMetadata с бандлом `kotlin-core` содержащим 2 библиотеки
+| Генерирую TOML
+| Секция `[bundles]` содержит `kotlin-core = ["kotlin-stdlib", "kotlin-reflect"]`
+
+| AC-001-3
+| EffectiveMetadata с плагином `kotlin-jvm`
+| Генерирую TOML
+| Секция `[plugins]` содержит `kotlin-jvm = { id = "...", version.ref = "..." }`
+
+| AC-001-4
+| Сгенерированный TOML файл
+| Подключаю в Gradle проект через `versionCatalogs { from(files(...)) }`
+| Gradle успешно парсит каталог, `libs.kotlin.stdlib` доступен
+
+| AC-001-5
+| Gradle task `dependangerGenerateToml`
+| Запускаю task без параметров
+| Файл создан в `gradle/libs.versions.toml`
+|===
 
 === US-002: Генерация для профиля
 
@@ -49,7 +76,31 @@ ____
 ____
 
 **Acceptance Criteria:**
-* Можно указать distribution profile * TOML содержит только библиотеки из профиля * Имя файла отражает профиль: `libs-production.versions.toml`
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| EffectiveMetadata с distribution `backend` (5 из 10 библиотек)
+| Генерирую TOML для distribution `backend`
+| TOML содержит только 5 библиотек из профиля `backend`
+
+| AC-002-2
+| Distribution profile `android` с фильтром `byTags { include("android") }`
+| Генерирую TOML
+| Только библиотеки с тегом `android` включены
+
+| AC-002-3
+| Настройка `toml { filename = "libs-{distribution}.versions.toml" }`
+| Генерирую для distribution `production`
+| Файл называется `libs-production.versions.toml`
+
+| AC-002-4
+| Два distribution: `backend` и `android`
+| Генерирую TOML для обоих
+| Создаются два файла с разным содержимым
+|===
 
 == SPI: ArtifactGenerator
 
@@ -191,6 +242,120 @@ plugins {
 | TOML синтаксис
 | Ключи соответствуют TOML spec
 | ERROR
+|===
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА генерировать валидный TOML файл, совместимый с Gradle Version Catalogs
+
+| FR-002
+| MUST
+| Система ДОЛЖНА включать секции `[versions]`, `[libraries]`, `[bundles]`, `[plugins]`
+
+| FR-003
+| MUST
+| Система ДОЛЖНА использовать `version.ref` для ссылок на версии (не inline версии)
+
+| FR-004
+| MUST
+| Система ДОЛЖНА сохранять DSL alias как TOML ключи без трансформации
+
+| FR-005
+| MUST
+| Система ДОЛЖНА валидировать TOML перед записью (ключи, ссылки, синтаксис)
+
+| FR-006
+| SHOULD
+| Система ДОЛЖНА поддерживать генерацию для конкретного distribution profile
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА поддерживать кастомное имя выходного файла
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА добавлять комментарии с метаданными (generated at, distribution)
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА сортировать секции алфавитно (опционально)
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать inline версии для библиотек без versionRef
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Пустой каталог
+| EffectiveMetadata без библиотек, версий, бандлов, плагинов
+| Генерируется TOML с пустыми секциями (валидный файл)
+
+| Библиотека без версии
+| Библиотека с `version = null` после pipeline
+| ERROR: "Library 'xxx' has no resolved version"
+
+| Невалидный TOML ключ
+| Alias содержит символы недопустимые в TOML: `my.lib` или `my lib`
+| ERROR: "Invalid TOML key 'my.lib'. Keys must match [a-zA-Z0-9_-]+"
+
+| Очень длинный alias
+| Alias длиной 500+ символов
+| WARNING, но генерация продолжается (Gradle может не поддержать)
+
+| Циклическая ссылка version.ref
+| version.ref указывает на несуществующую версию
+| ERROR: "Unknown version reference 'xxx' in library 'yyy'"
+
+| Бандл с несуществующей библиотекой
+| Bundle содержит alias библиотеки которой нет в effective
+| ERROR: "Unknown library 'xxx' in bundle 'yyy'"
+
+| Пустой бандл
+| Bundle без библиотек: `bundle("empty") { }`
+| WARNING: "Empty bundle 'empty'", бандл пропускается или включается пустым
+
+| Дубликаты после фильтрации
+| (не должно быть возможно — alias уникальны)
+| Валидация в pipeline предотвращает
+
+| Специальные символы в версии
+| Версия `1.0.0-SNAPSHOT+build.123`
+| Корректная сериализация в кавычках: `version = "1.0.0-SNAPSHOT+build.123"`
+
+| Platform library
+| Библиотека типа `platform` (BOM)
+| Генерируется как обычная библиотека (Gradle сам определит тип)
+
+| Конфликт имён секций
+| (невозможно — секции фиксированы)
+| N/A
+
+| Нет прав на запись
+| Директория `gradle/` не существует или read-only
+| ERROR: "Cannot write to gradle/libs.versions.toml: [причина]"
+
+| Файл уже существует
+| `libs.versions.toml` уже есть
+| Перезаписывается (с WARNING если `overwrite = false`)
+
+| Gradle < 7.0
+| Пользователь использует Gradle 6.x
+| WARNING: "Version Catalogs require Gradle 7.0+", генерация продолжается
+
+| Unicode в description/comments
+| Комментарий с emoji или кириллицей
+| Корректная сериализация в UTF-8
 |===
 
 == Связи

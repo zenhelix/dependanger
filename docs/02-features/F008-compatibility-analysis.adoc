@@ -17,7 +17,6 @@
 | ID | F008
 | Название | Compatibility Analysis
 | Приоритет | P3 (желательно)
-| Статус | 🔴 Не начат
 | Модуль | `dependanger-analysis`
 | Зависит от | F003 (Processing Pipeline)
 | Блокирует | —
@@ -39,9 +38,30 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно определить правило `jdkRequirement`
-* При нарушении генерируется ERROR или WARNING
-* Сообщение указывает какой JDK требуется
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| Правило `jdkRequirement("spring-jdk17") { matches = "org.springframework:*"; minJdk = 17 }`
+| Анализирую с `targetJdk = 11`, есть библиотека `spring-web`
+| `CompatibilityIssue` с `severity = ERROR`, message содержит "requires JDK 17+"
+
+| AC-001-2
+| Правило `jdkRequirement` с `minJdk = 17`
+| Анализирую с `targetJdk = 21`
+| Нет ошибок (JDK 21 >= 17)
+
+| AC-001-3
+| Правило `jdkRequirement` с `severity = WARNING`
+| Нарушение правила
+| `CompatibilityIssue` с `severity = WARNING`, pipeline продолжается
+
+| AC-001-4
+| Правило `jdkRequirement` с паттерном `matches = "org.springframework:*"`
+| Библиотеки `spring-web`, `spring-data-jpa` нарушают правило
+| `affectedLibraries = ["spring-web", "spring-data-jpa"]`
+|===
 
 === US-002: Взаимоисключающие библиотеки
 
@@ -52,9 +72,93 @@ ____
 
 **Acceptance Criteria:**
 
-* Можно определить правило `mutualExclusion`
-* При наличии обеих библиотек — WARNING
-* Сообщение указывает какие библиотеки конфликтуют
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| Правило `mutualExclusion("json-libs") { libraries("jackson-core", "gson") }`
+| Обе библиотеки присутствуют в effective metadata
+| `CompatibilityIssue` с `affectedLibraries = ["jackson-core", "gson"]`
+
+| AC-002-2
+| Правило `mutualExclusion` для `jackson-core` и `gson`
+| Только `jackson-core` присутствует
+| Нет ошибок (нет конфликта)
+
+| AC-002-3
+| Правило `mutualExclusion` с `severity = WARNING`
+| Обе библиотеки присутствуют
+| WARNING в diagnostics, pipeline продолжается
+
+| AC-002-4
+| Правило `mutualExclusion` для 3 библиотек: A, B, C
+| Присутствуют A и C (но не B)
+| `CompatibilityIssue` с `affectedLibraries = ["A", "C"]`
+|===
+
+=== US-003: Проверка совместимости версий
+
+[quote]
+____
+Как разработчик, я хочу убедиться что связанные библиотеки используют совместимые версии.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Правило `versionConstraint("kotlin-sync") { libraries("kotlin-stdlib", "kotlin-reflect"); constraint = SAME_MAJOR_MINOR }`
+| `kotlin-stdlib:2.1.0`, `kotlin-reflect:2.0.0`
+| `CompatibilityIssue`: minor версии не совпадают (2.1 vs 2.0)
+
+| AC-003-2
+| Правило `versionConstraint` с `SAME_MAJOR_MINOR`
+| `kotlin-stdlib:2.1.0`, `kotlin-reflect:2.1.20`
+| Нет ошибок (2.1 == 2.1)
+
+| AC-003-3
+| Правило `versionConstraint` с `SAME_MAJOR`
+| `lib-a:1.0.0`, `lib-b:1.9.0`
+| Нет ошибок (major = 1)
+
+| AC-003-4
+| Правило `versionConstraint` с `EXACT`
+| `lib-a:1.0.0`, `lib-b:1.0.1`
+| `CompatibilityIssue`: версии не идентичны
+|===
+
+=== US-004: Кастомные правила
+
+[quote]
+____
+Как архитектор, я хочу определять произвольные правила совместимости через код.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| `customRule("spring-kotlin") { condition = { ctx -> ctx.hasLibrary("spring-boot") && ctx.kotlinVersion < "1.9" } }`
+| `spring-boot` присутствует, Kotlin 1.8
+| `CompatibilityIssue` срабатывает
+
+| AC-004-2
+| Кастомное правило с `condition = { false }`
+| Анализ
+| Правило не срабатывает
+
+| AC-004-3
+| Кастомное правило с доступом к `ctx.libraries`, `ctx.jdkVersion`
+| Анализ
+| Правило имеет полный доступ к контексту
+|===
 
 == DSL синтаксис
 
@@ -158,15 +262,127 @@ issues.forEach { issue ->
 NOTE: Правила проверяются только против **effective** (отфильтрованных) библиотек.
 Отфильтрованные библиотеки не триггерят правила.
 
-=== Неполные правила (Incomplete Rules)
+== Функциональные требования
 
-Если правило ссылается на библиотеки, которые были отфильтрованы текущим distribution:
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
 
-* Система генерирует **WARNING** о неполном правиле
-* Правило всё равно проверяется для оставшихся библиотек
-* В diagnostics добавляется `IncompleteRuleWarning` с информацией о недостающих библиотеках
+| FR-001
+| MUST
+| Система ДОЛЖНА поддерживать правило `jdkRequirement` для проверки минимальной версии JDK
 
-Пример: правило `mutualExclusion("jackson-core", "gson")` при distribution, где `gson` отфильтрован, выдаст warning о том, что правило применяется неполностью.
+| FR-002
+| MUST
+| Система ДОЛЖНА поддерживать правило `mutualExclusion` для взаимоисключающих библиотек
+
+| FR-003
+| MUST
+| Система ДОЛЖНА поддерживать правило `versionConstraint` для проверки совместимости версий
+
+| FR-004
+| MUST
+| Система ДОЛЖНА добавлять результаты в `ProcessingDiagnostics` как `CompatibilityIssue`
+
+| FR-005
+| MUST
+| Система ДОЛЖНА поддерживать уровни severity: ERROR, WARNING, INFO
+
+| FR-006
+| MUST
+| При severity = ERROR в strict mode система ДОЛЖНА останавливать pipeline
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА поддерживать `customRule` для произвольных проверок
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА поддерживать паттерны в `matches` (glob: `org.springframework:*`)
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА включать `suggestion` в `CompatibilityIssue` с рекомендацией по исправлению
+
+| FR-010
+| MAY
+| Система МОЖЕТ поддерживать `versionConstraint` с типами: EXACT, SAME_MAJOR, SAME_MAJOR_MINOR
+
+| FR-011
+| MAY
+| Система МОЖЕТ автоматически определять известные несовместимости (встроенные правила)
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| Неполное правило (Incomplete Rule)
+| `mutualExclusion("jackson", "gson")`, но `gson` отфильтрован distribution
+| WARNING: "Rule 'json-libs' is incomplete: library 'gson' not in effective metadata"
+
+| Несуществующая библиотека в правиле
+| Правило ссылается на `unknown-lib` которой нет в DSL
+| ERROR: "Unknown library 'unknown-lib' in rule 'rule-id'"
+
+| Пустой список библиотек
+| `mutualExclusion("empty") { libraries() }`
+| ERROR: "Rule 'empty' has no libraries defined"
+
+| Одна библиотека в mutualExclusion
+| `mutualExclusion("single") { libraries("only-one") }`
+| WARNING: "mutualExclusion rule 'single' has only one library"
+
+| Нет правил совместимости
+| Блок `compatibility { }` пуст или отсутствует
+| Процессор пропускается, INFO: "No compatibility rules defined"
+
+| Все правила проходят
+| Ни одно правило не нарушено
+| Пустой список CompatibilityIssue, INFO: "All compatibility checks passed"
+
+| targetJdk не указан
+| `withCompatibilityAnalysis()` без `targetJdk`, есть `jdkRequirement` правила
+| WARNING: "targetJdk not specified, jdkRequirement rules will be skipped"
+
+| Невалидный паттерн matches
+| `matches = "[invalid"`
+| ERROR: "Invalid pattern '[invalid' in rule 'rule-id'"
+
+| Циклическая зависимость в customRule
+| customRule вызывает другое правило (не поддерживается)
+| Не применимо (правила независимы)
+
+| Exception в customRule condition
+| `condition = { throw RuntimeException() }`
+| ERROR: "Exception in custom rule 'rule-id': [message]", pipeline продолжается
+
+| Конфликтующие правила
+| Два правила с одинаковым `ruleId`
+| ERROR: "Duplicate rule ID 'rule-id'"
+
+| Версии с разным форматом
+| `kotlin-stdlib:2.1.0` vs `kotlin-reflect:2.1` (без patch)
+| Нормализация версий перед сравнением: `2.1` → `2.1.0`
+
+| Prerelease версии в versionConstraint
+| `lib-a:1.0.0-RC1`, `lib-b:1.0.0`
+| По умолчанию RC считается < stable; configurable
+
+| Много нарушений
+| 50 библиотек нарушают одно правило
+| Все 50 в `affectedLibraries`, возможно группировка в отчёте
+
+| Strict mode + ERROR
+| `severity = ERROR`, strict mode включён
+| Pipeline останавливается после первого ERROR
+
+| Strict mode + WARNING
+| `severity = WARNING`, strict mode включён
+| Pipeline продолжается, WARNING накапливаются
+|===
 
 == CLI команда
 

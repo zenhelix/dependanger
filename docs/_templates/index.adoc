@@ -1,0 +1,141 @@
+= Шаблоны и руководства по документации
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+== Обзор
+
+Этот раздел содержит шаблоны и руководства для создания документации проекта Dependanger.
+
+[cols="1,3",options="header"]
+|===
+| Что | Где найти
+
+| Как определить полноту документа
+| xref:documentation-completeness.adoc[Правила полноты]
+
+| Когда писать / останавливаться / продолжать
+| xref:documentation-workflow.adoc[Итеративный workflow]
+
+| Шаблон для новой фичи
+| xref:feature-template.adoc[Feature Template]
+
+| Шаблон для архитектурного решения
+| xref:adr-template.adoc[ADR Template]
+|===
+
+== Руководства
+
+=== Правила полноты документации
+
+xref:documentation-completeness.adoc[Правила полноты документации] — когда документ готов, а когда нет.
+
+**Ключевые принципы:**
+
+* **Purpose-Driven** — документ полон, когда отвечает на все вопросы stakeholders
+* **Testability** — хорошее требование можно превратить в тест
+* **Maturity Levels** — документация развивается итеративно (L0 → L1 → L2 → L3)
+
+=== Итеративный workflow
+
+xref:documentation-workflow.adoc[Итеративная работа с документацией] — практическое руководство.
+
+**Отвечает на вопросы:**
+
+* **Когда писать?** — триггеры для создания/обновления документации
+* **Когда остановиться?** — критерии достаточности
+* **Когда продолжить?** — когда нужна следующая итерация
+* **Когда подождать?** — когда ждать feedback
+
+== Шаблоны
+
+[cols="1,2,2",options="header"]
+|===
+| Шаблон | Назначение | Куда копировать
+
+| xref:feature-template.adoc[Feature Template]
+| Описание функциональных требований
+| `docs/02-features/F###-название.adoc`
+
+| xref:concept-template.adoc[Concept Template]
+| Концептуальные документы (архитектура, модели)
+| `docs/01-concepts/название.adoc`
+
+| xref:adr-template.adoc[ADR Template]
+| Architecture Decision Records
+| `docs/05-decisions/ADR-###-название.adoc`
+
+| xref:interface-template.adoc[Interface Template]
+| Документация интерфейсов (CLI, Gradle Plugin, API)
+| `docs/03-interfaces/название.adoc`
+|===
+
+== Уровни зрелости документов
+
+[cols="1,2,2",options="header"]
+|===
+| Уровень | Название | Когда достаточно
+
+| L0
+| Draft
+| Для brainstorming, идеи
+
+| L1
+| Minimal Viable
+| Для начала работы над MVP
+
+| L2
+| Development Ready
+| Для начала разработки
+
+| L3
+| Complete
+| Для production release
+|===
+
+NOTE: Для Concepts, ADR и Interface документов используются уровни L0-L2 (без L3), так как они не требуют той же степени детализации acceptance criteria, как Feature-документы.
+
+== Быстрый старт
+
+=== Создание Feature-документа
+
+[source,bash]
+----
+# Выполнить из корня проекта:
+cp docs/_templates/feature-template.adoc docs/02-features/F010-my-feature.adoc
+----
+
+Затем следуйте xref:documentation-workflow.adoc#_пример_1_новая_фича_от_начала_до_production[примеру workflow для новой фичи].
+
+=== Создание ADR
+
+[source,bash]
+----
+# Выполнить из корня проекта:
+cp docs/_templates/adr-template.adoc docs/05-decisions/ADR-005-my-decision.adoc
+----
+
+Затем:
+
+1. Опишите контекст и проблему
+2. Сформулируйте решение
+3. Опишите минимум 2 альтернативы
+4. Укажите последствия (позитивные и негативные)
+
+== Чеклист для ревью документации
+
+При ревью любого документа проверьте:
+
+* [ ] **Purpose Check** — документ отвечает на stakeholder questions
+* [ ] **Testability Check** — требования сформулированы тестируемо
+* [ ] **Maturity Check** — статус соответствует реальному уровню
+* [ ] **DRY Check** — нет копипасты, используются ссылки (xref:)
+
+Детали: xref:documentation-completeness.adoc#_чеклист_для_ревью_документации[Чеклист для ревью]
+
+== Связанные документы
+
+* xref:../01-concepts/constitution.adoc[Constitution] — обязательные архитектурные правила
+* xref:../01-concepts/guidelines.adoc[Guidelines] — рекомендации по разработке
+* xref:../01-concepts/fitness-functions.adoc[Fitness Functions] — автоматические проверки

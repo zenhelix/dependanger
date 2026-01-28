@@ -518,6 +518,159 @@ Summary:
 }
 ----
 
+=== license-check
+
+Проверка лицензий библиотек на соответствие политикам.
+
+[source,bash]
+----
+dependanger license-check [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--allow <license>`
+| Добавить лицензию в whitelist (можно указать несколько раз)
+| —
+
+| `--deny <license>`
+| Добавить лицензию в blacklist (можно указать несколько раз)
+| —
+
+| `--fail-on-denied`
+| Fail при наличии denied лицензий
+| `false`
+
+| `--fail-on-unknown`
+| Fail при наличии unknown лицензий
+| `false`
+
+| `--ignore-library <alias>`
+| Игнорировать библиотеку (можно указать несколько раз)
+| —
+
+| `--format <format>`
+| Формат вывода: `text` или `json`. Алиас: `--json` эквивалентен `--format json`
+| `text`
+
+| `-o, --output <path>`
+| Записать результат в файл
+| —
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Проверка завершена, проблем нет (или `--fail-on-*` не указаны)
+
+| `1`
+| Найдены denied или unknown лицензии (при `--fail-on-*`)
+
+| `2`
+| Ошибка выполнения (невалидный input, API недоступен)
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Базовая проверка лицензий
+dependanger license-check --input metadata.json
+
+# С дополнительным whitelist
+dependanger license-check --allow MIT --allow Apache-2.0 --input metadata.json
+
+# Fail при denied лицензиях
+dependanger license-check --fail-on-denied --input metadata.json
+
+# Добавить лицензию в blacklist
+dependanger license-check --deny GPL-3.0 --input metadata.json
+
+# JSON вывод для CI
+dependanger license-check --json --output license-report.json --input metadata.json
+----
+
+==== Пример вывода (text)
+
+[source]
+----
+License check: metadata.json
+Checking 45 libraries...
+
+DENIED licenses (1):
+  gpl-library (com.example:gpl-library:1.0.0)
+    License: GPL-3.0 (GNU General Public License v3.0)
+    Source: MAVEN_POM
+    Policy: DENIED (in blacklist)
+
+UNKNOWN licenses (2):
+  internal-lib (com.company:internal-lib:1.0.0)
+    License: not found
+    Source: UNKNOWN
+
+  custom-tool (org.example:custom-tool:2.0.0)
+    License: "Custom License"
+    Source: MAVEN_POM
+    Policy: UNKNOWN (not in whitelist/blacklist)
+
+ALLOWED licenses: 42
+
+Summary:
+  Libraries scanned: 45
+  Allowed: 42
+  Denied: 1
+  Unknown: 2
+----
+
+==== Пример вывода (JSON)
+
+[source,json]
+----
+{
+  "scannedAt": "2026-01-28T10:30:00Z",
+  "librariesScanned": 45,
+  "summary": {
+    "allowed": 42,
+    "denied": 1,
+    "unknown": 2
+  },
+  "licenses": [
+    {
+      "library": "gpl-library",
+      "group": "com.example",
+      "name": "gpl-library",
+      "version": "1.0.0",
+      "spdxId": "GPL-3.0",
+      "licenseName": "GNU General Public License v3.0",
+      "source": "MAVEN_POM",
+      "policyStatus": "DENIED"
+    },
+    {
+      "library": "guava",
+      "group": "com.google.guava",
+      "name": "guava",
+      "version": "33.0.0-jre",
+      "spdxId": "Apache-2.0",
+      "licenseName": "Apache License 2.0",
+      "source": "MAVEN_POM",
+      "policyStatus": "ALLOWED"
+    }
+  ]
+}
+----
+
 === analyze
 
 Анализ совместимости зависимостей.
@@ -1145,5 +1298,7 @@ dependency-check:
 * xref:../02-features/F002-metadata-serialization.adoc[F002 Metadata Serialization] — формат metadata.json
 * xref:../02-features/F007-update-check.adoc[F007 Update Check] — проверка обновлений
 * xref:../02-features/F008-compatibility-analysis.adoc[F008 Compatibility Analysis] — анализ совместимости
+* xref:../02-features/F010-security-scanning.adoc[F010 Security Scanning] — проверка уязвимостей
+* xref:../02-features/F011-license-compliance.adoc[F011 License Compliance] — проверка лицензий
 * xref:gradle-plugin.adoc[Gradle Plugin] — альтернативный интерфейс для Gradle проектов
 * xref:library-api.adoc[Library API] — программный API

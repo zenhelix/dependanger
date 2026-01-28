@@ -316,9 +316,15 @@ ____
 | Проверка уязвимостей через OSV API
 | ✅
 | xref:F010-security-scanning.adoc[F010]
+
+| 85
+| `license-check`
+| Проверка лицензий через Maven POM / ClearlyDefined API
+| ✅
+| xref:F011-license-compliance.adoc[F011]
 |===
 
-NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`
+NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`, `withLicenseCheck()`
 
 == Processing Context
 
@@ -391,8 +397,8 @@ Pipeline поддерживает параллельное выполнение 
 | Требуют последовательного выполнения (зависят от результатов предыдущих)
 
 | PARALLEL_IO
-| bom-import, update-check, security-check
-| I/O-bound операции (сетевые запросы к Maven Central, OSV API)
+| bom-import, update-check, security-check, license-check
+| I/O-bound операции (сетевые запросы к Maven Central, OSV API, ClearlyDefined API)
 
 | PARALLEL_COMPUTE
 | validation, compat-rules, compatibility-analysis

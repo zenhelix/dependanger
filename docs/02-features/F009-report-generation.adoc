@@ -199,6 +199,45 @@ ____
 | Секция `vulnerabilities` отсутствует или `null`
 |===
 
+=== US-007: Секция licenses в отчёте
+
+[quote]
+____
+Как legal/compliance officer, я хочу видеть список лицензий библиотек в отчёте, чтобы проверять соответствие политикам.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-007-1
+| Pipeline выполнен с `withLicenseCheck()`, найдено 45 лицензий
+| Генерирую отчёт
+| Секция `licenses` содержит 45 записей
+
+| AC-007-2
+| Лицензия с SPDX ID, source, policy status
+| Генерирую отчёт
+| Запись содержит все поля LicenseInfo
+
+| AC-007-3
+| 5 библиотек с denied лицензиями
+| Генерирую отчёт
+| `summary.deniedLicenses = 5`
+
+| AC-007-4
+| 3 библиотеки с unknown лицензиями
+| Генерирую отчёт
+| `summary.unknownLicenses = 3`
+
+| AC-007-5
+| License check не выполнен (без `withLicenseCheck()`)
+| Генерирую отчёт
+| Секция `licenses` отсутствует или `null`
+|===
+
 === US-006: Форматы вывода
 
 [quote]
@@ -268,6 +307,8 @@ result.writeReportTo(Path.of("dependanger-report.json"))
     "vulnerabilitiesCount": 3,
     "criticalVulnerabilities": 1,
     "highVulnerabilities": 2,
+    "deniedLicenses": 0,
+    "unknownLicenses": 2,
     "compatibilityIssues": 2,
     "validationErrors": 0,
     "validationWarnings": 3
@@ -346,6 +387,30 @@ result.writeReportTo(Path.of("dependanger-report.json"))
       "usedInBundles": ["legacy-bundle"]
     }
   ],
+  "licenses": [
+    {
+      "library": "guava",
+      "group": "com.google.guava",
+      "name": "guava",
+      "version": "33.0.0-jre",
+      "spdxId": "Apache-2.0",
+      "licenseName": "Apache License 2.0",
+      "source": "MAVEN_POM",
+      "policyStatus": "ALLOWED",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    {
+      "library": "unknown-lib",
+      "group": "com.example",
+      "name": "unknown-lib",
+      "version": "1.0.0",
+      "spdxId": null,
+      "licenseName": null,
+      "source": "UNKNOWN",
+      "policyStatus": "UNKNOWN",
+      "url": null
+    }
+  ],
   "validation": {
     "errors": [],
     "warnings": [
@@ -408,10 +473,10 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | Начальная версия схемы
 
 | 1.1
-| (планируется) Добавлено поле `security` с информацией о CVE
+| Добавлено поле `vulnerabilities` с информацией о CVE
 
 | 1.2
-| (планируется) Добавлено поле `licenses` с информацией о лицензиях
+| Добавлено поле `licenses` с информацией о лицензиях
 |===
 
 При парсинге отчёта:
@@ -489,6 +554,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | FR-016
 | SHOULD
 | Система ДОЛЖНА включать `vulnerabilitiesCount`, `criticalVulnerabilities`, `highVulnerabilities` в секцию `summary`
+
+| FR-017
+| SHOULD
+| Система ДОЛЖНА включать секцию `licenses` если выполнен LicenseCheck (SPDX ID, source, policyStatus)
+
+| FR-018
+| SHOULD
+| Система ДОЛЖНА включать `deniedLicenses`, `unknownLicenses` в секцию `summary`
 |===
 
 == Edge Cases
@@ -512,6 +585,18 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | Нет уязвимостей
 | Все библиотеки безопасны
 | `summary.vulnerabilitiesCount = 0`, `vulnerabilities = []`
+
+| LicenseCheck не выполнен
+| Pipeline без `withLicenseCheck()`
+| Секция `licenses` отсутствует или `"licenses": null`
+
+| Все лицензии allowed
+| Все библиотеки с разрешёнными лицензиями
+| `summary.deniedLicenses = 0`, `summary.unknownLicenses = 0`
+
+| Библиотека с неизвестной лицензией
+| Лицензия не определена ни в одном источнике
+| `policyStatus = "UNKNOWN"`, `source = "UNKNOWN"`
 
 | Deprecated без usedInBundles
 | Deprecated библиотека не используется ни в одном бандле
@@ -583,3 +668,5 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 
 * xref:F007-update-check.adoc[F007: Update Check] — данные об обновлениях
 * xref:F008-compatibility-analysis.adoc[F008: Compatibility Analysis] — данные о совместимости
+* xref:F010-security-scanning.adoc[F010: Security Scanning] — данные об уязвимостях
+* xref:F011-license-compliance.adoc[F011: License Compliance] — данные о лицензиях

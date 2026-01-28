@@ -28,6 +28,7 @@ flowchart TD
         F007["F007: Update Check (P3)"]
         F008["F008: Compatibility (P3)"]
         F010["F010: Security (P3)"]
+        F011["F011: Licenses (P3)"]
     end
 
     F002 --> F003
@@ -35,6 +36,7 @@ flowchart TD
     F003 -.-> F007
     F003 -.-> F008
     F003 -.-> F010
+    F003 -.-> F011
     F003 --> EM["EffectiveMetadata"]
 
     subgraph Output["OUTPUT / GENERATION"]
@@ -66,6 +68,7 @@ flowchart TD
     style F008 fill:#E6E6FA
     style F009 fill:#E6E6FA
     style F010 fill:#E6E6FA
+    style F011 fill:#E6E6FA
 ----
 
 == Карта фич
@@ -123,6 +126,11 @@ flowchart TD
 | Security Scanning — проверка уязвимостей (CVE) через OSV API
 | P3
 | 🔴 Не начат
+
+| xref:F011-license-compliance.adoc[F011]
+| License Compliance — проверка лицензий через Maven POM / ClearlyDefined API
+| P3
+| 🔴 Не начат
 |===
 
 == Матрица приоритетов
@@ -151,6 +159,7 @@ flowchart TD
 * **F008: Compatibility Analysis** — анализ совместимости
 * **F009: Report Generation** — единый отчёт
 * **F010: Security Scanning** — проверка уязвимостей (CVE)
+* **F011: License Compliance** — проверка лицензий
 
 == Зависимости между фичами
 
@@ -166,6 +175,7 @@ flowchart LR
     F003 -.-> F008[F008: Compatibility]
     F003 -.-> F009[F009: Report]
     F003 -.-> F010[F010: Security]
+    F003 -.-> F011[F011: Licenses]
 
     style F001 fill:#90EE90
     style F002 fill:#90EE90
@@ -216,6 +226,10 @@ flowchart LR
 | —
 
 | F010 Security Scanning
+| F003 (как процессор)
+| —
+
+| F011 License Compliance
 | F003 (как процессор)
 | —
 |===

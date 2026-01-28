@@ -104,6 +104,81 @@ ____
 | Формат работает с бинарными данными
 |===
 
+=== US-003: Управление metadata через CLI
+
+[quote]
+____
+Как DevOps инженер, я хочу создавать и редактировать metadata.json через CLI, чтобы управлять зависимостями без Gradle.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Пустая директория
+| Запускаю `dependanger init --output metadata.json`
+| Создаётся валидный `metadata.json` с `schemaVersion` и пустыми коллекциями
+
+| AC-003-2
+| Существующий `metadata.json`
+| Запускаю `dependanger add-library guava com.google.guava:guava --version 33.0.0-jre`
+| Библиотека добавлена в `libraries`, файл перезаписан
+
+| AC-003-3
+| `metadata.json` с библиотекой `guava`
+| Запускаю `dependanger remove-library guava`
+| Библиотека удалена из `libraries`
+
+| AC-003-4
+| `metadata.json` с версией `kotlin = 2.1.20`
+| Запускаю `dependanger update-version kotlin 2.1.21`
+| Версия обновлена на `2.1.21`
+
+| AC-003-5
+| Невалидный `metadata.json` (syntax error)
+| Запускаю любую команду редактирования
+| ERROR: "Failed to parse metadata.json: [details]"
+|===
+
+NOTE: Подробное описание CLI команд см. в xref:../03-interfaces/cli.adoc[CLI Interface].
+
+=== US-004: Работа с deprecated библиотеками
+
+[quote]
+____
+Как разработчик, я хочу видеть информацию о deprecated библиотеках в сериализованной модели, чтобы инструменты могли генерировать предупреждения.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| DSL с deprecated библиотекой (`replacedBy`, `message`, `since`, `removalVersion`)
+| Сериализую в JSON
+| Все поля `deprecation` сохранены: `replacedBy`, `message`, `since`, `removalVersion`
+
+| AC-004-2
+| `metadata.json` с deprecated библиотекой
+| Десериализую и обращаюсь к `library.deprecation`
+| Объект `DeprecationInfo` содержит все поля
+
+| AC-004-3
+| Deprecated библиотека с `removalVersion = "2.0.0"`
+| Читаю metadata, текущая версия каталога = "2.1.0"
+| Processing Pipeline сгенерирует ERROR (не сериализация)
+
+| AC-004-4
+| Deprecated библиотека только с `message` (без `replacedBy`)
+| Сериализую в JSON
+| `deprecation.replacedBy = null`, `deprecation.message = "..."` сохранён
+|===
+
 == SPI: SerializationFormat
 
 === Описание интерфейса
@@ -143,15 +218,18 @@ ____
 Корневая структура модели сериализации содержит:
 
 * `schemaVersion` — версия схемы для обратной совместимости
-* `versions` — именованные версии
-* `libraries` — библиотеки с метаданными
+* `versions` — именованные версии с fallback условиями
+* `libraries` — библиотеки с метаданными (включая deprecation)
 * `plugins` — Gradle plugins
 * `bundles` — группы библиотек
-* `platforms` — целевые платформы и BOM imports
+* `bomImports` — импорт версий из внешних Maven BOM
+* `targetPlatforms` — целевые платформы (JDK, Android, KMP)
 * `distributions` — профили фильтрации
 * `compatibility` — правила совместимости
 * `presets` — именованные presets настроек
 * `settings` — глобальные настройки
+
+NOTE: `bomImports` и `targetPlatforms` — это разные сущности. `bomImports` используется для импорта версий из внешних BOM, а `targetPlatforms` — для определения целевых платформ и проверки совместимости.
 
 === Вложенные структуры
 
@@ -160,31 +238,202 @@ ____
 | Структура | Описание
 
 | `VersionMetadata`
-| Версия с value, deprecation статусом и fallback условиями
+| Версия с value и fallback условиями
+
+| `FallbackCondition`
+| Условие для fallback версии: `type` + параметры (jdkBelow, kotlinVersionAtLeast, etc.)
 
 | `LibraryMetadata`
-| Maven координаты, теги, требования к платформе, поддерживаемые targets
+| Maven координаты, теги, требования (`requires`), deprecation info, тип (library/platform)
+
+| `DeprecationInfo`
+| Информация об устаревании: `replacedBy`, `message`, `since`, `removalVersion`
+
+| `RequirementsMetadata`
+| Требования к окружению: JDK версия, Kotlin версия
 
 | `PluginMetadata`
 | Gradle plugin ID и версия
 
 | `BundleMetadata`
-| Список библиотек и включаемых бандлов
+| Список библиотек и включаемых бандлов (extends)
 
-| `PlatformMetadata`
+| `BomImportMetadata`
+| Maven координаты BOM для импорта версий
+
+| `TargetPlatformMetadata`
 | Constraints для JDK, Android, поддерживаемые Kotlin targets
 
 | `DistributionMetadata`
-| Spec фильтрации, publishing настройки
+| Spec фильтрации с типизированными фильтрами
 
-| `Preset`
-| Именованный preset с предустановленными настройками
+| `FilterSpec`
+| Набор фильтров: `byTags`, `byGroups`, `byAliases`, `byBundles`, `byDeprecated`
+
+| `CompatibilityRuleMetadata`
+| Правило совместимости: тип, libraries, severity, message
+
+| `PresetMetadata`
+| Именованный preset с bundles, distributions, settings
 
 | `SettingsMetadata`
-| Глобальные настройки валидации
+| Глобальные настройки валидации и генерации
 |===
 
-=== Пример JSON
+=== Детальные структуры
+
+==== FallbackCondition
+
+Условие для выбора fallback версии.
+
+[source,json]
+----
+// Простое условие
+{ "type": "jdkBelow", "version": 17 }
+
+// Составное условие (AND)
+{
+  "type": "all",
+  "conditions": [
+    { "type": "jdkBelow", "version": 17 },
+    { "type": "kotlinVersionBelow", "version": "2.0" }
+  ]
+}
+
+// Составное условие (OR)
+{
+  "type": "any",
+  "conditions": [
+    { "type": "jdkBelow", "version": 11 },
+    { "type": "environment", "key": "LEGACY", "value": "true" }
+  ]
+}
+
+// Инверсия
+{ "type": "not", "condition": { "type": "distribution", "name": "production" } }
+----
+
+**Типы условий:**
+
+[cols="1,2",options="header"]
+|===
+| Type | Параметры
+
+| `jdkBelow` | `version: Int`
+| `jdkAtLeast` | `version: Int`
+| `jdkBetween` | `min: Int`, `max: Int`
+| `kotlinVersionBelow` | `version: String`
+| `kotlinVersionAtLeast` | `version: String`
+| `gradleVersionBelow` | `version: String`
+| `gradleVersionAtLeast` | `version: String`
+| `distribution` | `name: String`
+| `environment` | `key: String`, `value: String`
+| `all` | `conditions: List<FallbackCondition>`
+| `any` | `conditions: List<FallbackCondition>`
+| `not` | `condition: FallbackCondition`
+|===
+
+==== FilterSpec
+
+Спецификация фильтрации для distribution.
+
+[source,json]
+----
+{
+  "filters": [
+    {
+      "type": "byTags",
+      "include": { "anyOf": ["web", "server"] },
+      "exclude": { "anyOf": ["deprecated", "legacy"] }
+    },
+    {
+      "type": "byGroups",
+      "include": { "matching": ["org.springframework:*"] },
+      "exclude": { "matching": ["com.legacy:*"] }
+    },
+    {
+      "type": "byBundles",
+      "include": ["spring-backend", "kotlin-core"]
+    },
+    {
+      "type": "byDeprecated",
+      "exclude": true
+    }
+  ]
+}
+----
+
+**Логика фильтрации:**
+
+* Несколько `include` в одном фильтре — **OR**
+* Несколько `exclude` в одном фильтре — **OR**
+* `include` + `exclude` — include применяется первым, затем exclude
+* Несколько фильтров разных типов — **AND**
+
+==== CompatibilityRuleMetadata
+
+[source,json]
+----
+// JDK requirement
+{
+  "id": "spring-jdk17",
+  "type": "jdkRequirement",
+  "libraries": ["spring-web", "spring-data-jpa"],
+  "minJdk": 17,
+  "maxJdk": null,
+  "severity": "ERROR",
+  "message": "Spring 6.x requires JDK 17+"
+}
+
+// Mutual exclusion
+{
+  "id": "logging",
+  "type": "mutualExclusion",
+  "libraries": ["slf4j-simple", "logback-classic", "log4j-core"],
+  "severity": "WARNING",
+  "message": "Only one logging implementation should be used"
+}
+
+// Version constraint
+{
+  "id": "kotlin-compat",
+  "type": "versionConstraint",
+  "library": "kotlinx-coroutines-core",
+  "versionRange": "[1.7.0,)",
+  "severity": "ERROR"
+}
+----
+
+=== Пример JSON (минимальный)
+
+[source,json]
+----
+{
+  "schemaVersion": "1.0",
+  "versions": {
+    "kotlin": { "value": "2.1.20" },
+    "spring-boot": { "value": "3.4.0" }
+  },
+  "libraries": {
+    "kotlin-stdlib": {
+      "group": "org.jetbrains.kotlin",
+      "artifact": "kotlin-stdlib",
+      "versionRef": "kotlin",
+      "tags": ["kotlin", "core"]
+    }
+  },
+  "plugins": {},
+  "bundles": {},
+  "bomImports": {},
+  "targetPlatforms": {},
+  "distributions": {},
+  "compatibility": [],
+  "presets": {},
+  "settings": {}
+}
+----
+
+=== Пример JSON (полный)
 
 [source,json]
 ----
@@ -194,11 +443,26 @@ ____
     "kotlin": {
       "value": "2.1.20",
       "fallbacks": [
-        { "value": "1.9.24", "condition": { "type": "jdkBelow", "version": 17 } }
+        {
+          "value": "1.9.24",
+          "condition": { "type": "jdkBelow", "version": 17 }
+        }
       ]
     },
     "spring-boot": {
-      "value": "3.4.0"
+      "value": "3.4.0",
+      "fallbacks": [
+        {
+          "value": "2.7.18",
+          "condition": {
+            "type": "all",
+            "conditions": [
+              { "type": "jdkBelow", "version": 17 },
+              { "type": "kotlinVersionBelow", "version": "2.0" }
+            ]
+          }
+        }
+      ]
     }
   },
   "libraries": {
@@ -206,7 +470,37 @@ ____
       "group": "org.jetbrains.kotlin",
       "artifact": "kotlin-stdlib",
       "versionRef": "kotlin",
+      "type": "library",
       "tags": ["kotlin", "core"]
+    },
+    "spring-web": {
+      "group": "org.springframework",
+      "artifact": "spring-web",
+      "versionRef": null,
+      "type": "library",
+      "tags": ["spring", "web"],
+      "requires": {
+        "jdk": { "min": 17 }
+      }
+    },
+    "old-http": {
+      "group": "com.example",
+      "artifact": "old-http",
+      "version": "1.0.0",
+      "type": "library",
+      "tags": ["http", "legacy"],
+      "deprecation": {
+        "replacedBy": "new-http",
+        "message": "Use new-http which supports HTTP/2",
+        "since": "1.2.0",
+        "removalVersion": "2.0.0"
+      }
+    },
+    "spring-boot-bom": {
+      "group": "org.springframework.boot",
+      "artifact": "spring-boot-dependencies",
+      "versionRef": "spring-boot",
+      "type": "platform"
     }
   },
   "plugins": {
@@ -218,13 +512,103 @@ ____
   "bundles": {
     "kotlin-core": {
       "libraries": ["kotlin-stdlib", "kotlin-reflect"]
+    },
+    "spring-backend": {
+      "libraries": ["spring-web"],
+      "extends": ["kotlin-core"]
     }
   },
-  "platforms": {},
-  "distributions": {},
-  "compatibility": [],
-  "presets": {},
-  "settings": {}
+  "bomImports": {
+    "spring-boot-bom": {
+      "group": "org.springframework.boot",
+      "artifact": "spring-boot-dependencies",
+      "versionRef": "spring-boot"
+    },
+    "kotlin-bom": {
+      "group": "org.jetbrains.kotlin",
+      "artifact": "kotlin-bom",
+      "version": "2.1.20"
+    }
+  },
+  "targetPlatforms": {
+    "jvm17": {
+      "jdk": { "min": 17, "max": 21 },
+      "targets": ["jvm"]
+    },
+    "android-min21": {
+      "android": { "minSdk": 21, "targetSdk": 34 },
+      "targets": ["android"]
+    }
+  },
+  "distributions": {
+    "backend": {
+      "spec": {
+        "filters": [
+          {
+            "type": "byTags",
+            "include": { "anyOf": ["server", "web"] }
+          },
+          {
+            "type": "byBundles",
+            "include": ["spring-backend"]
+          }
+        ]
+      }
+    },
+    "production": {
+      "spec": {
+        "filters": [
+          {
+            "type": "byDeprecated",
+            "exclude": true
+          }
+        ]
+      }
+    }
+  },
+  "compatibility": [
+    {
+      "id": "spring-jdk17",
+      "type": "jdkRequirement",
+      "libraries": ["spring-web", "spring-data-jpa"],
+      "minJdk": 17,
+      "severity": "ERROR"
+    },
+    {
+      "id": "logging",
+      "type": "mutualExclusion",
+      "libraries": ["slf4j-simple", "logback-classic"],
+      "message": "Only one logging implementation should be used",
+      "severity": "WARNING"
+    }
+  ],
+  "presets": {
+    "spring-app": {
+      "bundles": ["spring-backend", "kotlin-core"],
+      "distributions": ["backend"],
+      "settings": {
+        "strictVersionResolution": true
+      }
+    }
+  },
+  "settings": {
+    "defaultDistribution": "backend",
+    "strictVersionResolution": false,
+    "validation": {
+      "onCompatibilityViolation": "FAIL",
+      "onDeprecatedLibrary": "WARN",
+      "onUnresolvedVersion": "WARN"
+    },
+    "toml": {
+      "filename": "libs.versions.toml",
+      "includeComments": true
+    },
+    "bom": {
+      "groupId": "com.example",
+      "artifactId": "my-bom",
+      "version": "1.0.0"
+    }
+  }
 }
 ----
 
@@ -241,6 +625,55 @@ ____
 **Outputs:**
 
 * `build/dependanger/metadata.json`
+
+[[not-serialized]]
+== Что НЕ сериализуется
+
+Следующие элементы DSL являются **runtime-only** и не включаются в `metadata.json`:
+
+[cols="1,2",options="header"]
+|===
+| Элемент | Причина
+
+| `processing { }`
+| Конфигурация pipeline — каждый интерфейс (Gradle Plugin, CLI) настраивает pipeline самостоятельно
+
+| `ProcessingPreset`
+| Preset pipeline (DEFAULT, MINIMAL, STRICT) — runtime настройка
+
+| `withBomImport()`, `withUpdateCheck()`, etc.
+| Builder методы для включения процессоров — runtime настройка
+
+| `disabledProcessors`
+| Список отключённых процессоров — runtime настройка
+
+| Resolved versions
+| Резолвинг версий происходит в Processing Pipeline, не на этапе сериализации
+|===
+
+IMPORTANT: `metadata.json` хранит **декларативное описание** зависимостей.
+Все runtime решения (какие процессоры включить, какую версию использовать) принимаются позже в Processing Pipeline.
+
+=== Пример: DSL vs Metadata
+
+[source,kotlin]
+----
+// DSL (в памяти)
+dependanger {
+    versions { version("kotlin", "2.1.20") }
+    libraries { library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib", version = versionRef("kotlin")) }
+
+    // Runtime-only: НЕ сериализуется
+    processing {
+        preset = ProcessingPreset.STRICT
+        withBomImport()
+        withUpdateCheck()
+    }
+}
+----
+
+В `metadata.json` будут только `versions` и `libraries`.
+Блок `processing` игнорируется при сериализации.
 
 == Версионирование схемы
 
@@ -306,6 +739,34 @@ ____
 | FR-010
 | MAY
 | Система МОЖЕТ поддерживать сжатие сериализованных данных
+
+| FR-011
+| MUST
+| Система ДОЛЖНА сериализовать `deprecation` информацию для библиотек (replacedBy, message, since, removalVersion)
+
+| FR-012
+| MUST
+| Система ДОЛЖНА сериализовать `bomImports` и `targetPlatforms` как отдельные коллекции
+
+| FR-013
+| MUST
+| Система ДОЛЖНА сериализовать `FilterSpec` в distributions с типизированными фильтрами
+
+| FR-014
+| MUST
+| Система ДОЛЖНА сериализовать `FallbackCondition` с поддержкой вложенных условий (all, any, not)
+
+| FR-015
+| SHOULD
+| CLI команды ДОЛЖНЫ читать и писать `metadata.json` через SerializationFormat SPI
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА различать `type: library` и `type: platform` для библиотек
+
+| FR-017
+| MAY
+| Система МОЖЕТ НЕ сериализовать `processing {}` блок (runtime-only конфигурация)
 |===
 
 == Edge Cases

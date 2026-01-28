@@ -102,6 +102,40 @@ ____
 | Создаются два файла с разным содержимым
 |===
 
+=== US-003: Комментарии для deprecated библиотек
+
+[quote]
+____
+Как разработчик, я хочу видеть информацию о deprecated библиотеках в сгенерированном TOML, чтобы понимать какие зависимости нужно обновить.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Deprecated библиотека `old-http` с `replacedBy = "new-http"`
+| Генерирую TOML с `includeComments = true`
+| Перед библиотекой комментарий: `# DEPRECATED: Use new-http`
+
+| AC-003-2
+| Deprecated библиотека с `removalVersion = "2.0.0"`
+| Генерирую TOML
+| Комментарий содержит: `Will be removed in 2.0.0`
+
+| AC-003-3
+| Deprecated библиотека с `message = "Use new-http which supports HTTP/2"`
+| Генерирую TOML
+| Комментарий содержит сообщение из `message`
+
+| AC-003-4
+| Генерация с `includeComments = false`
+| Генерирую TOML
+| Deprecated библиотеки включены, но без комментариев
+|===
+
 == SPI: ArtifactGenerator
 
 === Описание интерфейса
@@ -137,6 +171,11 @@ ktor = "3.0.0"
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 spring-boot-starter = { group = "org.springframework.boot", name = "spring-boot-starter", version.ref = "spring-boot" }
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
+
+# DEPRECATED: Use new-http which supports HTTP/2
+# Replacement: new-http
+# Will be removed in: 2.0.0
+old-http = { group = "com.example", name = "old-http", version.ref = "old-http" }
 
 [bundles]
 kotlin-core = ["kotlin-stdlib", "kotlin-reflect"]
@@ -289,6 +328,10 @@ plugins {
 | FR-010
 | MAY
 | Система МОЖЕТ поддерживать inline версии для библиотек без versionRef
+
+| FR-011
+| SHOULD
+| Система ДОЛЖНА добавлять комментарии о deprecation для deprecated библиотек (replacedBy, message, removalVersion)
 |===
 
 == Edge Cases
@@ -356,6 +399,18 @@ plugins {
 | Unicode в description/comments
 | Комментарий с emoji или кириллицей
 | Корректная сериализация в UTF-8
+
+| Deprecated библиотека
+| Библиотека помечена как deprecated с replacedBy
+| Добавляется комментарий перед библиотекой: `# DEPRECATED: ...`
+
+| Deprecated с многострочным message
+| `message` содержит перенос строки
+| Каждая строка message становится отдельным комментарием
+
+| Deprecated без replacedBy
+| Только message указан
+| Комментарий: `# DEPRECATED: {message}` без строки Replacement
 |===
 
 == Связи

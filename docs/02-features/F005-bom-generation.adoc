@@ -126,6 +126,35 @@ ____
 | `<artifactId>my-bom-backend</artifactId>`
 |===
 
+=== US-004: Комментарии для deprecated библиотек
+
+[quote]
+____
+Как разработчик, я хочу видеть информацию о deprecated библиотеках в сгенерированном BOM, чтобы понимать какие зависимости нужно обновить.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| Deprecated библиотека `old-http` с `replacedBy = "new-http"`
+| Генерирую BOM
+| XML комментарий перед `<dependency>`: `<!-- DEPRECATED: Use new-http -->`
+
+| AC-004-2
+| Deprecated библиотека с `removalVersion = "2.0.0"`
+| Генерирую BOM
+| Комментарий содержит: `Will be removed in 2.0.0`
+
+| AC-004-3
+| Deprecated библиотека с `message`
+| Генерирую BOM
+| Комментарий содержит сообщение из `message`
+|===
+
 == SPI: ArtifactGenerator
 
 === BomGenerator
@@ -170,6 +199,15 @@ ____
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter</artifactId>
                 <version>3.2.0</version>
+            </dependency>
+
+            <!-- DEPRECATED: Use new-http which supports HTTP/2 -->
+            <!-- Replacement: new-http -->
+            <!-- Will be removed in: 2.0.0 -->
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>old-http</artifactId>
+                <version>1.0.0</version>
             </dependency>
             <!-- ... остальные зависимости ... -->
         </dependencies>
@@ -355,6 +393,10 @@ publishing {
 | FR-010
 | MAY
 | Система МОЖЕТ поддерживать `<exclusions>` для зависимостей
+
+| FR-011
+| SHOULD
+| Система ДОЛЖНА добавлять XML комментарии о deprecation для deprecated библиотек (replacedBy, message, removalVersion)
 |===
 
 == Edge Cases
@@ -422,6 +464,14 @@ publishing {
 | Classifier в библиотеке
 | Библиотека с classifier (например, `sources`, `javadoc`)
 | Включается `<classifier>` в `<dependency>`
+
+| Deprecated библиотека
+| Библиотека помечена как deprecated
+| Добавляется XML комментарий перед `<dependency>`: `<!-- DEPRECATED: ... -->`
+
+| Deprecated с XML-unsafe символами в message
+| `message` содержит `<`, `>`, `&`
+| Символы экранируются в комментарии
 |===
 
 == Связи

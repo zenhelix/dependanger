@@ -235,6 +235,79 @@ ____
 | BOM генерируется с указанными координатами
 |===
 
+=== US-007: Пометка библиотеки как deprecated
+
+[quote]
+____
+Как team lead, я хочу пометить библиотеку как устаревшую с указанием замены, чтобы разработчики видели предупреждение и мигрировали на актуальную версию.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-007-1
+| DSL с библиотекой `old-lib`
+| Добавляю `deprecated { replacedBy = "new-lib"; message = "Use new-lib" }`
+| Библиотека помечена как deprecated с информацией о замене
+
+| AC-007-2
+| DSL с deprecated библиотекой `old-lib`, бандл содержит `old-lib`
+| Запускаю валидацию
+| WARNING: "Bundle 'xxx' contains deprecated library 'old-lib'"
+
+| AC-007-3
+| DSL с deprecated библиотекой, `removalVersion = "2.0.0"`, текущая версия каталога `2.1.0`
+| Запускаю валидацию
+| ERROR: "Library 'old-lib' should have been removed in version 2.0.0"
+
+| AC-007-4
+| DSL с deprecated библиотекой, `replacedBy = "also-deprecated"`
+| Запускаю валидацию
+| WARNING: "Replacement library 'also-deprecated' is also deprecated"
+
+| AC-007-5
+| Distribution с `byDeprecated { exclude() }`
+| Генерирую TOML
+| Deprecated библиотеки не включены в TOML
+
+| AC-007-6
+| Distribution без фильтра `byDeprecated`
+| Генерирую TOML
+| Deprecated библиотеки включены с комментарием о deprecation
+|===
+
+=== US-008: Фильтрация deprecated библиотек
+
+[quote]
+____
+Как разработчик, я хочу исключить deprecated библиотеки из production сборки, чтобы использовать только актуальные зависимости.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-008-1
+| 10 библиотек, 2 из них deprecated
+| Генерирую с distribution без `byDeprecated`
+| Все 10 библиотек включены, WARNING для deprecated
+
+| AC-008-2
+| 10 библиотек, 2 из них deprecated
+| Генерирую с distribution `byDeprecated { exclude() }`
+| 8 библиотек включены, deprecated исключены
+
+| AC-008-3
+| Distribution `byDeprecated { exclude() }`, бандл содержит deprecated
+| Генерирую TOML
+| Бандл включён, но deprecated библиотека из него исключена
+|===
+
 == Спецификация DSL
 
 === Базовая структура
@@ -495,8 +568,54 @@ libraries {
     // Platform library для экспорта в TOML
     platformLibrary("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
         version = versionRef("spring-boot"))
+
+    // Deprecated библиотека — полная форма
+    library("old-http", "com.example:old-http:1.0") {
+        tags("http", "legacy")
+        deprecated {
+            replacedBy = "new-http"
+            message = "Use new-http which supports HTTP/2"
+            since = "1.2.0"
+            removalVersion = "2.0.0"
+        }
+    }
+
+    // Deprecated библиотека — короткая форма
+    library("legacy-json", "com.example:legacy-json:1.0") {
+        deprecated(replacedBy = "modern-json")
+    }
+
+    // Deprecated без замены (abandoned)
+    library("abandoned-lib", "com.example:abandoned:1.0") {
+        deprecated(message = "Library is no longer maintained")
+    }
 }
 ----
+
+=== Блок deprecated
+
+Параметры блока `deprecated`:
+
+[cols="1,1,3",options="header"]
+|===
+| Параметр | Тип | Описание
+
+| `replacedBy`
+| String?
+| Alias библиотеки-замены. Должен указывать на существующую библиотеку
+
+| `message`
+| String?
+| Сообщение для разработчиков с пояснением и инструкциями по миграции
+
+| `since`
+| String?
+| Версия каталога Dependanger, начиная с которой библиотека помечена как deprecated
+
+| `removalVersion`
+| String?
+| Версия каталога, в которой библиотека будет удалена. Если текущая версия >= removalVersion, генерируется ERROR
+|===
 
 [[bom-imports]]
 == Блок bomImports
@@ -605,6 +724,15 @@ distributions {
             }
         }
     }
+
+    // Production без deprecated библиотек
+    distribution("production") {
+        spec {
+            filter {
+                byDeprecated { exclude() }
+            }
+        }
+    }
 }
 ----
 
@@ -625,9 +753,12 @@ distributions {
 
 | `byBundles`
 | Включение содержимого бандлов
+
+| `byDeprecated`
+| Фильтрация deprecated библиотек. По умолчанию deprecated **включаются** (с WARNING). Используйте `exclude()` для исключения
 |===
 
-NOTE: Если distribution не указан, все библиотеки включаются без фильтрации.
+NOTE: Если distribution не указан, все библиотеки включаются без фильтрации (включая deprecated с WARNING).
 
 == Блок settings
 
@@ -968,12 +1099,28 @@ NOTE: Подробное описание pipeline см. в xref:F003-processing
 | Система ДОЛЖНА поддерживать импорт версий из внешних Maven BOM
 
 | FR-013
-| MAY
-| Система МОЖЕТ поддерживать deprecation библиотек с указанием замены
+| SHOULD
+| Система ДОЛЖНА поддерживать deprecation библиотек с указанием замены (`replacedBy`), сообщения (`message`), версии начала (`since`) и версии удаления (`removalVersion`)
 
 | FR-014
+| SHOULD
+| Система ДОЛЖНА генерировать WARNING при использовании deprecated библиотек (настраивается через `onDeprecatedLibrary`)
+
+| FR-015
+| SHOULD
+| Система ДОЛЖНА поддерживать фильтрацию deprecated библиотек через `byDeprecated { exclude() }` в distributions
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА добавлять комментарии о deprecation в генерируемые артефакты (TOML, BOM)
+
+| FR-017
 | MAY
 | Система МОЖЕТ поддерживать требования к окружению (`requires`) на уровне библиотеки
+
+| FR-018
+| MAY
+| Система МОЖЕТ предоставлять CLI команду `migrate-deprecated` для автоматической миграции
 |===
 
 == Edge Cases
@@ -1021,6 +1168,26 @@ NOTE: Подробное описание pipeline см. в xref:F003-processing
 | Deprecated replacedBy несуществующий
 | `deprecated(replacedBy = "unknown-lib")`
 | WARNING: "Replacement library 'unknown-lib' not found"
+
+| Deprecated replacedBy указывает на deprecated
+| `deprecated(replacedBy = "also-deprecated-lib")`
+| WARNING: "Replacement library 'also-deprecated-lib' is also deprecated"
+
+| Циклическая замена deprecated
+| A replacedBy B, B replacedBy A
+| ERROR: "Circular deprecation replacement: A → B → A"
+
+| removalVersion в прошлом
+| `removalVersion = "1.0.0"`, текущая версия каталога `2.0.0`
+| ERROR: "Library 'xxx' should have been removed in version 1.0.0"
+
+| Бандл содержит deprecated
+| Бандл включает deprecated библиотеку
+| WARNING: "Bundle 'xxx' contains deprecated library 'yyy'"
+
+| byDeprecated exclude с replacedBy в том же distribution
+| Distribution исключает deprecated, но включает replacedBy
+| Корректное поведение: deprecated исключена, replacedBy включена
 
 | Пустой DSL
 | DSL без определений (пустые блоки)

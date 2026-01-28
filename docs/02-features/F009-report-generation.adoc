@@ -131,7 +131,41 @@ ____
 | Только секции `schemaVersion`, `generatedAt`, `distribution`, `summary`
 |===
 
-=== US-004: Форматы вывода
+=== US-004: Секция deprecated в отчёте
+
+[quote]
+____
+Как team lead, я хочу видеть список deprecated библиотек в отчёте, чтобы планировать миграцию на актуальные зависимости.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| 3 deprecated библиотеки в каталоге
+| Генерирую отчёт
+| Секция `deprecated` содержит 3 записи, `summary.deprecatedCount = 3`
+
+| AC-004-2
+| Deprecated библиотека с `replacedBy`, `message`, `removalVersion`
+| Генерирую отчёт
+| Запись содержит все поля deprecation info
+
+| AC-004-3
+| Deprecated библиотека используется в бандле `legacy`
+| Генерирую отчёт
+| Запись содержит `usedInBundles: ["legacy"]`
+
+| AC-004-4
+| Нет deprecated библиотек
+| Генерирую отчёт
+| `summary.deprecatedCount = 0`, секция `deprecated` пустой массив
+|===
+
+=== US-005: Форматы вывода
 
 [quote]
 ____
@@ -195,6 +229,7 @@ result.writeReportTo(Path.of("dependanger-report.json"))
     "libraryCount": 45,
     "pluginCount": 5,
     "bundleCount": 8,
+    "deprecatedCount": 3,
     "updatesAvailable": 12,
     "compatibilityIssues": 2,
     "validationErrors": 0,
@@ -243,6 +278,19 @@ result.writeReportTo(Path.of("dependanger-report.json"))
       "severity": "WARNING",
       "message": "Spring 6.x requires JDK 17+",
       "affectedLibraries": ["spring-web", "spring-data-jpa"]
+    }
+  ],
+  "deprecated": [
+    {
+      "library": "old-http",
+      "group": "com.example",
+      "name": "old-http",
+      "version": "1.0.0",
+      "replacedBy": "new-http",
+      "message": "Use new-http which supports HTTP/2",
+      "since": "1.2.0",
+      "removalVersion": "2.0.0",
+      "usedInBundles": ["legacy-bundle"]
     }
   ],
   "validation": {
@@ -372,6 +420,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | FR-012
 | MAY
 | Система МОЖЕТ поддерживать режим `--summary-only` для краткого отчёта
+
+| FR-013
+| SHOULD
+| Система ДОЛЖНА включать секцию `deprecated` со списком deprecated библиотек (replacedBy, message, since, removalVersion, usedInBundles)
+
+| FR-014
+| SHOULD
+| Система ДОЛЖНА включать `deprecatedCount` в секцию `summary`
 |===
 
 == Edge Cases
@@ -383,6 +439,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | Пустой каталог
 | EffectiveMetadata без библиотек, плагинов, бандлов
 | Валидный JSON с пустыми массивами, `summary` с нулями
+
+| Нет deprecated библиотек
+| Ни одна библиотека не помечена как deprecated
+| `summary.deprecatedCount = 0`, `deprecated = []`
+
+| Deprecated без usedInBundles
+| Deprecated библиотека не используется ни в одном бандле
+| `usedInBundles = []`
 
 | UpdateCheck не выполнен
 | Pipeline без `withUpdateCheck()`

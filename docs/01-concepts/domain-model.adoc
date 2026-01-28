@@ -366,6 +366,40 @@ ____
 | Requirements
 | Нет
 | Требования к окружению (JDK версия, Kotlin версия)
+
+| deprecation
+| DeprecationInfo
+| Нет
+| Информация об устаревании библиотеки (замена, сообщение, версия удаления)
+|===
+
+==== DeprecationInfo
+
+Информация об устаревшей библиотеке.
+
+[cols="1,1,1,3",options="header"]
+|===
+| Поле | Тип | Обязательность | Описание
+
+| replacedBy
+| String
+| Нет
+| Alias библиотеки-замены. Должен указывать на существующую библиотеку
+
+| message
+| String
+| Нет
+| Сообщение для разработчиков с пояснением причины и инструкциями по миграции
+
+| since
+| String
+| Нет
+| Версия каталога Dependanger, начиная с которой библиотека помечена как deprecated
+
+| removalVersion
+| String
+| Нет
+| Версия каталога, в которой библиотека будет удалена
 |===
 
 ==== VersionReference
@@ -402,6 +436,27 @@ libraries {
             jdk { min = 17 }
         }
     }
+
+    // Deprecated библиотека с полной информацией
+    library("old-http", "com.example:old-http:1.0") {
+        tags("http", "legacy")
+        deprecated {
+            replacedBy = "new-http"
+            message = "Use new-http which supports HTTP/2"
+            since = "1.2.0"
+            removalVersion = "2.0.0"
+        }
+    }
+
+    // Deprecated библиотека — короткая форма
+    library("legacy-json", "com.example:legacy-json:1.0") {
+        deprecated(replacedBy = "modern-json")
+    }
+
+    // Deprecated без замены (abandoned)
+    library("abandoned-lib", "com.example:abandoned:1.0") {
+        deprecated(message = "Library is no longer maintained")
+    }
 }
 ----
 
@@ -410,6 +465,7 @@ libraries {
 * `alias` уникален, соответствует паттерну `[a-z][a-z0-9-]*`
 * `group:name` формируют валидные Maven координаты
 * `versionRef()` должен ссылаться на существующий version alias
+* `deprecation.replacedBy` должен указывать на существующую не-deprecated библиотеку (WARNING если на deprecated)
 
 '''
 
@@ -845,6 +901,15 @@ distributions {
             }
         }
     }
+
+    // Production без deprecated библиотек
+    distribution("production") {
+        spec {
+            filter {
+                byDeprecated { exclude() }
+            }
+        }
+    }
 }
 ----
 
@@ -865,6 +930,9 @@ distributions {
 
 | `byBundles`
 | Включение содержимого бандлов
+
+| `byDeprecated`
+| Фильтрация deprecated библиотек. По умолчанию deprecated **включаются** (с WARNING). Используйте `exclude()` для исключения
 |===
 
 ==== Логика комбинирования фильтров

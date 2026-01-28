@@ -793,6 +793,104 @@ dependanger update-version kotlin 2.1.21
 dependanger update-library guava --tags core,utils,google
 ----
 
+=== migrate-deprecated
+
+Автоматическая миграция deprecated библиотек.
+
+[source,bash]
+----
+dependanger migrate-deprecated [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2",options="header"]
+|===
+| Опция | Описание
+
+| `--dry-run`
+| Показать план миграции без выполнения
+
+| `--replace`
+| Заменить deprecated на replacedBy в бандлах (default: true)
+
+| `--remove`
+| Удалить deprecated библиотеки из metadata (default: false)
+
+| `--remove-from-bundles`
+| Удалить deprecated из бандлов вместо замены (default: false)
+
+| `-i, --input <FILE>`
+| Входной файл (default: `./dependanger-metadata.json`)
+
+| `-o, --output <FILE>`
+| Выходной файл (default: перезаписать input)
+
+| `--backup`
+| Создать backup файла перед изменением
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Показать план миграции
+dependanger migrate-deprecated --dry-run
+
+# Заменить deprecated на replacedBy в бандлах
+dependanger migrate-deprecated --replace
+
+# Удалить deprecated библиотеки полностью
+dependanger migrate-deprecated --remove
+
+# Комбинировать: заменить в бандлах и удалить определения
+dependanger migrate-deprecated --replace --remove
+----
+
+==== Вывод --dry-run
+
+[source]
+----
+Migration plan for: dependanger-metadata.json
+
+Deprecated libraries found: 3
+
+1. old-http -> new-http
+   - Used in bundles: legacy-bundle, http-utils
+   - Action: Replace with 'new-http' in bundles
+
+2. legacy-json -> modern-json
+   - Used in bundles: utils
+   - Action: Replace with 'modern-json' in bundles
+
+3. abandoned-lib (no replacement)
+   - Used in bundles: misc
+   - Action: WARNING - no replacement available, manual migration required
+
+Summary:
+- Libraries to replace: 2
+- Libraries requiring manual migration: 1
+
+Run without --dry-run to apply changes.
+----
+
+==== Вывод после миграции
+
+[source]
+----
+Migration completed:
+
+✓ Replaced 'old-http' with 'new-http' in bundle 'legacy-bundle'
+✓ Replaced 'old-http' with 'new-http' in bundle 'http-utils'
+✓ Replaced 'legacy-json' with 'modern-json' in bundle 'utils'
+⚠ Skipped 'abandoned-lib' - no replacement available
+
+Updated: dependanger-metadata.json
+Backup: dependanger-metadata.json.bak
+
+Review changes and commit.
+----
+
 == Глобальные опции
 
 [cols="1,2",options="header"]

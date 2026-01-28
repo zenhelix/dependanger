@@ -27,12 +27,14 @@ flowchart TD
         F006["F006: BOM Import (P2)"]
         F007["F007: Update Check (P3)"]
         F008["F008: Compatibility (P3)"]
+        F010["F010: Security (P3)"]
     end
 
     F002 --> F003
     F003 -.-> F006
     F003 -.-> F007
     F003 -.-> F008
+    F003 -.-> F010
     F003 --> EM["EffectiveMetadata"]
 
     subgraph Output["OUTPUT / GENERATION"]
@@ -63,6 +65,7 @@ flowchart TD
     style F007 fill:#E6E6FA
     style F008 fill:#E6E6FA
     style F009 fill:#E6E6FA
+    style F010 fill:#E6E6FA
 ----
 
 == Карта фич
@@ -115,6 +118,11 @@ flowchart TD
 | Report Generation — единый JSON отчёт о зависимостях
 | P3
 | 🔴 Не начат
+
+| xref:F010-security-scanning.adoc[F010]
+| Security Scanning — проверка уязвимостей (CVE) через OSV API
+| P3
+| 🔴 Не начат
 |===
 
 == Матрица приоритетов
@@ -142,6 +150,7 @@ flowchart TD
 * **F007: Update Check** — проверка обновлений
 * **F008: Compatibility Analysis** — анализ совместимости
 * **F009: Report Generation** — единый отчёт
+* **F010: Security Scanning** — проверка уязвимостей (CVE)
 
 == Зависимости между фичами
 
@@ -156,6 +165,7 @@ flowchart LR
     F003 -.-> F007[F007: Updates]
     F003 -.-> F008[F008: Compatibility]
     F003 -.-> F009[F009: Report]
+    F003 -.-> F010[F010: Security]
 
     style F001 fill:#90EE90
     style F002 fill:#90EE90
@@ -203,6 +213,10 @@ flowchart LR
 
 | F009 Report Generation
 | F003
+| —
+
+| F010 Security Scanning
+| F003 (как процессор)
 | —
 |===
 

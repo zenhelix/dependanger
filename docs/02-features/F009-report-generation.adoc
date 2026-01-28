@@ -165,7 +165,41 @@ ____
 | `summary.deprecatedCount = 0`, секция `deprecated` пустой массив
 |===
 
-=== US-005: Форматы вывода
+=== US-005: Секция vulnerabilities в отчёте
+
+[quote]
+____
+Как security engineer, я хочу видеть список уязвимостей в отчёте, чтобы отслеживать безопасность зависимостей.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-005-1
+| Pipeline выполнен с `withSecurityCheck()`, найдено 3 уязвимости
+| Генерирую отчёт
+| Секция `vulnerabilities` содержит 3 записи, `summary.vulnerabilitiesCount = 3`
+
+| AC-005-2
+| Уязвимость с CVE, severity, CVSS, fixedVersion
+| Генерирую отчёт
+| Запись содержит все поля VulnerabilityInfo
+
+| AC-005-3
+| 1 CRITICAL + 2 HIGH уязвимости
+| Генерирую отчёт
+| `summary.criticalVulnerabilities = 1`, `summary.highVulnerabilities = 2`
+
+| AC-005-4
+| Security check не выполнен (без `withSecurityCheck()`)
+| Генерирую отчёт
+| Секция `vulnerabilities` отсутствует или `null`
+|===
+
+=== US-006: Форматы вывода
 
 [quote]
 ____
@@ -231,6 +265,9 @@ result.writeReportTo(Path.of("dependanger-report.json"))
     "bundleCount": 8,
     "deprecatedCount": 3,
     "updatesAvailable": 12,
+    "vulnerabilitiesCount": 3,
+    "criticalVulnerabilities": 1,
+    "highVulnerabilities": 2,
     "compatibilityIssues": 2,
     "validationErrors": 0,
     "validationWarnings": 3
@@ -278,6 +315,22 @@ result.writeReportTo(Path.of("dependanger-report.json"))
       "severity": "WARNING",
       "message": "Spring 6.x requires JDK 17+",
       "affectedLibraries": ["spring-web", "spring-data-jpa"]
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "library": "log4j-core",
+      "group": "org.apache.logging.log4j",
+      "name": "log4j-core",
+      "version": "2.14.0",
+      "cveId": "CVE-2021-44228",
+      "osvId": "GHSA-jfh8-c2jp-5v3q",
+      "severity": "CRITICAL",
+      "cvssScore": 10.0,
+      "summary": "Remote code injection in Log4j",
+      "fixedVersion": "2.17.0",
+      "references": ["https://nvd.nist.gov/vuln/detail/CVE-2021-44228"],
+      "publishedAt": "2021-12-10T00:00:00Z"
     }
   ],
   "deprecated": [
@@ -428,6 +481,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | FR-014
 | SHOULD
 | Система ДОЛЖНА включать `deprecatedCount` в секцию `summary`
+
+| FR-015
+| SHOULD
+| Система ДОЛЖНА включать секцию `vulnerabilities` если выполнен SecurityCheck (CVE, severity, CVSS, fixedVersion)
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА включать `vulnerabilitiesCount`, `criticalVulnerabilities`, `highVulnerabilities` в секцию `summary`
 |===
 
 == Edge Cases
@@ -443,6 +504,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | Нет deprecated библиотек
 | Ни одна библиотека не помечена как deprecated
 | `summary.deprecatedCount = 0`, `deprecated = []`
+
+| SecurityCheck не выполнен
+| Pipeline без `withSecurityCheck()`
+| Секция `vulnerabilities` отсутствует или `"vulnerabilities": null`
+
+| Нет уязвимостей
+| Все библиотеки безопасны
+| `summary.vulnerabilitiesCount = 0`, `vulnerabilities = []`
 
 | Deprecated без usedInBundles
 | Deprecated библиотека не используется ни в одном бандле

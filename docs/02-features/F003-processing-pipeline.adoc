@@ -310,9 +310,15 @@ ____
 | Анализ совместимости
 | ✅
 | xref:F008-compatibility-analysis.adoc[F008]
+
+| 80
+| `security-check`
+| Проверка уязвимостей через OSV API
+| ✅
+| xref:F010-security-scanning.adoc[F010]
 |===
 
-NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`
+NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`
 
 == Processing Context
 
@@ -385,8 +391,8 @@ Pipeline поддерживает параллельное выполнение 
 | Требуют последовательного выполнения (зависят от результатов предыдущих)
 
 | PARALLEL_IO
-| bom-import, update-check
-| I/O-bound операции (сетевые запросы к Maven Central)
+| bom-import, update-check, security-check
+| I/O-bound операции (сетевые запросы к Maven Central, OSV API)
 
 | PARALLEL_COMPUTE
 | validation, compat-rules, compatibility-analysis

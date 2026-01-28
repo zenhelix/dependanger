@@ -374,6 +374,150 @@ Summary: 1 major, 2 minor, 1 patch updates available
 }
 ----
 
+=== security-check
+
+Проверка библиотек на известные уязвимости (CVE) через OSV API.
+
+[source,bash]
+----
+dependanger security-check [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--min-severity <level>`
+| Минимальный severity: `critical`, `high`, `medium`, `low`, `all`
+| `high`
+
+| `--min-cvss <score>`
+| Минимальный CVSS score (0.0 - 10.0)
+| `7.0`
+
+| `--fail-on <level>`
+| Fail при severity >= level: `critical`, `high`, `medium`, `low`, `none`
+| `none`
+
+| `--ignore-cve <cve>`
+| Игнорировать CVE (можно указать несколько раз)
+| —
+
+| `--ignore-library <alias>`
+| Игнорировать библиотеку (можно указать несколько раз)
+| —
+
+| `--format <format>`
+| Формат вывода: `text` или `json`. Алиас: `--json` эквивалентен `--format json`
+| `text`
+
+| `-o, --output <path>`
+| Записать результат в файл
+| —
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Проверка завершена, критичных уязвимостей нет (или `--fail-on none`)
+
+| `1`
+| Найдены уязвимости >= указанного severity (при `--fail-on`)
+
+| `2`
+| Ошибка выполнения (невалидный input, OSV API недоступен)
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Базовая проверка (HIGH+ уязвимости)
+dependanger security-check --input metadata.json
+
+# Все уязвимости включая LOW
+dependanger security-check --min-severity all --input metadata.json
+
+# Fail при CRITICAL
+dependanger security-check --fail-on critical --input metadata.json
+
+# Игнорировать известный CVE
+dependanger security-check --ignore-cve CVE-2023-ACCEPTED --input metadata.json
+
+# JSON вывод для CI
+dependanger security-check --json --output security-report.json --input metadata.json
+----
+
+==== Пример вывода (text)
+
+[source]
+----
+Security scan: metadata.json
+Scanning 45 libraries...
+
+CRITICAL vulnerabilities (1):
+  log4j-core (org.apache.logging.log4j:log4j-core:2.14.0)
+    CVE-2021-44228 (CVSS: 10.0)
+    Remote code injection in Log4j
+    Fix: upgrade to 2.17.0
+    https://nvd.nist.gov/vuln/detail/CVE-2021-44228
+
+HIGH vulnerabilities (2):
+  spring-web (org.springframework:spring-web:5.3.0)
+    CVE-2022-22965 (CVSS: 9.8)
+    Spring4Shell RCE vulnerability
+    Fix: upgrade to 5.3.18
+
+  jackson-databind (com.fasterxml.jackson.core:jackson-databind:2.9.0)
+    CVE-2019-12384 (CVSS: 7.5)
+    Polymorphic deserialization vulnerability
+    Fix: upgrade to 2.9.9
+
+Summary:
+  Libraries scanned: 45
+  Vulnerabilities found: 3 (1 critical, 2 high)
+----
+
+==== Пример вывода (json)
+
+[source,json]
+----
+{
+  "scannedAt": "2026-01-28T10:30:00Z",
+  "librariesScanned": 45,
+  "summary": {
+    "total": 3,
+    "critical": 1,
+    "high": 2,
+    "medium": 0,
+    "low": 0
+  },
+  "vulnerabilities": [
+    {
+      "library": "log4j-core",
+      "group": "org.apache.logging.log4j",
+      "name": "log4j-core",
+      "version": "2.14.0",
+      "cveId": "CVE-2021-44228",
+      "severity": "CRITICAL",
+      "cvssScore": 10.0,
+      "summary": "Remote code injection in Log4j",
+      "fixedVersion": "2.17.0"
+    }
+  ]
+}
+----
+
 === analyze
 
 Анализ совместимости зависимостей.

@@ -1,0 +1,766 @@
+= F012: Transitive Resolution
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Резолвинг и визуализация транзитивных зависимостей с поддержкой constraints для контроля версий.
+--
+
+== Метаданные
+
+[cols="1,2"]
+|===
+| ID | F012
+| Название | Transitive Resolution
+| Приоритет | P4 (будущее)
+| Модуль | `dependanger-transitive`
+| Зависит от | F003 (Processing Pipeline)
+| Блокирует | —
+|===
+
+== Описание
+
+Transitive Resolution предоставляет:
+
+* **Резолвинг** транзитивных зависимостей из Maven repositories
+* **Визуализация** дерева зависимостей в отчёте
+* **Интеграция** с F010 (Security) и F011 (Licenses) для проверки транзитивных
+* **Constraints** для принудительного контроля версий транзитивных зависимостей
+
+NOTE: Это **информационная** фича.
+Dependanger не заменяет dependency resolution в Gradle/Maven, а дополняет его visibility и constraints.
+
+== User Stories
+
+=== US-001: Видимость транзитивных зависимостей
+
+[quote]
+____
+Как разработчик, я хочу видеть полное дерево транзитивных зависимостей, чтобы понимать что реально попадает в мой проект.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-001-1
+| Библиотека `spring-web:6.2.0` с 5 транзитивными зависимостями
+| Pipeline выполняет `transitive-resolver` процессор
+| EffectiveMetadata содержит дерево транзитивных для `spring-web`
+
+| AC-001-2
+| 10 прямых зависимостей
+| Генерирую отчёт с `withTransitiveResolution()`
+| Секция `transitives` содержит дерево для всех 10 библиотек
+
+| AC-001-3
+| Транзитивная `guava:31.0` тянется из 3 разных библиотек
+| Генерирую flat list
+| `guava` появляется один раз с `requestedBy: ["lib-a", "lib-b", "lib-c"]`
+
+| AC-001-4
+| Maven repository недоступен
+| Pipeline выполняет резолвинг
+| WARNING: "Failed to resolve transitives for 'xxx': Connection timeout", pipeline продолжается
+
+| AC-001-5
+| Глубина дерева > `maxDepth`
+| Pipeline резолвит транзитивные
+| Резолвинг останавливается на указанной глубине, WARNING в логе
+|===
+
+=== US-002: Обнаружение конфликтов версий
+
+[quote]
+____
+Как team lead, я хочу видеть конфликты версий транзитивных зависимостей, чтобы понимать какая версия будет использоваться.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-002-1
+| `lib-a` тянет `guava:31.0`, `lib-b` тянет `guava:33.0`
+| Pipeline резолвит транзитивные
+| Конфликт записан в `conflicts`, resolved version = `33.0` (HIGHEST)
+
+| AC-002-2
+| 3 конфликта версий в дереве
+| Генерирую отчёт
+| Секция `transitives.conflicts` содержит 3 записи с деталями
+
+| AC-002-3
+| Нет конфликтов версий
+| Генерирую отчёт
+| `transitives.conflicts = []`
+
+| AC-002-4
+| Конфликт с constraint (constraint указывает версию ниже чем HIGHEST)
+| Pipeline резолвит
+| Используется версия из constraint, отмечено `strategy: "CONSTRAINT"`
+|===
+
+=== US-003: Security check для транзитивных
+
+[quote]
+____
+Как security engineer, я хочу проверять транзитивные зависимости на уязвимости, чтобы не пропустить CVE в глубине дерева.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-003-1
+| Транзитивная `log4j-core:2.14.0` с CVE-2021-44228
+| `withSecurityCheck { includeTransitives = true }`
+| Уязвимость найдена и отображена с `depth > 0`
+
+| AC-003-2
+| Прямая зависимость безопасна, но её транзитивная уязвима
+| Security check с `includeTransitives = true`
+| Уязвимость транзитивной показана с информацией о пути (`via: ["spring-boot", "spring-core"]`)
+
+| AC-003-3
+| `includeTransitives = false` (default)
+| Security check
+| Проверяются только прямые зависимости
+|===
+
+=== US-004: License check для транзитивных
+
+[quote]
+____
+Как legal officer, я хочу проверять лицензии транзитивных зависимостей, чтобы GPL не попала в проект через транзитивы.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| Транзитивная библиотека с GPL-3.0 лицензией
+| `withLicenseCheck { includeTransitives = true }`
+| Лицензия найдена и отображена с `depth > 0`
+
+| AC-004-2
+| Прямая зависимость MIT, но её транзитивная GPL
+| License check с `includeTransitives = true`
+| GPL лицензия показана с путём до неё
+
+| AC-004-3
+| `includeTransitives = false` (default)
+| License check
+| Проверяются только прямые зависимости
+|===
+
+=== US-005: Constraints для контроля версий
+
+[quote]
+____
+Как разработчик, я хочу принудительно указать версию транзитивной зависимости, чтобы исправить уязвимость или конфликт.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-005-1
+| Constraint `log4j-core:2.17.0`, транзитивная тянет `2.14.0`
+| Генерирую BOM
+| BOM содержит `<dependency>` для `log4j-core:2.17.0` в `<dependencyManagement>`
+
+| AC-005-2
+| Constraint с `reason`
+| Генерирую constraints snippet
+| Gradle snippet содержит `because("reason")`
+
+| AC-005-3
+| Exclude constraint для `commons-logging`
+| Генерирую Gradle snippet
+| Snippet содержит exclusion rule
+
+| AC-005-4
+| Substitute `javax.annotation-api` -> `jakarta.annotation-api`
+| Генерирую Gradle snippet
+| Snippet содержит substitution rule
+|===
+
+== DSL: Constraints
+
+=== Синтаксис
+
+[source,kotlin]
+----
+dependanger {
+    // Прямые зависимости
+    library("spring-web", "org.springframework:spring-web:6.2.0")
+
+    // Constraints для транзитивных зависимостей
+    constraints {
+        // Принудительная версия
+        constraint("log4j-core", "org.apache.logging.log4j:log4j-core:2.17.0") {
+            reason = "Security fix for CVE-2021-44228"
+        }
+
+        // Короткая форма
+        constraint("snakeyaml", "org.yaml:snakeyaml:2.0")
+
+        // Исключение транзитивной зависимости
+        exclude("commons-logging", "commons-logging:commons-logging") {
+            reason = "Using SLF4J instead"
+        }
+
+        // Замена одной библиотеки на другую
+        substitute("javax-annotation", "jakarta.annotation:jakarta.annotation-api:2.1.1") {
+            from = "javax.annotation:javax.annotation-api"
+            reason = "Jakarta EE migration"
+        }
+    }
+}
+----
+
+=== Доменная модель
+
+[source,kotlin]
+----
+data class Constraint(
+    val alias: String,
+    val coordinates: MavenCoordinates,
+    val type: ConstraintType,
+    val reason: String? = null,
+    val substituteFrom: MavenCoordinates? = null  // только для SUBSTITUTE
+)
+
+enum class ConstraintType {
+    VERSION,      // Принудительная версия
+    EXCLUDE,      // Исключить зависимость
+    SUBSTITUTE    // Заменить на другую
+}
+----
+
+== Processing Configuration
+
+[source,kotlin]
+----
+dependanger {
+    processing {
+        withTransitiveResolution {
+            // Maven repositories для резолвинга
+            repositories = listOf(
+                "https://repo.maven.apache.org/maven2",
+                "https://repo.spring.io/milestone"
+            )
+
+            // Максимальная глубина дерева (default: 10)
+            maxDepth = 10
+
+            // Таймаут на одну библиотеку (default: 30s)
+            timeout = 30.seconds
+
+            // Директория кэша (default: ~/.dependanger/cache)
+            cacheDir = Path("~/.dependanger/cache")
+
+            // Время жизни кэша (default: 24h)
+            cacheTtl = 24.hours
+
+            // Стратегия разрешения конфликтов (default: HIGHEST)
+            conflictResolution = ConflictResolution.HIGHEST
+        }
+
+        // Включить транзитивные в security check
+        withSecurityCheck {
+            includeTransitives = true
+        }
+
+        // Включить транзитивные в license check
+        withLicenseCheck {
+            includeTransitives = true
+        }
+    }
+}
+----
+
+== Processor: transitive-resolver
+
+[cols="1,2",options="header"]
+|===
+| Параметр | Значение
+
+| Order | 90
+| Processor ID | `transitive-resolver`
+| Phase | PARALLEL_IO
+| Optional | Yes
+| Включение | `withTransitiveResolution()`
+|===
+
+=== Алгоритм резолвинга
+
+[source]
+----
+1. Для каждой прямой зависимости:
+   a. Проверить кэш
+   b. Если нет в кэше — скачать POM из repository
+   c. Распарсить <dependencies> секцию
+   d. Рекурсивно резолвить каждую зависимость (до maxDepth)
+
+2. Построить дерево зависимостей
+
+3. Обнаружить конфликты версий:
+   a. Найти артефакты с разными версиями
+   b. Применить стратегию HIGHEST
+   c. Записать конфликты в отчёт
+
+4. Применить constraints:
+   a. VERSION — заменить resolved version
+   b. EXCLUDE — удалить из дерева
+   c. SUBSTITUTE — заменить артефакт
+
+5. Передать результат следующим процессорам (security-check, license-check)
+----
+
+=== Conflict Resolution Strategy
+
+[cols="1,3",options="header"]
+|===
+| Стратегия | Описание
+
+| HIGHEST
+| Использовать наивысшую версию (как Gradle по умолчанию). Конфликты записываются в отчёт.
+|===
+
+NOTE: В текущей версии поддерживается только стратегия HIGHEST.
+Другие стратегии (FAIL, LOWEST, PREFER_PROJECT) могут быть добавлены в будущем.
+
+== CLI: resolve-transitives
+
+[source,bash]
+----
+dependanger resolve-transitives [OPTIONS]
+----
+
+=== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--repo <url>`
+| Maven repository URL (можно указать несколько раз)
+| Maven Central
+
+| `--max-depth <n>`
+| Максимальная глубина резолвинга
+| `10`
+
+| `--timeout <seconds>`
+| Таймаут на библиотеку
+| `30`
+
+| `--no-cache`
+| Не использовать кэш
+| `false`
+
+| `--format <format>`
+| Формат вывода: `tree`, `flat`, `json`
+| `tree`
+
+| `-o, --output <path>`
+| Записать результат в файл
+| —
+
+| `--show-conflicts`
+| Показать только конфликты версий
+| `false`
+|===
+
+=== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Резолвинг успешен
+
+| `1`
+| Есть конфликты версий (информационно, не ошибка)
+
+| `2`
+| Ошибка выполнения (невалидный input, сетевая ошибка)
+|===
+
+=== Примеры
+
+[source,bash]
+----
+# Показать дерево зависимостей
+dependanger resolve-transitives --input metadata.json
+
+# Flat список всех транзитивных
+dependanger resolve-transitives --format flat --input metadata.json
+
+# Только конфликты
+dependanger resolve-transitives --show-conflicts --input metadata.json
+
+# JSON для обработки
+dependanger resolve-transitives --format json --output transitives.json --input metadata.json
+
+# С дополнительным repository
+dependanger resolve-transitives --repo https://repo.spring.io/milestone --input metadata.json
+----
+
+=== Пример вывода (tree)
+
+[source]
+----
+Resolving transitives for: metadata.json
+Direct dependencies: 10
+Repositories: [Maven Central]
+
+spring-web:6.2.0
+├── spring-beans:6.2.0
+│   └── spring-core:6.2.0
+│       └── spring-jcl:6.2.0
+├── spring-core:6.2.0 (*)
+└── micrometer-observation:1.14.0
+    └── micrometer-commons:1.14.0
+
+kotlin-stdlib:2.1.20
+└── kotlin-stdlib-common:2.1.20 (org.jetbrains.kotlin)
+
+(*) = duplicate, already shown above
+
+Conflicts detected: 2
+
+  guava: 31.0-jre vs 33.0.0-jre
+    Requested by: [lib-a (31.0), lib-b (33.0)]
+    Resolved: 33.0.0-jre (HIGHEST)
+
+  jackson-databind: 2.15.0 vs 2.16.0
+    Requested by: [spring-web (2.15.0), some-lib (2.16.0)]
+    Resolved: 2.16.0 (HIGHEST)
+
+Summary:
+  Direct dependencies: 10
+  Transitive dependencies: 87
+  Total unique artifacts: 97
+  Version conflicts: 2
+----
+
+=== Пример вывода (JSON)
+
+[source,json]
+----
+{
+  "resolvedAt": "2026-01-28T10:30:00Z",
+  "repositories": ["https://repo.maven.apache.org/maven2"],
+  "summary": {
+    "directCount": 10,
+    "transitiveCount": 87,
+    "totalUniqueArtifacts": 97,
+    "conflictCount": 2
+  },
+  "tree": [
+    {
+      "library": "spring-web",
+      "group": "org.springframework",
+      "name": "spring-web",
+      "version": "6.2.0",
+      "depth": 0,
+      "transitives": [
+        {
+          "group": "org.springframework",
+          "name": "spring-beans",
+          "version": "6.2.0",
+          "scope": "compile",
+          "depth": 1,
+          "transitives": [...]
+        }
+      ]
+    }
+  ],
+  "flatList": [
+    {
+      "group": "org.springframework",
+      "name": "spring-core",
+      "version": "6.2.0",
+      "requestedBy": ["spring-web", "spring-beans"],
+      "depth": 1
+    }
+  ],
+  "conflicts": [
+    {
+      "group": "com.google.guava",
+      "name": "guava",
+      "versions": [
+        {"version": "31.0-jre", "requestedBy": ["lib-a"]},
+        {"version": "33.0.0-jre", "requestedBy": ["lib-b"]}
+      ],
+      "resolved": "33.0.0-jre",
+      "strategy": "HIGHEST"
+    }
+  ]
+}
+----
+
+== Генерация Constraints
+
+=== Gradle Snippet
+
+При наличии constraints генерируется файл `dependanger-constraints.gradle.kts`:
+
+[source,kotlin]
+----
+// Generated by Dependanger
+// Apply: apply(from = "dependanger-constraints.gradle.kts")
+
+dependencies {
+    constraints {
+        implementation("org.apache.logging.log4j:log4j-core:2.17.0") {
+            because("Security fix for CVE-2021-44228")
+        }
+        implementation("org.yaml:snakeyaml:2.0")
+    }
+}
+
+configurations.all {
+    // Excludes
+    exclude(group = "commons-logging", module = "commons-logging")
+
+    // Substitutions
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("javax.annotation:javax.annotation-api"))
+            .using(module("jakarta.annotation:jakarta.annotation-api:2.1.1"))
+            .because("Jakarta EE migration")
+    }
+}
+----
+
+=== BOM (Maven)
+
+Constraints генерируются в `<dependencyManagement>` секции BOM:
+
+[source,xml]
+----
+<dependencyManagement>
+    <dependencies>
+        <!-- Constraints -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.17.0</version>
+        </dependency>
+
+        <!-- Exclusions через optional + provided scope -->
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+            <version>99.0-does-not-exist</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+----
+
+NOTE: Maven BOM имеет ограниченную поддержку exclusions и substitutions.
+Для полного контроля рекомендуется использовать Gradle.
+
+== Отчёт (F009)
+
+При включённом `withTransitiveResolution()` в отчёт добавляется секция `transitives`:
+
+[source,json]
+----
+{
+  "transitives": {
+    "resolved": true,
+    "resolvedAt": "2026-01-28T10:30:00Z",
+    "repositories": ["https://repo.maven.apache.org/maven2"],
+    "summary": {
+      "directCount": 10,
+      "transitiveCount": 87,
+      "totalUniqueArtifacts": 97,
+      "conflictCount": 2,
+      "maxDepth": 5
+    },
+    "tree": [...],
+    "flatList": [...],
+    "conflicts": [...]
+  },
+  "constraints": [
+    {
+      "alias": "log4j-core",
+      "type": "VERSION",
+      "coordinates": "org.apache.logging.log4j:log4j-core:2.17.0",
+      "reason": "Security fix for CVE-2021-44228"
+    },
+    {
+      "alias": "commons-logging",
+      "type": "EXCLUDE",
+      "coordinates": "commons-logging:commons-logging",
+      "reason": "Using SLF4J instead"
+    }
+  ]
+}
+----
+
+== Функциональные требования
+
+[cols="1,1,4",options="header"]
+|===
+| ID | Приоритет | Требование
+
+| FR-001
+| MUST
+| Система ДОЛЖНА резолвить транзитивные зависимости из Maven repositories
+
+| FR-002
+| MUST
+| Система ДОЛЖНА строить дерево зависимостей с указанием глубины
+
+| FR-003
+| MUST
+| Система ДОЛЖНА обнаруживать конфликты версий и применять стратегию HIGHEST
+
+| FR-004
+| MUST
+| Система ДОЛЖНА записывать все конфликты в отчёт
+
+| FR-005
+| MUST
+| Система ДОЛЖНА поддерживать constraints (VERSION, EXCLUDE, SUBSTITUTE)
+
+| FR-006
+| MUST
+| Система ДОЛЖНА кэшировать результаты резолвинга
+
+| FR-007
+| SHOULD
+| Система ДОЛЖНА генерировать Gradle constraints snippet
+
+| FR-008
+| SHOULD
+| Система ДОЛЖНА генерировать constraints в Maven BOM
+
+| FR-009
+| SHOULD
+| Система ДОЛЖНА интегрироваться с F010 (Security) через `includeTransitives`
+
+| FR-010
+| SHOULD
+| Система ДОЛЖНА интегрироваться с F011 (Licenses) через `includeTransitives`
+
+| FR-011
+| SHOULD
+| Система ДОЛЖНА поддерживать несколько Maven repositories
+
+| FR-012
+| SHOULD
+| Система ДОЛЖНА ограничивать глубину резолвинга через `maxDepth`
+
+| FR-013
+| MAY
+| Система МОЖЕТ поддерживать резолвинг из локального Maven cache (~/.m2)
+
+| FR-014
+| MAY
+| Система МОЖЕТ показывать лицензии транзитивных в tree view
+|===
+
+== Edge Cases
+
+[cols="1,3,2",options="header"]
+|===
+| Сценарий | Описание | Ожидаемое поведение
+
+| POM не найден
+| Артефакт существует, но POM отсутствует в repository
+| WARNING, транзитивные для этой библиотеки не резолвятся
+
+| Циклическая зависимость
+| A -> B -> C -> A
+| Цикл обнаруживается, прерывается, WARNING в логе
+
+| Repository недоступен
+| Сетевая ошибка или 5xx
+| Retry с exponential backoff, затем WARNING и продолжение
+
+| Очень глубокое дерево
+| Глубина > maxDepth
+| Резолвинг останавливается, WARNING: "Max depth reached"
+
+| Очень много транзитивных
+| 1000+ транзитивных зависимостей
+| Резолвинг выполняется (медленнее), рекомендуется увеличить timeout
+
+| Constraint на несуществующую библиотеку
+| Constraint для артефакта, которого нет в дереве
+| WARNING: "Constraint 'xxx' does not match any transitive dependency"
+
+| Конфликтующие constraints
+| Два constraint для одного артефакта с разными версиями
+| ERROR: "Conflicting constraints for 'xxx': 2.17.0 vs 2.18.0"
+
+| SNAPSHOT версии
+| Транзитивная зависит от SNAPSHOT
+| Резолвится как обычная версия, WARNING о нестабильности
+
+| Optional dependencies
+| POM содержит `<optional>true</optional>`
+| По умолчанию не включаются, можно включить через `includeOptional = true`
+
+| Provided/Test scope
+| Зависимости с scope != compile
+| По умолчанию только compile, можно настроить через `scopes = [...]`
+
+| Parent POM
+| Зависимости определены в parent POM
+| Parent POM резолвится и парсится
+
+| BOM в dependencyManagement
+| POM импортирует BOM
+| BOM резолвится, версии применяются
+
+| Кэш устарел
+| TTL кэша истёк
+| Перезапрос из repository
+
+| Прерывание резолвинга
+| Ctrl+C во время резолвинга
+| Graceful shutdown, частичные результаты не сохраняются
+
+| Параллельный резолвинг
+| Две библиотеки с общей транзитивной
+| Резолвится один раз, результат переиспользуется
+|===
+
+== Связи
+
+* **Зависит от:** xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* **Расширяет:** xref:F010-security-scanning.adoc[F010: Security Scanning] (includeTransitives)
+* **Расширяет:** xref:F011-license-compliance.adoc[F011: License Compliance] (includeTransitives)
+* **Выходные данные:** xref:F009-report-generation.adoc[F009: Report] (секция transitives)
+
+== Связанные документы
+
+* xref:../01-concepts/domain-model.adoc[Доменная модель — Constraint]
+* xref:../03-interfaces/cli.adoc[CLI — resolve-transitives]

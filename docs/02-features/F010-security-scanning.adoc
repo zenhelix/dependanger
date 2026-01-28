@@ -160,6 +160,40 @@ ____
 | Task fails с exit code != 0
 |===
 
+=== US-006: Проверка транзитивных зависимостей
+
+[quote]
+____
+Как security engineer, я хочу проверять транзитивные зависимости на уязвимости, чтобы не пропустить CVE в глубине дерева.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-006-1
+| Транзитивная `log4j-core:2.14.0` с CVE-2021-44228
+| Запускаю с `includeTransitives = true`
+| Уязвимость найдена и отображена с `depth > 0`
+
+| AC-006-2
+| Прямая зависимость безопасна, но её транзитивная уязвима
+| Запускаю с `includeTransitives = true`
+| Уязвимость показана с путём (`via: ["spring-boot", "spring-core"]`)
+
+| AC-006-3
+| `includeTransitives = false` (default)
+| Запускаю security check
+| Проверяются только прямые зависимости
+
+| AC-006-4
+| `includeTransitives = true`, F012 не включён
+| Запускаю security check
+| Автоматически включается `withTransitiveResolution()`
+|===
+
 === US-005: Интеграция в CI
 
 [quote]
@@ -378,6 +412,9 @@ Dependanger группирует библиотеки в batches для эффе
     // Игнорирование
     ignoreCves = listOf("CVE-2023-OLD")      // Игнорировать конкретные CVE
     ignoreLibraries = listOf("test-lib")     // Игнорировать библиотеки
+
+    // Транзитивные зависимости (требует F012)
+    includeTransitives = false         // Проверять транзитивные (default: false)
 
     // Сеть
     timeout = 30.seconds               // Таймаут на запрос
@@ -618,6 +655,10 @@ dependanger {
 | FR-013
 | MAY
 | Система МОЖЕТ показывать `ignoredVulnerabilities` в отчёте
+
+| FR-014
+| MAY
+| Система МОЖЕТ проверять транзитивные зависимости при `includeTransitives = true` (требует xref:F012-transitive-resolution.adoc[F012])
 |===
 
 == Edge Cases
@@ -706,4 +747,5 @@ dependanger {
 * xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
 * xref:F007-update-check.adoc[F007: Update Check] — дополняет информацией о версиях
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает vulnerabilities info
+* xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — для проверки транзитивных
 * https://osv.dev/docs/[OSV API Documentation]

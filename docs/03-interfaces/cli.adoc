@@ -671,6 +671,128 @@ Summary:
 }
 ----
 
+=== resolve-transitives
+
+Резолвинг и визуализация транзитивных зависимостей.
+
+[source,bash]
+----
+dependanger resolve-transitives [OPTIONS]
+----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `--repo <url>`
+| Maven repository URL (можно указать несколько раз)
+| Maven Central
+
+| `--max-depth <n>`
+| Максимальная глубина резолвинга
+| `10`
+
+| `--timeout <seconds>`
+| Таймаут на библиотеку
+| `30`
+
+| `--no-cache`
+| Не использовать кэш
+| `false`
+
+| `--format <format>`
+| Формат вывода: `tree`, `flat`, `json`
+| `tree`
+
+| `-o, --output <path>`
+| Записать результат в файл
+| —
+
+| `--show-conflicts`
+| Показать только конфликты версий
+| `false`
+|===
+
+==== Exit Codes
+
+[cols="1,2",options="header"]
+|===
+| Код | Описание
+
+| `0`
+| Резолвинг успешен
+
+| `1`
+| Есть конфликты версий (информационно, не ошибка)
+
+| `2`
+| Ошибка выполнения (невалидный input, сетевая ошибка)
+|===
+
+==== Примеры
+
+[source,bash]
+----
+# Показать дерево зависимостей
+dependanger resolve-transitives --input metadata.json
+
+# Flat список всех транзитивных
+dependanger resolve-transitives --format flat --input metadata.json
+
+# Только конфликты
+dependanger resolve-transitives --show-conflicts --input metadata.json
+
+# JSON для обработки
+dependanger resolve-transitives --format json --output transitives.json --input metadata.json
+
+# С дополнительным repository
+dependanger resolve-transitives --repo https://repo.spring.io/milestone --input metadata.json
+----
+
+==== Пример вывода (tree)
+
+[source]
+----
+Resolving transitives for: metadata.json
+Direct dependencies: 10
+Repositories: [Maven Central]
+
+spring-web:6.2.0
+├── spring-beans:6.2.0
+│   └── spring-core:6.2.0
+│       └── spring-jcl:6.2.0
+├── spring-core:6.2.0 (*)
+└── micrometer-observation:1.14.0
+    └── micrometer-commons:1.14.0
+
+kotlin-stdlib:2.1.20
+└── kotlin-stdlib-common:2.1.20 (org.jetbrains.kotlin)
+
+(*) = duplicate, already shown above
+
+Conflicts detected: 2
+
+  guava: 31.0-jre vs 33.0.0-jre
+    Requested by: [lib-a (31.0), lib-b (33.0)]
+    Resolved: 33.0.0-jre (HIGHEST)
+
+  jackson-databind: 2.15.0 vs 2.16.0
+    Requested by: [spring-web (2.15.0), some-lib (2.16.0)]
+    Resolved: 2.16.0 (HIGHEST)
+
+Summary:
+  Direct dependencies: 10
+  Transitive dependencies: 87
+  Total unique artifacts: 97
+  Version conflicts: 2
+----
+
 === analyze
 
 Анализ совместимости зависимостей.
@@ -1300,5 +1422,6 @@ dependency-check:
 * xref:../02-features/F008-compatibility-analysis.adoc[F008 Compatibility Analysis] — анализ совместимости
 * xref:../02-features/F010-security-scanning.adoc[F010 Security Scanning] — проверка уязвимостей
 * xref:../02-features/F011-license-compliance.adoc[F011 License Compliance] — проверка лицензий
+* xref:../02-features/F012-transitive-resolution.adoc[F012 Transitive Resolution] — резолвинг транзитивных
 * xref:gradle-plugin.adoc[Gradle Plugin] — альтернативный интерфейс для Gradle проектов
 * xref:library-api.adoc[Library API] — программный API

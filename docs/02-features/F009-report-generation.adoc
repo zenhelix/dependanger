@@ -199,6 +199,40 @@ ____
 | Секция `vulnerabilities` отсутствует или `null`
 |===
 
+=== US-008: Секция transitives в отчёте
+
+[quote]
+____
+Как разработчик, я хочу видеть полное дерево транзитивных зависимостей в отчёте, чтобы понимать что реально попадает в проект.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-008-1
+| Pipeline выполнен с `withTransitiveResolution()`, 87 транзитивных
+| Генерирую отчёт
+| Секция `transitives` содержит tree и flatList
+
+| AC-008-2
+| 2 конфликта версий в дереве
+| Генерирую отчёт
+| `transitives.conflicts` содержит 2 записи с resolved версиями
+
+| AC-008-3
+| Определены 3 constraints
+| Генерирую отчёт
+| Секция `constraints` содержит 3 записи
+
+| AC-008-4
+| Transitive resolution не выполнен
+| Генерирую отчёт
+| Секция `transitives` отсутствует или `null`
+|===
+
 === US-007: Секция licenses в отчёте
 
 [quote]
@@ -411,6 +445,42 @@ result.writeReportTo(Path.of("dependanger-report.json"))
       "url": null
     }
   ],
+  "transitives": {
+    "resolved": true,
+    "resolvedAt": "2026-01-27T10:30:00Z",
+    "summary": {
+      "directCount": 45,
+      "transitiveCount": 87,
+      "totalUniqueArtifacts": 132,
+      "conflictCount": 2
+    },
+    "flatList": [
+      {
+        "group": "org.springframework",
+        "name": "spring-core",
+        "version": "6.2.0",
+        "requestedBy": ["spring-web", "spring-beans"],
+        "depth": 1
+      }
+    ],
+    "conflicts": [
+      {
+        "group": "com.google.guava",
+        "name": "guava",
+        "versions": ["31.0-jre", "33.0.0-jre"],
+        "resolved": "33.0.0-jre",
+        "strategy": "HIGHEST"
+      }
+    ]
+  },
+  "constraints": [
+    {
+      "alias": "log4j-core",
+      "type": "VERSION",
+      "coordinates": "org.apache.logging.log4j:log4j-core:2.17.0",
+      "reason": "Security fix for CVE-2021-44228"
+    }
+  ],
   "validation": {
     "errors": [],
     "warnings": [
@@ -477,6 +547,9 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 
 | 1.2
 | Добавлено поле `licenses` с информацией о лицензиях
+
+| 1.3
+| Добавлены поля `transitives` и `constraints` для транзитивных зависимостей
 |===
 
 При парсинге отчёта:
@@ -562,6 +635,14 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | FR-018
 | SHOULD
 | Система ДОЛЖНА включать `deniedLicenses`, `unknownLicenses` в секцию `summary`
+
+| FR-019
+| MAY
+| Система МОЖЕТ включать секцию `transitives` если выполнен TransitiveResolution (tree, flatList, conflicts)
+
+| FR-020
+| MAY
+| Система МОЖЕТ включать секцию `constraints` со списком определённых constraints
 |===
 
 == Edge Cases
@@ -597,6 +678,18 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | Библиотека с неизвестной лицензией
 | Лицензия не определена ни в одном источнике
 | `policyStatus = "UNKNOWN"`, `source = "UNKNOWN"`
+
+| TransitiveResolution не выполнен
+| Pipeline без `withTransitiveResolution()`
+| Секция `transitives` отсутствует или `null`
+
+| Нет транзитивных зависимостей
+| Все прямые зависимости без транзитивных
+| `transitives.transitiveCount = 0`, `flatList = []`
+
+| Конфликты версий
+| Разные версии одного артефакта
+| `transitives.conflicts` содержит записи с `strategy: "HIGHEST"`
 
 | Deprecated без usedInBundles
 | Deprecated библиотека не используется ни в одном бандле
@@ -670,3 +763,4 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 * xref:F008-compatibility-analysis.adoc[F008: Compatibility Analysis] — данные о совместимости
 * xref:F010-security-scanning.adoc[F010: Security Scanning] — данные об уязвимостях
 * xref:F011-license-compliance.adoc[F011: License Compliance] — данные о лицензиях
+* xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — данные о транзитивных зависимостях

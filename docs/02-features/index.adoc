@@ -29,6 +29,7 @@ flowchart TD
         F008["F008: Compatibility (P3)"]
         F010["F010: Security (P3)"]
         F011["F011: Licenses (P3)"]
+        F012["F012: Transitives (P4)"]
     end
 
     F002 --> F003
@@ -37,6 +38,7 @@ flowchart TD
     F003 -.-> F008
     F003 -.-> F010
     F003 -.-> F011
+    F003 -.-> F012
     F003 --> EM["EffectiveMetadata"]
 
     subgraph Output["OUTPUT / GENERATION"]
@@ -69,6 +71,7 @@ flowchart TD
     style F009 fill:#E6E6FA
     style F010 fill:#E6E6FA
     style F011 fill:#E6E6FA
+    style F012 fill:#FFB6C1
 ----
 
 == Карта фич
@@ -131,6 +134,11 @@ flowchart TD
 | License Compliance — проверка лицензий через Maven POM / ClearlyDefined API
 | P3
 | 🔴 Не начат
+
+| xref:F012-transitive-resolution.adoc[F012]
+| Transitive Resolution — резолвинг транзитивных зависимостей и constraints
+| P4
+| 🔴 Не начат
 |===
 
 == Матрица приоритетов
@@ -161,6 +169,12 @@ flowchart TD
 * **F010: Security Scanning** — проверка уязвимостей (CVE)
 * **F011: License Compliance** — проверка лицензий
 
+=== P4 — Будущее
+
+Фичи для будущих версий.
+
+* **F012: Transitive Resolution** — резолвинг транзитивных зависимостей и constraints
+
 == Зависимости между фичами
 
 [mermaid,target=feature-deps,format=svg]
@@ -176,6 +190,7 @@ flowchart LR
     F003 -.-> F009[F009: Report]
     F003 -.-> F010[F010: Security]
     F003 -.-> F011[F011: Licenses]
+    F003 -.-> F012[F012: Transitives]
 
     style F001 fill:#90EE90
     style F002 fill:#90EE90
@@ -232,6 +247,10 @@ flowchart LR
 | F011 License Compliance
 | F003 (как процессор)
 | —
+
+| F012 Transitive Resolution
+| F003 (как процессор)
+| — (расширяет F010, F011)
 |===
 
 == SPI точки расширения

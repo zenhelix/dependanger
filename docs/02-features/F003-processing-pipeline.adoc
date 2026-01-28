@@ -322,9 +322,15 @@ ____
 | Проверка лицензий через Maven POM / ClearlyDefined API
 | ✅
 | xref:F011-license-compliance.adoc[F011]
+
+| 90
+| `transitive-resolver`
+| Резолвинг транзитивных зависимостей из Maven repositories
+| ✅
+| xref:F012-transitive-resolution.adoc[F012]
 |===
 
-NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`, `withLicenseCheck()`
+NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`, `withLicenseCheck()`, `withTransitiveResolution()`
 
 == Processing Context
 
@@ -397,7 +403,7 @@ Pipeline поддерживает параллельное выполнение 
 | Требуют последовательного выполнения (зависят от результатов предыдущих)
 
 | PARALLEL_IO
-| bom-import, update-check, security-check, license-check
+| bom-import, update-check, security-check, license-check, transitive-resolver
 | I/O-bound операции (сетевые запросы к Maven Central, OSV API, ClearlyDefined API)
 
 | PARALLEL_COMPUTE

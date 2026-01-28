@@ -65,7 +65,7 @@ dependanger {
     bundles { ... }
     
     // Внешние BOM для импорта версий
-    platforms { ... }
+    bomImports { ... }
     
     // Профили генерации с фильтрацией
     distributions { ... }
@@ -221,25 +221,25 @@ bundles {
 }
 ----
 
-=== Блок platforms
+=== Блок bomImports
 
 Импорт версий из внешних Maven BOM.
 
 [source,kotlin]
 ----
-platforms {
+bomImports {
     // Spring Boot BOM
-    platform("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
         version = versionRef("spring-boot")
     }
-    
+
     // Kotlin BOM
-    platform("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom") {
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom") {
         version = versionRef("kotlin")
     }
-    
-    // Platform с конкретной версией
-    platform("junit-bom", "org.junit:junit-bom:5.11.0")
+
+    // BOM с конкретной версией
+    bom("junit-bom", "org.junit:junit-bom:5.11.0")
 }
 ----
 
@@ -374,19 +374,19 @@ processing {
 
 | `dependangerGenerateEffective`
 | metadata.json → effective-*.json
-| `generateMetadata`
+| `dependangerGenerateMetadata`
 
 | `dependangerGenerateToml`
 | effective → TOML catalog
-| `generateEffective`
+| `dependangerGenerateEffective`
 
 | `dependangerGenerateBom`
 | effective → Maven BOM
-| `generateEffective`
+| `dependangerGenerateEffective`
 
 | `dependangerGenerate`
 | Полный пайплайн генерации
-| `generateToml`, `generateBom`
+| `dependangerGenerateToml`, `dependangerGenerateBom`
 |===
 
 === Задачи анализа
@@ -397,23 +397,23 @@ processing {
 
 | `dependangerValidate`
 | Валидация DSL конфигурации
-| `generateMetadata`
+| `dependangerGenerateMetadata`
 
 | `dependangerCheckUpdates`
 | Проверка доступных обновлений
-| `generateEffective`
+| `dependangerGenerateEffective`
 
 | `dependangerAnalyze`
 | Анализ совместимости
-| `generateEffective`
+| `dependangerGenerateEffective`
 
 | `dependangerReport`
 | Генерация unified JSON отчёта
-| `checkUpdates`, `analyze`
+| `dependangerCheckUpdates`, `dependangerAnalyze`
 
 | `dependangerListVersions`
 | Вывод всех версий в консоль
-| `generateEffective`
+| `dependangerGenerateEffective`
 |===
 
 === Примеры использования

@@ -382,6 +382,12 @@ annotation class DependangerDslMarker
 
 | `settings { }`
 | Глобальные настройки
+
+| `presets { }`
+| Именованные пресеты конфигурации
+
+| `processing { }`
+| Настройки пайплайна обработки
 |===
 
 === Builder Pattern
@@ -680,6 +686,175 @@ settings {
 | Игнорировать
 |===
 
+== Блок compatibility
+
+Правила проверки совместимости библиотек.
+
+=== Синтаксис
+
+[source,kotlin]
+----
+compatibility {
+    // Требование к JDK для библиотек
+    jdkRequirement("spring-boot-3x") {
+        libraries("spring-boot-starter")
+        minJdk = 17
+    }
+
+    // Взаимоисключающие библиотеки
+    mutualExclusion("logging") {
+        libraries("slf4j-simple", "logback-classic", "log4j-core")
+        message = "Only one logging implementation should be used"
+    }
+
+    // Ограничение версий
+    versionConstraint("kotlin-compat") {
+        library = "kotlinx-coroutines-core"
+        versionRange = "[1.7.0,)"  // >= 1.7.0
+    }
+
+    // Кастомное правило
+    customRule("security-check") {
+        condition { metadata ->
+            // Проверка условия
+            true
+        }
+        message = "Security check failed"
+        severity = WARNING
+    }
+}
+----
+
+=== Типы правил
+
+[cols="1,3",options="header"]
+|===
+| Правило | Описание
+
+| `jdkRequirement`
+| Проверка минимальной/максимальной версии JDK для указанных библиотек
+
+| `mutualExclusion`
+| Проверка что только одна библиотека из списка включена
+
+| `versionConstraint`
+| Проверка версии библиотеки по Maven version range
+
+| `customRule`
+| Кастомное правило с произвольной логикой
+|===
+
+=== Severity
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| ERROR
+| Останавливает pipeline
+
+| WARNING
+| Предупреждение, pipeline продолжается
+
+| INFO
+| Информационное сообщение
+|===
+
+== Блок presets
+
+Именованные пресеты конфигурации для переиспользования.
+
+=== Синтаксис
+
+[source,kotlin]
+----
+presets {
+    // Пресет для Spring приложений
+    preset("spring-app") {
+        bundles("spring-backend", "kotlin-core")
+        settings {
+            strictVersionResolution = true
+        }
+    }
+
+    // Пресет для Android библиотек
+    preset("android-lib") {
+        bundles("kotlin-core", "android-core")
+        distributions("android")
+    }
+}
+----
+
+=== Применение пресета
+
+[source,kotlin]
+----
+dependanger {
+    applyPreset("spring-app")
+
+    // Дополнительные настройки поверх пресета
+    libraries {
+        library("custom-lib", "com.example:custom:1.0.0")
+    }
+}
+----
+
+== Блок processing
+
+Настройки пайплайна обработки метаданных.
+
+=== Синтаксис
+
+[source,kotlin]
+----
+processing {
+    // Включить импорт версий из BOM
+    importBoms = true
+
+    // Включить проверку обновлений
+    checkUpdates = true
+
+    // Настройки анализа совместимости
+    analyzeCompatibility {
+        enabled = true
+        targetJdk = 17
+        failOnErrors = true
+    }
+
+    // Использовать preset конфигурации pipeline
+    preset = ProcessingPreset.STRICT
+
+    // Кастомная настройка процессоров
+    withBomImport()
+    withUpdateCheck()
+    withoutCompatibilityAnalysis()
+
+    // Отключить конкретные процессоры
+    disabledProcessors = listOf("update-check")
+}
+----
+
+=== ProcessingPreset
+
+[cols="1,3",options="header"]
+|===
+| Preset | Описание
+
+| DEFAULT
+| Стандартная конфигурация: обязательные процессоры + bom-import
+
+| MINIMAL
+| Минимальный набор: только обязательные процессоры
+
+| STRICT
+| Все проверки включены + strictVersionResolution
+
+| DISTRIBUTION
+| Для генерации артефактов: обязательные + profile фильтрация
+|===
+
+NOTE: Подробное описание pipeline см. в xref:F003-processing-pipeline.adoc[F003: Processing Pipeline].
+
 == Модель данных
 
 === DependangerDsl
@@ -695,6 +870,8 @@ settings {
 * `distributions { }` — профили генерации с фильтрацией
 * `compatibility { }` — правила совместимости
 * `settings { }` — глобальные настройки
+* `presets { }` — именованные пресеты конфигурации
+* `processing { }` — настройки пайплайна обработки
 
 === Ключевые сущности
 

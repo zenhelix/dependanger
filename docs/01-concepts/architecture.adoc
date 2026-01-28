@@ -42,7 +42,7 @@
 
 == Архитектурные слои
 
-Система организована в 5 архитектурных слоёв:
+Система организована в 4 архитектурных слоя с дополнительными SPI-реализациями:
 
 [mermaid,target=architecture-layers,format=svg]
 ----
@@ -59,11 +59,19 @@ flowchart TB
     subgraph L4["4. FEATURES"]
         F1["Процессоры: resolver, updates, etc."]
     end
-    subgraph L5["5. EXPORT"]
-        E1["Генераторы артефактов (SPI)"]
+    subgraph SPI["SPI Implementations"]
+        S1["Генераторы, Резолверы"]
     end
-    L1 --> L2 --> L3 --> L4 --> L5
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L2 -.->|"координирует через SPI"| SPI
+    L3 -.->|"использует через SPI"| SPI
 ----
+
+NOTE: Слои определяют направление основных зависимостей (от периферии к ядру).
+SPI-реализации (генераторы, резолверы) не являются отдельным слоем — это точки расширения, которые API и MODEL координируют через абстрактные интерфейсы.
+Зависимость идёт от реализаций к интерфейсам, а не наоборот.
 
 === Описание слоёв
 
@@ -76,21 +84,32 @@ flowchart TB
 | `dependanger-gradle-plugin`, `dependanger-cli`
 
 | API
-| Фасад и координация. Единая точка входа для всего функционала.
+| Фасад и координация. Единая точка входа для всего функционала. Координирует SPI-реализации через абстрактные интерфейсы.
 | `dependanger-api`
 
 | MODEL
-| Доменные модели: Core (DSL, сущности), metadata.json, EffectiveMetadata.
+| Доменные модели: Core (DSL, сущности), metadata.json, EffectiveMetadata. Определяет SPI интерфейсы.
 | `dependanger-core`, `dependanger-metadata-json`, `dependanger-effective`
 
 | FEATURES
-| Опциональные процессоры pipeline. Могут быть отключены.
+| Опциональные процессоры pipeline. Могут быть отключены. Реализуют `EffectiveMetadataProcessor` SPI.
 | `dependanger-maven-resolver`, `dependanger-updates`, `dependanger-analysis`
+|===
 
-| EXPORT
-| Экспортный слой — генераторы преобразуют `EffectiveMetadata` в TOML/BOM через `ArtifactGenerator` SPI.
+=== SPI-реализации (не слой)
+
+Генераторы артефактов — это SPI-реализации интерфейса `ArtifactGenerator<T>`, а не отдельный архитектурный слой:
+
+[cols="1,2,2",options="header"]
+|===
+| Тип | Описание | Модули
+
+| Generators
+| Преобразуют `EffectiveMetadata` в TOML/BOM. Реализуют `ArtifactGenerator` SPI.
 | `dependanger-generator-toml`, `dependanger-generator-bom`
 |===
+
+Такой подход соответствует принципу E1 (расширяемость через SPI): новые генераторы добавляются без изменения API или MODEL слоёв.
 
 == C4 Диаграммы
 
@@ -113,7 +132,7 @@ flowchart TB
     end
 
     subgraph model ["Model Layer"]
-        core["dependanger-core<br/><i>DSL, Models</i>"]
+        core["dependanger-core<br/><i>DSL, Models, SPI Interfaces</i>"]
         meta["dependanger-metadata-json<br/><i>Serialization</i>"]
         eff["dependanger-effective<br/><i>Pipeline</i>"]
     end
@@ -124,7 +143,7 @@ flowchart TB
         analysis["analysis<br/><i>Compatibility</i>"]
     end
 
-    subgraph export ["Export Layer"]
+    subgraph spi ["SPI Implementations"]
         toml["generator-toml"]
         bom["generator-bom"]
     end
@@ -138,18 +157,24 @@ flowchart TB
 
     facade --> core
     facade --> eff
-    facade --> toml
-    facade --> bom
+    facade -.->|"ArtifactGenerator SPI"| toml
+    facade -.->|"ArtifactGenerator SPI"| bom
 
     eff --> core
     eff --> meta
-    eff -.-> resolver
-    eff -.-> updates
-    eff -.-> analysis
+    eff -.->|"EffectiveMetadataProcessor SPI"| resolver
+    eff -.->|"EffectiveMetadataProcessor SPI"| updates
+    eff -.->|"EffectiveMetadataProcessor SPI"| analysis
 
+    toml --> core
+    bom --> core
     resolver --> maven
     updates --> maven
 ----
+
+NOTE: Пунктирные стрелки обозначают зависимость через SPI интерфейсы.
+API и MODEL не зависят от конкретных реализаций — они работают с абстракциями (`ArtifactGenerator`, `EffectiveMetadataProcessor`).
+Реализации подключаются через ServiceLoader.
 
 === Level 3: Component (API Module)
 
@@ -203,12 +228,12 @@ flowchart TB
         core[core]
     end
 
-    subgraph exportLayer [Export Layer]
+    subgraph spiImpl [SPI Implementations]
         generator-toml[generator-toml]
         generator-bom[generator-bom]
     end
 
-    subgraph features [Features Layer]
+    subgraph features [Features Layer / SPI Processors]
         maven-resolver[maven-resolver]
         updates[updates]
         analysis[analysis]
@@ -219,14 +244,14 @@ flowchart TB
     cli --> api
 
     api --> effective
-    api --> generator-toml
-    api --> generator-bom
+    api -.->|"SPI"| generator-toml
+    api -.->|"SPI"| generator-bom
 
     effective --> core
     effective --> metadata-json
-    effective --> maven-resolver
-    effective --> updates
-    effective --> analysis
+    effective -.->|"SPI"| maven-resolver
+    effective -.->|"SPI"| updates
+    effective -.->|"SPI"| analysis
 
     metadata-json --> core
 
@@ -241,9 +266,12 @@ flowchart TB
     style interfaces fill:#ADD8E6
     style apiLayer fill:#F08080
     style modelLayer fill:#98FB98
-    style exportLayer fill:#FFFFE0
+    style spiImpl fill:#FFFFE0
     style features fill:#DDA0DD
 ----
+
+NOTE: Пунктирные стрелки (`-.->`) обозначают зависимость через SPI интерфейсы.
+API и effective модули не имеют compile-time зависимости от конкретных реализаций — они загружаются через ServiceLoader или явную конфигурацию.
 
 === Описание модулей
 
@@ -272,14 +300,14 @@ flowchart TB
 | API
 
 | `dependanger-generator-toml`
-| Генерация Gradle Version Catalog (TOML)
+| Генерация Gradle Version Catalog (TOML). Реализует `ArtifactGenerator` SPI.
 | core
-| EXPORT
+| SPI
 
 | `dependanger-generator-bom`
-| Генерация Maven BOM (XML)
+| Генерация Maven BOM (XML). Реализует `ArtifactGenerator` SPI.
 | core
-| EXPORT
+| SPI
 
 | `dependanger-maven-resolver`
 | BOM import процессор (order: 15)
@@ -364,7 +392,7 @@ flowchart TB
 | Сериализованная конфигурация из DSL
 | `dependangerGenerateMetadata` task
 
-| `effective-\{dist\}.json`
+| `effective-\{distribution\}.json`
 | Обработанная модель для distribution
 | `dependangerGenerateEffective` task
 

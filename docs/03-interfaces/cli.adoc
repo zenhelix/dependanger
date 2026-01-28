@@ -672,22 +672,45 @@ dependanger add-bundle kotlin-core --libraries kotlin-stdlib,kotlin-reflect
 dependanger add-bundle kotlin-full --extends kotlin-core --libraries kotlinx-coroutines-core
 ----
 
-=== add-platform
+=== add-bom
 
-Добавить новую platform (BOM import) в metadata.
+Добавить новый BOM import в metadata.
 
 [source,bash]
 ----
-dependanger add-platform <coordinates> [OPTIONS]
+dependanger add-bom <coordinates> [OPTIONS]
 ----
+
+==== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Путь к metadata.json
+| `./metadata.json`
+
+| `--alias <alias>`
+| Alias для BOM (если не указан, генерируется из artifactId)
+| —
+
+| `--version <version>`
+| Версия BOM или ссылка на alias (ref:name)
+| —
+|===
 
 ==== Примеры
 
 [source,bash]
 ----
-dependanger add-platform org.springframework.boot:spring-boot-dependencies:3.4.1
-dependanger add-platform org.jetbrains.kotlin:kotlin-bom --version ref:kotlin
+dependanger add-bom org.springframework.boot:spring-boot-dependencies:3.4.1
+dependanger add-bom org.jetbrains.kotlin:kotlin-bom --version ref:kotlin
+dependanger add-bom org.junit:junit-bom:5.11.0 --alias junit-bom
 ----
+
+NOTE: Команда соответствует DSL блоку `bomImports { bom(...) }`.
+В терминологии Gradle/Maven это называется "platform", но в Dependanger используется термин "BOM import" для избежания путаницы с `targetPlatforms`.
 
 === add-distribution
 
@@ -735,7 +758,7 @@ dependanger remove-version <alias>
 dependanger remove-library <alias>
 dependanger remove-plugin <alias>
 dependanger remove-bundle <name>
-dependanger remove-platform <coordinates>
+dependanger remove-bom <alias>
 dependanger remove-distribution <name>
 ----
 

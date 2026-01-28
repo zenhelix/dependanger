@@ -111,7 +111,7 @@ Pipeline выполняет: резолвинг версий, импорт из 
 | Термин | Краткое определение
 
 | DependangerDsl
-| Точка входа Kotlin DSL. Содержит блоки `versions`, `libraries`, `plugins`, `bundles`, `bomImports`, `targetPlatforms`, `distributions`, `compatibility`, `settings`.
+| Точка входа Kotlin DSL. Содержит блоки `versions`, `libraries`, `plugins`, `bundles`, `bomImports`, `targetPlatforms`, `distributions`, `compatibility`, `settings`, `presets`.
 
 | DependangerMetadata
 | Сериализуемое представление конфигурации. Промежуточный формат (`metadata.json`).
@@ -148,6 +148,9 @@ Pipeline выполняет: резолвинг версий, импорт из 
 
 | Settings
 | Глобальные настройки валидации и генерации.
+
+| Preset
+| Именованный пресет конфигурации (bundles, distributions, settings) для переиспользования.
 |===
 
 == Стейкхолдеры

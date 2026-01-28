@@ -35,7 +35,7 @@ flowchart TD
     F003 -.-> F008
     F003 --> EM["EffectiveMetadata"]
 
-    subgraph Export["EXPORT"]
+    subgraph Output["OUTPUT / GENERATION"]
         F004["F004: TOML (P1)"]
         F005["F005: BOM (P2)"]
         F009["F009: Report (P3)"]

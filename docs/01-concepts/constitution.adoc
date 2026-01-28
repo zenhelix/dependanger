@@ -34,21 +34,28 @@
 
 [IMPORTANT]
 ====
-Зависимости между модулями ДОЛЖНЫ быть направлены от периферии к ядру.
+Зависимости между слоями ДОЛЖНЫ быть направлены от периферии к ядру.
 
 [mermaid,target=constitution-deps,format=svg]
 ----
 flowchart LR
-    interfaces["interfaces<br/>(CLI)"] --> api["api<br/>(facade)"]
-    api --> features["features<br/>(processors)"]
-    features --> core["core"]
+    interfaces["interfaces<br/>(CLI, Gradle)"] --> api["api<br/>(facade)"]
+    api --> model["model<br/>(core, effective)"]
+    model --> features["features<br/>(processors)"]
+    api -.->|"SPI"| spi["SPI implementations<br/>(generators)"]
+    model -.->|"SPI"| spi
 ----
 ====
+
+NOTE: API и MODEL координируют SPI-реализации (генераторы, резолверы) через абстрактные интерфейсы.
+Это не нарушает принцип направления зависимостей: API зависит от _интерфейсов_ (`ArtifactGenerator`, `EffectiveMetadataProcessor`), а не от конкретных реализаций.
+Реализации зависят от core (где определены интерфейсы).
 
 **Запрещено:**
 
 * [ ] Core модуль НЕ МОЖЕТ зависеть от api, features или interfaces
 * [ ] API модуль НЕ МОЖЕТ зависеть от конкретных интерфейсов (CLI, Gradle Plugin)
+* [ ] API модуль НЕ МОЖЕТ иметь compile-time зависимость от конкретных SPI-реализаций (только от интерфейсов)
 * [ ] Циклические зависимости между модулями
 
 **Проверка:** `ArchUnit: LayeredArchitectureTest`

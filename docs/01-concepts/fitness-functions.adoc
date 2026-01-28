@@ -65,7 +65,7 @@ Fitness Functions позволяют:
 | Правило | Что проверяем | Инструмент
 
 | M1: Направление зависимостей
-| interfaces → api → features → core (не наоборот)
+| interfaces → api → model → features (не наоборот); API зависит от SPI интерфейсов, не от реализаций
 | ArchUnit (layeredArchitecture)
 
 | M2: Изоляция core
@@ -186,13 +186,27 @@ class LayeredArchitectureTest {
     val `layers should respect dependency direction` = layeredArchitecture()
         .consideringAllDependencies()
         .layer("Core").definedBy("..core..")
+        .layer("Model").definedBy("..effective..", "..metadata..")
         .layer("Features").definedBy("..features..")
         .layer("Api").definedBy("..api..")
         .layer("Interfaces").definedBy("..cli..", "..gradle..")
+        .layer("SpiImpl").definedBy("..generator..")
         .whereLayer("Core").mayNotAccessAnyLayer()
         .whereLayer("Features").mayOnlyAccessLayers("Core")
-        .whereLayer("Api").mayOnlyAccessLayers("Core", "Features")
+        .whereLayer("Model").mayOnlyAccessLayers("Core", "Features")
+        .whereLayer("Api").mayOnlyAccessLayers("Core", "Model")
         .whereLayer("Interfaces").mayOnlyAccessLayers("Api")
+        .whereLayer("SpiImpl").mayOnlyAccessLayers("Core")
+
+    @ArchTest
+    val `api should not depend on concrete SPI implementations` = noClasses()
+        .that().resideInAPackage("..api..")
+        .should().dependOnClassesThat()
+        .resideInAnyPackage(
+            "..generator.toml..",
+            "..generator.bom.."
+        )
+        .because("API should depend on SPI interfaces, not concrete implementations")
 }
 ----
 
@@ -350,6 +364,12 @@ LayeredArchitectureTest > layers should respect dependency direction FAILED
     Layer 'Core' is not allowed to access 'Api', but class
     io.github.zenhelix.dependanger.core.Library accesses
     io.github.zenhelix.dependanger.api.Dependanger in (Library.kt:15)
+
+LayeredArchitectureTest > api should not depend on concrete SPI implementations FAILED
+    java.lang.AssertionError: Architecture Violation [Priority: MEDIUM]
+    Rule 'api should not depend on concrete SPI implementations' was violated (1 times):
+    Class io.github.zenhelix.dependanger.api.Dependanger accesses
+    io.github.zenhelix.dependanger.generator.toml.TomlGenerator in (Dependanger.kt:42)
 ----
 
 == Связанные документы

@@ -101,10 +101,13 @@ erDiagram
     DependangerDsl ||--o{ Distribution : contains
     DependangerDsl ||--o{ CompatibilityRule : contains
     DependangerDsl ||--|| Settings : has
+    DependangerDsl ||--o{ Preset : contains
     Bundle ||--o{ Library : includes
     Bundle ||--o{ Bundle : extends
     Library }o--o| Version : references
     Plugin }o--o| Version : references
+    Preset ||--o{ Bundle : includes
+    Preset ||--o| Settings : overrides
 
     DependangerDsl {
         Versions versions
@@ -116,6 +119,7 @@ erDiagram
         Distributions distributions
         Compatibility compatibility
         Settings settings
+        Presets presets
     }
 
     Library {
@@ -175,6 +179,13 @@ erDiagram
         TomlSettings toml
         BomSettings bom
     }
+
+    Preset {
+        string name PK
+        list bundles
+        list distributions
+        Settings settings
+    }
 ----
 
 == Сущности
@@ -230,9 +241,13 @@ NOTE: Полная спецификация DSL синтаксиса: xref:../02
 | `settings { }`
 | SettingsDsl
 | Глобальные настройки валидации и генерации
+
+| `presets { }`
+| PresetsDsl
+| Именованные пресеты конфигурации для переиспользования
 |===
 
-NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings`
+NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings` → `presets`
 
 ==== Пример DSL
 
@@ -1089,6 +1104,78 @@ settings {
 
 '''
 
+=== Preset
+
+[quote]
+____
+Именованный пресет конфигурации для переиспользования.
+Содержит набор бандлов, distributions и настроек, которые можно применить через `applyPreset()`.
+____
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+presets {
+    // Пресет для Spring приложений
+    preset("spring-app") {
+        bundles("spring-backend", "kotlin-core")
+        distributions("backend")
+        settings {
+            strictVersionResolution = true
+        }
+    }
+
+    // Пресет для Android библиотек
+    preset("android-lib") {
+        bundles("kotlin-core", "android-core")
+        distributions("android")
+    }
+}
+
+// Применение пресета
+dependanger {
+    applyPreset("spring-app")
+
+    // Дополнительные настройки поверх пресета
+    libraries {
+        library("custom-lib", "com.example:custom:1.0.0")
+    }
+}
+----
+
+==== Атрибуты Preset
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `name`
+| String
+| Уникальное имя пресета (PK)
+
+| `bundles`
+| List<String>
+| Список бандлов, включаемых при применении пресета
+
+| `distributions`
+| List<String>
+| Список distributions, активируемых при применении пресета
+
+| `settings`
+| Settings?
+| Переопределения настроек (merge с глобальными settings)
+|===
+
+==== Поведение при применении
+
+* `applyPreset()` можно вызывать несколько раз — настройки объединяются
+* Бандлы и distributions добавляются к существующим
+* Settings мержатся: явно указанные в пресете переопределяют глобальные
+* Порядок применения имеет значение: последний пресет имеет приоритет для settings
+
+'''
+
 === Platform Library
 
 [quote]
@@ -1120,6 +1207,104 @@ libraries {
 * В генерируемом TOML отображается с типом `pom`
 * Потребители подключают через `implementation(platform(libs.spring.boot.bom))`
 * Не содержит `supportedTargets` (это не runtime dependency)
+
+'''
+
+[[runtime-configuration]]
+== Runtime Configuration
+
+Настройки, которые влияют на поведение системы во время выполнения, но **НЕ сериализуются** в metadata.json.
+
+=== ProcessingConfig
+
+[quote]
+____
+Конфигурация пайплайна обработки метаданных.
+Определяет какие процессоры включены, их настройки и режим работы.
+____
+
+IMPORTANT: `ProcessingConfig` — это runtime-only конфигурация.
+Она задаётся в DSL блоке `processing { }` или через CLI параметры, но НЕ сохраняется в metadata.json.
+Каждый интерфейс (Gradle Plugin, CLI) настраивает pipeline самостоятельно.
+
+==== DSL синтаксис
+
+[source,kotlin]
+----
+processing {
+    // Включить импорт версий из BOM
+    importBoms = true
+
+    // Включить проверку обновлений
+    checkUpdates = true
+
+    // Настройки анализа совместимости
+    analyzeCompatibility {
+        enabled = true
+        targetJdk = 17
+        failOnErrors = true
+    }
+
+    // Использовать preset конфигурации pipeline
+    preset = ProcessingPreset.STRICT
+
+    // Или кастомная настройка процессоров
+    withBomImport()
+    withUpdateCheck()
+    withoutCompatibilityAnalysis()
+
+    // Отключить конкретные процессоры
+    disabledProcessors = listOf("update-check")
+}
+----
+
+==== Атрибуты ProcessingConfig
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `preset`
+| ProcessingPreset
+| Предустановленная конфигурация (DEFAULT, MINIMAL, STRICT, DISTRIBUTION)
+
+| `importBoms`
+| Boolean
+| Включить BomImportProcessor (импорт версий из BOM)
+
+| `checkUpdates`
+| Boolean
+| Включить UpdateCheckProcessor (проверка обновлений)
+
+| `analyzeCompatibility`
+| CompatibilityConfig
+| Настройки CompatibilityAnalysisProcessor
+
+| `disabledProcessors`
+| List<String>
+| Список ID процессоров для отключения
+|===
+
+==== ProcessingPreset
+
+[cols="1,3",options="header"]
+|===
+| Preset | Описание
+
+| DEFAULT
+| Стандартная конфигурация: обязательные процессоры + bom-import
+
+| MINIMAL
+| Минимальный набор: только обязательные процессоры
+
+| STRICT
+| Все проверки включены + strictVersionResolution
+
+| DISTRIBUTION
+| Для генерации артефактов: обязательные + profile фильтрация
+|===
+
+NOTE: Подробное описание pipeline и процессоров см. в xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline].
 
 '''
 

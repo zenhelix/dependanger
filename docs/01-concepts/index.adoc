@@ -24,7 +24,7 @@
 | 🟢 Готов
 
 | xref:architecture.adoc[Архитектура]
-| Компоненты, слои (INTERFACES → API → MODEL → FEATURES → EXPORT), потоки данных, C4 диаграммы, SPI интерфейсы.
+| Компоненты, слои (INTERFACES → API → MODEL → FEATURES), SPI-реализации, потоки данных, C4 диаграммы, SPI интерфейсы.
 | 🟢 Готов
 |===
 

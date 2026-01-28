@@ -308,6 +308,123 @@ ____
 | Бандл включён, но deprecated библиотека из него исключена
 |===
 
+=== US-009: Определение Platform Library
+
+[quote]
+____
+Как разработчик, я хочу определить Platform Library (BOM) для экспорта в TOML, чтобы потребители могли подключить её через `platform()`.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-009-1
+| DSL с пустым блоком `libraries { }`
+| Добавляю `platformLibrary("spring-bom", "org.springframework.boot:spring-boot-dependencies", version = versionRef("spring-boot"))`
+| Platform library создана с `type = PLATFORM`
+
+| AC-009-2
+| DSL с platformLibrary `spring-bom`
+| Генерирую TOML
+| В TOML добавлена запись `spring-bom = \{ group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "spring-boot" \}` без явного указания type (Gradle определяет автоматически при использовании через `platform()`)
+
+| AC-009-3
+| DSL с platformLibrary и bomImport с одинаковыми координатами
+| Запускаю валидацию
+| WARNING: "Platform library 'spring-bom' has same coordinates as BOM import 'spring-boot-bom'. Consider using only one approach"
+
+| AC-009-4
+| DSL с platformLibrary без версии
+| Запускаю валидацию
+| ERROR: "Platform library 'xxx' must have explicit version"
+|===
+
+NOTE: `platformLibrary()` используется для **экспорта** BOM в генерируемый TOML.
+Для **импорта** версий из внешних BOM используйте `bomImports { }`.
+
+=== US-010: Применение пресетов конфигурации
+
+[quote]
+____
+Как team lead, я хочу создать переиспользуемые пресеты конфигурации, чтобы стандартизировать настройки для разных типов проектов в организации.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-010-1
+| DSL с пустым блоком `presets { }`
+| Добавляю `preset("spring-app") { bundles("spring-backend"); distributions("backend") }`
+| Пресет создан с указанными бандлами и distributions
+
+| AC-010-2
+| DSL с пресетом `spring-app`
+| Вызываю `applyPreset("spring-app")` в корневом DSL
+| Бандлы и distributions из пресета активированы
+
+| AC-010-3
+| DSL с двумя пресетами, оба переопределяют `strictVersionResolution`
+| Вызываю `applyPreset("preset-a")` затем `applyPreset("preset-b")`
+| Используется значение из `preset-b` (последний применённый имеет приоритет)
+
+| AC-010-4
+| DSL с пресетом и явными настройками после `applyPreset()`
+| Вызываю `applyPreset("base")` затем переопределяю `settings { }`
+| Явные настройки после `applyPreset()` имеют приоритет
+
+| AC-010-5
+| DSL с несуществующим пресетом
+| Вызываю `applyPreset("unknown")`
+| ERROR: "Unknown preset 'unknown'"
+|===
+
+=== US-011: Настройка пайплайна обработки
+
+[quote]
+____
+Как разработчик, я хочу настроить пайплайн обработки метаданных, чтобы включить или отключить определённые процессоры (BOM import, update check, и т.д.).
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-011-1
+| DSL с пустым блоком `processing { }`
+| Добавляю `preset = ProcessingPreset.STRICT`
+| Pipeline использует все проверки + strictVersionResolution
+
+| AC-011-2
+| DSL с `processing { importBoms = true }`
+| Pipeline выполняется
+| BomImportProcessor включён, версии из BOM импортируются
+
+| AC-011-3
+| DSL с `processing { withBomImport(); withUpdateCheck() }`
+| Pipeline выполняется
+| BomImportProcessor и UpdateCheckProcessor включены
+
+| AC-011-4
+| DSL с `processing { disabledProcessors = listOf("update-check") }`
+| Pipeline выполняется
+| UpdateCheckProcessor пропускается
+
+| AC-011-5
+| DSL с `processing { disabledProcessors = listOf("validation") }`
+| Pipeline выполняется
+| ERROR: "Cannot disable required processor 'validation'"
+|===
+
+NOTE: Подробное описание pipeline и процессоров см. в xref:F003-processing-pipeline.adoc[F003: Processing Pipeline].
+
 == Спецификация DSL
 
 === Базовая структура
@@ -541,6 +658,55 @@ versions {
 | Условие не выполнено
 |===
 
+=== Комбинирование условий
+
+Условия можно комбинировать для создания сложных правил:
+
+[source,kotlin]
+----
+versions {
+    version("spring-boot", "3.4.0") {
+        // Одно условие
+        fallback("2.7.18") { jdkBelow(17) }
+
+        // AND: все условия должны выполниться
+        fallback("3.2.0") {
+            all(
+                jdkAtLeast(17),
+                kotlinVersionBelow("2.0")
+            )
+        }
+
+        // OR: хотя бы одно условие
+        fallback("3.0.0") {
+            any(
+                jdkBelow(11),
+                environment("LEGACY_MODE", "true")
+            )
+        }
+
+        // NOT: инверсия условия
+        fallback("3.3.0") {
+            not(distribution("production"))
+        }
+
+        // Комбинация AND, OR, NOT
+        fallback("2.5.0") {
+            all(
+                jdkBelow(17),
+                any(
+                    environment("CI", "true"),
+                    not(distribution("local"))
+                )
+            )
+        }
+    }
+}
+----
+
+NOTE: Fallback условия проверяются **по порядку определения**.
+Первое matching условие выигрывает.
+
 == Блок libraries
 
 === Синтаксис
@@ -639,6 +805,50 @@ bomImports {
 * Версии из BOM импортируются во время processing pipeline (BomImportProcessor)
 * Приоритет: DECLARED (явная версия в DSL) > BOM_IMPORT (из bomImports)
 * Порядок BomImport имеет значение: первый BOM с версией для библиотеки выигрывает
+
+[[version-source]]
+=== VersionSource и приоритет версий
+
+При резолвинге версий система определяет источник (`VersionSource`) для каждой библиотеки:
+
+[cols="1,1,3",options="header"]
+|===
+| Приоритет | Source | Когда используется
+
+| 1 (высший)
+| DECLARED
+| Версия явно указана в DSL любым из способов (см. ниже)
+
+| 2 (низший)
+| BOM_IMPORT
+| Версия импортирована из BomImport через BomImportProcessor
+|===
+
+**Что считается DECLARED:**
+
+[source,kotlin]
+----
+libraries {
+    // 1. Inline версия в coordinates — DECLARED
+    library("slf4j", "org.slf4j:slf4j-api:2.0.9")
+
+    // 2. Явный параметр version с литералом — DECLARED
+    library("guava", "com.google.guava:guava") {
+        version = "33.0.0-jre"
+    }
+
+    // 3. Ссылка на version alias через versionRef() — DECLARED
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin"))
+
+    // 4. Без версии — версия будет BOM_IMPORT (если найдена в BOM)
+    //    или останется null (WARNING/ERROR в зависимости от strictVersionResolution)
+    library("spring-web", "org.springframework:spring-web")
+}
+----
+
+IMPORTANT: Даже если библиотека с DECLARED версией присутствует в BOM — используется DECLARED версия.
+BOM_IMPORT применяется **только** когда версия не указана явно.
 
 == Блок targetPlatforms
 
@@ -1121,6 +1331,38 @@ NOTE: Подробное описание pipeline см. в xref:F003-processing
 | FR-018
 | MAY
 | Система МОЖЕТ предоставлять CLI команду `migrate-deprecated` для автоматической миграции
+
+| FR-019
+| SHOULD
+| Система ДОЛЖНА поддерживать `platformLibrary()` для экспорта BOM/Platform зависимостей в TOML
+
+| FR-020
+| SHOULD
+| Система ДОЛЖНА поддерживать именованные пресеты (`presets { }`) для переиспользования конфигураций
+
+| FR-021
+| SHOULD
+| Система ДОЛЖНА поддерживать применение пресетов через `applyPreset()` с мержем настроек
+
+| FR-022
+| SHOULD
+| При применении нескольких пресетов система ДОЛЖНА использовать значения из последнего применённого пресета (приоритет последнего)
+
+| FR-023
+| SHOULD
+| Система ДОЛЖНА поддерживать блок `processing { }` для настройки пайплайна обработки
+
+| FR-024
+| SHOULD
+| Система ДОЛЖНА поддерживать `ProcessingPreset` (DEFAULT, MINIMAL, STRICT, DISTRIBUTION) для быстрой настройки pipeline
+
+| FR-025
+| MAY
+| Система МОЖЕТ поддерживать отключение опциональных процессоров через `disabledProcessors`
+
+| FR-026
+| MUST
+| Система НЕ ДОЛЖНА позволять отключать обязательные процессоры (validation, version-resolver, и др.)
 |===
 
 == Edge Cases
@@ -1212,7 +1454,117 @@ NOTE: Подробное описание pipeline см. в xref:F003-processing
 | Пустой distribution spec
 | `distribution("empty") { }` без фильтров
 | Все библиотеки включаются (эквивалент отсутствия фильтрации)
+
+3+h| Presets
+
+| Несуществующий пресет
+| `applyPreset("unknown")`
+| ERROR: "Unknown preset 'unknown'"
+
+| Пресет ссылается на несуществующий бандл
+| `preset("p") { bundles("unknown-bundle") }`
+| ERROR: "Unknown bundle 'unknown-bundle' in preset 'p'"
+
+| Пресет ссылается на несуществующий distribution
+| `preset("p") { distributions("unknown-dist") }`
+| ERROR: "Unknown distribution 'unknown-dist' in preset 'p'"
+
+| Два пресета с конфликтующими settings
+| `applyPreset("a")` (strictVersionResolution=true), `applyPreset("b")` (strictVersionResolution=false)
+| Используется значение из последнего пресета: `strictVersionResolution=false`
+
+| Явные settings после applyPreset
+| `applyPreset("base")` затем `settings { strictVersionResolution = true }`
+| Явные settings переопределяют значения из пресета
+
+| Циклические пресеты (если поддерживается extends)
+| Пресет A extends B, пресет B extends A
+| ERROR: "Circular preset dependency: A → B → A"
+
+| Пустой пресет
+| `preset("empty") { }` без bundles/distributions/settings
+| Валидно, пресет не вносит изменений при применении
+
+3+h| Platform Library
+
+| platformLibrary без версии
+| `platformLibrary("bom", "group:artifact")`
+| ERROR: "Platform library 'bom' must have explicit version"
+
+| platformLibrary с теми же координатами что и bomImport
+| `platformLibrary("spring-bom", ...)` и `bom("spring-bom", ...)` с одинаковыми coordinates
+| WARNING: "Platform library and BOM import have same coordinates"
+
+| platformLibrary в бандле
+| Бандл содержит platformLibrary
+| WARNING: "Bundle 'xxx' contains platform library 'yyy'. Platform libraries are typically not bundled"
+
+3+h| Processing
+
+| Отключение обязательного процессора
+| `disabledProcessors = listOf("validation")`
+| ERROR: "Cannot disable required processor 'validation'"
+
+| Конфликт preset и явных настроек
+| `preset = MINIMAL` и `withBomImport()` вместе
+| `withBomImport()` добавляется к MINIMAL preset
+
+| Неизвестный процессор в disabledProcessors
+| `disabledProcessors = listOf("unknown-processor")`
+| WARNING: "Unknown processor 'unknown-processor' in disabledProcessors"
+
+| importBoms=true без bomImports
+| `processing { importBoms = true }`, блок `bomImports` пуст
+| INFO: "BOM import enabled but no BOM imports defined"
 |===
+
+== Трансформация DSL → Metadata
+
+[[to-metadata]]
+=== Метод toMetadata()
+
+`DependangerDsl` конвертируется в `DependangerMetadata` через метод `toMetadata()`:
+
+[source,kotlin]
+----
+val dsl = DependangerDsl()
+
+dsl.versions { version("kotlin", "2.1.20") }
+dsl.libraries { library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib", version = versionRef("kotlin")) }
+
+// Конвертация в сериализуемую модель
+val metadata: DependangerMetadata = dsl.toMetadata()
+
+// Сериализация в JSON
+val json = SerializationFormat.JSON.write(metadata)
+----
+
+=== Когда вызывается toMetadata()
+
+[cols="1,2",options="header"]
+|===
+| Контекст | Поведение
+
+| Gradle Plugin
+| Вызывается автоматически в задаче `dependangerGenerateMetadata`
+
+| Library API
+| Вызывается явно пользователем: `dsl.toMetadata()`
+
+| CLI
+| CLI работает с уже сериализованным `metadata.json`, не с DSL напрямую
+|===
+
+=== Что происходит при toMetadata()
+
+1. **Валидация DSL** — проверка уникальности alias, существования ссылок, отсутствия циклов
+2. **Применение пресетов** — если вызван `applyPreset()`, настройки мержатся
+3. **Создание Metadata** — все сущности конвертируются в сериализуемые DTO
+4. **НЕ резолвятся версии** — резолвинг происходит позже в Processing Pipeline
+
+NOTE: `processing { }` блок **НЕ сериализуется** в metadata.json.
+Это runtime-only конфигурация.
+Каждый интерфейс (Gradle Plugin, CLI) настраивает pipeline самостоятельно.
 
 == Связи
 

@@ -247,28 +247,52 @@ bomImports {
 
 Профили генерации с фильтрацией библиотек.
 
+NOTE: Полная документация по фильтрам: xref:../02-features/F001-registry-dsl.adoc#_блок_distributions[F001: Registry DSL — блок distributions].
+
 [source,kotlin]
 ----
 distributions {
-    // Дистрибуция для core библиотек
+    // Дистрибуция для core библиотек (короткая форма)
     distribution("core") {
-        filter {
-            includeTags("core")
-            excludeTags("android", "ios")
+        spec {
+            filter {
+                byTags { include { anyOf("core") } }
+                byTags { exclude { anyOf("android", "ios") } }
+            }
         }
     }
-    
-    // Дистрибуция для Android
+
+    // Дистрибуция для Android (полная форма)
     distribution("android") {
-        filter {
-            includeTags("android", "core")
-            excludeLibraries("desktop-only-lib")
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+                byGroups { exclude { matching("org.desktop:*") } }
+            }
         }
     }
-    
+
+    // Дистрибуция для backend
+    distribution("backend") {
+        spec {
+            filter {
+                byBundles { include("spring-backend", "kotlin-core") }
+            }
+        }
+    }
+
+    // Production без deprecated библиотек
+    distribution("production") {
+        spec {
+            filter {
+                byDeprecated { exclude() }
+            }
+        }
+    }
+
     // Дистрибуция со всеми библиотеками (без фильтрации)
     distribution("full") {
-        // Пустой фильтр = все библиотеки
+        // Пустой spec = все библиотеки
     }
 }
 ----

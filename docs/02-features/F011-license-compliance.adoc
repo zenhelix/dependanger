@@ -717,25 +717,95 @@ Summary:
 
 === dependangerLicenseCheck
 
-Задача проверки лицензий.
+Задача проверки лицензий в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+
+**Outputs:**
+
+* `build/dependanger/license-report.json` — JSON отчёт
+* Console output — текстовый отчёт
+
+**Опции:**
+
+* `allowedLicenses`, `deniedLicenses` — whitelist/blacklist
+* `failOnDenied`, `failOnUnknown` — fail условия
+* `warnOnCopyleft`, `warnOnUnknown` — предупреждения
+* `includeTransitives` — проверять транзитивные зависимости
 
 [source,bash]
 ----
+# Базовая проверка
 ./gradlew dependangerLicenseCheck
+
+# Fail при denied
+./gradlew dependangerLicenseCheck -PfailOnDenied=true
+
+# С whitelist
+./gradlew dependangerLicenseCheck -PallowedLicenses=MIT,Apache-2.0
 ----
 
-Результат: `build/dependanger/license-report.json`
+== Settings DSL
 
-=== Конфигурация в build.gradle.kts
+Полная конфигурация проверки лицензий в Gradle DSL.
 
 [source,kotlin]
 ----
 dependanger {
-    license {
-        allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause")
-        deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
-        failOnDenied = false
-        warnOnCopyleft = true
+    settings {
+        licenseCheck {
+            // Включение процессора
+            enabled = true  // или через processing { checkLicenses = true }
+
+            // Whitelist (если указан — только эти разрешены)
+            allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause", "ISC")
+
+            // Blacklist (эти всегда запрещены)
+            deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
+
+            // Предупреждения
+            warnOnCopyleft = true  // default: true
+            warnOnUnknown = true  // default: true
+
+            // Fail условия (по умолчанию false — только warn)
+            failOnDenied = false  // default
+            failOnUnknown = false  // default
+            failOnCopyleft = false  // default
+
+            // Исключения
+            ignoreLibraries = listOf("internal-test-lib")
+
+            // Транзитивные зависимости
+            includeTransitives = false  // требует F012
+
+            // Источники лицензий (порядок = приоритет)
+            sources = listOf(
+                LicenseSource.USER_DEFINED,
+                LicenseSource.MAVEN_POM,
+                LicenseSource.CLEARLY_DEFINED
+            )
+
+            // Кеширование
+            cache {
+                enabled = true
+                ttl = 7.days  // default: 7 дней (лицензии редко меняются)
+                directory = file("~/.dependanger/cache/licenses")
+            }
+
+            // Сеть
+            timeout = 30.seconds
+        }
+    }
+
+    // Или короткая форма через processing
+    processing {
+        checkLicenses = true
     }
 }
 ----
@@ -849,6 +919,18 @@ dependanger {
 | FR-015
 | MAY
 | Система МОЖЕТ проверять транзитивные зависимости при `includeTransitives = true` (требует xref:F012-transitive-resolution.adoc[F012])
+
+| FR-016
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger license-check`
+
+| FR-017
+| SHOULD
+| Система ДОЛЖНА поддерживать форматы вывода: `text`, `json`
+
+| FR-018
+| SHOULD
+| Система ДОЛЖНА выводить summary по категориям лицензий
 |===
 
 == Edge Cases
@@ -934,8 +1016,10 @@ dependanger {
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 85)
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает licenses info
 * xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — для проверки транзитивных
+* xref:../03-interfaces/cli.adoc[CLI — команда license-check]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerLicenseCheck]
 * https://spdx.org/licenses/[SPDX License List]
 * https://clearlydefined.io/[ClearlyDefined]

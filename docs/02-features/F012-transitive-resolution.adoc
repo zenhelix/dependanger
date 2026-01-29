@@ -522,6 +522,101 @@ Summary:
 }
 ----
 
+== Gradle Task
+
+=== dependangerResolveTransitives
+
+Задача резолвинга транзитивных зависимостей в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+
+**Outputs:**
+
+* `build/dependanger/transitives.json` — JSON с деревом зависимостей
+* `build/dependanger/dependanger-constraints.gradle.kts` — Gradle snippet для constraints
+* Console output — текстовый отчёт
+
+**Опции:**
+
+* `maxDepth` — максимальная глубина резолвинга
+* `showConflicts` — показать только конфликты
+* `generateConstraints` — генерировать Gradle snippet
+
+[source,bash]
+----
+# Базовый резолвинг
+./gradlew dependangerResolveTransitives
+
+# Только конфликты
+./gradlew dependangerResolveTransitives -PshowConflicts=true
+
+# С ограничением глубины
+./gradlew dependangerResolveTransitives -PmaxDepth=5
+----
+
+== Settings DSL
+
+Полная конфигурация резолвинга транзитивных зависимостей в Gradle DSL.
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        transitiveResolution {
+            // Включение процессора
+            enabled = true  // или через processing { resolveTransitives = true }
+
+            // Maven repositories для резолвинга
+            repositories {
+                mavenCentral()
+                maven("https://repo.spring.io/milestone")
+                maven("https://nexus.example.com/releases") {
+                    credentials {
+                        username = providers.environmentVariable("NEXUS_USER")
+                        password = providers.environmentVariable("NEXUS_PASSWORD")
+                    }
+                }
+            }
+
+            // Глубина резолвинга
+            maxDepth = 10  // default
+
+            // Scopes для включения
+            scopes = listOf("compile", "runtime")  // default: compile only
+            includeOptional = false  // default
+
+            // Кеширование
+            cache {
+                enabled = true
+                ttl = 24.hours  // default
+                directory = file("~/.dependanger/cache/transitives")
+            }
+
+            // Сеть
+            timeout = 30.seconds  // per-library
+
+            // Стратегия разрешения конфликтов
+            conflictResolution = HIGHEST  // только HIGHEST в текущей версии
+
+            // Генерация
+            generateConstraintsSnippet = true  // default
+            constraintsFilename = "dependanger-constraints.gradle.kts"
+        }
+    }
+
+    // Или короткая форма через processing
+    processing {
+        resolveTransitives = true
+    }
+}
+----
+
 == Генерация Constraints
 
 === Gradle Snippet
@@ -684,6 +779,18 @@ NOTE: Maven BOM имеет ограниченную поддержку exclusion
 | FR-014
 | MAY
 | Система МОЖЕТ показывать лицензии транзитивных в tree view
+
+| FR-015
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger resolve-transitives`
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА поддерживать форматы вывода: `tree`, `flat`, `json`
+
+| FR-017
+| SHOULD
+| Система ДОЛЖНА выводить summary со статистикой (directCount, transitiveCount, conflictCount)
 |===
 
 == Edge Cases
@@ -763,4 +870,5 @@ NOTE: Maven BOM имеет ограниченную поддержку exclusion
 == Связанные документы
 
 * xref:../01-concepts/domain-model.adoc[Доменная модель — Constraint]
-* xref:../03-interfaces/cli.adoc[CLI — resolve-transitives]
+* xref:../03-interfaces/cli.adoc[CLI — команда resolve-transitives]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerResolveTransitives]

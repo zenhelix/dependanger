@@ -136,6 +136,38 @@ ____
 | Deprecated библиотеки включены, но без комментариев
 |===
 
+=== US-004: Platform Library в TOML
+
+[quote]
+____
+Как Gradle разработчик, я хочу использовать platform libraries (BOM) из Version Catalog, чтобы управлять версиями через BOM.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| EffectiveMetadata с `platformLibrary("spring-bom", "org.springframework.boot:spring-boot-dependencies")`
+| Генерирую TOML
+| Библиотека добавлена в `[libraries]`: `spring-bom = { group = "...", name = "..." }`
+
+| AC-004-2
+| TOML с platform library `spring-bom`
+| Использую в build.gradle.kts
+| Можно использовать: `implementation(platform(libs.spring.bom))`
+
+| AC-004-3
+| Platform library с inline версией
+| Генерирую TOML
+| Версия включена inline: `spring-bom = { group = "...", name = "...", version = "3.4.0" }`
+|===
+
+NOTE: Gradle Version Catalogs не имеют отдельного типа для platform libraries.
+Platform libraries генерируются как обычные библиотеки, а пользователь оборачивает их в `platform()` при использовании.
+
 == SPI: ArtifactGenerator
 
 === Описание интерфейса
@@ -225,10 +257,120 @@ TOML ключи = DSL alias без изменений (нижний регист
 
 * `gradle/libs.versions.toml` (или кастомный путь)
 
-**Опции:**
+**Зависимости:**
 
-* `includeComments` — добавлять комментарии в TOML
-* `includeMetadata` — добавлять метаданные (generated at, distribution)
+* Зависит от `dependangerGenerateEffective`
+
+== CLI Command
+
+[source,bash]
+----
+dependanger generate --toml [OPTIONS]
+----
+
+=== Опции
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `-i, --input <path>`
+| Входной metadata.json файл
+| обязательный
+
+| `-o, --output <path>`
+| Директория для выходных файлов
+| `.`
+
+| `-d, --distribution <name>`
+| Генерировать для указанной дистрибуции
+| все
+
+| `--all`
+| Генерировать для всех дистрибуций
+| `false`
+
+| `--toml-name <name>`
+| Имя выходного TOML файла
+| `libs.versions.toml`
+
+| `--include-comments`
+| Добавлять комментарии (deprecated, metadata)
+| `true`
+
+| `--sort`
+| Сортировать секции алфавитно
+| `true`
+|===
+
+=== Примеры
+
+[source,bash]
+----
+# Генерация TOML (default)
+dependanger generate --toml --input metadata.json
+
+# Для конкретного distribution
+dependanger generate --toml --distribution backend --input metadata.json
+
+# Для всех distributions
+dependanger generate --toml --all --input metadata.json --output ./catalogs
+
+# Без комментариев
+dependanger generate --toml --no-include-comments --input metadata.json
+----
+
+NOTE: Подробное описание CLI см. в xref:../03-interfaces/cli.adoc[CLI Interface].
+
+== Настройки
+
+=== DSL конфигурация
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        toml {
+            // Имя файла (поддерживает placeholder {distribution})
+            filename = "libs.versions.toml"
+            // или для multi-distribution:
+            filename = "libs-{distribution}.versions.toml"
+
+            // Добавлять комментарии о deprecated библиотеках
+            includeDeprecationComments = true
+
+            // Добавлять метаданные (generated at, distribution)
+            includeMetadata = true
+
+            // Сортировать секции алфавитно
+            sortAlphabetically = true
+
+            // Использовать inline версии вместо version.ref
+            // (не рекомендуется, но поддерживается)
+            useInlineVersions = false
+
+            // Выходная директория
+            outputDirectory = file("gradle")
+        }
+    }
+}
+----
+
+=== Inline версии
+
+По умолчанию генерируются ссылки на версии через `version.ref`.
+Можно включить inline версии:
+
+[source,toml]
+----
+# С version.ref (default)
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
+
+# С inline версией (useInlineVersions = true)
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version = "2.1.20" }
+----
+
+WARNING: Inline версии не рекомендуются, так как затрудняют централизованное управление версиями.
 
 == Использование в Gradle
 
@@ -332,6 +474,22 @@ plugins {
 | FR-011
 | SHOULD
 | Система ДОЛЖНА добавлять комментарии о deprecation для deprecated библиотек (replacedBy, message, removalVersion)
+
+| FR-012
+| SHOULD
+| Система ДОЛЖНА поддерживать генерацию TOML через CLI команду `dependanger generate --toml`
+
+| FR-013
+| SHOULD
+| Система ДОЛЖНА поддерживать placeholder `\{distribution\}` в имени файла для multi-distribution
+
+| FR-014
+| SHOULD
+| Система ДОЛЖНА генерировать platform libraries как обычные библиотеки (пользователь оборачивает в `platform()`)
+
+| FR-015
+| MAY
+| Система МОЖЕТ поддерживать опцию `useInlineVersions` для inline версий вместо version.ref
 |===
 
 == Edge Cases

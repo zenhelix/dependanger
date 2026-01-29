@@ -33,6 +33,254 @@ Processing Pipeline выполняет многоэтапную обработк
 
 Результат — `EffectiveMetadata`, готовый для генерации артефактов.
 
+[[effective-metadata]]
+== EffectiveMetadata
+
+=== Отличия от DependangerMetadata
+
+[cols="1,2,2",options="header"]
+|===
+| Аспект | DependangerMetadata | EffectiveMetadata
+
+| Версии
+| `versionRef("kotlin")` — ссылка
+| `resolvedVersion = "2.1.20"`, `versionSource = DECLARED`
+
+| Библиотеки
+| Все определённые библиотеки
+| Только отфильтрованные по distribution
+
+| Бандлы
+| Ссылки на библиотеки
+| Раскрытые с учётом `extends`
+
+| Deprecated
+| Информация о deprecation
+| + флаг `isDeprecated`, проверено `removalVersion`
+
+| Плагины
+| Все плагины
+| Отфильтрованные по distribution
+
+| Диагностика
+| —
+| `ProcessingDiagnostics` с ошибками/предупреждениями
+|===
+
+=== Структура EffectiveMetadata
+
+[source,kotlin]
+----
+data class EffectiveMetadata(
+    val schemaVersion: String,
+    val distributionProfile: String?,
+    val libraries: Map<String, EffectiveLibrary>,
+    val plugins: Map<String, EffectivePlugin>,
+    val bundles: Map<String, EffectiveBundle>,
+    val versions: Map<String, ResolvedVersion>,
+    val diagnostics: ProcessingDiagnostics,
+    val processingInfo: ProcessingInfo
+)
+
+data class EffectiveLibrary(
+    val alias: String,
+    val group: String,
+    val artifact: String,
+    val resolvedVersion: String?,
+    val versionSource: VersionSource,
+    val tags: Set<String>,
+    val isDeprecated: Boolean,
+    val deprecation: DeprecationInfo?
+)
+
+data class ResolvedVersion(
+    val alias: String,
+    val value: String,
+    val source: VersionSource,
+    val originalRef: String?  // для BOM_IMPORT — ссылка на BOM
+)
+
+enum class VersionSource {
+    DECLARED,    // Явно указана в DSL
+    BOM_IMPORT   // Импортирована из BOM
+}
+----
+
+=== Пример effective-backend.json
+
+[source,json]
+----
+{
+  "schemaVersion": "1.0",
+  "distributionProfile": "backend",
+  "libraries": {
+    "spring-web": {
+      "alias": "spring-web",
+      "group": "org.springframework",
+      "artifact": "spring-web",
+      "resolvedVersion": "6.2.0",
+      "versionSource": "BOM_IMPORT",
+      "tags": ["spring", "web"],
+      "isDeprecated": false
+    },
+    "kotlin-stdlib": {
+      "alias": "kotlin-stdlib",
+      "group": "org.jetbrains.kotlin",
+      "artifact": "kotlin-stdlib",
+      "resolvedVersion": "2.1.20",
+      "versionSource": "DECLARED",
+      "tags": ["kotlin", "core"],
+      "isDeprecated": false
+    }
+  },
+  "plugins": {
+    "kotlin-jvm": {
+      "alias": "kotlin-jvm",
+      "id": "org.jetbrains.kotlin.jvm",
+      "resolvedVersion": "2.1.20",
+      "versionSource": "DECLARED"
+    }
+  },
+  "bundles": {
+    "spring-backend": {
+      "alias": "spring-backend",
+      "libraries": ["spring-web", "spring-data-jpa"],
+      "resolvedFrom": ["kotlin-core"]
+    }
+  },
+  "versions": {
+    "kotlin": {
+      "alias": "kotlin",
+      "value": "2.1.20",
+      "source": "DECLARED"
+    },
+    "spring-boot": {
+      "alias": "spring-boot",
+      "value": "3.4.0",
+      "source": "DECLARED"
+    }
+  },
+  "diagnostics": {
+    "errors": [],
+    "warnings": [
+      {
+        "code": "DEPRECATED_LIBRARY",
+        "message": "Library 'old-http' is deprecated. Use 'new-http' instead.",
+        "library": "old-http"
+      }
+    ]
+  },
+  "processingInfo": {
+    "processedAt": "2026-01-28T10:30:00Z",
+    "processorIds": ["profile", "metadata-conversion", "bom-import", "library-filter", "version-resolver", "validation"],
+    "context": {
+      "jdkVersion": 21,
+      "kotlinVersion": "2.1.20"
+    }
+  }
+}
+----
+
+[[processing-diagnostics]]
+== ProcessingDiagnostics
+
+Структура для сбора ошибок и предупреждений во время выполнения pipeline.
+
+=== Уровни диагностики
+
+[cols="1,2,2",options="header"]
+|===
+| Уровень | Поведение | Примеры
+
+| ERROR
+| Pipeline останавливается (в strict mode) или продолжается с пометкой
+| Неразрешённая версия, циклические бандлы, невалидные координаты
+
+| WARNING
+| Pipeline продолжается, информация сохраняется
+| Deprecated библиотека, неиспользуемая версия, пустой distribution
+
+| INFO
+| Информационное сообщение
+| Импортирована версия из BOM, применён fallback
+|===
+
+=== Структура
+
+[source,kotlin]
+----
+data class ProcessingDiagnostics(
+    val errors: List<DiagnosticMessage>,
+    val warnings: List<DiagnosticMessage>,
+    val infos: List<DiagnosticMessage>
+) {
+    fun hasErrors(): Boolean = errors.isNotEmpty()
+    fun hasWarnings(): Boolean = warnings.isNotEmpty()
+}
+
+data class DiagnosticMessage(
+    val code: String,           // e.g., "UNRESOLVED_VERSION", "DEPRECATED_LIBRARY"
+    val message: String,        // Human-readable сообщение
+    val processorId: String,    // Процессор, который добавил сообщение
+    val context: Map<String, Any> = emptyMap()  // Дополнительный контекст
+)
+----
+
+=== Коды диагностики
+
+[cols="1,2,1",options="header"]
+|===
+| Код | Описание | Уровень
+
+| `UNRESOLVED_VERSION`
+| Версия не разрешена (нет в DSL, нет в BOM)
+| ERROR/WARNING
+
+| `UNKNOWN_VERSION_REF`
+| Ссылка на несуществующий version alias
+| ERROR
+
+| `CIRCULAR_BUNDLE`
+| Циклическая зависимость бандлов
+| ERROR
+
+| `UNKNOWN_LIBRARY_IN_BUNDLE`
+| Бандл ссылается на несуществующую библиотеку
+| ERROR
+
+| `INVALID_COORDINATES`
+| Невалидные Maven координаты
+| ERROR
+
+| `DEPRECATED_LIBRARY`
+| Библиотека помечена как deprecated
+| WARNING
+
+| `DEPRECATED_PAST_REMOVAL`
+| Deprecated библиотека прошла removalVersion
+| ERROR
+
+| `EMPTY_DISTRIBUTION`
+| Distribution filter исключил все библиотеки
+| WARNING
+
+| `UNUSED_VERSION`
+| Версия не используется ни одной библиотекой
+| INFO
+
+| `BOM_VERSION_IMPORTED`
+| Версия импортирована из BOM
+| INFO
+
+| `FALLBACK_APPLIED`
+| Применена fallback версия
+| INFO
+
+| `COMPATIBILITY_VIOLATION`
+| Нарушено правило совместимости
+| ERROR/WARNING
+|===
+
 == User Stories
 
 === US-001: Резолвинг версий
@@ -201,6 +449,89 @@ ____
 | Нет ошибок, pipeline продолжается
 |===
 
+=== US-005: Обработка deprecated библиотек
+
+[quote]
+____
+Как разработчик, я хочу получать предупреждения о deprecated библиотеках при генерации, чтобы вовремя мигрировать на актуальные версии.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-005-1
+| Библиотека `old-http` с `deprecated(replacedBy = "new-http")`
+| Pipeline выполняется с `settings { onDeprecatedLibrary = WARN }`
+| WARNING: "Library 'old-http' is deprecated. Use 'new-http' instead."
+
+| AC-005-2
+| Библиотека `old-http` с `deprecated(replacedBy = "new-http")`
+| Pipeline выполняется с `settings { onDeprecatedLibrary = FAIL }`
+| ERROR: "Library 'old-http' is deprecated", pipeline останавливается
+
+| AC-005-3
+| Библиотека `old-http` с `deprecated(replacedBy = "new-http")`
+| Pipeline выполняется с `settings { onDeprecatedLibrary = IGNORE }`
+| Нет сообщений, pipeline продолжается
+
+| AC-005-4
+| Библиотека с `deprecated(removalVersion = "1.0.0")`, текущая версия каталога "2.0.0"
+| Pipeline выполняется
+| ERROR: "Library 'xxx' should have been removed in version 1.0.0"
+
+| AC-005-5
+| Distribution с `byDeprecated { exclude() }`, deprecated библиотека в metadata
+| Pipeline выполняет library-filter
+| Deprecated библиотека исключена из EffectiveMetadata
+
+| AC-005-6
+| Deprecated библиотека включена, генерируется TOML
+| Артефакт генерируется
+| Комментарий в TOML: `# DEPRECATED: Use 'new-http' instead`
+|===
+
+=== US-006: Проверка правил совместимости
+
+[quote]
+____
+Как team lead, я хочу определить правила совместимости для библиотек, чтобы команда не использовала несовместимые комбинации.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-006-1
+| Правило `jdkRequirement("spring-jdk17")` с `minJdk = 17`, контекст с JDK 11
+| Pipeline выполняет compat-rules процессор
+| ERROR: "spring-web requires JDK 17+, but target JDK is 11"
+
+| AC-006-2
+| Правило `mutualExclusion("logging")` с `libraries = ["slf4j-simple", "logback-classic"]`, оба в metadata
+| Pipeline выполняет compat-rules процессор
+| WARNING: "Only one logging implementation should be used: slf4j-simple, logback-classic"
+
+| AC-006-3
+| Правило `versionConstraint("kotlin-compat")` с `versionRange = "[1.7.0,)"`, библиотека версии 1.5.0
+| Pipeline выполняет compat-rules процессор
+| ERROR: "kotlinx-coroutines-core version 1.5.0 does not satisfy constraint [1.7.0,)"
+
+| AC-006-4
+| Кастомное правило `customRule("my-check")` возвращает ERROR
+| Pipeline выполняет compat-rules процессор
+| ERROR с message из customRule
+
+| AC-006-5
+| Все правила совместимости пройдены
+| Pipeline выполняет compat-rules процессор
+| Нет ошибок, pipeline продолжается
+|===
+
 == SPI: EffectiveMetadataProcessor
 
 === Описание интерфейса
@@ -332,6 +663,78 @@ ____
 
 NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`, `withLicenseCheck()`, `withTransitiveResolution()`
 
+[[compat-rules-processor]]
+=== Процессор compat-rules
+
+Процессор `compat-rules` (order: 66) проверяет правила совместимости, определённые в блоке `compatibility {}`.
+
+**Типы правил:**
+
+[cols="1,3",options="header"]
+|===
+| Тип | Описание
+
+| `jdkRequirement`
+| Проверяет требования к версии JDK для указанных библиотек
+
+| `mutualExclusion`
+| Проверяет что указанные библиотеки не используются одновременно
+
+| `versionConstraint`
+| Проверяет что версия библиотеки соответствует диапазону
+
+| `customRule`
+| Кастомная проверка через callback
+|===
+
+**Связь с DSL:**
+
+[source,kotlin]
+----
+dependanger {
+    compatibility {
+        jdkRequirement("spring-jdk17") {
+            libraries("spring-web", "spring-data-jpa")
+            minJdk = 17
+        }
+
+        mutualExclusion("logging") {
+            libraries("slf4j-simple", "logback-classic", "log4j-core")
+            message = "Only one logging implementation should be used"
+        }
+
+        versionConstraint("kotlin-compat") {
+            library = "kotlinx-coroutines-core"
+            versionRange = "[1.7.0,)"
+        }
+    }
+}
+----
+
+NOTE: Правила проверяются процессором `compat-rules` (order: 66) после валидации (order: 65).
+
+[[deprecated-handling]]
+=== Обработка deprecated библиотек
+
+Deprecated библиотеки обрабатываются на нескольких этапах pipeline:
+
+1. **library-filter (order: 20)** — если distribution имеет `byDeprecated { exclude() }`, deprecated исключаются
+2. **validation (order: 65)** — проверка `removalVersion`, генерация WARNING/ERROR согласно `onDeprecatedLibrary`
+3. **Генерация артефактов** — добавление комментариев о deprecation
+
+**Настройка поведения:**
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        validation {
+            onDeprecatedLibrary = WARN  // WARN (default), FAIL, IGNORE
+        }
+    }
+}
+----
+
 == Processing Context
 
 `ProcessingContext` содержит информацию об окружении, которая используется процессорами для принятия решений.
@@ -436,18 +839,36 @@ Pipeline поддерживает параллельное выполнение 
 | Обязательные + profile фильтрация
 |===
 
+=== Способы настройки
+
+Есть два эквивалентных способа настройки опциональных процессоров:
+
 [source,kotlin]
 ----
 dependanger {
     processing {
-        preset = ProcessingPreset.STRICT
-        // или кастомная настройка:
+        // Способ 1: Property-style
+        importBoms = true
+        checkUpdates = true
+        analyzeCompatibility = false
+
+        // Способ 2: Builder-style (эквивалентно)
         withBomImport()
         withUpdateCheck()
         withoutCompatibilityAnalysis()
+
+        // Preset + кастомизация
+        preset = ProcessingPreset.STRICT
+        withoutSecurityCheck()  // отключить один процессор из preset
+
+        // Отключение процессоров по ID
+        disabledProcessors = listOf("license-check")
     }
 }
 ----
+
+NOTE: Property-style (`importBoms = true`) и Builder-style (`withBomImport()`) эквивалентны.
+Используйте тот стиль, который предпочитаете.
 
 == Pipeline Flow
 
@@ -541,6 +962,30 @@ flowchart TD
 | FR-016
 | MAY
 | Система МОЖЕТ поддерживать включение опциональных процессоров через `withBomImport()`, `withUpdateCheck()`, etc.
+
+| FR-017
+| MUST
+| Система ДОЛЖНА генерировать WARNING/ERROR для deprecated библиотек согласно `onDeprecatedLibrary` настройке
+
+| FR-018
+| MUST
+| Система ДОЛЖНА генерировать ERROR для deprecated библиотек с `removalVersion` <= текущей версии каталога
+
+| FR-019
+| MUST
+| Система ДОЛЖНА проверять правила совместимости из блока `compatibility {}` в процессоре `compat-rules`
+
+| FR-020
+| SHOULD
+| Система ДОЛЖНА поддерживать типы правил: `jdkRequirement`, `mutualExclusion`, `versionConstraint`, `customRule`
+
+| FR-021
+| SHOULD
+| Система ДОЛЖНА сохранять диагностику (errors, warnings, infos) в `ProcessingDiagnostics`
+
+| FR-022
+| SHOULD
+| Система ДОЛЖНА указывать `processorId` для каждого диагностического сообщения
 |===
 
 == Edge Cases
@@ -633,6 +1078,106 @@ flowchart TD
 | Два pipeline запущены параллельно для одного metadata
 | Независимое выполнение, каждый создаёт свой EffectiveMetadata
 |===
+
+== Gradle Tasks
+
+=== dependangerGenerateEffective
+
+Основная задача для запуска pipeline и генерации EffectiveMetadata.
+
+**Inputs:**
+
+* `metadata.json` (от `dependangerGenerateMetadata`)
+* Настройки из блока `processing { }`
+
+**Outputs:**
+
+* `build/dependanger/effective-{distribution}.json`
+
+**Зависимости:**
+
+* Зависит от `dependangerGenerateMetadata`
+
+=== Связь задач с процессорами
+
+[cols="1,2,2",options="header"]
+|===
+| Gradle Task | Процессоры | Описание
+
+| `dependangerGenerateEffective`
+| Все включённые процессоры
+| Полный pipeline
+
+| `dependangerValidate`
+| profile → metadata-conversion → validation
+| Только валидация
+
+| `dependangerCheckUpdates`
+| profile → metadata-conversion → update-check
+| Проверка обновлений
+
+| `dependangerAnalyze`
+| profile → metadata-conversion → compat-rules → compatibility-analysis
+| Анализ совместимости
+|===
+
+== CLI Commands
+
+CLI команды используют те же процессоры, что и Gradle tasks.
+
+=== Связь команд с процессорами
+
+[cols="1,2,2",options="header"]
+|===
+| CLI Command | Процессоры | Описание
+
+| `dependanger generate`
+| Полный pipeline + генерация
+| Генерация TOML/BOM
+
+| `dependanger validate`
+| validation
+| Валидация metadata.json
+
+| `dependanger check-updates`
+| update-check
+| Проверка обновлений в Maven
+
+| `dependanger analyze`
+| compat-rules, compatibility-analysis
+| Анализ совместимости
+
+| `dependanger security-check`
+| security-check
+| Проверка уязвимостей (OSV API)
+
+| `dependanger license-check`
+| license-check
+| Проверка лицензий
+
+| `dependanger resolve-transitives`
+| transitive-resolver
+| Резолвинг транзитивных зависимостей
+|===
+
+=== Пример использования
+
+[source,bash]
+----
+# Полный pipeline через CLI
+dependanger generate --input metadata.json --output ./build
+
+# Только валидация
+dependanger validate --input metadata.json --strict
+
+# Проверка обновлений
+dependanger check-updates --input metadata.json --json
+
+# Генерация для конкретного distribution
+dependanger generate --distribution backend --input metadata.json
+----
+
+NOTE: Подробное описание CLI команд см. в xref:../03-interfaces/cli.adoc[CLI Interface].
 
 == Связи
 

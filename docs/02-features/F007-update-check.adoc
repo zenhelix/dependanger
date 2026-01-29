@@ -192,6 +192,8 @@ updates.forEach { update ->
 
 == Конфигурация
 
+=== Builder API
+
 [source,kotlin]
 ----
 .withUpdateCheck(
@@ -202,6 +204,22 @@ updates.forEach { update ->
     ),
     timeout = 30.seconds           // Таймаут на запрос
 )
+----
+
+=== Флаг ignoreUpdates
+
+Для исключения конкретной библиотеки из проверки обновлений:
+
+[source,kotlin]
+----
+dependanger {
+    libraries {
+        // Эта библиотека пропускается при проверке обновлений
+        library("legacy-lib", "com.example:legacy:1.0.0") {
+            ignoreUpdates = true
+        }
+    }
+}
 ----
 
 == SPI: UpdateCheckProcessor
@@ -221,19 +239,247 @@ updates.forEach { update ->
 * TTL: 1 час (настраивается)
 * При отсутствии сети используется кеш
 
-== CLI команда
+== CLI Command
+
+=== dependanger check-updates
+
+Проверка доступных обновлений через CLI.
 
 [source,bash]
 ----
-dependanger check-updates [--json] [--include-prerelease]
+dependanger check-updates [options] <input>
+----
+
+**Аргументы:**
+
+[cols="1,2,1",options="header"]
+|===
+| Аргумент | Описание | Default
+
+| `<input>`
+| Путь к `effective-*.json` файлу
+| `effective-metadata.json`
+|===
+
+**Опции:**
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--output`, `-o`
+| Путь для выходного файла (для --format file)
+| `./updates.json`
+
+| `--format`, `-f`
+| Формат вывода: `text`, `json`, `file`
+| `text`
+
+| `--include-prerelease`
+| Включать RC/beta/alpha версии
+| `false`
+
+| `--min-update-type`
+| Минимальный тип: `patch`, `minor`, `major`
+| `patch`
+
+| `--exclude-patterns`
+| Исключить библиотеки по паттерну (через запятую)
+| —
+
+| `--repositories`
+| Репозитории для проверки (через запятую)
+| Maven Central
+
+| `--timeout`
+| Таймаут на запрос (например, `30s`)
+| `30s`
+
+| `--cache-ttl`
+| TTL кеша версий (например, `1h`)
+| `1h`
+
+| `--offline`
+| Использовать только кеш
+| `false`
+
+| `--fail-on`
+| Exit code 1 при: `any`, `major`, `minor`, `none`
+| `none`
+
+| `--parallel`
+| Максимум параллельных запросов
+| `10`
+|===
+
+**Примеры:**
+
+[source,bash]
+----
+# Базовая проверка
+dependanger check-updates effective-metadata.json
+
+# JSON формат
+dependanger check-updates --format json effective-metadata.json
+
+# Сохранение в файл
+dependanger check-updates --format file --output updates.json effective-metadata.json
+
+# Только MINOR и MAJOR
+dependanger check-updates --min-update-type minor effective-metadata.json
+
+# Включая prereleases
+dependanger check-updates --include-prerelease effective-metadata.json
+
+# Fail на MAJOR обновлениях (для CI)
+dependanger check-updates --fail-on major effective-metadata.json
+
+# Исключение определённых библиотек
+dependanger check-updates --exclude-patterns "org.springframework:*,io.ktor:*" effective-metadata.json
+----
+
+**Пример вывода (text):**
+
+[source]
+----
+Checking updates for 15 libraries...
+
+MAJOR updates:
+  ktor-core: 2.3.0 -> 3.0.0
+
+MINOR updates:
+  spring-boot-starter: 3.2.0 -> 3.4.0
+  kotlin-stdlib: 2.1.0 -> 2.1.20
+
+PATCH updates:
+  guava: 33.0.0-jre -> 33.0.1-jre
+
+Summary: 1 major, 2 minor, 1 patch updates available
+----
+
+**Пример вывода (json):**
+
+[source,json]
+----
+{
+  "updates": [
+    {
+      "library": "ktor-core",
+      "group": "io.ktor",
+      "name": "ktor-core",
+      "currentVersion": "2.3.0",
+      "latestStable": "3.0.0",
+      "updateType": "MAJOR",
+      "repository": "https://repo.maven.apache.org/maven2"
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "major": 1,
+    "minor": 2,
+    "patch": 1
+  }
+}
 ----
 
 == Gradle Task
 
+=== dependangerCheckUpdates
+
+Задача проверки обновлений в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+
+**Outputs:**
+
+* `build/dependanger/updates.json` — JSON с результатами
+* Console output — текстовый отчёт
+
+**Опции:**
+
+* `includePrerelease` — включать RC/beta/alpha
+* `minUpdateType` — минимальный тип обновления (`PATCH`, `MINOR`, `MAJOR`)
+* `excludePatterns` — паттерны для исключения
+* `failOnMajorUpdates` — exit code 1 при MAJOR обновлениях
+* `failOnAnyUpdates` — exit code 1 при любых обновлениях
+
 [source,bash]
 ----
+# Базовая проверка
 ./gradlew dependangerCheckUpdates
+
+# С включением prereleases
+./gradlew dependangerCheckUpdates -PincludePrerelease=true
+
+# Fail на MAJOR
+./gradlew dependangerCheckUpdates -PfailOnMajorUpdates=true
 ----
+
+== Settings DSL
+
+Полная конфигурация проверки обновлений в Gradle DSL.
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        updateCheck {
+            // Включение процессора
+            enabled = true  // или через processing { checkUpdates = true }
+
+            // Типы обновлений
+            includePrerelease = false  // default
+            minUpdateType = PATCH  // PATCH, MINOR, MAJOR
+
+            // Фильтрация
+            excludePatterns = listOf(
+                "org.springframework:*",  // все Spring
+                "*:*-internal"  // все internal артефакты
+            )
+
+            // Репозитории
+            repositories {
+                mavenCentral()
+                google()
+                maven("https://nexus.example.com/releases") {
+                    credentials {
+                        username = providers.environmentVariable("NEXUS_USER")
+                        password = providers.environmentVariable("NEXUS_PASSWORD")
+                    }
+                }
+            }
+
+            // Кеширование
+            cache {
+                enabled = true
+                ttl = 1.hours  // default
+                directory = file("~/.dependanger/cache/versions")
+            }
+
+            // Параллелизм
+            parallelism = 10  // max concurrent requests
+
+            // Таймауты
+            timeout = 30.seconds  // per-request timeout
+
+            // CI интеграция
+            failOnMajorUpdates = false  // default
+            failOnMinorUpdates = false  // default
+            failOnAnyUpdates = false  // default
+        }
+    }
+
+    // Или короткая форма через processing
+    processing {
+        checkUpdates = true
+    }
+}
 
 == Функциональные требования
 
@@ -288,6 +534,22 @@ dependanger check-updates [--json] [--include-prerelease]
 | FR-012
 | MAY
 | Система МОЖЕТ определять security-критичные обновления (через OSV API)
+
+| FR-013
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger check-updates`
+
+| FR-014
+| SHOULD
+| Система ДОЛЖНА поддерживать форматы вывода: `text`, `json`, `file`
+
+| FR-015
+| SHOULD
+| Система ДОЛЖНА поддерживать опцию `--fail-on` для интеграции в CI
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА выводить summary статистику (total, major, minor, patch)
 |===
 
 == Edge Cases
@@ -365,5 +627,8 @@ dependanger check-updates [--json] [--include-prerelease]
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 70)
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает update info
+* xref:../03-interfaces/cli.adoc[CLI — команда check-updates]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerCheckUpdates]
+* xref:F010-security-scanning.adoc[F010: Security Scanning] — security-критичные обновления

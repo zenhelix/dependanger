@@ -116,33 +116,98 @@ ____
 | Используется устаревший кеш, WARNING в логе
 |===
 
+=== US-004: Использование через CLI
+
+[quote]
+____
+Как DevOps инженер, я хочу использовать BOM import через CLI, чтобы резолвить версии в CI/CD pipeline без Gradle.
+____
+
+**Acceptance Criteria:**
+
+[cols="1,3,3,3",options="header"]
+|===
+| ID | Given | When | Then
+
+| AC-004-1
+| Metadata JSON с `bomImports` секцией
+| Выполняю `dependanger process --import-boms`
+| Библиотеки без версий получают версии из BOM
+
+| AC-004-2
+| Metadata JSON с `bomImports` секцией, флаг `--import-boms` не указан
+| Выполняю `dependanger process`
+| BOM import не выполняется, версии остаются без изменений
+
+| AC-004-3
+| Опция `--bom-cache-ttl 48h`
+| Выполняю pipeline
+| TTL кеша = 48 часов вместо 24 по умолчанию
+|===
+
 == DSL синтаксис
+
+=== Объявление BOM
 
 [source,kotlin]
 ----
-dsl.bomImports {
-    // Spring Boot BOM - высший приоритет
-    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
+dependanger {
+    bomImports {
+        // Spring Boot BOM - высший приоритет
+        bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
 
-    // Kotlin BOM
-    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+        // Kotlin BOM
+        bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
 
-    // AWS BOM с ссылкой на version alias
-    bom("aws-bom", "software.amazon.awssdk:bom", version = versionRef("aws"))
-}
-
-dsl.libraries {
-    // Версия будет из Spring Boot BOM
-    library("spring-web", "org.springframework:spring-web") {
-        tags("spring", "web")
+        // AWS BOM с ссылкой на version alias
+        bom("aws-bom", "software.amazon.awssdk:bom") {
+            version = versionRef("aws")
+        }
     }
 
-    // Явная версия имеет приоритет над BOM
-    library("jackson-core", "com.fasterxml.jackson.core:jackson-core:2.16.0") {
-        tags("json")
+    libraries {
+        // Версия будет из Spring Boot BOM
+        library("spring-web", "org.springframework:spring-web") {
+            tags("spring", "web")
+        }
+
+        // Явная версия имеет приоритет над BOM
+        library("jackson-core", "com.fasterxml.jackson.core:jackson-core:2.16.0") {
+            tags("json")
+        }
     }
 }
 ----
+
+=== Включение процессора
+
+BOM Import — опциональный процессор.
+Включение через блок `processing {}`:
+
+[source,kotlin]
+----
+dependanger {
+    bomImports {
+        bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0")
+    }
+
+    processing {
+        // Property-style
+        importBoms = true
+    }
+}
+----
+
+Или через builder API:
+
+[source,kotlin]
+----
+Dependanger.fromDsl { ... }
+    .withBomImport()  // Builder-style
+    .build()
+----
+
+NOTE: Без явного включения (`importBoms = true` или `withBomImport()`) процессор не выполняется, даже если `bomImports {}` объявлен.
 
 == Функциональные требования
 
@@ -181,6 +246,22 @@ dsl.libraries {
 | FR-008
 | MUST
 | В strict mode система ДОЛЖНА завершаться с ERROR при неразрешённой версии
+
+| FR-009
+| MUST
+| Система ДОЛЖНА поддерживать включение процессора через CLI флаг `--import-boms`
+
+| FR-010
+| SHOULD
+| Система ДОЛЖНА поддерживать настройку TTL кеша через CLI опцию `--bom-cache-ttl`
+
+| FR-011
+| SHOULD
+| Система ДОЛЖНА поддерживать настройку репозиториев для скачивания BOM
+
+| FR-012
+| MAY
+| Система МОЖЕТ поддерживать проверку подписи BOM (GPG verification)
 |===
 
 == Поведение
@@ -387,10 +468,127 @@ val result = Dependanger.fromDsl {
 // spring-web будет иметь версию из Spring Boot BOM
 ----
 
+== CLI Command
+
+=== dependanger process --import-boms
+
+Включение BOM import при обработке через CLI.
+
+[source,bash]
+----
+dependanger process --import-boms [options] <input>
+----
+
+**Опции:**
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--import-boms`
+| Включить BOM import процессор
+| `false`
+
+| `--bom-cache-ttl`
+| TTL кеша BOM (например, `24h`, `1d`, `30m`)
+| `24h`
+
+| `--bom-cache-dir`
+| Директория для кеша BOM
+| `~/.dependanger/cache/bom`
+
+| `--offline`
+| Работать только с кешем, без сетевых запросов
+| `false`
+
+| `--insecure-hosts`
+| Хосты с невалидными сертификатами (через запятую)
+| —
+
+| `--strict`
+| Strict mode: ошибка при неразрешённых версиях
+| `false`
+|===
+
+**Примеры:**
+
+[source,bash]
+----
+# Базовый импорт
+dependanger process --import-boms metadata.json
+
+# С кастомным TTL
+dependanger process --import-boms --bom-cache-ttl 48h metadata.json
+
+# Offline режим
+dependanger process --import-boms --offline metadata.json
+
+# Strict mode
+dependanger process --import-boms --strict metadata.json
+----
+
+== Gradle Task
+
+BOM import выполняется как часть `dependangerGenerateEffective` задачи при включённом процессоре.
+
+[source,bash]
+----
+# Полный pipeline с BOM import
+./gradlew dependangerGenerateEffective
+
+# Только если processing { importBoms = true }
+----
+
+== Settings DSL
+
+Полная конфигурация BOM import в Gradle DSL.
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        // Кеширование BOM
+        bomCache {
+            enabled = true  // default: true
+            directory = file("~/.dependanger/cache/bom")  // default
+            ttl = 24.hours  // default: 24 часа
+            ttlSnapshot = 1.hours  // TTL для SNAPSHOT версий
+        }
+
+        // Репозитории для скачивания BOM
+        repositories {
+            maven {
+                url = "https://repo.maven.apache.org/maven2"
+            }
+            maven {
+                url = "https://nexus.example.com/repository/releases"
+                credentials {
+                    username = providers.environmentVariable("NEXUS_USER")
+                    password = providers.environmentVariable("NEXUS_PASSWORD")
+                }
+            }
+        }
+
+        // Хосты с невалидными сертификатами (для тестовых окружений)
+        insecureHosts = listOf("nexus.local")
+
+        // Таймауты
+        networkTimeout {
+            connect = 30.seconds  // default
+            read = 60.seconds  // default
+        }
+
+        // Strict mode
+        strictVersionResolution = false  // default
+    }
+}
+----
+
 == Кеширование
 
 * BOM файлы кешируются в `~/.dependanger/cache/bom/`
 * TTL кеша: 24 часа (настраивается через `settings { bomCache { ttl = 48.hours } }`)
+* TTL для SNAPSHOT версий: 1 час (настраивается через `ttlSnapshot`)
 * При отсутствии сети используется кеш с WARNING в логе
 * Кеш инвалидируется при изменении версии BOM
 
@@ -403,6 +601,8 @@ val result = Dependanger.fromDsl {
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 15)
 * xref:../01-concepts/domain-model.adoc#bom-import[Доменная модель — BomImport] — сущность BomImport
 * xref:F001-registry-dsl.adoc#bom-imports[F001: Registry DSL — блок bomImports] — DSL синтаксис
+* xref:../03-interfaces/cli.adoc[CLI — команда process --import-boms]
+* xref:../03-interfaces/gradle-plugin.adoc#processing-block[Gradle Plugin — блок processing]

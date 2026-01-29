@@ -535,25 +535,91 @@ ERROR: Critical vulnerabilities found. Fix before deploying.
 
 === dependangerSecurityCheck
 
-Задача проверки уязвимостей.
+Задача проверки уязвимостей в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+
+**Outputs:**
+
+* `build/dependanger/security-report.json` — JSON отчёт
+* Console output — текстовый отчёт
+
+**Опции:**
+
+* `minSeverity` — минимальный severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`)
+* `minCvssScore` — минимальный CVSS score
+* `failOnCritical`, `failOnHigh` — fail при уязвимостях
+* `ignoreCves`, `ignoreLibraries` — списки для игнорирования
+* `includeTransitives` — проверять транзитивные зависимости
 
 [source,bash]
 ----
+# Базовая проверка
 ./gradlew dependangerSecurityCheck
+
+# Fail при CRITICAL
+./gradlew dependangerSecurityCheck -PfailOnCritical=true
+
+# Только CRITICAL и HIGH
+./gradlew dependangerSecurityCheck -PminSeverity=HIGH
 ----
 
-Результат: `build/dependanger/security-report.json`
+== Settings DSL
 
-=== Конфигурация в build.gradle.kts
+Полная конфигурация проверки безопасности в Gradle DSL.
 
 [source,kotlin]
 ----
 dependanger {
-    security {
-        minSeverity = "high"
-        failOnCritical = true
-        failOnHigh = false
-        ignoreCves = listOf("CVE-2023-ACCEPTED")
+    settings {
+        securityCheck {
+            // Включение процессора
+            enabled = true  // или через processing { checkSecurity = true }
+
+            // Фильтрация
+            minSeverity = HIGH  // CRITICAL, HIGH, MEDIUM, LOW
+            minCvssScore = 7.0  // 0.0 - 10.0
+
+            // Fail условия
+            failOnCritical = false  // default
+            failOnHigh = false  // default
+
+            // Игнорирование
+            ignoreCves = listOf(
+                "CVE-2023-ACCEPTED",
+                "CVE-2023-KNOWN-RISK"
+            )
+            ignoreLibraries = listOf("internal-test-lib")
+
+            // Транзитивные зависимости
+            includeTransitives = false  // требует F012
+
+            // Кеширование
+            cache {
+                enabled = true
+                ttl = 24.hours  // default
+                directory = file("~/.dependanger/cache/security")
+            }
+
+            // Сеть
+            timeout = 30.seconds
+            retries = 3
+            batchSize = 1000  // OSV API batch limit
+
+            // Отчёт
+            includeIgnoredInReport = true  // показывать ignoredVulnerabilities
+        }
+    }
+
+    // Или короткая форма через processing
+    processing {
+        checkSecurity = true
     }
 }
 ----
@@ -659,6 +725,18 @@ dependanger {
 | FR-014
 | MAY
 | Система МОЖЕТ проверять транзитивные зависимости при `includeTransitives = true` (требует xref:F012-transitive-resolution.adoc[F012])
+
+| FR-015
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger security-check`
+
+| FR-016
+| SHOULD
+| Система ДОЛЖНА поддерживать форматы вывода: `text`, `json`
+
+| FR-017
+| SHOULD
+| Система ДОЛЖНА выводить summary со статистикой по severity уровням
 |===
 
 == Edge Cases
@@ -744,8 +822,10 @@ dependanger {
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 80)
 * xref:F007-update-check.adoc[F007: Update Check] — дополняет информацией о версиях
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает vulnerabilities info
 * xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — для проверки транзитивных
+* xref:../03-interfaces/cli.adoc[CLI — команда security-check]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerSecurityCheck]
 * https://osv.dev/docs/[OSV API Documentation]

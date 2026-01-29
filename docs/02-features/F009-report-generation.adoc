@@ -493,21 +493,175 @@ result.writeReportTo(Path.of("dependanger-report.json"))
 }
 ----
 
-== CLI команда
+== CLI Command
+
+=== dependanger report
+
+Генерация отчёта через CLI.
 
 [source,bash]
 ----
-dependanger report [--output=report.json] [--include-updates] [--include-compatibility]
+dependanger report [options] <input>
+----
+
+**Аргументы:**
+
+[cols="1,2,1",options="header"]
+|===
+| Аргумент | Описание | Default
+
+| `<input>`
+| Путь к `effective-*.json` файлу
+| `effective-metadata.json`
+|===
+
+**Опции:**
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--output`, `-o`
+| Путь для выходного файла
+| `./dependanger-report.json`
+
+| `--format`, `-f`
+| Формат вывода: `json`, `yaml`, `markdown`
+| `json`
+
+| `--include-updates`
+| Включить секцию updates
+| `true`
+
+| `--include-compatibility`
+| Включить секцию compatibility
+| `true`
+
+| `--include-vulnerabilities`
+| Включить секцию vulnerabilities
+| `true`
+
+| `--include-licenses`
+| Включить секцию licenses
+| `true`
+
+| `--include-transitives`
+| Включить секцию transitives
+| `true`
+
+| `--include-deprecated`
+| Включить секцию deprecated
+| `true`
+
+| `--summary-only`
+| Только summary (без детальных секций)
+| `false`
+
+| `--pretty`
+| Pretty-print JSON (с отступами)
+| `true`
+|===
+
+**Примеры:**
+
+[source,bash]
+----
+# Полный отчёт
+dependanger report effective-metadata.json
+
+# Только summary
+dependanger report --summary-only effective-metadata.json
+
+# YAML формат
+dependanger report --format yaml --output report.yaml effective-metadata.json
+
+# Без транзитивных зависимостей
+dependanger report --include-transitives=false effective-metadata.json
+
+# Кастомный путь
+dependanger report --output /path/to/report.json effective-metadata.json
 ----
 
 == Gradle Task
 
+=== dependangerReport
+
+Задача генерации отчёта в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+* `dependangerCheckUpdates` — если включены updates (опционально)
+* `dependangerAnalyze` — если включена compatibility (опционально)
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+* `updates.json` от `dependangerCheckUpdates` (если есть)
+* `compatibility.json` от `dependangerAnalyze` (если есть)
+* `ProcessingDiagnostics` из pipeline
+
+**Outputs:**
+
+* `build/dependanger/dependanger-report.json` — JSON отчёт
+* (опционально) `build/dependanger/dependanger-report.yaml`
+* (опционально) `build/dependanger/dependanger-report.md`
+
+**Опции:**
+
+* `format` — формат вывода (`json`, `yaml`, `markdown`)
+* `includeUpdates`, `includeCompatibility`, `includeVulnerabilities`, `includeLicenses`, `includeTransitives`, `includeDeprecated` — секции для включения
+* `summaryOnly` — только summary
+* `prettyPrint` — форматирование JSON
+
 [source,bash]
 ----
+# Базовая генерация
 ./gradlew dependangerReport
+
+# Только summary
+./gradlew dependangerReport -PsummaryOnly=true
+
+# YAML формат
+./gradlew dependangerReport -Pformat=yaml
 ----
 
-Результат: `build/dependanger/dependanger-report.json`
+== Settings DSL
+
+Полная конфигурация генерации отчёта в Gradle DSL.
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        report {
+            // Выходной файл
+            filename = "dependanger-report.json"  // default
+            format = JSON  // JSON, YAML, MARKDOWN
+
+            // Секции для включения
+            includeUpdates = true  // default
+            includeCompatibility = true  // default
+            includeVulnerabilities = true  // default
+            includeLicenses = true  // default
+            includeTransitives = true  // default
+            includeDeprecated = true  // default
+            includeValidation = true  // default
+
+            // Краткий режим
+            summaryOnly = false  // default
+
+            // Форматирование
+            prettyPrint = true  // default
+            indent = "  "  // default: 2 spaces
+
+            // Метаданные
+            includeGeneratedAt = true  // default
+            includeSchemaVersion = true  // default
+        }
+    }
+}
+----
 
 == Интеграции
 
@@ -643,6 +797,22 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 | FR-020
 | MAY
 | Система МОЖЕТ включать секцию `constraints` со списком определённых constraints
+
+| FR-021
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger report`
+
+| FR-022
+| SHOULD
+| Система ДОЛЖНА поддерживать опции для включения/исключения секций
+
+| FR-023
+| SHOULD
+| Система ДОЛЖНА поддерживать опцию `--pretty` для форматирования JSON
+
+| FR-024
+| SHOULD
+| Система ДОЛЖНА использовать atomic write для предотвращения частичных файлов
 |===
 
 == Edge Cases
@@ -764,3 +934,5 @@ dependanger report [--output=report.json] [--include-updates] [--include-compati
 * xref:F010-security-scanning.adoc[F010: Security Scanning] — данные об уязвимостях
 * xref:F011-license-compliance.adoc[F011: License Compliance] — данные о лицензиях
 * xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — данные о транзитивных зависимостях
+* xref:../03-interfaces/cli.adoc[CLI — команда report]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerReport]

@@ -164,37 +164,44 @@ ____
 
 [source,kotlin]
 ----
-dsl.compatibility {
-    // Требование к JDK
-    jdkRequirement("spring-jdk17") {
-        matches = "org.springframework:*"
-        minJdk = 17
-        message = "Spring 6.x requires JDK 17+"
-        severity = ERROR
-    }
-    
-    // Взаимоисключающие библиотеки
-    mutualExclusion("json-libs") {
-        libraries("jackson-core", "gson")
-        severity = WARNING
-        message = "Consider using only one JSON library"
-    }
-    
-    // Требование одинаковых версий
-    versionConstraint("kotlin-sync") {
-        libraries("kotlin-stdlib", "kotlin-reflect", "kotlinx-coroutines-core")
-        constraint = SAME_MAJOR_MINOR
-        message = "Kotlin libraries should use compatible versions"
-    }
-    
-    // Кастомное правило
-    customRule("spring-boot-kotlin") {
-        condition = { ctx ->
-            ctx.hasLibrary("spring-boot-starter") && 
-            ctx.kotlinVersion?.let { it < "1.9" } == true
+dependanger {
+    compatibility {
+        // Требование к JDK
+        jdkRequirement("spring-jdk17") {
+            matches = "org.springframework:*"
+            minJdk = 17
+            message = "Spring 6.x requires JDK 17+"
+            severity = ERROR
         }
-        message = "Spring Boot 3.x works best with Kotlin 1.9+"
-        severity = INFO
+
+        // Взаимоисключающие библиотеки
+        mutualExclusion("json-libs") {
+            libraries("jackson-core", "gson")
+            severity = WARNING
+            message = "Consider using only one JSON library"
+        }
+
+        // Требование одинаковых версий
+        versionConstraint("kotlin-sync") {
+            libraries("kotlin-stdlib", "kotlin-reflect", "kotlinx-coroutines-core")
+            constraint = SAME_MAJOR_MINOR
+            message = "Kotlin libraries should use compatible versions"
+        }
+
+        // Кастомное правило
+        customRule("spring-boot-kotlin") {
+            condition = { ctx ->
+                ctx.hasLibrary("spring-boot-starter") &&
+                ctx.kotlinVersion?.let { it < "1.9" } == true
+            }
+            message = "Spring Boot 3.x works best with Kotlin 1.9+"
+            severity = INFO
+        }
+    }
+
+    // Включение процессора
+    processing {
+        analyzeCompatibility = true
     }
 }
 ----
@@ -311,6 +318,22 @@ NOTE: Правила проверяются только против **effectiv
 | FR-011
 | MAY
 | Система МОЖЕТ автоматически определять известные несовместимости (встроенные правила)
+
+| FR-012
+| MUST
+| Система ДОЛЖНА поддерживать CLI команду `dependanger analyze`
+
+| FR-013
+| SHOULD
+| Система ДОЛЖНА поддерживать форматы вывода: `text`, `json`, `file`
+
+| FR-014
+| SHOULD
+| Система ДОЛЖНА поддерживать опцию `--strict` для CI интеграции
+
+| FR-015
+| SHOULD
+| Система ДОЛЖНА выводить summary статистику по severity уровням
 |===
 
 == Edge Cases
@@ -384,18 +407,183 @@ NOTE: Правила проверяются только против **effectiv
 | Pipeline продолжается, WARNING накапливаются
 |===
 
-== CLI команда
+== CLI Command
+
+=== dependanger analyze
+
+Проверка совместимости через CLI.
 
 [source,bash]
 ----
-dependanger analyze [--target-jdk=17] [--json]
+dependanger analyze [options] <input>
+----
+
+**Аргументы:**
+
+[cols="1,2,1",options="header"]
+|===
+| Аргумент | Описание | Default
+
+| `<input>`
+| Путь к `effective-*.json` файлу
+| `effective-metadata.json`
+|===
+
+**Опции:**
+
+[cols="1,2,1",options="header"]
+|===
+| Опция | Описание | Default
+
+| `--output`, `-o`
+| Путь для выходного файла (для --format file)
+| `./compatibility.json`
+
+| `--format`, `-f`
+| Формат вывода: `text`, `json`, `file`
+| `text`
+
+| `--target-jdk`
+| Целевая версия JDK для проверки
+| (обязательный для jdkRequirement)
+
+| `--target-kotlin`
+| Целевая версия Kotlin для проверки
+| —
+
+| `--strict`
+| Exit code 1 при любых ERROR
+| `false`
+
+| `--min-severity`
+| Минимальный уровень: `info`, `warning`, `error`
+| `info`
+
+| `--rules`
+| Путь к файлу с правилами (если не в metadata)
+| —
+|===
+
+**Примеры:**
+
+[source,bash]
+----
+# Базовый анализ
+dependanger analyze --target-jdk 17 effective-metadata.json
+
+# JSON формат
+dependanger analyze --target-jdk 17 --format json effective-metadata.json
+
+# Strict mode (для CI)
+dependanger analyze --target-jdk 17 --strict effective-metadata.json
+
+# Только ERROR и WARNING
+dependanger analyze --target-jdk 17 --min-severity warning effective-metadata.json
+----
+
+**Пример вывода (text):**
+
+[source]
+----
+Analyzing compatibility for 15 libraries...
+
+ERRORS:
+  [spring-jdk17] Spring 6.x requires JDK 17+
+    Affected: spring-web, spring-data-jpa
+    Suggestion: Upgrade to JDK 17 or use Spring 5.x
+
+WARNINGS:
+  [json-libs] Consider using only one JSON library
+    Affected: jackson-core, gson
+
+INFO:
+  [spring-boot-kotlin] Spring Boot 3.x works best with Kotlin 1.9+
+    Affected: spring-boot-starter
+
+Summary: 1 error, 1 warning, 1 info
 ----
 
 == Gradle Task
 
+=== dependangerAnalyze
+
+Задача анализа совместимости в Gradle.
+
+**Зависимости:**
+
+* `dependangerGenerateEffective` — требуется EffectiveMetadata
+
+**Inputs:**
+
+* `effective-\{distribution\}.json` от `dependangerGenerateEffective`
+* Правила из `compatibility { }` блока DSL
+
+**Outputs:**
+
+* `build/dependanger/compatibility.json` — JSON с результатами
+* Console output — текстовый отчёт
+
+**Опции:**
+
+* `targetJdk` — целевая версия JDK
+* `targetKotlin` — целевая версия Kotlin
+* `minSeverity` — минимальный уровень severity (`INFO`, `WARNING`, `ERROR`)
+* `failOnError` — exit code 1 при ERROR issues
+
 [source,bash]
 ----
+# Базовый анализ
 ./gradlew dependangerAnalyze
+
+# С указанием JDK
+./gradlew dependangerAnalyze -PtargetJdk=17
+
+# Strict mode
+./gradlew dependangerAnalyze -PfailOnError=true
+----
+
+== Settings DSL
+
+Полная конфигурация анализа совместимости в Gradle DSL.
+
+[source,kotlin]
+----
+dependanger {
+    settings {
+        compatibilityAnalysis {
+            // Включение процессора
+            enabled = true  // или через processing { analyzeCompatibility = true }
+
+            // Целевое окружение
+            targetJdk = 17
+            targetKotlin = "2.1.0"
+            targetGradle = "8.5"
+
+            // Фильтрация результатов
+            minSeverity = INFO  // INFO, WARNING, ERROR
+
+            // CI интеграция
+            failOnError = false  // default
+            failOnWarning = false  // default
+
+            // Встроенные правила
+            enableBuiltinRules = true  // default
+
+            // Настройки отчёта
+            includePassedRules = false  // показывать правила которые прошли
+            groupBySeverity = true  // группировать по severity
+        }
+    }
+
+    // Или короткая форма через processing
+    processing {
+        analyzeCompatibility {
+            enabled = true
+            targetJdk = 17
+            failOnErrors = true
+        }
+    }
+}
 ----
 
 == Связи
@@ -406,6 +594,9 @@ dependanger analyze [--target-jdk=17] [--json]
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 75)
 * xref:../01-concepts/domain-model.adoc[CompatibilityRule] — определение правил
+* xref:F001-registry-dsl.adoc[F001: Registry DSL — блок compatibility]
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает compatibility issues
+* xref:../03-interfaces/cli.adoc[CLI — команда analyze]
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerAnalyze]

@@ -134,6 +134,10 @@ val metadata = json.decodeFromString<DependangerMetadata>(jsonString)
 * Формат JSON выбран как основной формат обмена данными
 * SPI `SerializationFormat<T>` позволяет подключать альтернативные форматы
 
+== Связанные фичи
+
+* xref:../02-features/F002-metadata-serialization.adoc[F002 Metadata Serialization] — реализация сериализации через SerializationFormat SPI
+
 == Ссылки
 
 * https://github.com/Kotlin/kotlinx.serialization[kotlinx.serialization GitHub]

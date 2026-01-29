@@ -495,7 +495,7 @@ dependanger process [OPTIONS]
 
 | `--distribution`
 | `-d`
-| Активный distribution profile
+| Активный Distribution
 |
 
 | `--import-boms`

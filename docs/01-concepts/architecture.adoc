@@ -504,6 +504,51 @@ META-INF/services/
 └── io.github.zenhelix.dependanger.generator.spi.ArtifactGenerator
 ----
 
+=== Пример: создание кастомного процессора с ServiceLoader
+
+**1. Реализация интерфейса:**
+
+[source,kotlin]
+----
+// my-processor/src/main/kotlin/MyProcessor.kt
+package com.example
+
+class MyCustomProcessor : EffectiveMetadataProcessor {
+    override val name = "my-custom"
+    override val order = 90
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext
+    ): EffectiveMetadata {
+        // Логика обработки
+        return metadata
+    }
+}
+----
+
+**2. Регистрация в ServiceLoader:**
+
+[source]
+----
+// my-processor/src/main/resources/META-INF/services/
+// io.github.zenhelix.dependanger.effective.spi.EffectiveMetadataProcessor
+
+com.example.MyCustomProcessor
+----
+
+**3. Подключение модуля:**
+
+[source,kotlin]
+----
+// build.gradle.kts
+dependencies {
+    runtimeOnly("com.example:my-processor:1.0.0")
+}
+----
+
+После добавления модуля в classpath, система автоматически обнаружит и подключит `MyCustomProcessor` в pipeline.
+
 == Программное использование
 
 === Базовое использование

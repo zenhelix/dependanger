@@ -27,7 +27,7 @@
 Processing Pipeline выполняет многоэтапную обработку метаданных:
 
 * Резолвинг версий (из alias, BomImport, Maven)
-* Применение фильтров (distribution profile)
+* Применение фильтров (Distribution)
 * Валидация
 * Опциональные проверки (updates, compatibility)
 
@@ -554,7 +554,7 @@ ____
 
 | 5
 | `profile`
-| Применение distribution profile
+| Применение Distribution
 | ❌
 | —
 
@@ -744,7 +744,7 @@ dependanger {
 * `jdkVersion` — версия JDK (для условий fallback)
 * `kotlinVersion` — версия Kotlin (опционально)
 * `gradleVersion` — версия Gradle (опционально)
-* `distributionProfile` — активный distribution profile
+* `distributionProfile` — активный Distribution
 * `environment` — переменные окружения
 * `strictVersionResolution` — режим строгой резолюции версий
 * `enabledProcessors` / `disabledProcessors` — управление процессорами
@@ -917,7 +917,7 @@ flowchart TD
 
 | FR-005
 | MUST
-| Система ДОЛЖНА фильтровать библиотеки согласно активному distribution profile
+| Система ДОЛЖНА фильтровать библиотеки согласно активному Distribution
 
 | FR-006
 | MUST
@@ -1016,7 +1016,7 @@ flowchart TD
 
 | Несуществующий distribution
 | Запрос генерации для `distribution = "unknown"`
-| ERROR: "Unknown distribution profile 'unknown'"
+| ERROR: "Unknown Distribution 'unknown'"
 
 | Дубликат processorId
 | Два процессора с одинаковым `processorId`

@@ -42,9 +42,9 @@ Dependanger предлагает:
 
 * Единое место для определения всех зависимостей через Kotlin DSL
 * Описания, теги, информация о совместимости для каждой библиотеки
-* Версии с условными fallback (JDK версия, Kotlin версия, distribution profile)
+* Версии с условными fallback (JDK версия, Kotlin версия, Distribution)
 
-**Ролевые бандлы и distribution profiles**
+**Ролевые бандлы и Distributions**
 
 * **Bundles** — именованные группы библиотек (`kotlin-core`, `spring-web`)
 * **Distributions** — профили генерации с фильтрацией (`android`, `backend`, `minimal`)
@@ -130,6 +130,9 @@ Pipeline выполняет: резолвинг версий, импорт из 
 
 | BomImport
 | Импорт версий из внешнего Maven BOM/Platform (Spring Boot BOM, Kotlin BOM).
+
+| Platform Library
+| Библиотека типа BOM для экспорта в TOML с `type=pom`. Потребители подключают через `platform()`.
 
 | TargetPlatform
 | Целевая платформа с ограничениями (JDK version, Kotlin targets).

@@ -1133,7 +1133,7 @@ NOTE: Команда соответствует DSL блоку `bomImports { bom
 
 === add-distribution
 
-Добавить новый distribution profile в metadata.
+Добавить новый Distribution в metadata.
 
 [source,bash]
 ----

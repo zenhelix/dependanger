@@ -76,69 +76,57 @@ flowchart TD
 
 == Карта фич
 
-[cols="1,3,1,1",options="header"]
+[cols="1,4,1",options="header"]
 |===
-| ID | Название | Приоритет | Статус
+| ID | Название | Приоритет
 
 | xref:F001-registry-dsl.adoc[F001]
 | Registry DSL — Kotlin DSL для определения libraries, plugins, bundles, versions, bomImports, targetPlatforms, distributions, compatibility, settings
 | P1
-| 🔴 Не начат
 
 | xref:F002-metadata-serialization.adoc[F002]
 | Metadata Serialization — сериализация в metadata.json через SerializationFormat SPI
 | P1
-| 🔴 Не начат
 
 | xref:F003-processing-pipeline.adoc[F003]
 | Processing Pipeline — многоэтапная обработка через процессоры
 | P1
-| 🟢 Готов
 
 | xref:F004-toml-generation.adoc[F004]
 | TOML Generation — генерация Gradle Version Catalog
 | P1
-| 🔴 Не начат
 
 | xref:F005-bom-generation.adoc[F005]
 | BOM Generation — генерация Maven BOM
 | P2
-| 🔴 Не начат
 
 | xref:F006-bom-import.adoc[F006]
 | BOM Import — импорт версий из внешних Maven BOM/Platform
 | P2
-| 🔴 Не начат
 
 | xref:F007-update-check.adoc[F007]
 | Update Check — проверка доступных обновлений в Maven репозиториях
 | P3
-| 🔴 Не начат
 
 | xref:F008-compatibility-analysis.adoc[F008]
 | Compatibility Analysis — анализ совместимости на основе правил
 | P3
-| 🔴 Не начат
 
 | xref:F009-report-generation.adoc[F009]
 | Report Generation — единый JSON отчёт о зависимостях
 | P3
-| 🔴 Не начат
 
 | xref:F010-security-scanning.adoc[F010]
 | Security Scanning — проверка уязвимостей (CVE) через OSV API
 | P3
-| 🔴 Не начат
 
 | xref:F011-license-compliance.adoc[F011]
 | License Compliance — проверка лицензий через Maven POM / ClearlyDefined API
 | P3
-| 🔴 Не начат
 
 | xref:F012-transitive-resolution.adoc[F012]
 | Transitive Resolution — резолвинг транзитивных зависимостей и constraints
 | P4
-| 🔴 Не начат
 |===
 
 == Матрица приоритетов

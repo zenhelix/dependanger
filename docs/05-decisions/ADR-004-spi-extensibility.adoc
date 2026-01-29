@@ -277,6 +277,13 @@ interface NewFeatureProcessor : EffectiveMetadataProcessor
 * xref:ADR-002-pipeline-architecture.adoc[ADR-002] — `EffectiveMetadataProcessor` реализует pipeline через SPI
 * Multi-module architecture позволяет изолировать реализации
 
+== Связанные фичи
+
+* xref:../02-features/F002-metadata-serialization.adoc[F002 Metadata Serialization] — `SerializationFormat` SPI
+* xref:../02-features/F003-processing-pipeline.adoc[F003 Processing Pipeline] — `EffectiveMetadataProcessor` SPI
+* xref:../02-features/F004-toml-generation.adoc[F004 TOML Generation] — `ArtifactGenerator` SPI
+* xref:../02-features/F005-bom-generation.adoc[F005 BOM Generation] — `ArtifactGenerator` SPI
+
 == Ссылки
 
 * xref:../01-concepts/architecture.adoc[Архитектура] — описание модулей и SPI

@@ -1560,7 +1560,7 @@ val json = SerializationFormat.JSON.write(metadata)
 1. **Валидация DSL** — проверка уникальности alias, существования ссылок, отсутствия циклов
 2. **Применение пресетов** — если вызван `applyPreset()`, настройки мержатся
 3. **Создание Metadata** — все сущности конвертируются в сериализуемые DTO
-4. **НЕ резолвятся версии** — резолвинг происходит позже в Processing Pipeline
+4. **НЕ резолвятся версии** — резолвинг происходит позже в xref:F003-processing-pipeline.adoc[Processing Pipeline]
 
 NOTE: `processing { }` блок **НЕ сериализуется** в metadata.json.
 Это runtime-only конфигурация.

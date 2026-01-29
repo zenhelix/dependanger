@@ -171,7 +171,7 @@ ____
 | AC-004-3
 | Deprecated библиотека с `removalVersion = "2.0.0"`
 | Читаю metadata, текущая версия каталога = "2.1.0"
-| Processing Pipeline сгенерирует ERROR (не сериализация)
+| xref:F003-processing-pipeline.adoc[Processing Pipeline] сгенерирует ERROR (не сериализация)
 
 | AC-004-4
 | Deprecated библиотека только с `message` (без `replacedBy`)
@@ -648,11 +648,11 @@ NOTE: `bomImports` и `targetPlatforms` — это разные сущности
 | Список отключённых процессоров — runtime настройка
 
 | Resolved versions
-| Резолвинг версий происходит в Processing Pipeline, не на этапе сериализации
+| Резолвинг версий происходит в xref:F003-processing-pipeline.adoc[Processing Pipeline], не на этапе сериализации
 |===
 
 IMPORTANT: `metadata.json` хранит **декларативное описание** зависимостей.
-Все runtime решения (какие процессоры включить, какую версию использовать) принимаются позже в Processing Pipeline.
+Все runtime решения (какие процессоры включить, какую версию использовать) принимаются позже в xref:F003-processing-pipeline.adoc[Processing Pipeline].
 
 === Пример: DSL vs Metadata
 

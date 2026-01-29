@@ -480,6 +480,7 @@ dependanger {
         checkUpdates = true
     }
 }
+----
 
 == Функциональные требования
 

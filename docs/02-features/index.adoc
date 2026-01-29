@@ -147,33 +147,33 @@ flowchart TD
 
 Без этих фич продукт не имеет ценности.
 
-* **F001: Registry DSL** — основа всей системы, Kotlin DSL (включая settings)
-* **F002: Metadata Serialization** — промежуточное хранение
-* **F003: Processing Pipeline** — трансформация данных
-* **F004: TOML Generation** — основной выходной формат
+* **xref:F001-registry-dsl.adoc[F001: Registry DSL]** — основа всей системы, Kotlin DSL (включая settings)
+* **xref:F002-metadata-serialization.adoc[F002: Metadata Serialization]** — промежуточное хранение
+* **xref:F003-processing-pipeline.adoc[F003: Processing Pipeline]** — трансформация данных
+* **xref:F004-toml-generation.adoc[F004: TOML Generation]** — основной выходной формат
 
 === P2 — Важно
 
 Значительно увеличивают ценность, но MVP возможен и без них.
 
-* **F005: BOM Generation** — выходной формат для Maven
-* **F006: BOM Import** — импорт версий из Spring BOM, Kotlin BOM и др.
+* **xref:F005-bom-generation.adoc[F005: BOM Generation]** — выходной формат для Maven
+* **xref:F006-bom-import.adoc[F006: BOM Import]** — импорт версий из Spring BOM, Kotlin BOM и др.
 
 === P3 — Желательно
 
 Улучшают user experience, но не критичны.
 
-* **F007: Update Check** — проверка обновлений
-* **F008: Compatibility Analysis** — анализ совместимости
-* **F009: Report Generation** — единый отчёт
-* **F010: Security Scanning** — проверка уязвимостей (CVE)
-* **F011: License Compliance** — проверка лицензий
+* **xref:F007-update-check.adoc[F007: Update Check]** — проверка обновлений
+* **xref:F008-compatibility-analysis.adoc[F008: Compatibility Analysis]** — анализ совместимости
+* **xref:F009-report-generation.adoc[F009: Report Generation]** — единый отчёт
+* **xref:F010-security-scanning.adoc[F010: Security Scanning]** — проверка уязвимостей (CVE)
+* **xref:F011-license-compliance.adoc[F011: License Compliance]** — проверка лицензий
 
 === P4 — Будущее
 
 Фичи для будущих версий.
 
-* **F012: Transitive Resolution** — резолвинг транзитивных зависимостей и constraints
+* **xref:F012-transitive-resolution.adoc[F012: Transitive Resolution]** — резолвинг транзитивных зависимостей и constraints
 
 == Зависимости между фичами
 
@@ -204,51 +204,51 @@ flowchart LR
 |===
 | Фича | Зависит от | Блокирует
 
-| F001 Registry DSL
+| xref:F001-registry-dsl.adoc[F001 Registry DSL]
 | —
 | F002
 
-| F002 Metadata Serialization
+| xref:F002-metadata-serialization.adoc[F002 Metadata Serialization]
 | F001
 | F003
 
-| F003 Processing Pipeline
+| xref:F003-processing-pipeline.adoc[F003 Processing Pipeline]
 | F002
 | F004, F005, F006, F007, F008, F009
 
-| F004 TOML Generation
+| xref:F004-toml-generation.adoc[F004 TOML Generation]
 | F003
 | —
 
-| F005 BOM Generation
+| xref:F005-bom-generation.adoc[F005 BOM Generation]
 | F003
 | —
 
-| F006 BOM Import
+| xref:F006-bom-import.adoc[F006 BOM Import]
 | F003 (как процессор)
 | —
 
-| F007 Update Check
+| xref:F007-update-check.adoc[F007 Update Check]
 | F003 (как процессор)
 | —
 
-| F008 Compatibility Analysis
+| xref:F008-compatibility-analysis.adoc[F008 Compatibility Analysis]
 | F003 (как процессор)
 | —
 
-| F009 Report Generation
+| xref:F009-report-generation.adoc[F009 Report Generation]
 | F003
 | —
 
-| F010 Security Scanning
+| xref:F010-security-scanning.adoc[F010 Security Scanning]
 | F003 (как процессор)
 | —
 
-| F011 License Compliance
+| xref:F011-license-compliance.adoc[F011 License Compliance]
 | F003 (как процессор)
 | —
 
-| F012 Transitive Resolution
+| xref:F012-transitive-resolution.adoc[F012 Transitive Resolution]
 | F003 (как процессор)
 | — (расширяет F010, F011)
 |===

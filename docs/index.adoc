@@ -23,11 +23,14 @@
 | xref:03-interfaces/index.adoc[03. Интерфейсы]
 | Gradle Plugin, CLI, API — точки входа в систему
 
-| xref:04-nfr.adoc[04. Нефункциональные требования]
-| Производительность, масштабируемость, безопасность
+| xref:04-appendix/index.adoc[04. Приложения]
+| Нефункциональные требования, справочные материалы
 
 | xref:05-decisions/index.adoc[05. Архитектурные решения]
 | ADR (Architecture Decision Records)
+
+| xref:06-reference/index.adoc[06. Справочник]
+| DSL Syntax Reference, Model Schema — технические спецификации
 |===
 
 == Структура уровней документации
@@ -69,11 +72,18 @@ docs/
 ├── 03-interfaces/
 │   ├── index.adoc
 │   ├── gradle-plugin.adoc
-│   └── cli.adoc
-├── 04-nfr.adoc
+│   ├── cli.adoc
+│   └── library-api.adoc
+├── 04-appendix/
+│   ├── index.adoc
+│   └── nfr.adoc                  # Нефункциональные требования
 ├── 05-decisions/
 │   ├── index.adoc
 │   └── ADR-001-*.adoc
+├── 06-reference/
+│   ├── index.adoc
+│   ├── dsl-syntax.adoc           # Справочник DSL синтаксиса
+│   └── model-schema.adoc         # Справочник структур данных
 └── _templates/                   # Шаблоны документов
     ├── feature-template.adoc
     ├── interface-template.adoc

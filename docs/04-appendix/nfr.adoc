@@ -278,6 +278,7 @@
 
 == Связанные документы
 
-* xref:00-overview.adoc[Обзор проекта]
-* xref:02-features/index.adoc[Функциональные требования]
-* xref:05-decisions/index.adoc[Архитектурные решения]
+* xref:../00-overview.adoc[Обзор проекта]
+* xref:../02-features/index.adoc[Функциональные требования]
+* xref:../05-decisions/index.adoc[Архитектурные решения]
+* xref:../03-interfaces/index.adoc[Интерфейсы] — NFR применяются к интерфейсам

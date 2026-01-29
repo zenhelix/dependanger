@@ -1,0 +1,677 @@
+= DSL Syntax Reference
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Полная спецификация Kotlin DSL для конфигурации Dependanger.
+Содержит все блоки, функции, параметры и примеры использования.
+
+Концептуальное описание сущностей: xref:../01-concepts/domain-model.adoc[Доменная модель].
+--
+
+[[dsl-root]]
+== Корневой DSL
+
+=== DependangerDsl
+
+Корневая точка входа Kotlin DSL.
+
+==== Доступные блоки
+
+[cols="1,2,2",options="header"]
+|===
+| Блок | Тип | Описание
+
+| `versions { }`
+| VersionsDsl
+| Именованные версии с fallback условиями
+
+| `libraries { }`
+| LibrariesDsl
+| Библиотеки с Maven координатами
+
+| `plugins { }`
+| PluginsDsl
+| Gradle plugins
+
+| `bundles { }`
+| BundlesDsl
+| Группы библиотек
+
+| `bomImports { }`
+| BomImportsDsl
+| Импорт версий из внешних Maven BOM
+
+| `targetPlatforms { }`
+| TargetPlatformsDsl
+| Целевые платформы с ограничениями (JDK, Kotlin targets)
+
+| `distributions { }`
+| DistributionsDsl
+| Профили генерации с фильтрацией
+
+| `compatibility { }`
+| CompatibilityDsl
+| Правила совместимости
+
+| `settings { }`
+| SettingsDsl
+| Глобальные настройки валидации и генерации
+
+| `presets { }`
+| PresetsDsl
+| Именованные пресеты конфигурации для переиспользования
+|===
+
+NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings` → `presets`
+
+==== Полный пример
+
+[source,kotlin]
+----
+val dsl = DependangerDsl()
+
+dsl.versions {
+    version("kotlin", "2.1.20")
+    version("spring-boot", "3.4.0") {
+        fallback("2.7.18") { jdkBelow(17) }
+    }
+}
+
+dsl.libraries {
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin")) {
+        tags("core", "kotlin")
+    }
+}
+
+dsl.bundles {
+    bundle("kotlin-core") {
+        libraries("kotlin-stdlib", "kotlin-reflect")
+    }
+}
+
+dsl.plugins {
+    plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm",
+        version = versionRef("kotlin"))
+}
+
+dsl.bomImports {
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+
+dsl.targetPlatforms {
+    platform("jvm17") {
+        jdk { min = 17; max = 21 }
+    }
+    platform("android-min21") {
+        android { minSdk = 21; targetSdk = 34 }
+    }
+}
+
+dsl.distributions {
+    distribution("android") {
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+            }
+        }
+    }
+}
+
+dsl.settings {
+    validation {
+        onCompatibilityViolation = ValidationAction.FAIL
+        onUnresolvedVersion = ValidationAction.WARN
+    }
+    toml {
+        filename = "libs.versions.toml"
+    }
+}
+----
+
+'''
+
+[[dsl-versions]]
+== versions { }
+
+Блок для определения именованных версий.
+
+=== version()
+
+[source,kotlin]
+----
+versions {
+    // Простая версия
+    version("kotlin", "2.1.20")
+
+    // Версия с fallback условиями
+    version("spring-boot", "3.4.0") {
+        fallback("2.7.18") { jdkBelow(17) }
+        fallback("3.2.0") { kotlinVersionBelow("1.9") }
+    }
+}
+----
+
+=== Доступные условия для fallback
+
+[cols="1,3",options="header"]
+|===
+| Условие | Описание
+
+| `jdkBelow(version)`
+| JDK версия < указанной
+
+| `jdkAtLeast(version)`
+| JDK версия >= указанной
+
+| `jdkBetween(min, max)`
+| JDK версия в диапазоне [min, max]
+
+| `kotlinVersionBelow(version)`
+| Kotlin версия < указанной
+
+| `kotlinVersionAtLeast(version)`
+| Kotlin версия >= указанной
+
+| `gradleVersionAtLeast(version)`
+| Gradle версия >= указанной
+
+| `gradleVersionBelow(version)`
+| Gradle версия < указанной
+
+| `distribution(name)`
+| Активен указанный distribution profile
+
+| `environment(key, value)`
+| Переменная окружения равна значению
+
+| `all(conditions...)`
+| Все условия выполнены (AND)
+
+| `any(conditions...)`
+| Хотя бы одно условие выполнено (OR)
+
+| `not(condition)`
+| Условие не выполнено (NOT)
+|===
+
+'''
+
+[[dsl-libraries]]
+== libraries { }
+
+Блок для определения библиотек.
+
+=== library()
+
+[source,kotlin]
+----
+libraries {
+    // С ссылкой на version alias
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin")) {
+        tags("core", "kotlin")
+    }
+
+    // С inline версией
+    library("slf4j-api", "org.slf4j:slf4j-api:2.0.9") {
+        tags("logging")
+    }
+
+    // Без версии (будет взята из BomImport)
+    library("spring-web", "org.springframework:spring-web") {
+        tags("web", "spring")
+        requires {
+            jdk { min = 17 }
+        }
+    }
+
+    // Deprecated библиотека с полной информацией
+    library("old-http", "com.example:old-http:1.0") {
+        tags("http", "legacy")
+        deprecated {
+            replacedBy = "new-http"
+            message = "Use new-http which supports HTTP/2"
+            since = "1.2.0"
+            removalVersion = "2.0.0"
+        }
+    }
+
+    // Deprecated библиотека — короткая форма
+    library("legacy-json", "com.example:legacy-json:1.0") {
+        deprecated(replacedBy = "modern-json")
+    }
+
+    // Deprecated без замены (abandoned)
+    library("abandoned-lib", "com.example:abandoned:1.0") {
+        deprecated(message = "Library is no longer maintained")
+    }
+}
+----
+
+=== platformLibrary()
+
+Для экспорта BOM-зависимости в генерируемый TOML.
+
+[source,kotlin]
+----
+libraries {
+    // Обычная библиотека
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+        version = versionRef("kotlin"))
+
+    // Platform library — экспортируется в TOML как library с type=pom
+    platformLibrary("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+}
+----
+
+NOTE: Не путать с `bomImports {}`, который используется для *импорта* версий из внешних BOM.
+`platformLibrary()` — для *экспорта* BOM-зависимости в генерируемый TOML.
+
+'''
+
+[[dsl-plugins]]
+== plugins { }
+
+Блок для определения Gradle plugins.
+
+=== plugin()
+
+[source,kotlin]
+----
+plugins {
+    plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm",
+        version = versionRef("kotlin"))
+
+    plugin("ksp", "com.google.devtools.ksp:2.1.20-1.0.29")
+}
+----
+
+'''
+
+[[dsl-bundles]]
+== bundles { }
+
+Блок для определения групп библиотек.
+
+=== bundle()
+
+[source,kotlin]
+----
+bundles {
+    bundle("kotlin-core") {
+        libraries("kotlin-stdlib", "kotlin-reflect")
+    }
+
+    bundle("kotlin-serialization") {
+        libraries("kotlinx-serialization-core", "kotlinx-serialization-json")
+        extends("kotlin-core")  // Включает библиотеки из kotlin-core
+    }
+
+    bundle("spring-backend") {
+        libraries("spring-web", "spring-data-jpa")
+        extends("kotlin-core", "kotlin-serialization")
+    }
+}
+----
+
+'''
+
+[[dsl-bom-imports]]
+== bomImports { }
+
+Блок для импорта версий из внешних Maven BOM.
+
+=== bom()
+
+[source,kotlin]
+----
+bomImports {
+    // С ссылкой на version alias
+    bom("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies",
+        version = versionRef("spring-boot"))
+
+    // С inline версией
+    bom("kotlin-bom", "org.jetbrains.kotlin:kotlin-bom:2.1.20")
+}
+----
+
+'''
+
+[[dsl-target-platforms]]
+== targetPlatforms { }
+
+Блок для определения целевых платформ.
+
+=== platform()
+
+[source,kotlin]
+----
+targetPlatforms {
+    // Платформа с JDK constraints
+    platform("jvm17") {
+        jdk { min = 17; max = 21 }
+        targets { jvm() }
+    }
+
+    // Платформа для Android
+    platform("android-min21") {
+        android { minSdk = 21; targetSdk = 34 }
+        targets { android() }
+    }
+
+    // KMP платформа
+    platform("kmp-mobile") {
+        targets { android(); ios() }
+    }
+}
+----
+
+=== Доступные targets
+
+[cols="1,2",options="header"]
+|===
+| Target | Описание
+
+| `jvm()`
+| JVM target
+
+| `js()`
+| JavaScript (Browser, Node)
+
+| `android()`
+| Android
+
+| `ios()`
+| iOS (arm64, x64, simulatorArm64)
+
+| `macos()`
+| macOS
+
+| `linux()`
+| Linux
+
+| `mingw()`
+| Windows (MinGW)
+
+| `native()`
+| Все native targets
+
+| `wasmJs()`, `wasmWasi()`
+| WebAssembly
+|===
+
+'''
+
+[[dsl-distributions]]
+== distributions { }
+
+Блок для определения профилей генерации с фильтрацией.
+
+=== distribution()
+
+[source,kotlin]
+----
+distributions {
+    distribution("android") {
+        spec {
+            filter {
+                byTags { include { anyOf("android", "mobile") } }
+                byGroups { exclude { matching("org.springframework:*") } }
+            }
+        }
+    }
+
+    distribution("backend") {
+        spec {
+            filter {
+                byTags { include { anyOf("server", "web", "database") } }
+                byBundles { include("spring-backend", "kotlin-core") }
+            }
+        }
+    }
+
+    distribution("minimal") {
+        spec {
+            filter {
+                byBundles { include("kotlin-core") }
+            }
+        }
+    }
+
+    // Production без deprecated библиотек
+    distribution("production") {
+        spec {
+            filter {
+                byDeprecated { exclude() }
+            }
+        }
+    }
+}
+----
+
+=== Типы фильтров
+
+[cols="1,3",options="header"]
+|===
+| Фильтр | Описание
+
+| `byTags`
+| Фильтрация по тегам библиотек
+
+| `byGroups`
+| Фильтрация по Maven group pattern
+
+| `byAliases`
+| Фильтрация по alias библиотек
+
+| `byBundles`
+| Включение содержимого бандлов
+
+| `byDeprecated`
+| Фильтрация deprecated библиотек. По умолчанию deprecated **включаются** (с WARNING). Используйте `exclude()` для исключения
+|===
+
+=== Логика комбинирования фильтров
+
+[cols="1,3",options="header"]
+|===
+| Комбинация | Логика
+
+| Несколько `include` в одном фильтре
+| **OR** — библиотека включается, если подходит под любой include
+
+| Несколько `exclude` в одном фильтре
+| **OR** — библиотека исключается, если подходит под любой exclude
+
+| `include` + `exclude` в одном фильтре
+| `include` применяется первым, затем из результата удаляются `exclude`
+
+| Несколько разных фильтров (`byTags` + `byGroups`)
+| **AND** — библиотека должна пройти все фильтры
+|===
+
+==== Алгоритм фильтрации
+
+1. Если нет `include` фильтров → все библиотеки потенциально включены
+2. Применяются `include` фильтры → только matching библиотеки остаются
+3. Применяются `exclude` фильтры → matching библиотеки удаляются
+4. Результаты всех фильтров (`byTags`, `byGroups`, `byAliases`) объединяются через **AND**
+
+'''
+
+[[dsl-compatibility]]
+== compatibility { }
+
+Блок для определения правил совместимости.
+
+=== jdkRequirement()
+
+[source,kotlin]
+----
+compatibility {
+    jdkRequirement("spring-jdk17") {
+        matches = "org.springframework:*"
+        minJdk = 17
+        message = "Spring 6.x requires JDK 17+"
+    }
+}
+----
+
+=== mutualExclusion()
+
+[source,kotlin]
+----
+compatibility {
+    mutualExclusion("json-libs") {
+        libraries("jackson-core", "gson")
+        severity = WARNING
+        message = "Consider using only one JSON library"
+    }
+}
+----
+
+=== versionConstraint()
+
+[source,kotlin]
+----
+compatibility {
+    versionConstraint("kotlin-version-sync") {
+        libraries("kotlin-stdlib", "kotlin-reflect", "kotlinx-coroutines-core")
+        constraint = SAME_MAJOR_MINOR
+    }
+}
+----
+
+'''
+
+[[dsl-settings]]
+== settings { }
+
+Блок для глобальных настроек.
+
+[source,kotlin]
+----
+settings {
+    // Настройки валидации
+    validation {
+        onCompatibilityViolation = ValidationAction.FAIL
+        onDeprecatedLibrary = ValidationAction.WARN
+        onJdkMismatch = ValidationAction.FAIL
+        onUnresolvedVersion = ValidationAction.WARN
+    }
+
+    // Дефолтная дистрибуция
+    defaultDistribution = "core"
+
+    // Строгий режим резолюции версий
+    strictVersionResolution = true
+
+    // Настройки генерации TOML
+    toml {
+        filename = "libs.versions.toml"
+        includeComments = true
+        sortSections = true
+    }
+
+    // Настройки генерации BOM
+    bom {
+        groupId = "com.example"
+        artifactId = "my-bom"
+        version = "1.0.0"  // или versionRef("bom")
+        includeOptionalDependencies = false
+    }
+}
+----
+
+'''
+
+[[dsl-presets]]
+== presets { }
+
+Блок для именованных пресетов конфигурации.
+
+=== preset()
+
+[source,kotlin]
+----
+presets {
+    // Пресет для Spring приложений
+    preset("spring-app") {
+        bundles("spring-backend", "kotlin-core")
+        distributions("backend")
+        settings {
+            strictVersionResolution = true
+        }
+    }
+
+    // Пресет для Android библиотек
+    preset("android-lib") {
+        bundles("kotlin-core", "android-core")
+        distributions("android")
+    }
+}
+
+// Применение пресета
+dependanger {
+    applyPreset("spring-app")
+
+    // Дополнительные настройки поверх пресета
+    libraries {
+        library("custom-lib", "com.example:custom:1.0.0")
+    }
+}
+----
+
+'''
+
+[[dsl-processing]]
+== processing { }
+
+Runtime-only конфигурация пайплайна обработки.
+
+IMPORTANT: `ProcessingConfig` — это runtime-only конфигурация.
+Она задаётся в DSL блоке `processing { }` или через CLI параметры, но НЕ сохраняется в metadata.json.
+
+[source,kotlin]
+----
+processing {
+    // Включить импорт версий из BOM
+    importBoms = true
+
+    // Включить проверку обновлений
+    checkUpdates = true
+
+    // Настройки анализа совместимости
+    analyzeCompatibility {
+        enabled = true
+        targetJdk = 17
+        failOnErrors = true
+    }
+
+    // Использовать preset конфигурации pipeline
+    preset = ProcessingPreset.STRICT
+
+    // Или кастомная настройка процессоров
+    withBomImport()
+    withUpdateCheck()
+    withoutCompatibilityAnalysis()
+
+    // Отключить конкретные процессоры
+    disabledProcessors = listOf("update-check")
+}
+----
+
+== Связанные документы
+
+* xref:../01-concepts/domain-model.adoc[Доменная модель] — концептуальное описание сущностей
+* xref:model-schema.adoc[Model Schema Reference] — структуры данных
+* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — функциональные требования
+* xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin] — использование DSL в Gradle

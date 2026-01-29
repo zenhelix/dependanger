@@ -1,0 +1,53 @@
+= Справочник
+:toc: left
+:toclevels: 2
+:sectnums:
+:icons: font
+
+== Обзор раздела
+
+Раздел содержит технические спецификации и справочники по синтаксису.
+В отличие от xref:../01-concepts/index.adoc[концепций] (что такое) и xref:../02-features/index.adoc[фич] (что делает), здесь описывается **как выглядит** — grammar, syntax, schema.
+
+== Документы раздела
+
+[cols="1,2,1",options="header"]
+|===
+| Документ | Описание | Статус
+
+| xref:dsl-syntax.adoc[DSL Syntax Reference]
+| Полная спецификация Kotlin DSL: все блоки, функции, типы, примеры использования.
+| 🟢 Готов
+
+| xref:model-schema.adoc[Model Schema Reference]
+| Структуры данных: VersionReference, VersionSource, FilterSpec, ProcessingConfig и др.
+| 🟢 Готов
+|===
+
+== Когда использовать этот раздел
+
+[cols="1,2",options="header"]
+|===
+| Вопрос | Раздел
+
+| "Что такое Library?"
+| xref:../01-concepts/domain-model.adoc[01-concepts/domain-model]
+
+| "Как объявить библиотеку в DSL?"
+| xref:dsl-syntax.adoc[06-reference/dsl-syntax] ← **этот раздел**
+
+| "Какие параметры принимает library()?"
+| xref:dsl-syntax.adoc[06-reference/dsl-syntax] ← **этот раздел**
+
+| "Для чего нужен Distribution?"
+| xref:../01-concepts/domain-model.adoc[01-concepts/domain-model]
+
+| "Как написать фильтр для Distribution?"
+| xref:dsl-syntax.adoc[06-reference/dsl-syntax] ← **этот раздел**
+|===
+
+== Связи с другими разделами
+
+* xref:../01-concepts/domain-model.adoc[← Доменная модель] — концептуальное описание сущностей
+* xref:../02-features/F001-registry-dsl.adoc[← F001: Registry DSL] — функциональные требования к DSL
+* xref:../03-interfaces/gradle-plugin.adoc[← Gradle Plugin] — использование DSL в Gradle

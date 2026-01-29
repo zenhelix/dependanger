@@ -10,6 +10,11 @@
 DSL Model (в памяти), Metadata Model (сериализованная), Effective Model (готовая к генерации).
 
 Краткие определения терминов: xref:../00-overview.adoc#glossary[Глоссарий в Overview].
+
+**Справочники:**
+
+* xref:../06-reference/dsl-syntax.adoc[DSL Syntax Reference] — полная спецификация DSL синтаксиса
+* xref:../06-reference/model-schema.adoc[Model Schema Reference] — структуры данных
 --
 
 == Уровни моделей
@@ -198,7 +203,7 @@ ____
 Содержит все определения для генерации артефактов (TOML, BOM).
 ____
 
-NOTE: Полная спецификация DSL синтаксиса: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
+NOTE: Полная спецификация DSL синтаксиса: xref:../06-reference/dsl-syntax.adoc[DSL Syntax Reference].
 
 ==== DSL блоки
 
@@ -404,14 +409,8 @@ ____
 
 ==== VersionReference
 
-[source,kotlin]
-----
-sealed class VersionReference {
-    data class Literal(val version: String) : VersionReference()
-    data class Reference(val name: String) : VersionReference()
-    data class Range(val range: VersionRange) : VersionReference()
-}
-----
+Ссылка на версию — может быть литералом, ссылкой на alias или диапазоном.
+Подробности: xref:../06-reference/model-schema.adoc#version-reference[Model Schema: VersionReference].
 
 ==== DSL синтаксис
 
@@ -1552,6 +1551,8 @@ flowchart TB
 == Связанные документы
 
 * xref:architecture.adoc[Архитектура] — модули, SPI интерфейсы
-* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — полная спецификация DSL синтаксиса
+* xref:../06-reference/dsl-syntax.adoc[DSL Syntax Reference] — полная спецификация DSL синтаксиса
+* xref:../06-reference/model-schema.adoc[Model Schema Reference] — структуры данных
+* xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL] — функциональные требования к DSL
 * xref:../02-features/F002-metadata-serialization.adoc[F002: Metadata Serialization] — SerializationFormat SPI
 * xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] — процессоры и их порядок

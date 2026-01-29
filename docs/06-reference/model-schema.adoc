@@ -1,0 +1,541 @@
+= Model Schema Reference
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[abstract]
+--
+Справочник по структурам данных системы Dependanger.
+Содержит типы, классы, enums и их атрибуты.
+
+Концептуальное описание сущностей: xref:../01-concepts/domain-model.adoc[Доменная модель].
+DSL синтаксис: xref:dsl-syntax.adoc[DSL Syntax Reference].
+--
+
+[[version-types]]
+== Типы версий
+
+[[version-reference]]
+=== VersionReference
+
+Ссылка на версию — может быть литералом, ссылкой на alias или диапазоном.
+
+[source,kotlin]
+----
+sealed class VersionReference {
+    data class Literal(val version: String) : VersionReference()
+    data class Reference(val name: String) : VersionReference()
+    data class Range(val range: VersionRange) : VersionReference()
+}
+----
+
+[cols="1,3,2",options="header"]
+|===
+| Тип | Описание | Пример DSL
+
+| `Literal`
+| Явно указанная версия
+| `"2.0.9"` или `version = "2.0.9"`
+
+| `Reference`
+| Ссылка на именованную версию
+| `versionRef("kotlin")`
+
+| `Range`
+| Диапазон версий
+| `versionRange("[1.0, 2.0)")`
+|===
+
+[[version-fallback]]
+=== VersionFallback
+
+Условная альтернативная версия.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `value`
+| String
+| Альтернативное значение версии
+
+| `condition`
+| FallbackCondition
+| Условие, при котором используется fallback
+|===
+
+[[version-source]]
+=== VersionSource
+
+Источник разрешённой версии (в Effective Model).
+
+[cols="1,1,3",options="header"]
+|===
+| Приоритет | Значение | Описание
+
+| 1 (высший)
+| DECLARED
+| Явно указана в DSL конфигурации через `version = "1.0.0"`, `versionRef("alias")` или inline в coordinates
+
+| 2 (низший)
+| BOM_IMPORT
+| Импортирована из BomImport через BomImportProcessor
+|===
+
+==== Примеры VersionSource
+
+[source,kotlin]
+----
+// DECLARED — явно указана версия
+library("guava", "com.google.guava:guava", version = "33.0.0-jre")
+
+// DECLARED — через versionRef
+library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+    version = versionRef("kotlin"))
+
+// DECLARED — inline версия в coordinates
+library("slf4j", "org.slf4j:slf4j-api:2.0.9")
+
+// BOM_IMPORT — версия будет из Spring Boot BOM
+library("spring-web", "org.springframework:spring-web")  // без версии
+----
+
+[[resolved-version]]
+=== ResolvedVersion
+
+Версия с информацией об источнике (в Effective Model).
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `value`
+| String
+| Значение версии (например: `3.4.0`)
+
+| `source`
+| VersionSource
+| Источник версии (DECLARED или BOM_IMPORT)
+|===
+
+'''
+
+[[library-types]]
+== Типы библиотек
+
+[[deprecation-info]]
+=== DeprecationInfo
+
+Информация об устаревшей библиотеке.
+
+[cols="1,1,1,3",options="header"]
+|===
+| Поле | Тип | Обязательность | Описание
+
+| `replacedBy`
+| String
+| Нет
+| Alias библиотеки-замены. Должен указывать на существующую библиотеку
+
+| `message`
+| String
+| Нет
+| Сообщение для разработчиков с пояснением причины и инструкциями по миграции
+
+| `since`
+| String
+| Нет
+| Версия каталога Dependanger, начиная с которой библиотека помечена как deprecated
+
+| `removalVersion`
+| String
+| Нет
+| Версия каталога, в которой библиотека будет удалена
+|===
+
+[[requirements]]
+=== Requirements
+
+Требования к окружению для библиотеки.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `jdk`
+| JdkConstraints
+| Ограничения по версии JDK (min, max)
+
+| `kotlin`
+| KotlinConstraints
+| Ограничения по версии Kotlin
+|===
+
+'''
+
+[[platform-types]]
+== Типы платформ
+
+[[jdk-constraints]]
+=== JdkConstraints
+
+Ограничения по версии JDK.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `min`
+| Int?
+| Минимальная версия JDK (включительно)
+
+| `max`
+| Int?
+| Максимальная версия JDK (включительно)
+|===
+
+[[android-constraints]]
+=== AndroidConstraints
+
+Ограничения для Android.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `minSdk`
+| Int?
+| Минимальный Android SDK
+
+| `targetSdk`
+| Int?
+| Целевой Android SDK
+|===
+
+'''
+
+[[filter-types]]
+== Типы фильтрации
+
+[[filter-spec]]
+=== FilterSpec
+
+Спецификация фильтрации для Distribution.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `byTags`
+| TagFilter?
+| Фильтр по тегам
+
+| `byGroups`
+| GroupFilter?
+| Фильтр по Maven group
+
+| `byAliases`
+| AliasFilter?
+| Фильтр по alias
+
+| `byBundles`
+| BundleFilter?
+| Фильтр по бандлам
+
+| `byDeprecated`
+| DeprecatedFilter?
+| Фильтр deprecated библиотек
+|===
+
+[[tag-filter]]
+=== TagFilter
+
+[cols="1,1,3",options="header"]
+|===
+| Метод | Параметры | Описание
+
+| `include { anyOf(...) }`
+| Список тегов
+| Включить библиотеки с любым из тегов
+
+| `include { allOf(...) }`
+| Список тегов
+| Включить библиотеки со всеми тегами
+
+| `exclude { anyOf(...) }`
+| Список тегов
+| Исключить библиотеки с любым из тегов
+|===
+
+[[group-filter]]
+=== GroupFilter
+
+[cols="1,1,3",options="header"]
+|===
+| Метод | Параметры | Описание
+
+| `include { matching(...) }`
+| Pattern (glob)
+| Включить группы по паттерну
+
+| `exclude { matching(...) }`
+| Pattern (glob)
+| Исключить группы по паттерну
+|===
+
+'''
+
+[[validation-types]]
+== Типы валидации
+
+[[validation-action]]
+=== ValidationAction
+
+Действие при нарушении правила.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `FAIL`
+| Ошибка, блокирует обработку
+
+| `WARN`
+| Предупреждение, обработка продолжается
+
+| `INFO`
+| Информационное сообщение
+
+| `IGNORE`
+| Игнорировать
+|===
+
+[[severity]]
+=== Severity
+
+Серьёзность нарушения правила совместимости.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `ERROR`
+| Нарушение блокирует генерацию
+
+| `WARNING`
+| Предупреждение, генерация продолжается
+
+| `INFO`
+| Информационное сообщение
+|===
+
+[[validation-settings]]
+=== ValidationSettings
+
+Настройки валидации в блоке `settings { validation { } }`.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `onCompatibilityViolation`
+| ValidationAction
+| Действие при нарушении правила совместимости
+
+| `onDeprecatedLibrary`
+| ValidationAction
+| Действие при использовании deprecated библиотеки
+
+| `onJdkMismatch`
+| ValidationAction
+| Действие при несовместимости с JDK
+
+| `onUnresolvedVersion`
+| ValidationAction
+| Действие при неразрешённой версии
+|===
+
+'''
+
+[[settings-types]]
+== Типы настроек
+
+[[toml-settings]]
+=== TomlSettings
+
+Настройки генерации TOML Version Catalog.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `filename`
+| String
+| Имя выходного файла (default: `libs.versions.toml`)
+
+| `includeComments`
+| Boolean
+| Добавлять комментарии в TOML
+
+| `sortSections`
+| Boolean
+| Сортировать секции и элементы
+|===
+
+[[bom-settings]]
+=== BomSettings
+
+Настройки генерации Maven BOM.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `groupId`
+| String
+| Maven groupId для генерируемого BOM
+
+| `artifactId`
+| String
+| Maven artifactId для генерируемого BOM
+
+| `version`
+| String
+| Версия BOM
+
+| `includeOptionalDependencies`
+| Boolean
+| Включать зависимости с `optional=true`
+|===
+
+'''
+
+[[processing-types]]
+== Типы обработки
+
+[[processing-preset]]
+=== ProcessingPreset
+
+Предустановленная конфигурация pipeline.
+
+[cols="1,3",options="header"]
+|===
+| Preset | Описание
+
+| `DEFAULT`
+| Стандартная конфигурация: обязательные процессоры + bom-import
+
+| `MINIMAL`
+| Минимальный набор: только обязательные процессоры
+
+| `STRICT`
+| Все проверки включены + strictVersionResolution
+
+| `DISTRIBUTION`
+| Для генерации артефактов: обязательные + profile фильтрация
+|===
+
+[[processing-config]]
+=== ProcessingConfig
+
+Конфигурация пайплайна обработки (runtime-only).
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `preset`
+| ProcessingPreset
+| Предустановленная конфигурация
+
+| `importBoms`
+| Boolean
+| Включить BomImportProcessor
+
+| `checkUpdates`
+| Boolean
+| Включить UpdateCheckProcessor
+
+| `analyzeCompatibility`
+| CompatibilityConfig
+| Настройки CompatibilityAnalysisProcessor
+
+| `disabledProcessors`
+| List<String>
+| Список ID процессоров для отключения
+|===
+
+[[processing-diagnostics]]
+=== ProcessingDiagnostics
+
+Результаты валидации pipeline (в Effective Model).
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `errors`
+| List<DiagnosticMessage>
+| Ошибки (блокируют генерацию)
+
+| `warnings`
+| List<DiagnosticMessage>
+| Предупреждения
+
+| `infos`
+| List<DiagnosticMessage>
+| Информационные сообщения
+|===
+
+'''
+
+[[compatibility-types]]
+== Типы совместимости
+
+[[rule-type]]
+=== RuleType
+
+Тип правила совместимости.
+
+[cols="1,2,2",options="header"]
+|===
+| Тип | Описание | Пример
+
+| `jdkRequirement`
+| Требование к версии JDK
+| Spring Boot 3.x требует JDK 17+
+
+| `mutualExclusion`
+| Взаимоисключающие библиотеки
+| Jackson и Gson не должны быть вместе
+
+| `versionConstraint`
+| Ограничение версий между библиотеками
+| Kotlin stdlib и reflect должны иметь одинаковую версию
+|===
+
+[[version-constraint-type]]
+=== VersionConstraintType
+
+Тип ограничения версий.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `SAME_VERSION`
+| Все библиотеки должны иметь одинаковую версию
+
+| `SAME_MAJOR`
+| Все библиотеки должны иметь одинаковую major версию
+
+| `SAME_MAJOR_MINOR`
+| Все библиотеки должны иметь одинаковые major.minor
+|===
+
+== Связанные документы
+
+* xref:../01-concepts/domain-model.adoc[Доменная модель] — концептуальное описание сущностей
+* xref:dsl-syntax.adoc[DSL Syntax Reference] — синтаксис DSL
+* xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline] — процессоры и их порядок

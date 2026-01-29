@@ -84,3 +84,4 @@ flowchart TB
 * xref:../00-overview.adoc[← Обзор проекта] — контекст, цели, глоссарий
 * xref:../02-features/index.adoc[Функциональные требования →] — что система делает
 * xref:../05-decisions/index.adoc[ADR →] — обоснования архитектурных решений
+* xref:../06-reference/index.adoc[Справочник →] — DSL синтаксис, структуры данных

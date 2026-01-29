@@ -44,7 +44,8 @@ plugins {
 
 == DSL Конфигурация
 
-NOTE: Полная документация по DSL синтаксису: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
+NOTE: Полная спецификация DSL синтаксиса: xref:../06-reference/dsl-syntax.adoc[DSL Syntax Reference].
+Функциональные требования: xref:../02-features/F001-registry-dsl.adoc[F001: Registry DSL].
 Ниже приведены примеры использования в контексте Gradle плагина.
 
 === Базовая структура
@@ -544,7 +545,8 @@ tasks.named("generateToml") {
 
 == Связи с другими разделами
 
-* xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — описание DSL синтаксиса
+* xref:../06-reference/dsl-syntax.adoc[DSL Syntax Reference] — полная спецификация DSL
+* xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — функциональные требования DSL
 * xref:../02-features/F003-processing-pipeline.adoc[F003 Processing Pipeline] — пайплайн обработки
 * xref:cli.adoc[CLI] — альтернативный интерфейс для standalone использования
 * xref:library-api.adoc[Library API] — программный API

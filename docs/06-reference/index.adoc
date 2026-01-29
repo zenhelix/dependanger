@@ -19,6 +19,10 @@
 | Полная спецификация Kotlin DSL: все блоки, функции, типы, примеры использования.
 | 🟢 Готов
 
+| xref:cli-reference.adoc[CLI Reference]
+| Полная спецификация CLI: все команды, опции, exit codes, переменные окружения.
+| 🟢 Готов
+
 | xref:model-schema.adoc[Model Schema Reference]
 | Структуры данных: VersionReference, VersionSource, FilterSpec, ProcessingConfig и др.
 | 🟢 Готов
@@ -44,6 +48,12 @@
 
 | "Как написать фильтр для Distribution?"
 | xref:dsl-syntax.adoc[06-reference/dsl-syntax] ← **этот раздел**
+
+| "Какие команды есть в CLI?"
+| xref:cli-reference.adoc[06-reference/cli-reference] ← **этот раздел**
+
+| "Какие опции у команды check-updates?"
+| xref:cli-reference.adoc[06-reference/cli-reference] ← **этот раздел**
 |===
 
 == Связи с другими разделами
@@ -51,3 +61,4 @@
 * xref:../01-concepts/domain-model.adoc[← Доменная модель] — концептуальное описание сущностей
 * xref:../02-features/F001-registry-dsl.adoc[← F001: Registry DSL] — функциональные требования к DSL
 * xref:../03-interfaces/gradle-plugin.adoc[← Gradle Plugin] — использование DSL в Gradle
+* xref:../03-interfaces/cli.adoc[← CLI Interface] — использование CLI, CI/CD интеграция

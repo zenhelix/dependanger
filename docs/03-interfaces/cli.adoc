@@ -1417,6 +1417,7 @@ dependency-check:
 
 == Связи с другими разделами
 
+* xref:../06-reference/cli-reference.adoc[CLI Reference] — полная спецификация команд, опций, exit codes
 * xref:../02-features/F002-metadata-serialization.adoc[F002 Metadata Serialization] — формат metadata.json
 * xref:../02-features/F007-update-check.adoc[F007 Update Check] — проверка обновлений
 * xref:../02-features/F008-compatibility-analysis.adoc[F008 Compatibility Analysis] — анализ совместимости

@@ -1,5 +1,7 @@
 package io.github.zenhelix.dependanger.features.security
 
+import io.github.zenhelix.dependanger.effective.model.VulnerabilityInfo
+
 public class OsvApiClient(
     public val apiUrl: String = "https://api.osv.dev",
 ) {

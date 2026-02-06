@@ -3,7 +3,6 @@ package io.github.zenhelix.dependanger.core.dsl
 import io.github.zenhelix.dependanger.core.model.CompatibilityRule
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.VersionConstraintType
-import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 
 @DependangerDslMarker
 public class CompatibilityDsl {
@@ -53,6 +52,8 @@ public class CompatibilityDsl {
         rules.add(
             CompatibilityRule.CustomRule(
                 name = name,
+                ruleId = dsl.ruleId,
+                parameters = dsl.parameters.toMap(),
                 severity = dsl.severity,
                 message = dsl.message,
             )
@@ -94,11 +95,12 @@ public class VersionConstraintDsl {
 
 @DependangerDslMarker
 public class CustomRuleDsl {
-    public var condition: ((DependangerMetadata) -> Boolean)? = null
+    public var ruleId: String = ""
+    public var parameters: MutableMap<String, String> = mutableMapOf()
     public var severity: Severity = Severity.WARNING
     public var message: String? = null
 
-    public fun condition(block: (DependangerMetadata) -> Boolean) {
-        condition = block
+    public fun parameter(key: String, value: String) {
+        parameters[key] = value
     }
 }

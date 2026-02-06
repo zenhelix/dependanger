@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.analysis
+package io.github.zenhelix.dependanger.effective.model
 
 import io.github.zenhelix.dependanger.core.model.Severity
 import kotlinx.serialization.Serializable

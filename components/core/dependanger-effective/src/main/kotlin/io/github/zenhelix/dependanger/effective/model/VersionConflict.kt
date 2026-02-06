@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.transitive
+package io.github.zenhelix.dependanger.effective.model
 
 import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
 import kotlinx.serialization.Serializable

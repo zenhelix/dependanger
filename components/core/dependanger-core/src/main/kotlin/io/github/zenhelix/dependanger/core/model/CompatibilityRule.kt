@@ -38,6 +38,8 @@ public sealed class CompatibilityRule {
     @Serializable
     public data class CustomRule(
         override val name: String,
+        val ruleId: String,
+        val parameters: Map<String, String> = emptyMap(),
         override val severity: Severity = Severity.WARNING,
         override val message: String? = null,
     ) : CompatibilityRule()

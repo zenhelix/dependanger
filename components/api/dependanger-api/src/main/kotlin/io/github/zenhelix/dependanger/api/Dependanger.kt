@@ -11,7 +11,6 @@ public class Dependanger private constructor(
     private val preset: ProcessingPreset,
     private val environment: ProcessingEnvironment,
 ) {
-    public fun process(distribution: String? = null): DependangerResult = TODO()
     public fun process(distribution: String? = null, callback: ProcessingCallback? = null): DependangerResult = TODO()
     public fun generateToml(effective: EffectiveMetadata): String = TODO()
     public fun generateBom(effective: EffectiveMetadata): String = TODO()

@@ -11,4 +11,11 @@ public data class EffectiveMetadata(
     val plugins: List<EffectivePlugin> = emptyList(),
     val bundles: List<EffectiveBundle> = emptyList(),
     val diagnostics: ProcessingDiagnostics = ProcessingDiagnostics(),
+    val updates: List<UpdateAvailableInfo> = emptyList(),
+    val vulnerabilities: List<VulnerabilityInfo> = emptyList(),
+    val licenseViolations: List<LicenseViolation> = emptyList(),
+    val compatibilityIssues: List<CompatibilityIssue> = emptyList(),
+    val transitives: List<TransitiveTree> = emptyList(),
+    val flatDependencies: List<FlatDependency> = emptyList(),
+    val versionConflicts: List<VersionConflict> = emptyList(),
 )

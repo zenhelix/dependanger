@@ -7,7 +7,8 @@ public data class DiagnosticMessage(
     val code: String,
     val message: String,
     val severity: Severity,
-    val source: String? = null,
+    val processorId: String? = null,
+    val context: Map<String, String> = emptyMap(),
 )
 
 @Serializable

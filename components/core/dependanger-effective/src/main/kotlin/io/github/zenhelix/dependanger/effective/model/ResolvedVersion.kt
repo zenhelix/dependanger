@@ -4,8 +4,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class ResolvedVersion(
+    val alias: String,
     val value: String,
     val source: VersionSource,
+    val originalRef: String? = null,
 )
 
 @Serializable

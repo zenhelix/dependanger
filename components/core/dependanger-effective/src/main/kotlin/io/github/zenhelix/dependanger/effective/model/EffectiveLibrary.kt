@@ -10,10 +10,11 @@ import kotlinx.serialization.Serializable
 public data class EffectiveLibrary(
     val alias: String,
     val group: String,
-    val name: String,
+    val artifact: String,
     val version: ResolvedVersion? = null,
     val tags: Set<String> = emptySet(),
     val requires: Requirements? = null,
+    val isDeprecated: Boolean = false,
     val deprecation: DeprecationInfo? = null,
     val license: LicenseInfo? = null,
     val constraints: List<Constraint> = emptyList(),

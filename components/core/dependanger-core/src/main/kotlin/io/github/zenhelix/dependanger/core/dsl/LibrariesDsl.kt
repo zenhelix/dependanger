@@ -12,30 +12,30 @@ public class LibrariesDsl {
     public val libraries: MutableList<Library> = mutableListOf()
 
     public fun library(alias: String, coordinates: String) {
-        val (group, name, version) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, name = name, version = version))
+        val (group, artifact, version) = parseCoordinates(coordinates)
+        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
-        val (group, name, _) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, name = name, version = version))
+        val (group, artifact, _) = parseCoordinates(coordinates)
+        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version))
     }
 
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
-        val (group, name, version) = parseCoordinates(coordinates)
+        val (group, artifact, version) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        libraries.add(dsl.toLibrary(alias, group, name))
+        libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference, block: LibraryDsl.() -> Unit) {
-        val (group, name, _) = parseCoordinates(coordinates)
+        val (group, artifact, _) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        libraries.add(dsl.toLibrary(alias, group, name))
+        libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
-        val (group, name, _) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, name = name, version = version, isPlatform = true))
+        val (group, artifact, _) = parseCoordinates(coordinates)
+        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version, isPlatform = true))
     }
 
     private fun parseCoordinates(coordinates: String): Triple<String, String, VersionReference?> {
@@ -84,10 +84,10 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         constraints.addAll(dsl.constraints)
     }
 
-    public fun toLibrary(alias: String, group: String, name: String): Library = Library(
+    public fun toLibrary(alias: String, group: String, artifact: String): Library = Library(
         alias = alias,
         group = group,
-        name = name,
+        artifact = artifact,
         version = version,
         tags = tags.toSet(),
         requires = requires,

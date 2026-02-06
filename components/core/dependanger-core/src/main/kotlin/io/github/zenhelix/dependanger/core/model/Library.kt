@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 public data class Library(
     val alias: String,
     val group: String,
-    val name: String,
+    val artifact: String,
     val version: VersionReference? = null,
     val tags: Set<String> = emptySet(),
     val requires: Requirements? = null,

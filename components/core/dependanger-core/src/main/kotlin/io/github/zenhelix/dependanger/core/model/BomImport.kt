@@ -6,6 +6,6 @@ import kotlinx.serialization.Serializable
 public data class BomImport(
     val alias: String,
     val group: String,
-    val name: String,
+    val artifact: String,
     val version: VersionReference,
 )

@@ -1,6 +1,4 @@
-package io.github.zenhelix.dependanger.api
-
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+package io.github.zenhelix.dependanger.effective.pipeline
 
 public interface ProcessingCallback {
     public fun onPhaseStarted(phase: ProcessingPhase) {}

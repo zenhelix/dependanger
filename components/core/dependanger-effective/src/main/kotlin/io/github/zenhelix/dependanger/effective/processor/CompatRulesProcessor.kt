@@ -7,6 +7,6 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class CompatRulesProcessor : EffectiveMetadataProcessor {
     override val id: String = "compat-rules"
-    override val order: Int = ProcessingPhase.COMPAT_RULES.order
+    override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

@@ -2,7 +2,7 @@ package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
-import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPreset
 
@@ -12,8 +12,6 @@ public class Dependanger private constructor(
     private val environment: ProcessingEnvironment,
 ) {
     public suspend fun process(distribution: String? = null, callback: ProcessingCallback? = null): DependangerResult = TODO()
-    public fun generateToml(effective: EffectiveMetadata): String = TODO()
-    public fun generateBom(effective: EffectiveMetadata): String = TODO()
     public suspend fun validate(): DependangerResult = TODO()
 
     public companion object {

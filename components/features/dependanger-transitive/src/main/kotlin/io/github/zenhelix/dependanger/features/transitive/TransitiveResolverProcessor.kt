@@ -7,7 +7,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = "transitive-resolver"
-    override val order: Int = ProcessingPhase.TRANSITIVE_RESOLVER.order
+    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

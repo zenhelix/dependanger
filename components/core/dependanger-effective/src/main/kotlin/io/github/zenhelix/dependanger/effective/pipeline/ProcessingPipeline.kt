@@ -11,7 +11,9 @@ public class ProcessingPipeline(
             distribution = context.activeDistribution,
         )
         for (processor in processors.sortedBy { it.order }) {
+            context.callback?.onPhaseStarted(processor.phase)
             result = processor.process(result, context)
+            context.callback?.onPhaseCompleted(processor.phase)
         }
         return result
     }

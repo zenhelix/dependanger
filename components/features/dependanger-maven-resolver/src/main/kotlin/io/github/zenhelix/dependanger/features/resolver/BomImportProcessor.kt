@@ -7,7 +7,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class BomImportProcessor : EffectiveMetadataProcessor {
     override val id: String = "bom-import"
-    override val order: Int = ProcessingPhase.BOM_IMPORT.order
+    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

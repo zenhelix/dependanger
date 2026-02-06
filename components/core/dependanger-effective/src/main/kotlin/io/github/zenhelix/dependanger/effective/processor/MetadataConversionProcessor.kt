@@ -7,6 +7,6 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class MetadataConversionProcessor : EffectiveMetadataProcessor {
     override val id: String = "metadata-conversion"
-    override val order: Int = ProcessingPhase.METADATA_CONVERSION.order
+    override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

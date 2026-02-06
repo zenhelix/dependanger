@@ -7,6 +7,6 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = "version-resolver"
-    override val order: Int = ProcessingPhase.VERSION_RESOLVER.order
+    override val phase: ProcessingPhase = ProcessingPhase.VERSION_RESOLVER
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

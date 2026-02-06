@@ -7,6 +7,6 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionFallbackProcessor : EffectiveMetadataProcessor {
     override val id: String = "version-fallback"
-    override val order: Int = ProcessingPhase.VERSION_FALLBACK.order
+    override val phase: ProcessingPhase = ProcessingPhase.VERSION_FALLBACK
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

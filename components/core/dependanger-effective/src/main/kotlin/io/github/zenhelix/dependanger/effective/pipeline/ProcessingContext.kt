@@ -10,6 +10,7 @@ public class ProcessingContext(
     public val settings: Settings,
     public val environment: ProcessingEnvironment,
     public val activeDistribution: String? = null,
+    public val callback: ProcessingCallback? = null,
 ) {
     private val properties: MutableMap<ProcessingContextKey<*>, Any> = mutableMapOf()
 

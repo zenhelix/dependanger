@@ -7,7 +7,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
     override val id: String = "compatibility-analysis"
-    override val order: Int = ProcessingPhase.COMPATIBILITY_ANALYSIS.order
+    override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

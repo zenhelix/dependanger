@@ -9,5 +9,5 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     override val id: String = "bom-import"
     override val order: Int = ProcessingPhase.BOM_IMPORT.order
 
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

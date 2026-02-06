@@ -9,5 +9,5 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
     override val id: String = "compatibility-analysis"
     override val order: Int = ProcessingPhase.COMPATIBILITY_ANALYSIS.order
 
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

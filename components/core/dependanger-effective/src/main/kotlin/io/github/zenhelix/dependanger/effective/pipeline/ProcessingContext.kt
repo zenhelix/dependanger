@@ -5,11 +5,11 @@ import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 
 public class ProcessingContextKey<T>(public val name: String)
 
-public data class ProcessingContext(
-    val originalMetadata: DependangerMetadata,
-    val settings: Settings,
-    val environment: ProcessingEnvironment,
-    val activeDistribution: String? = null,
+public class ProcessingContext(
+    public val originalMetadata: DependangerMetadata,
+    public val settings: Settings,
+    public val environment: ProcessingEnvironment,
+    public val activeDistribution: String? = null,
 ) {
     private val properties: MutableMap<ProcessingContextKey<*>, Any> = mutableMapOf()
 

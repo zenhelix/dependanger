@@ -8,5 +8,5 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ProfileProcessor : EffectiveMetadataProcessor {
     override val id: String = "profile"
     override val order: Int = ProcessingPhase.PROFILE.order
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

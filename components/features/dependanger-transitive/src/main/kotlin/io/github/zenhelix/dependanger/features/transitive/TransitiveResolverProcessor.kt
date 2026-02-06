@@ -9,5 +9,5 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = "transitive-resolver"
     override val order: Int = ProcessingPhase.TRANSITIVE_RESOLVER.order
 
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

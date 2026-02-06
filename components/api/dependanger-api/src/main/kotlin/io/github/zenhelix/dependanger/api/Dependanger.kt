@@ -11,10 +11,10 @@ public class Dependanger private constructor(
     private val preset: ProcessingPreset,
     private val environment: ProcessingEnvironment,
 ) {
-    public fun process(distribution: String? = null, callback: ProcessingCallback? = null): DependangerResult = TODO()
+    public suspend fun process(distribution: String? = null, callback: ProcessingCallback? = null): DependangerResult = TODO()
     public fun generateToml(effective: EffectiveMetadata): String = TODO()
     public fun generateBom(effective: EffectiveMetadata): String = TODO()
-    public fun validate(): DependangerResult = TODO()
+    public suspend fun validate(): DependangerResult = TODO()
 
     public companion object {
         public fun fromDsl(block: DependangerDsl.() -> Unit): DependangerBuilder = DependangerBuilder(block)

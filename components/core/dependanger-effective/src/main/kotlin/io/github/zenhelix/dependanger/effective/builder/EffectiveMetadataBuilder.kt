@@ -14,5 +14,5 @@ public class EffectiveMetadataBuilder {
     public fun distribution(name: String): EffectiveMetadataBuilder = apply { this.distribution = name }
     public fun environment(env: ProcessingEnvironment): EffectiveMetadataBuilder = apply { this.environment = env }
 
-    public fun build(metadata: DependangerMetadata): EffectiveMetadata = TODO()
+    public suspend fun build(metadata: DependangerMetadata): EffectiveMetadata = TODO()
 }

@@ -8,5 +8,5 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = "library-filter"
     override val order: Int = ProcessingPhase.LIBRARY_FILTER.order
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

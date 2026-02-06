@@ -8,5 +8,5 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class PluginProcessor : EffectiveMetadataProcessor {
     override val id: String = "plugin"
     override val order: Int = ProcessingPhase.PLUGIN.order
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

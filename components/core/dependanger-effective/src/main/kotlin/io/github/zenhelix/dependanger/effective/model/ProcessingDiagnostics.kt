@@ -1,21 +1,13 @@
 package io.github.zenhelix.dependanger.effective.model
 
-import io.github.zenhelix.dependanger.core.model.Severity
-import kotlinx.serialization.Serializable
+import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 
-@Serializable
-public data class ProcessingDiagnostics(
-    val errors: List<DiagnosticMessage> = emptyList(),
-    val warnings: List<DiagnosticMessage> = emptyList(),
-    val infos: List<DiagnosticMessage> = emptyList(),
-) {
-    public val hasErrors: Boolean get() = errors.isNotEmpty()
-}
+@Deprecated("Use io.github.zenhelix.dependanger.core.model.Diagnostics", ReplaceWith("Diagnostics", "io.github.zenhelix.dependanger.core.model.Diagnostics"))
+public typealias ProcessingDiagnostics = Diagnostics
 
-@Serializable
-public data class DiagnosticMessage(
-    val code: String,
-    val message: String,
-    val severity: Severity,
-    val processorId: String? = null,
+@Deprecated(
+    "Use io.github.zenhelix.dependanger.core.model.DiagnosticMessage",
+    ReplaceWith("DiagnosticMessage", "io.github.zenhelix.dependanger.core.model.DiagnosticMessage")
 )
+public typealias ProcessingDiagnosticMessage = DiagnosticMessage

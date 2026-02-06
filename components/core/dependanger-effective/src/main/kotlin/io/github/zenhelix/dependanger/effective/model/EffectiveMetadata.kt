@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.model
 
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,7 +11,7 @@ public data class EffectiveMetadata(
     val libraries: List<EffectiveLibrary> = emptyList(),
     val plugins: List<EffectivePlugin> = emptyList(),
     val bundles: List<EffectiveBundle> = emptyList(),
-    val diagnostics: ProcessingDiagnostics = ProcessingDiagnostics(),
+    val diagnostics: Diagnostics = Diagnostics(),
     val updates: List<UpdateAvailableInfo> = emptyList(),
     val vulnerabilities: List<VulnerabilityInfo> = emptyList(),
     val licenseViolations: List<LicenseViolation> = emptyList(),

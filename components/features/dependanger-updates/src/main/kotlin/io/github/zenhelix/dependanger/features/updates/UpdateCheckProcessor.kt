@@ -9,5 +9,5 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
     override val id: String = "update-check"
     override val order: Int = ProcessingPhase.UPDATE_CHECK.order
 
-    override fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }

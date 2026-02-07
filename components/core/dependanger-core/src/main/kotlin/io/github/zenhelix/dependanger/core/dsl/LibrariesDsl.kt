@@ -50,6 +50,7 @@ public class LibrariesDsl {
 
 @DependangerDslMarker
 public class LibraryDsl(private var version: VersionReference? = null) {
+    public var description: String? = null
     public var tags: MutableSet<String> = mutableSetOf()
     public var requires: Requirements? = null
     public var deprecation: DeprecationInfo? = null
@@ -89,6 +90,7 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         group = group,
         artifact = artifact,
         version = version,
+        description = description,
         tags = tags.toSet(),
         requires = requires,
         deprecation = deprecation,

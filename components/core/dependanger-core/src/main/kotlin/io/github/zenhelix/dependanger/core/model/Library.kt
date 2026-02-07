@@ -8,6 +8,7 @@ public data class Library(
     val group: String,
     val artifact: String,
     val version: VersionReference? = null,
+    val description: String? = null,
     val tags: Set<String> = emptySet(),
     val requires: Requirements? = null,
     val deprecation: DeprecationInfo? = null,

@@ -12,6 +12,7 @@ public data class EffectiveLibrary(
     val group: String,
     val artifact: String,
     val version: ResolvedVersion? = null,
+    val description: String? = null,
     val tags: Set<String> = emptySet(),
     val requires: Requirements? = null,
     val isDeprecated: Boolean = false,

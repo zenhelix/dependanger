@@ -98,8 +98,8 @@ public class TagExcludeDsl {
 
 @DependangerDslMarker
 public class GroupFilterDsl {
-    public val includes: MutableList<String> = mutableListOf()
-    public val excludes: MutableList<String> = mutableListOf()
+    public val includes: MutableSet<String> = mutableSetOf()
+    public val excludes: MutableSet<String> = mutableSetOf()
 
     public fun include(block: GroupMatchDsl.() -> Unit) {
         val dsl = GroupMatchDsl().apply(block)
@@ -111,7 +111,7 @@ public class GroupFilterDsl {
         excludes.addAll(dsl.patterns)
     }
 
-    public fun toGroupFilter(): GroupFilter = GroupFilter(includes = includes.toList(), excludes = excludes.toList())
+    public fun toGroupFilter(): GroupFilter = GroupFilter(includes = includes.toSet(), excludes = excludes.toSet())
 }
 
 @DependangerDslMarker

@@ -70,7 +70,6 @@ public data class SecurityCheckSettings(
     val enabled: Boolean = false,
     val failOnVulnerability: Severity = Severity.ERROR,
     val ignoreVulnerabilities: List<String> = emptyList(),
-    val osvApiUrl: String = "https://api.osv.dev",
 )
 
 @Serializable

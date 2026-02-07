@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class GroupFilter(
-    val includes: List<String> = emptyList(),
-    val excludes: List<String> = emptyList(),
+    val includes: Set<String> = emptySet(),
+    val excludes: Set<String> = emptySet(),
 )

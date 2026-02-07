@@ -15,6 +15,15 @@ public sealed class VersionReference {
 }
 
 @Serializable
-public data class VersionRange(
-    val notation: String,
-)
+public sealed class VersionRange {
+    @Serializable
+    public data class Simple(val notation: String) : VersionRange()
+
+    @Serializable
+    public data class Rich(
+        val require: String? = null,
+        val strictly: String? = null,
+        val prefer: String? = null,
+        val reject: List<String> = emptyList(),
+    ) : VersionRange()
+}

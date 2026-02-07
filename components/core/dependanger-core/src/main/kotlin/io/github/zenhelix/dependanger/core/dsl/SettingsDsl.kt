@@ -192,13 +192,11 @@ public class SecurityCheckSettingsDsl {
     public var enabled: Boolean = false
     public var failOnVulnerability: Severity = Severity.ERROR
     public var ignoreVulnerabilities: List<String> = emptyList()
-    public var osvApiUrl: String = "https://api.osv.dev"
 
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(
         enabled = enabled,
         failOnVulnerability = failOnVulnerability,
         ignoreVulnerabilities = ignoreVulnerabilities,
-        osvApiUrl = osvApiUrl,
     )
 }
 

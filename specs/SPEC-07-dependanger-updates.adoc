@@ -1,0 +1,404 @@
+= SPEC-07: dependanger-updates -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-updates` проверяет доступные обновления для библиотек, запрашивая Maven metadata XML из репозиториев.
+Результаты хранятся в `EffectiveMetadata.extensions` через `ExtensionKey` (`EffectiveMetadataKeys.UPDATES`).
+
+Приоритет: **P3** (желательно).
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+Нет полностью реализованных компонентов.
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// UpdateCheckProcessor.kt
+public class UpdateCheckProcessor : EffectiveMetadataProcessor {
+    override val id: String = "update-check"
+    override val phase: ProcessingPhase = ProcessingPhase.UPDATE_CHECK  // order=100, PARALLEL_IO
+    override val isOptional: Boolean = true
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+}
+----
+
+[[spec-update-check]]
+== SPEC-07.1: UpdateCheckProcessor.process()
+
+[[purpose-update-check]]
+=== Назначение
+
+Параллельно запрашивает Maven репозитории для определения доступных обновлений каждой библиотеки.
+Классифицирует обновления по типу (PATCH, MINOR, MAJOR, PRERELEASE) и сохраняет результаты в extensions.
+
+[[algorithm-update-check]]
+=== Алгоритм
+
+[source,text]
+----
+1. Получить настройки updateCheck из context.settings
+2. Получить список repositories из `context.settings.repositories` (см. xref:index.adoc#repository-convention[конвенция репозиториев]). Default: Maven Central
+3. Получить фильтры: excludePatterns, includePrerelease, minUpdateType
+4. Отфильтровать библиотеки:
+   a. Исключить библиотеки с ignoreUpdates = true
+   b. Исключить библиотеки matching excludePatterns
+   c. Исключить библиотеки без resolvedVersion
+5. Создать VersionCache (файловый кеш, TTL 1h)
+6. Параллельно (Semaphore с concurrency = parallelism, default 10):
+   Для каждой отфильтрованной библиотеки:
+   a. Проверить кеш -> если есть и не истёк -> использовать
+   b. Запросить maven-metadata.xml из репозиториев
+   c. Распарсить XML: извлечь <versioning><versions><version>
+   d. Отфильтровать prerelease (alpha, beta, rc, snapshot, M, CR, ea)
+   e. Сравнить текущую версию с найденными
+   f. Определить latestStable, latestAny, updateType
+   g. Если есть обновление -> создать UpdateAvailableInfo
+   h. Сохранить в кеш
+7. Собрать все UpdateAvailableInfo в список
+8. Отфильтровать по minUpdateType
+9. Записать в metadata через withExtension(EffectiveMetadataKeys.UPDATES, updates)
+10. Добавить INFO в diagnostics: "X updates available"
+----
+
+[[implementation-update-check]]
+=== Детальная реализация
+
+==== MavenMetadataFetcher (новый класс)
+
+[source,kotlin]
+----
+public class MavenMetadataFetcher(
+    private val repositories: List<MavenRepository>,
+    private val httpClient: HttpClient,
+    private val timeout: Long = 30_000,
+) {
+    /**
+     * Запрашивает maven-metadata.xml для артефакта.
+     * URL: {repoUrl}/{groupPath}/{artifactId}/maven-metadata.xml
+     */
+    public suspend fun fetchAvailableVersions(
+        group: String,
+        artifact: String
+    ): VersionFetchResult {
+        val groupPath = group.replace('.', '/')
+        for (repo in repositories) {
+            val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/maven-metadata.xml"
+            try {
+                val response = httpClient.get(url) {
+                    timeout { requestTimeoutMillis = this@MavenMetadataFetcher.timeout }
+                    if (repo.username != null && repo.password != null) {
+                        basicAuth(repo.username, repo.password)
+                    }
+                }
+                if (response.status == HttpStatusCode.OK) {
+                    val versions = parseMavenMetadataXml(response.bodyAsText())
+                    return VersionFetchResult(versions, repo.url)
+                }
+            } catch (e: Exception) {
+                logger.warn { "Failed to fetch metadata for $group:$artifact from ${repo.url}: ${e.message}" }
+            }
+        }
+        return VersionFetchResult(emptyList(), null)
+    }
+
+    private fun parseMavenMetadataXml(xml: String): List<String> {
+        // Парсинг: <metadata><versioning><versions><version>X.Y.Z</version>...
+        val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(xml.byteInputStream())
+        val versionNodes = doc.getElementsByTagName("version")
+        return (0 until versionNodes.length).map { versionNodes.item(it).textContent }
+    }
+}
+
+public data class VersionFetchResult(
+    val versions: List<String>,
+    val repository: String?,
+)
+----
+
+==== VersionComparator
+
+NOTE: `VersionComparator` и `SemanticVersion` определены в `dependanger-core` (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01: Общие утилиты]).
+Модуль `dependanger-updates` использует каноническую реализацию из `io.github.zenhelix.dependanger.core.util.VersionComparator`.
+
+Используемые методы:
+
+* `VersionComparator.parse(version): SemanticVersion?` — парсинг строки в семантическую версию
+* `VersionComparator.isPrerelease(version): Boolean` — определение prerelease
+* `VersionComparator.compare(a, b): Int` — сравнение двух версий
+* `VersionComparator.classifyUpdate(current, latest): UpdateType` — классификация обновления (MAJOR/MINOR/PATCH/PRERELEASE)
+
+==== UpdateCheckProcessor.process()
+
+[source,kotlin]
+----
+override suspend fun process(
+    metadata: EffectiveMetadata,
+    context: ProcessingContext
+): EffectiveMetadata {
+    val settings = context.settings.updateCheck ?: return metadata
+    val repos = context.settings.repositories.ifEmpty {
+        listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
+    }
+    val fetcher = MavenMetadataFetcher(repos, createHttpClient(), settings.timeout)
+    val cache = VersionCache(settings.cacheDirectory, settings.cacheTtlHours)
+    val includePrerelease = settings.includePrerelease
+    val parallelism = settings.parallelism ?: 10
+
+    // Отфильтровать библиотеки
+    val librariesToCheck = metadata.libraries.values
+        .filter { it.resolvedVersion != null }
+        .filter { lib -> settings.excludePatterns.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) } }
+
+    // GlobMatcher из dependanger-core (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01])
+
+    val semaphore = Semaphore(parallelism)
+    val updates = coroutineScope {
+        librariesToCheck.map { lib ->
+            async {
+                semaphore.withPermit {
+                    checkUpdate(lib, fetcher, cache, includePrerelease)
+                }
+            }
+        }.awaitAll().filterNotNull()
+    }
+
+    // Фильтр по minUpdateType
+    val filtered = settings.minUpdateType?.let { min ->
+        updates.filter { it.updateType.ordinal <= min.ordinal }
+    } ?: updates
+
+    return metadata
+        .withExtension(EffectiveMetadataKeys.UPDATES, filtered)
+        .let { m ->
+            if (filtered.isNotEmpty()) {
+                val summary = "Updates available: ${filtered.size} " +
+                    "(${filtered.count { it.updateType == UpdateType.MAJOR }} major, " +
+                    "${filtered.count { it.updateType == UpdateType.MINOR }} minor, " +
+                    "${filtered.count { it.updateType == UpdateType.PATCH }} patch)"
+                m.copy(diagnostics = m.diagnostics.addInfo(
+                    DiagnosticMessage("UPDATES_AVAILABLE", summary, "update-check")
+                ))
+            } else m
+        }
+}
+
+private suspend fun checkUpdate(
+    lib: EffectiveLibrary,
+    fetcher: MavenMetadataFetcher,
+    cache: VersionCache,
+    includePrerelease: Boolean,
+): UpdateAvailableInfo? {
+    val currentVersion = lib.resolvedVersion ?: return null
+    val currentParsed = VersionComparator.parse(currentVersion) ?: return null
+
+    // Кеш
+    val cachedVersions = cache.get(lib.group, lib.artifact)
+    val result = cachedVersions ?: fetcher.fetchAvailableVersions(lib.group, lib.artifact)
+
+    if (cachedVersions == null && result.versions.isNotEmpty()) {
+        cache.put(lib.group, lib.artifact, result)
+    }
+
+    if (result.versions.isEmpty()) return null
+
+    // Фильтрация и сортировка
+    val stableVersions = result.versions
+        .filter { !VersionComparator.isPrerelease(it) }
+        .mapNotNull { v -> VersionComparator.parse(v)?.let { v to it } }
+        .sortedByDescending { it.second }
+
+    val allVersions = result.versions
+        .mapNotNull { v -> VersionComparator.parse(v)?.let { v to it } }
+        .sortedByDescending { it.second }
+
+    val latestStable = stableVersions.firstOrNull()
+    val latestAny = allVersions.firstOrNull()
+
+    // Определить обновление
+    val targetVersion = if (includePrerelease) latestAny else latestStable
+    if (targetVersion == null || targetVersion.second <= currentParsed) return null
+
+    // UpdateType enum определён в dependanger-core (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01])
+    val updateType = VersionComparator.classifyUpdate(currentParsed, targetVersion.second)
+
+    return UpdateAvailableInfo(
+        alias = lib.alias,
+        group = lib.group,
+        artifact = lib.artifact,
+        currentVersion = currentVersion,
+        latestVersion = targetVersion.first,
+        latestStable = latestStable?.first,
+        latestAny = latestAny?.first,
+        updateType = updateType,
+        repository = result.repository,
+    )
+}
+----
+
+[[api-spec]]
+== API: Maven Metadata XML
+
+=== Endpoint
+
+[source,text]
+----
+GET https://repo1.maven.org/maven2/{groupPath}/{artifactId}/maven-metadata.xml
+----
+
+=== Пример ответа
+
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+    <groupId>org.jetbrains.kotlin</groupId>
+    <artifactId>kotlin-stdlib</artifactId>
+    <versioning>
+        <latest>2.1.20</latest>
+        <release>2.1.20</release>
+        <versions>
+            <version>1.9.25</version>
+            <version>2.0.0</version>
+            <version>2.0.0-RC1</version>
+            <version>2.1.0</version>
+            <version>2.1.20</version>
+        </versions>
+        <lastUpdated>20260115120000</lastUpdated>
+    </versioning>
+</metadata>
+----
+
+[[cache-impl]]
+== Кеш версий
+
+=== Структура
+
+[source,text]
+----
+~/.dependanger/cache/versions/
+  org.jetbrains.kotlin/
+    kotlin-stdlib.json    # {"versions":["2.1.20",...], "fetchedAt":"...", "repository":"..."}
+----
+
+NOTE: Ключ кеша: `"{groupId}/{artifactId}.json"`.
+Dots в groupId сохраняются как есть (НЕ заменяются на слеши).
+Например: `org.jetbrains.kotlin/kotlin-stdlib.json`.
+
+=== TTL
+
+- Default: 1 час (настраивается через `settings.updateCheck.cache.ttl`)
+- При недоступности сети: используется стейл кеш с WARNING
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Диагностический код
+
+| Репозиторий недоступен | WARNING, библиотека пропускается | `UPDATE_REPO_UNREACHABLE`
+| Таймаут запроса | WARNING, retry 1 раз | `UPDATE_TIMEOUT`
+| Библиотека не найдена | WARNING, пропуск | `UPDATE_LIB_NOT_FOUND`
+| Невалидный формат версии | WARNING, сравнение как строки | `UPDATE_INVALID_VERSION`
+| Пустой каталог | Процессор завершается, 0 обновлений | --
+| Все актуальны | INFO "All libraries are up to date" | `ALL_UP_TO_DATE`
+| Prerelease текущая версия | Показывать обновление до стабильной | --
+| Downgrade (max < current) | Не показывать | --
+| Rate limiting (429) | Exponential backoff + WARNING | `UPDATE_RATE_LIMITED`
+| 500+ библиотек | Semaphore(10), параллельная обработка | --
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+[cols="1,2,1"]
+|===
+| Код | Описание | Уровень
+
+| `UPDATES_AVAILABLE` | Сводка доступных обновлений | INFO
+| `ALL_UP_TO_DATE` | Все библиотеки актуальны | INFO
+| `UPDATE_REPO_UNREACHABLE` | Репозиторий недоступен | WARNING
+| `UPDATE_TIMEOUT` | Таймаут запроса | WARNING
+| `UPDATE_LIB_NOT_FOUND` | Библиотека не найдена | WARNING
+| `UPDATE_INVALID_VERSION` | Невалидный формат версии | WARNING
+| `UPDATE_RATE_LIMITED` | Rate limiting от репозитория | WARNING
+|===
+
+[[extension-keys]]
+== ExtensionKey
+
+[source,kotlin]
+----
+// Запись результатов:
+metadata.withExtension(EffectiveMetadataKeys.UPDATES, updates: List<UpdateAvailableInfo>)
+
+// Чтение результатов:
+metadata.updates // -> List<UpdateAvailableInfo>
+----
+
+[[testing]]
+== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `no libraries returns empty updates` | Пустой каталог -> 0 обновлений
+| `library with newer stable version` | 2.1.0 -> 2.1.20 -> PATCH update
+| `major version update detected` | 2.3.0 -> 3.0.0 -> MAJOR
+| `minor version update detected` | 3.2.0 -> 3.4.0 -> MINOR
+| `prerelease filtered by default` | Только RC доступна -> нет обновлений
+| `prerelease included when enabled` | includePrerelease=true -> показать RC
+| `declared version not skipped` | Библиотека с версией проверяется
+| `excludePatterns filter works` | "org.springframework:*" -> Spring пропускается
+| `multiple repos fallback` | Первый 404, второй 200 -> успех
+| `cache hit skips network` | Кеш валиден -> нет HTTP запроса
+| `parallel execution with semaphore` | 100 библиотек, max 10 concurrent
+| `version comparison edge cases` | 1.0.Final vs 1.0.1, qualifiers
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-updates зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- dependanger-maven-resolver (implementation)
+- io.ktor:ktor-client-core:3.1.1 (implementation)
+- io.ktor:ktor-client-cio:3.1.1 (implementation)
+- io.ktor:ktor-client-content-negotiation:3.1.1 (implementation)
+- io.ktor:ktor-serialization-kotlinx-json:3.1.1 (implementation)
+- org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0 (implementation)
+- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `UpdateCheckProcessor.kt` | Реализация `process()` -- основная логика проверки обновлений
+| `MavenMetadataFetcher.kt` | **Создать** -- HTTP-загрузка и парсинг maven-metadata.xml
+| `VersionCache.kt` | **Создать** -- файловый кеш результатов проверки версий
+|===
+
+[[priority]]
+== Приоритет
+
+**P3** (желательно) -- Проверка обновлений полезна для CI/CD, но не блокирует основной workflow.
+Включается через `withUpdateCheck()` или `processing { checkUpdates = true }`.

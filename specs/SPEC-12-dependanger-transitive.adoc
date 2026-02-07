@@ -1,0 +1,711 @@
+= SPEC-12: dependanger-transitive -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-transitive` резолвит транзитивные зависимости из Maven repositories, строит дерево зависимостей, обнаруживает конфликты версий и применяет constraints (VERSION, EXCLUDE, SUBSTITUTE).
+Результаты хранятся в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.TRANSITIVES`, `EffectiveMetadataKeys.FLAT_DEPENDENCIES` и `EffectiveMetadataKeys.VERSION_CONFLICTS`.
+
+Приоритет: **P4** (будущее).
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `TransitiveTree.kt` | Полностью: @Serializable data class (group, artifact, version, children, isDuplicate, scope)
+| `FlatDependency.kt` | Полностью: @Serializable data class (group, artifact, version, isDirectDependency, isOptional)
+| `VersionConflict.kt` | Полностью: @Serializable data class (group, artifact, requestedVersions, resolvedVersion, resolution)
+|===
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// TransitiveResolverProcessor.kt
+public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
+    override val id: String = "transitive-resolver"
+    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=140, PARALLEL_IO
+    override val isOptional: Boolean = true
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+}
+----
+
+[[spec-transitive-resolver]]
+== SPEC-12.1: TransitiveResolverProcessor.process()
+
+[[purpose-transitive]]
+=== Назначение
+
+Для каждой прямой библиотеки из EffectiveMetadata скачать POM из Maven repository, рекурсивно разрезолвить дерево зависимостей (до maxDepth), обнаружить конфликты версий, применить constraints и предоставить результат следующим процессорам (security-check, license-check через includeTransitives).
+
+[[algorithm-transitive]]
+=== Алгоритм
+
+[source,text]
+----
+1. Получить настройки transitiveResolution из context.settings
+2. Получить repositories из settings (default: Maven Central)
+3. Получить constraints из context.originalMetadata.constraints
+4. Собрать прямые зависимости:
+   a. Все библиотеки из metadata.libraries с resolvedVersion != null
+   b. Все библиотеки из metadata.plugins с resolvedVersion != null (если includePlugins=true)
+5. Для каждой прямой зависимости (параллельно, PARALLEL_IO):
+   a. Проверить кеш для group:artifact:version
+   b. Если нет в кеше:
+      i.   Скачать POM из repository через MavenPomDownloader
+      ii.  Распарсить <dependencies> секцию (исключить test, provided scope по умолчанию)
+      iii. Для каждой зависимости в POM рекурсивно резолвить (до maxDepth)
+      iv.  Обнаружить циклические зависимости (Set<"group:artifact"> visited)
+      v.   Пометить дубликаты (isDuplicate=true)
+   c. Построить TransitiveTree для библиотеки
+   d. Сохранить в кеш
+6. Обнаружить конфликты версий:
+   a. Собрать все артефакты с разными версиями
+   b. Для каждого конфликта:
+      i.   Применить стратегию HIGHEST (наивысшая версия)
+      ii.  Если есть constraint -> использовать версию из constraint
+      iii. Создать VersionConflict(requestedVersions, resolvedVersion, resolution)
+7. Применить constraints:
+   a. VERSION -> заменить resolved version в дереве и flat list
+   b. EXCLUDE -> удалить из дерева и flat list
+   c. SUBSTITUTE -> заменить артефакт (координаты) в дереве и flat list
+8. Построить flat list (FlatDependency для каждого уникального артефакта):
+   a. Deduplicate по group:artifact
+   b. Записать isDirectDependency, isOptional
+9. Записать в metadata:
+   a. withExtension(EffectiveMetadataKeys.TRANSITIVES, trees: List<TransitiveTree>)
+   b. withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flat: List<FlatDependency>)
+   c. withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts: List<VersionConflict>)
+10. Добавить diagnostics:
+    a. INFO: "Resolved X direct, Y transitive dependencies, Z conflicts"
+    b. Для каждого конфликта -> WARNING с деталями
+    c. Если constraint на несуществующую -> WARNING
+----
+
+[[implementation-transitive]]
+=== Детальная реализация
+
+==== TransitiveResolverProcessor.process()
+
+[source,kotlin]
+----
+public class TransitiveResolverProcessor(
+    private val pomDownloader: MavenPomDownloader = MavenPomDownloader(),
+    private val cache: TransitiveCache = TransitiveCache(),
+    private val maxDepth: Int = 50,
+) : EffectiveMetadataProcessor {
+    override val id: String = "transitive-resolver"
+    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=140, PARALLEL_IO
+    override val isOptional: Boolean = true
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): EffectiveMetadata {
+        val settings = context.settings.transitiveResolution ?: return metadata
+        val repositories = settings.repositories.ifEmpty {
+            listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
+        }
+        val constraints = context.originalMetadata.constraints ?: emptyList()
+        val effectiveMaxDepth = settings.maxDepth ?: maxDepth
+        val scopes = settings.scopes ?: listOf("compile", "runtime")
+
+        val libraries = metadata.libraries.values
+            .filter { it.resolvedVersion != null }
+
+        if (libraries.isEmpty()) {
+            return metadata.withDiagnostic(
+                DiagnosticEntry.info("TRANSITIVE_NO_LIBS", "No libraries to resolve transitives for")
+            )
+        }
+
+        // Параллельный резолвинг
+        val trees = coroutineScope {
+            libraries.map { lib ->
+                async {
+                    resolveTree(
+                        group = lib.group,
+                        artifact = lib.artifact,
+                        version = lib.resolvedVersion!!,
+                        repositories = repositories,
+                        depth = 0,
+                        maxDepth = effectiveMaxDepth,
+                        scopes = scopes,
+                        visited = mutableSetOf("${lib.group}:${lib.artifact}"),
+                    )
+                }
+            }.awaitAll()
+        }
+
+        // Обнаружить конфликты
+        val allDependencies = collectAllDependencies(trees)
+        val conflicts = detectConflicts(allDependencies, constraints)
+
+        // Применить constraints
+        val constrainedTrees = applyConstraints(trees, constraints)
+
+        // Построить flat list
+        val flatList = buildFlatList(constrainedTrees, libraries)
+
+        // Записать результаты
+        var updatedMetadata = metadata
+            .withExtension(EffectiveMetadataKeys.TRANSITIVES, constrainedTrees)
+            .withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flatList)
+            .withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts)
+
+        updatedMetadata = updatedMetadata.withDiagnostic(
+            DiagnosticEntry.info(
+                "TRANSITIVE_RESOLVED",
+                "Resolved ${libraries.size} direct, ${flatList.count { !it.isDirectDependency }} transitive dependencies, ${conflicts.size} conflicts"
+            )
+        )
+
+        for (conflict in conflicts) {
+            updatedMetadata = updatedMetadata.withDiagnostic(
+                DiagnosticEntry.warning(
+                    "TRANSITIVE_CONFLICT",
+                    "Version conflict: ${conflict.group}:${conflict.artifact} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})"
+                )
+            )
+        }
+
+        return updatedMetadata
+    }
+}
+----
+
+==== Рекурсивный резолвинг дерева
+
+[source,kotlin]
+----
+private suspend fun resolveTree(
+    group: String,
+    artifact: String,
+    version: String,
+    repositories: List<MavenRepository>,
+    depth: Int,
+    maxDepth: Int,
+    scopes: List<String>,
+    visited: MutableSet<String>,
+): TransitiveTree {
+    val coordinate = "$group:$artifact"
+
+    // Проверить максимальную глубину
+    if (depth >= maxDepth) {
+        logger.warn { "Max depth $maxDepth reached for $coordinate:$version, branch truncated" }
+        // WARNING в diagnostics добавляется вызывающим кодом
+        return TransitiveTree(group, artifact, version, children = emptyList())
+    }
+
+    // Проверить кеш
+    cache.get(group, artifact, version)?.let { cached ->
+        return cached.copy(isDuplicate = coordinate in visited)
+    }
+
+    // Скачать и распарсить POM
+    val pomXml = try {
+        downloadPom(group, artifact, version, repositories)
+    } catch (e: Exception) {
+        logger.warn(e) { "Failed to download POM for $coordinate:$version" }
+        return TransitiveTree(group, artifact, version, children = emptyList())
+    }
+
+    if (pomXml == null) {
+        return TransitiveTree(group, artifact, version, children = emptyList())
+    }
+
+    // Парсить зависимости из POM
+    val pomDependencies = parsePomDependencies(pomXml, scopes)
+
+    // Рекурсивно резолвить children
+    val children = coroutineScope {
+        pomDependencies.map { dep ->
+            async {
+                val childCoordinate = "${dep.group}:${dep.artifact}"
+                if (childCoordinate in visited) {
+                    // Циклическая зависимость
+                    TransitiveTree(dep.group, dep.artifact, dep.version, isDuplicate = true, scope = dep.scope)
+                } else {
+                    val newVisited = visited.toMutableSet().apply { add(childCoordinate) }
+                    resolveTree(
+                        group = dep.group,
+                        artifact = dep.artifact,
+                        version = dep.version ?: "UNKNOWN",
+                        repositories = repositories,
+                        depth = depth + 1,
+                        maxDepth = maxDepth,
+                        scopes = scopes,
+                        visited = newVisited,
+                    ).copy(scope = dep.scope)
+                }
+            }
+        }.awaitAll()
+    }
+
+    val tree = TransitiveTree(group, artifact, version, children = children)
+
+    // Сохранить в кеш
+    cache.put(group, artifact, version, tree)
+
+    return tree
+}
+----
+
+==== POM зависимости парсинг
+
+[source,kotlin]
+----
+private fun parsePomDependencies(
+    pomXml: String,
+    scopes: List<String>,
+): List<PomDependencyEntry> {
+    val factory = DocumentBuilderFactory.newInstance()
+    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+    val builder = factory.newDocumentBuilder()
+    val doc = builder.parse(InputSource(StringReader(pomXml)))
+
+    // Собрать properties для подстановки ${property}
+    val properties = parseProperties(doc)
+
+    // Собрать managedVersions из <dependencyManagement>
+    val managedVersions = parseDependencyManagement(doc, properties)
+
+    // Парсить <dependencies> (только прямые, не из dependencyManagement)
+    val dependenciesNode = doc.documentElement
+        .getElementsByTagName("dependencies")
+        .let { nodes ->
+            (0 until nodes.length)
+                .map { nodes.item(it) }
+                .firstOrNull { it.parentNode == doc.documentElement }
+        } ?: return emptyList()
+
+    val depNodes = (dependenciesNode as Element).getElementsByTagName("dependency")
+    return (0 until depNodes.length).mapNotNull { i ->
+        val node = depNodes.item(i) as Element
+        val group = resolveProperty(node.getTagValue("groupId"), properties) ?: return@mapNotNull null
+        val artifact = resolveProperty(node.getTagValue("artifactId"), properties) ?: return@mapNotNull null
+        val version = resolveProperty(node.getTagValue("version"), properties)
+            ?: managedVersions["$group:$artifact"]
+        val scope = node.getTagValue("scope") ?: "compile"
+        val optional = node.getTagValue("optional")?.toBooleanStrictOrNull() ?: false
+
+        // Фильтр по scope
+        if (scope !in scopes) return@mapNotNull null
+        if (optional && !includeOptional) return@mapNotNull null
+
+        PomDependencyEntry(group, artifact, version, scope)
+    }
+}
+
+internal data class PomDependencyEntry(
+    val group: String,
+    val artifact: String,
+    val version: String?,
+    val scope: String,
+)
+
+private fun resolveProperty(value: String?, properties: Map<String, String>): String? {
+    if (value == null) return null
+    if (!value.contains("\${")) return value
+
+    val regex = Regex("""\$\{([^}]+)}""")
+    return regex.replace(value) { match ->
+        val propName = match.groupValues[1]
+        properties[propName] ?: match.value
+    }
+}
+----
+
+==== Обнаружение конфликтов
+
+[source,kotlin]
+----
+private fun detectConflicts(
+    allDependencies: Map<String, List<String>>, // group:artifact -> [versions]
+    constraints: List<Constraint>,
+): List<VersionConflict> {
+    return allDependencies
+        .filter { (_, versions) -> versions.distinct().size > 1 }
+        .map { (coordinate, versions) ->
+            val (group, artifact) = coordinate.split(":", limit = 2)
+            val distinctVersions = versions.distinct()
+
+            // Проверить constraint
+            val constraint = constraints.firstOrNull {
+                it.type == ConstraintType.VERSION &&
+                    it.coordinates.group == group &&
+                    it.coordinates.artifact == artifact
+            }
+
+            val resolvedVersion = if (constraint != null) {
+                constraint.coordinates.version
+            } else {
+                selectHighest(distinctVersions)
+            }
+
+            val resolution = if (constraint != null) {
+                ConflictResolutionStrategy.CONSTRAINT
+            } else {
+                ConflictResolutionStrategy.HIGHEST
+            }
+
+            VersionConflict(
+                group = group,
+                artifact = artifact,
+                requestedVersions = distinctVersions,
+                resolvedVersion = resolvedVersion,
+                resolution = resolution,
+            )
+        }
+}
+
+/**
+ * Выбрать наивысшую версию из списка.
+ * Используется семантическое сравнение, с fallback на строковое.
+ */
+private fun selectHighest(versions: List<String>): String {
+    return versions.sortedWith(VersionComparator.comparator()).last()
+}
+----
+
+==== Применение constraints
+
+[source,kotlin]
+----
+private fun applyConstraints(
+    trees: List<TransitiveTree>,
+    constraints: List<Constraint>,
+): List<TransitiveTree> {
+    var result = trees
+
+    for (constraint in constraints) {
+        result = when (constraint.type) {
+            ConstraintType.VERSION -> applyVersionConstraint(result, constraint)
+            ConstraintType.EXCLUDE -> applyExcludeConstraint(result, constraint)
+            ConstraintType.SUBSTITUTE -> applySubstituteConstraint(result, constraint)
+        }
+    }
+
+    return result
+}
+
+private fun applyVersionConstraint(
+    trees: List<TransitiveTree>,
+    constraint: Constraint,
+): List<TransitiveTree> {
+    return trees.map { tree ->
+        if (tree.group == constraint.coordinates.group &&
+            tree.artifact == constraint.coordinates.artifact) {
+            tree.copy(version = constraint.coordinates.version)
+        } else {
+            tree.copy(children = applyVersionConstraint(tree.children, constraint))
+        }
+    }
+}
+
+private fun applyExcludeConstraint(
+    trees: List<TransitiveTree>,
+    constraint: Constraint,
+): List<TransitiveTree> {
+    return trees
+        .filter { !(it.group == constraint.coordinates.group && it.artifact == constraint.coordinates.artifact) }
+        .map { tree ->
+            tree.copy(children = applyExcludeConstraint(tree.children, constraint))
+        }
+}
+
+private fun applySubstituteConstraint(
+    trees: List<TransitiveTree>,
+    constraint: Constraint,
+): List<TransitiveTree> {
+    val from = constraint.substituteFrom ?: return trees
+    return trees.map { tree ->
+        if (tree.group == from.group && tree.artifact == from.artifact) {
+            tree.copy(
+                group = constraint.coordinates.group,
+                artifact = constraint.coordinates.artifact,
+                version = constraint.coordinates.version,
+            )
+        } else {
+            tree.copy(children = applySubstituteConstraint(tree.children, constraint))
+        }
+    }
+}
+----
+
+==== Построение flat list
+
+[source,kotlin]
+----
+private fun buildFlatList(
+    trees: List<TransitiveTree>,
+    directLibraries: Collection<EffectiveLibrary>,
+): List<FlatDependency> {
+    val directCoordinates = directLibraries.map { "${it.group}:${it.artifact}" }.toSet()
+    val seen = mutableMapOf<String, FlatDependency>()
+
+    fun traverse(tree: TransitiveTree) {
+        val coordinate = "${tree.group}:${tree.artifact}"
+        if (coordinate !in seen && tree.version != null) {
+            seen[coordinate] = FlatDependency(
+                group = tree.group,
+                artifact = tree.artifact,
+                version = tree.version,
+                isDirectDependency = coordinate in directCoordinates,
+                isOptional = false,
+            )
+        }
+        tree.children.forEach { traverse(it) }
+    }
+
+    trees.forEach { traverse(it) }
+    return seen.values.toList()
+}
+----
+
+[[pom-download]]
+== Скачивание POM
+
+Модуль использует `MavenPomDownloader` из `dependanger-maven-resolver` для скачивания POM файлов.
+
+=== URL формирование
+
+[source,text]
+----
+{repositoryUrl}/{group.replace('.','/')}/{artifact}/{version}/{artifact}-{version}.pom
+----
+
+=== Пример
+
+[source,text]
+----
+https://repo.maven.apache.org/maven2/org/springframework/spring-web/6.2.0/spring-web-6.2.0.pom
+----
+
+=== Стратегия поиска по repositories
+
+[source,text]
+----
+1. Для каждого repository в порядке приоритета:
+   a. Попытка скачать POM
+   b. Если 200 OK -> парсить и вернуть
+   c. Если 404 -> перейти к следующему repository
+   d. Если 5xx/timeout -> retry 3 раза, затем перейти к следующему
+2. Если ни один repository не вернул POM -> WARNING, пустое дерево для библиотеки
+----
+
+[[cache-impl]]
+== Кеш транзитивных
+
+=== Структура
+
+[source,text]
+----
+~/.dependanger/cache/transitives/
+  org.springframework/
+    spring-web/
+      6.2.0.json    # TransitiveTree сериализованный
+  com.fasterxml.jackson.core/
+    jackson-databind/
+      2.17.0.json
+----
+
+=== TTL
+
+- Default: 24 часа
+- Ключ кеша: `{group}/{artifact}/{version}`
+- При недоступности сети: используется стейл кеш с WARNING
+
+=== Реализация
+
+[source,kotlin]
+----
+internal class TransitiveCache(
+    private val cacheDir: Path = Path(System.getProperty("user.home"), ".dependanger", "cache", "transitives"),
+    private val ttl: Duration = 24.hours,
+    private val json: Json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = false
+    },
+) {
+    suspend fun get(group: String, artifact: String, version: String): TransitiveTree? {
+        val file = cacheFile(group, artifact, version)
+        if (!file.exists()) return null
+
+        val age = Clock.System.now() - Instant.fromEpochMilliseconds(file.lastModified())
+        if (age > ttl) return null
+
+        return try {
+            json.decodeFromString<TransitiveTree>(file.readText())
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to read transitive cache for $group:$artifact:$version" }
+            null
+        }
+    }
+
+    suspend fun put(group: String, artifact: String, version: String, tree: TransitiveTree) {
+        val file = cacheFile(group, artifact, version)
+        file.parentFile.mkdirs()
+        file.writeText(json.encodeToString(tree))
+    }
+
+    fun invalidate(group: String, artifact: String, version: String) {
+        cacheFile(group, artifact, version).delete()
+    }
+
+    fun clear() {
+        cacheDir.toFile().deleteRecursively()
+    }
+
+    private fun cacheFile(group: String, artifact: String, version: String): File =
+        cacheDir.resolve(group).resolve(artifact).resolve("$version.json").toFile()
+}
+----
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Диагностический код
+
+| POM не найден (404) | WARNING, пустое дерево для библиотеки | `TRANSITIVE_POM_NOT_FOUND`
+| Repository недоступен | Retry с exponential backoff, затем WARNING | `TRANSITIVE_REPO_UNAVAILABLE`
+| Циклическая зависимость (A -> B -> C -> A) | Цикл обнаруживается, прерывается, isDuplicate=true | `TRANSITIVE_CYCLE_DETECTED`
+| Глубина > maxDepth (default=50) | Резолвинг останавливается, ветка обрезается, WARNING. Настраивается через `settings.transitiveResolution.maxDepth` | `TRANSITIVE_MAX_DEPTH`
+| > 5000 транзитивных | WARNING при >5000 транзитивных зависимостей | `TRANSITIVE_LARGE_TREE`
+| > 10000 транзитивных (maxTransitives) | ERROR и остановка резолвинга. Ограничение по умолчанию `maxTransitives = 10000`, настраивается через `settings.transitiveResolution.maxTransitives` | `TRANSITIVE_MAX_EXCEEDED`
+| Constraint на несуществующую библиотеку | WARNING "Constraint does not match" | `TRANSITIVE_UNUSED_CONSTRAINT`
+| Конфликтующие constraints | ERROR "Conflicting constraints" | `TRANSITIVE_CONFLICTING_CONSTRAINTS`
+| SNAPSHOT версии | Резолвятся как обычные, WARNING о нестабильности | `TRANSITIVE_SNAPSHOT`
+| Optional dependencies | Не включаются по умолчанию, опция includeOptional | --
+| Provided/Test scope | Не включаются по умолчанию, опция scopes | --
+| Parent POM | Parent POM резолвится, версии и dependencies наследуются | --
+| BOM в dependencyManagement | BOM резолвится, managed versions применяются | --
+| Пустой каталог | 0 транзитивных, INFO | `TRANSITIVE_NO_LIBS`
+| Таймаут при скачивании POM | Retry 3 раза, затем WARNING, пустое дерево | `TRANSITIVE_TIMEOUT`
+| Дубликаты в дереве | Помечаются isDuplicate=true, в flat list -- одна запись | --
+| Кеш устарел (TTL) | Перезапрос из repository | --
+| Сеть недоступна, кеш есть | Используется стейл кеш + WARNING | `TRANSITIVE_STALE_CACHE`
+| Параллельный резолвинг | Общие зависимости резолвятся один раз через кеш | --
+| Прерывание (Ctrl+C) | Graceful shutdown, частичные данные не сохраняются | --
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+[cols="1,2,1"]
+|===
+| Код | Описание | Уровень
+
+| `TRANSITIVE_RESOLVED` | Резолвинг транзитивных завершён | INFO
+| `TRANSITIVE_NO_LIBS` | Нет библиотек для резолвинга | INFO
+| `TRANSITIVE_CONFLICT` | Конфликт версий транзитивных | WARNING
+| `TRANSITIVE_POM_NOT_FOUND` | POM не найден в repositories | WARNING
+| `TRANSITIVE_REPO_UNAVAILABLE` | Repository недоступен | WARNING
+| `TRANSITIVE_CYCLE_DETECTED` | Обнаружена циклическая зависимость | WARNING
+| `TRANSITIVE_MAX_DEPTH` | Достигнута максимальная глубина | WARNING
+| `TRANSITIVE_LARGE_TREE` | Слишком большое дерево (> 5000 транзитивных) | WARNING
+| `TRANSITIVE_MAX_EXCEEDED` | Превышен лимит транзитивных зависимостей (default: 10000), резолвинг остановлен | ERROR
+| `TRANSITIVE_UNUSED_CONSTRAINT` | Constraint не соответствует ни одной зависимости | WARNING
+| `TRANSITIVE_CONFLICTING_CONSTRAINTS` | Конфликтующие constraints для одного артефакта | ERROR
+| `TRANSITIVE_SNAPSHOT` | Транзитивная зависимость на SNAPSHOT версию | WARNING
+| `TRANSITIVE_TIMEOUT` | Таймаут при скачивании POM | WARNING
+| `TRANSITIVE_STALE_CACHE` | Используется устаревший кеш | WARNING
+|===
+
+[[extension-keys]]
+== ExtensionKey
+
+[source,kotlin]
+----
+// Запись результатов:
+metadata.withExtension(EffectiveMetadataKeys.TRANSITIVES, trees: List<TransitiveTree>)
+metadata.withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flat: List<FlatDependency>)
+metadata.withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts: List<VersionConflict>)
+
+// Чтение результатов:
+metadata.transitives       // -> List<TransitiveTree>
+metadata.flatDependencies  // -> List<FlatDependency>
+metadata.versionConflicts  // -> List<VersionConflict>
+----
+
+[[testing]]
+== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `no libraries returns empty` | Пустой каталог -> 0 транзитивных, INFO
+| `single library resolved` | spring-web:6.2.0 -> дерево с spring-beans, spring-core
+| `recursive resolution` | A -> B -> C -> дерево глубины 3
+| `max depth stops recursion` | maxDepth=2, дерево глубже -> обрезка
+| `cycle detection` | A -> B -> A -> isDuplicate=true, WARNING
+| `duplicate detection` | spring-core тянется из 2 библиотек -> isDuplicate для второго
+| `version conflict HIGHEST` | guava 31.0 vs 33.0 -> resolved=33.0 (HIGHEST)
+| `version conflict with constraint` | constraint=2.17.0 -> resolved=2.17.0 (CONSTRAINT)
+| `VERSION constraint applied` | constraint на log4j:2.17.0 -> версия заменена в дереве
+| `EXCLUDE constraint applied` | exclude commons-logging -> удалён из дерева и flat list
+| `SUBSTITUTE constraint applied` | javax -> jakarta -> координаты заменены
+| `unused constraint warning` | constraint на несуществующую -> WARNING
+| `conflicting constraints error` | два constraint на один артефакт -> ERROR
+| `flat list deduplication` | spring-core встречается 3 раза -> одна запись в flat list
+| `flat list isDirectDependency` | Прямая зависимость -> isDirectDependency=true
+| `scope filtering` | test scope -> не включается (default scopes=compile,runtime)
+| `optional excluded by default` | optional=true -> не включается
+| `POM not found` | 404 -> WARNING, пустое дерево
+| `repository fallback` | Первый repo 404, второй OK -> из второго
+| `cache prevents duplicate downloads` | Повторный POM запрос -> из кеша
+| `stale cache on network failure` | Сеть недоступна, кеш есть -> кеш + WARNING
+| `parent POM inheritance` | Зависимости из parent POM включены
+| `dependencyManagement versions` | Managed versions применяются к зависимостям без версии
+| `property resolution in POM` | ${project.version} -> resolved version
+| `SNAPSHOT warning` | Транзитивная на SNAPSHOT -> WARNING
+| `parallel resolution` | 10 библиотек -> параллельные запросы
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-transitive зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- dependanger-maven-resolver (implementation)
+- org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0 (implementation)
+- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `TransitiveResolverProcessor.kt` | Реализация `process()` -- рекурсивный резолвинг, конфликты, constraints
+| `TransitiveTreeBuilder.kt` | **Создать** -- рекурсивное построение дерева зависимостей из POM
+| `PomDependencyParser.kt` | **Создать** -- парсинг <dependencies> из Maven POM с property resolution
+| `ConflictDetector.kt` | **Создать** -- обнаружение конфликтов версий и применение стратегии HIGHEST
+| `ConstraintApplier.kt` | **Создать** -- применение constraints (VERSION, EXCLUDE, SUBSTITUTE) к дереву
+| `FlatListBuilder.kt` | **Создать** -- построение flat list из дерева с дедупликацией
+| `TransitiveCache.kt` | **Создать** -- файловый кеш результатов резолвинга (TTL 24 часа)
+|===
+
+[[priority]]
+== Приоритет
+
+**P4** (будущее) -- резолвинг транзитивных зависимостей предоставляет полную видимость для security и license проверок.
+Включается через `withTransitiveResolution()` или `processing { resolveTransitives = true }`.

@@ -1,0 +1,400 @@
+= SPEC-09: dependanger-report -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-report` генерирует единый отчёт о состоянии зависимостей, объединяя данные из EffectiveMetadata и extensions (updates, vulnerabilities, licenses, compatibility, transitives).
+Поддерживает форматы: JSON, YAML, Markdown, HTML.
+
+Приоритет: **P3** (желательно).
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `DependangerReport.kt` | Полностью: @Serializable data class (format, content, outputPath)
+|===
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// ReportGenerator.kt
+public class ReportGenerator {
+    public fun generate(
+        effective: EffectiveMetadata,
+        format: ReportFormat = ReportFormat.JSON,
+        sections: Set<ReportSection> = ReportSection.entries.toSet(),
+        outputDir: String = "build/reports/dependanger",
+    ): DependangerReport = TODO()
+}
+----
+
+[[report-models]]
+== Модели отчёта
+
+=== Enums
+
+[source,kotlin]
+----
+@Serializable
+public enum class ReportFormat { JSON, YAML, MARKDOWN, HTML }
+
+@Serializable
+public enum class ReportSection {
+    SUMMARY, LIBRARIES, PLUGINS, BUNDLES, VERSIONS,
+    DEPRECATED, UPDATES, VULNERABILITIES, LICENSES,
+    COMPATIBILITY, TRANSITIVES, DIAGNOSTICS
+}
+----
+
+=== Report Entity Models
+
+[source,kotlin]
+----
+@Serializable
+public data class ReportLibrary(
+    val alias: String,
+    val group: String,
+    val artifact: String,
+    val version: String?,
+    val tags: Set<String> = emptySet(),
+    val isDeprecated: Boolean = false,
+    val isPlatform: Boolean = false,
+)
+
+@Serializable
+public data class ReportPlugin(
+    val alias: String,
+    val id: String,
+    val version: String?,
+)
+
+@Serializable
+public data class ReportBundle(
+    val alias: String,
+    val libraries: List<String>,
+)
+----
+
+[[spec-report-generator]]
+== SPEC-09.1: ReportGenerator.generate()
+
+[[purpose-report]]
+=== Назначение
+
+Собрать данные из `EffectiveMetadata` (библиотеки, плагины, бандлы) и extensions (updates, vulnerabilities, licenses, compatibility, transitives), сформировать отчёт в запрошенном формате.
+
+[[algorithm-report]]
+=== Алгоритм
+
+[source,text]
+----
+1. Построить ReportData из EffectiveMetadata:
+   a. summary -> подсчитать счётчики
+   b. libraries -> из metadata.libraries
+   c. plugins -> из metadata.plugins
+   d. bundles -> из metadata.bundles
+   e. updates -> из metadata.updates (extension)
+   f. compatibility -> из metadata.compatibilityIssues (extension)
+   g. vulnerabilities -> из metadata.vulnerabilities (extension)
+   h. deprecated -> отфильтровать библиотеки с isDeprecated=true
+   i. licenses -> из extensions (LicenseResult для каждой библиотеки)
+   j. transitives -> из metadata.transitives (extension)
+   k. constraints -> из originalMetadata.constraints
+   l. validation -> из metadata.diagnostics (errors + warnings)
+2. Отфильтровать секции по списку `sections`
+3. Построить summary:
+   - libraryCount, pluginCount, bundleCount
+   - deprecatedCount -> count isDeprecated
+   - updatesAvailable -> updates.size
+   - vulnerabilitiesCount, criticalVulnerabilities, highVulnerabilities
+   - deniedLicenses, unknownLicenses
+   - compatibilityIssues
+   - validationErrors, validationWarnings
+4. Сериализовать в формат:
+   a. JSON -> kotlinx-serialization Json.encodeToString с prettyPrint
+   b. YAML -> конвертация из JSON: kotlinx-serialization-json -> JSON string -> manual YAML conversion (простая конвертация без внешних зависимостей)
+   c. Markdown -> шаблонный рендеринг
+   d. HTML -> шаблонный рендеринг (обёртка над Markdown)
+5. Если outputDir указан -> записать файл (atomic write)
+6. Вернуть DependangerReport(format, content, outputPath)
+----
+
+[[implementation-report]]
+=== Детальная реализация
+
+==== ReportData (внутренняя модель)
+
+[source,kotlin]
+----
+@Serializable
+internal data class ReportData(
+    val schemaVersion: String = "1.0",
+    val generatedAt: String, // ISO 8601 UTC
+    val distribution: String?,
+    val summary: ReportSummary,
+    val libraries: List<ReportLibrary>? = null,
+    val plugins: List<ReportPlugin>? = null,
+    val bundles: List<ReportBundle>? = null,
+    val updates: List<ReportUpdate>? = null,
+    val compatibility: List<ReportCompatibilityIssue>? = null,
+    val vulnerabilities: List<ReportVulnerability>? = null,
+    val deprecated: List<ReportDeprecated>? = null,
+    val licenses: List<ReportLicense>? = null,
+    val transitives: ReportTransitives? = null,
+    val constraints: List<ReportConstraint>? = null,
+    val validation: ReportValidation? = null,
+)
+
+@Serializable
+internal data class ReportSummary(
+    val libraryCount: Int = 0,
+    val pluginCount: Int = 0,
+    val bundleCount: Int = 0,
+    val deprecatedCount: Int = 0,
+    val updatesAvailable: Int = 0,
+    val vulnerabilitiesCount: Int = 0,
+    val criticalVulnerabilities: Int = 0,
+    val highVulnerabilities: Int = 0,
+    val deniedLicenses: Int = 0,
+    val unknownLicenses: Int = 0,
+    val compatibilityIssues: Int = 0,
+    val validationErrors: Int = 0,
+    val validationWarnings: Int = 0,
+)
+----
+
+==== ReportGenerator.generate()
+
+[source,kotlin]
+----
+public fun generate(
+    effective: EffectiveMetadata,
+    format: ReportFormat,
+    sections: List<ReportSection>,
+    outputDir: String,
+): DependangerReport {
+    // 1. Собрать данные
+    val reportData = buildReportData(effective, sections)
+
+    // 2. Сериализовать в формат
+    val content = when (format) {
+        ReportFormat.JSON -> renderJson(reportData)
+        ReportFormat.YAML -> renderYaml(reportData)
+        ReportFormat.MARKDOWN -> renderMarkdown(reportData)
+        ReportFormat.HTML -> renderHtml(reportData)
+    }
+
+    // 3. Записать файл (если outputDir указан)
+    val extension = when (format) {
+        ReportFormat.JSON -> "json"
+        ReportFormat.YAML -> "yaml"
+        ReportFormat.MARKDOWN -> "md"
+        ReportFormat.HTML -> "html"
+    }
+    val outputPath = "$outputDir/dependanger-report.$extension"
+    val dir = File(outputDir)
+    if (!dir.exists()) dir.mkdirs()
+
+    // Atomic write
+    val tempFile = File.createTempFile("report-", ".$extension", dir)
+    tempFile.writeText(content)
+    val targetFile = File(outputPath)
+    tempFile.renameTo(targetFile)
+
+    return DependangerReport(format, content, outputPath)
+}
+----
+
+==== JSON рендеринг
+
+[source,kotlin]
+----
+private val json = Json {
+    prettyPrint = true
+    encodeDefaults = false
+    explicitNulls = false
+}
+
+private fun renderJson(data: ReportData): String =
+    json.encodeToString(data)
+----
+
+==== Markdown рендеринг
+
+[source,kotlin]
+----
+private fun renderMarkdown(data: ReportData): String = buildString {
+    appendLine("# Dependanger Report")
+    appendLine()
+    appendLine("Generated: ${data.generatedAt}")
+    data.distribution?.let { appendLine("Distribution: $it") }
+    appendLine()
+
+    // Summary
+    appendLine("## Summary")
+    appendLine()
+    appendLine("| Metric | Count |")
+    appendLine("|--------|-------|")
+    appendLine("| Libraries | ${data.summary.libraryCount} |")
+    appendLine("| Plugins | ${data.summary.pluginCount} |")
+    appendLine("| Bundles | ${data.summary.bundleCount} |")
+    if (data.summary.updatesAvailable > 0)
+        appendLine("| Updates Available | ${data.summary.updatesAvailable} |")
+    if (data.summary.vulnerabilitiesCount > 0)
+        appendLine("| Vulnerabilities | ${data.summary.vulnerabilitiesCount} |")
+    // ... остальные секции
+
+    // Libraries
+    data.libraries?.let { libs ->
+        appendLine()
+        appendLine("## Libraries")
+        appendLine()
+        appendLine("| Alias | Coordinates | Version | Source |")
+        appendLine("|-------|------------|---------|--------|")
+        for (lib in libs) {
+            appendLine("| ${lib.alias} | ${lib.group}:${lib.name} | ${lib.version ?: "N/A"} | ${lib.versionSource} |")
+        }
+    }
+
+    // Updates, Vulnerabilities, etc. -- аналогично
+}
+----
+
+[[report-sections]]
+== Секции отчёта
+
+[cols="1,2,2"]
+|===
+| Секция | Источник данных | Условие включения
+
+| `summary` | Вычисляемая | Всегда
+| `libraries` | `metadata.libraries` | ReportSection.LIBRARIES in sections
+| `plugins` | `metadata.plugins` | ReportSection.PLUGINS in sections
+| `bundles` | `metadata.bundles` | ReportSection.BUNDLES in sections
+| `updates` | `metadata.updates` (ExtensionKey) | ReportSection.UPDATES in sections + данные есть
+| `compatibility` | `metadata.compatibilityIssues` | ReportSection.COMPATIBILITY in sections + данные есть
+| `vulnerabilities` | `metadata.vulnerabilities` | ReportSection.VULNERABILITIES in sections + данные есть
+| `deprecated` | `metadata.libraries.filter { isDeprecated }` | ReportSection.DEPRECATED in sections
+| `licenses` | Extension из LicenseCheckProcessor | ReportSection.LICENSES in sections + данные есть
+| `transitives` | `metadata.transitives` | ReportSection.TRANSITIVES in sections + данные есть
+| `constraints` | `context.originalMetadata.constraints` | ReportSection.CONSTRAINTS in sections
+| `validation` | `metadata.diagnostics` | ReportSection.VALIDATION in sections
+|===
+
+[[json-schema]]
+== JSON Schema (версия 1.0)
+
+Структура полностью описана в документации F009. Ключевые поля:
+
+- `schemaVersion`: "1.0" -- обязательное
+- `generatedAt`: ISO 8601 UTC -- обязательное
+- `distribution`: String? -- optional
+- `summary`: объект со счётчиками -- обязательное
+- Остальные секции -- optional (null если процессор не запущен)
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Обоснование
+
+| Пустой каталог | Валидный отчёт с пустыми массивами, summary с нулями | Корректный сценарий
+| Процессор не запущен | Секция = null в JSON | Не путать с "нет данных" и "проверка не выполнена"
+| summaryOnly | Только schemaVersion, generatedAt, distribution, summary | Для быстрого просмотра
+| Специальные символы | JSON escaping: `"`, `\n`, unicode | Стандартное JSON поведение
+| Очень большой каталог (1000+) | Генерация продолжается, WARNING при > 500KB | Рекомендуется --summary-only
+| Нет прав на запись | ERROR "Cannot write report" | Fail-fast
+| Файл уже существует | Перезаписать (atomic write через temp) | Идемпотентность
+| Невалидный формат | ERROR "Unsupported format" | Fail-fast
+| Timestamp | Всегда UTC: "2026-01-27T10:30:00Z" | Consistency
+| Прерывание (Ctrl+C) | Частичный файл удаляется (atomic write) | Не оставлять мусор
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+ReportGenerator не добавляет собственных диагностических кодов -- он только читает данные из metadata и extensions.
+
+[[extension-keys]]
+== ExtensionKey
+
+ReportGenerator читает из extensions:
+
+[source,kotlin]
+----
+metadata.updates                // EffectiveMetadataKeys.UPDATES
+metadata.vulnerabilities        // EffectiveMetadataKeys.VULNERABILITIES
+metadata.compatibilityIssues    // EffectiveMetadataKeys.COMPATIBILITY_ISSUES
+metadata.licenseViolations      // EffectiveMetadataKeys.LICENSE_VIOLATIONS
+metadata.transitives            // EffectiveMetadataKeys.TRANSITIVES
+metadata.flatDependencies       // EffectiveMetadataKeys.FLAT_DEPENDENCIES
+metadata.versionConflicts       // EffectiveMetadataKeys.VERSION_CONFLICTS
+----
+
+[[testing]]
+== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `empty metadata produces valid JSON` | Пустой каталог -> валидный JSON с нулевыми счётчиками
+| `libraries included in report` | 10 библиотек -> JSON содержит 10 записей
+| `updates section from extension` | UpdateAvailableInfo -> отчёт содержит updates
+| `vulnerabilities section from extension` | VulnerabilityInfo -> отчёт содержит vulnerabilities
+| `compatibility section from extension` | CompatibilityIssue -> отчёт содержит compatibility
+| `deprecated libraries filtered` | isDeprecated=true -> deprecated секция
+| `summary counts are correct` | Все счётчики соответствуют данным
+| `section filtering works` | sections=[SUMMARY, LIBRARIES] -> только эти секции
+| `summaryOnly mode` | Только summary + metadata полей
+| `JSON format is valid` | Парсинг через kotlinx.serialization
+| `Markdown format renders correctly` | Markdown содержит таблицы и заголовки
+| `null sections when processor not run` | updates=null если withUpdateCheck() не вызывался
+| `atomic write creates file` | Файл создан по указанному пути
+| `file overwrite works` | Перезапись существующего файла
+| `timestamp is UTC ISO 8601` | generatedAt формат корректен
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-report зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `ReportGenerator.kt` | Реализация `generate()` -- сбор данных + рендеринг
+| `ReportData.kt` | **Создать** -- внутренние @Serializable модели отчёта
+| `JsonReportRenderer.kt` | **Создать** -- JSON рендеринг
+| `MarkdownReportRenderer.kt` | **Создать** -- Markdown рендеринг
+| `YamlReportRenderer.kt` | **Создать** -- YAML рендеринг (конвертация из JSON или ручной)
+| `HtmlReportRenderer.kt` | **Создать** -- HTML рендеринг (обёртка над Markdown)
+|===
+
+[[priority]]
+== Приоритет
+
+**P3** (желательно) -- отчёт является ключевым артефактом для CI/CD интеграции и дашбордов.
+Schema version 1.0 обеспечивает forward/backward compatibility.

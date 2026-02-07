@@ -1,0 +1,313 @@
+= SPEC-08: dependanger-analysis -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-analysis` проверяет совместимость библиотек на основе правил, определённых в блоке `compatibility { }` DSL.
+Поддерживает четыре типа правил: `jdkRequirement`, `mutualExclusion`, `versionConstraint`, `customRule`.
+Результаты сохраняются в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.COMPATIBILITY_ISSUES`.
+
+Приоритет: **P3** (желательно).
+
+[[current-state]]
+== Текущее состояние
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// CompatibilityCheckProcessor.kt
+public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
+    override val id: String = "compatibility-analysis"
+    override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS  // order=110, SEQUENTIAL
+    override val isOptional: Boolean = true
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+}
+----
+
+NOTE: Базовая проверка правил совместимости (`compat-rules`, order=66) реализована в `dependanger-effective` (xref:SPEC-03-dependanger-effective.adoc[SPEC-03]).
+Данный модуль `CompatibilityCheckProcessor` (order=110) ДОПОЛНЯЕТ `CompatRulesProcessor`, а НЕ переопределяет его.
+Если один и тот же rule ID проверен обоими процессорами -- оба результата сохраняются в diagnostics.
+
+Расширенный анализ может включать bytecode-анализ и другие тяжёлые проверки.
+
+[[spec-compatibility-check]]
+== SPEC-08.1: CompatibilityCheckProcessor.process()
+
+[[purpose-compat]]
+=== Назначение
+
+Выполнить расширенный анализ совместимости, который дополняет базовый `compat-rules` процессор (order=66).
+Включает: pattern matching по координатам, проверку constraints SAME_VERSION/SAME_MAJOR/SAME_MAJOR_MINOR, расширенный JDK анализ, и вызов customRule handlers.
+
+[[algorithm-compat]]
+=== Алгоритм
+
+[source,text]
+----
+1. Получить правила совместимости из context.originalMetadata.compatibility
+2. Получить настройки из context.settings.compatibilityAnalysis
+3. Получить targetJdk:
+      i.   `context.environment.jdkVersion` (explicit) -- приоритет
+      ii.  `Runtime.version().feature()` (auto-detect)
+      iii. `null` -> пропуск JDK-проверок с WARNING
+   Получить targetKotlin:
+      i.   `context.environment.kotlinVersion` (explicit)
+      ii.  `null` -> пропуск Kotlin-проверок с WARNING
+4. Если правил нет -> вернуть metadata, INFO "No compatibility rules defined"
+5. Для каждого правила:
+   a. JdkRequirement:
+      i.   Найти все библиотеки matching `matches` glob pattern
+      ii.  Если targetJdk < minJdk -> CompatibilityIssue(severity, message, affectedLibraries)
+      iii. Если targetJdk > maxJdk (если задан) -> аналогично
+   b. MutualExclusion:
+      i.   Проверить наличие библиотек из списка в effective metadata
+      ii.  Если 2+ присутствуют -> CompatibilityIssue(affectedLibraries = присутствующие)
+   c. VersionConstraint:
+      i.   Получить версии всех указанных библиотек
+      ii.  Проверить constraint:
+           - SAME_VERSION: все версии идентичны
+           - SAME_MAJOR: все major совпадают
+           - SAME_MAJOR_MINOR: все major.minor совпадают
+      iii. При несовпадении -> CompatibilityIssue
+   d. CustomRule:
+      i.   Найти handler по ruleId через `CustomRuleHandler` SPI из xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01]. ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.core.spi.CustomRuleHandler`
+      ii.  Вызвать `handler.evaluate(rule, libraries, context)` в try-catch
+      iii. Обработать результат -> CompatibilityIssue
+6. Собрать все CompatibilityIssue
+7. Записать в metadata через withExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES, issues)
+8. Добавить diagnostics: INFO/WARNING/ERROR в зависимости от severity
+9. В strict mode при severity=ERROR -> отметить в diagnostics как ERROR
+----
+
+[[implementation-compat]]
+=== Детальная реализация
+
+==== Pattern Matching (Glob)
+
+NOTE: `GlobMatcher` определён в `dependanger-core` (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01: Общие утилиты]).
+Модуль `dependanger-analysis` использует каноническую реализацию из `io.github.zenhelix.dependanger.core.util.GlobMatcher`.
+
+Используемые методы:
+
+* `GlobMatcher.matches(pattern, group, artifact)` — проверка координат "group:artifact" против glob-паттерна
+* `GlobMatcher.matchesGlob(pattern, value)` — проверка строки против glob-паттерна
+
+Поддерживаемые паттерны:
+
+* `"org.springframework:*"` — все артефакты группы org.springframework
+* `"org.springframework*:*"` — org.springframework И org.springframework.boot
+* `"*:spring-*"` — все группы, артефакты начинающиеся с "spring-"
+
+==== Version Constraint проверка
+
+NOTE: Используется `VersionComparator` из `dependanger-core` (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01: Общие утилиты]).
+
+[source,kotlin]
+----
+private fun checkVersionConstraint(
+    rule: CompatibilityRule.VersionConstraint,
+    libraries: Map<String, EffectiveLibrary>
+): CompatibilityIssue? {
+    val involvedLibs = rule.libraries.mapNotNull { alias -> libraries[alias] }
+    if (involvedLibs.size < 2) return null
+
+    val versions = involvedLibs.mapNotNull { it.resolvedVersion }
+    if (versions.size < 2) return null
+
+    val parsed = versions.map { VersionComparator.parse(it) ?: return null }
+
+    val compatible = when (rule.constraint) {
+        ConstraintType.SAME_VERSION -> parsed.distinct().size == 1
+        ConstraintType.SAME_MAJOR -> parsed.map { it.major }.distinct().size == 1
+        ConstraintType.SAME_MAJOR_MINOR ->
+            parsed.map { it.major to it.minor }.distinct().size == 1
+    }
+
+    return if (!compatible) {
+        CompatibilityIssue(
+            ruleId = rule.id,
+            message = rule.message ?: "Version constraint violated: ${rule.constraint}",
+            severity = rule.severity,
+            affectedLibraries = involvedLibs.map { it.alias },
+            suggestion = "Align versions of: ${involvedLibs.joinToString { "${it.alias}:${it.resolvedVersion}" }}"
+        )
+    } else null
+}
+----
+
+==== JDK Requirement проверка
+
+[source,kotlin]
+----
+private fun checkJdkRequirement(
+    rule: CompatibilityRule.JdkRequirement,
+    libraries: Map<String, EffectiveLibrary>,
+    targetJdk: Int?
+): CompatibilityIssue? {
+    if (targetJdk == null) {
+        logger.warn { "targetJdk not specified, skipping jdkRequirement rule '${rule.id}'" }
+        return null
+    }
+
+    val matchingLibs = libraries.values.filter { lib ->
+        GlobMatcher.matches(rule.matches, lib.group, lib.artifact)
+    }
+
+    if (matchingLibs.isEmpty()) return null
+
+    val violated = when {
+        rule.minJdk != null && targetJdk < rule.minJdk -> true
+        rule.maxJdk != null && targetJdk > rule.maxJdk -> true
+        else -> false
+    }
+
+    return if (violated) {
+        CompatibilityIssue(
+            ruleId = rule.id,
+            message = rule.message ?: "Requires JDK ${rule.minJdk}+, but target is $targetJdk",
+            severity = rule.severity,
+            affectedLibraries = matchingLibs.map { it.alias },
+            suggestion = "Upgrade to JDK ${rule.minJdk} or use compatible library versions"
+        )
+    } else null
+}
+----
+
+==== Mutual Exclusion проверка
+
+[source,kotlin]
+----
+private fun checkMutualExclusion(
+    rule: CompatibilityRule.MutualExclusion,
+    libraries: Map<String, EffectiveLibrary>
+): CompatibilityIssue? {
+    val present = rule.libraries.filter { it in libraries }
+    return if (present.size >= 2) {
+        CompatibilityIssue(
+            ruleId = rule.id,
+            message = rule.message ?: "Mutually exclusive libraries found: ${present.joinToString()}",
+            severity = rule.severity,
+            affectedLibraries = present,
+            suggestion = "Remove one of: ${present.joinToString()}"
+        )
+    } else null
+}
+----
+
+[[bytecode-analysis]]
+== Bytecode-анализ (будущее, опционально)
+
+Модуль имеет зависимость на `org.ow2.asm:asm:9.7.1` для потенциального bytecode-анализа.
+В текущей версии не используется.
+Возможные будущие применения:
+
+- Определение минимальной версии JDK по class file version
+- Анализ бинарной совместимости библиотек
+- Обнаружение split packages
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Диагностический код
+
+| Нет правил совместимости | Процессор пропускается, INFO | `COMPAT_NO_RULES`
+| Все правила проходят | Пустой список issues, INFO | `COMPAT_ALL_PASSED`
+| targetJdk не указан | jdkRequirement правила пропускаются с WARNING | `COMPAT_NO_TARGET_JDK`
+| Невалидный glob pattern | ERROR для конкретного правила | `COMPAT_INVALID_PATTERN`
+| Exception в customRule | ERROR с message, pipeline продолжается | `COMPAT_CUSTOM_RULE_FAILED`
+| Дубликат ruleId | ERROR | `COMPAT_DUPLICATE_RULE`
+| Неизвестная библиотека в правиле | WARNING | `COMPAT_UNKNOWN_LIB`
+| Одна библиотека в mutualExclusion | WARNING "rule has only one library" | `COMPAT_SINGLE_LIB_RULE`
+| Версии с разным форматом | Нормализация перед сравнением | --
+| Strict mode + ERROR severity | ERROR в diagnostics | --
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+[cols="1,2,1"]
+|===
+| Код | Описание | Уровень
+
+| `COMPAT_NO_RULES` | Нет правил совместимости | INFO
+| `COMPAT_ALL_PASSED` | Все проверки прошли | INFO
+| `COMPAT_VIOLATION` | Нарушение правила совместимости | ERROR/WARNING
+| `COMPAT_NO_TARGET_JDK` | targetJdk не указан | WARNING
+| `COMPAT_INVALID_PATTERN` | Невалидный glob pattern | ERROR
+| `COMPAT_CUSTOM_RULE_FAILED` | Exception в customRule | ERROR
+| `COMPAT_DUPLICATE_RULE` | Дубликат ruleId | ERROR
+| `COMPAT_UNKNOWN_LIB` | Неизвестная библиотека | WARNING
+| `COMPAT_SINGLE_LIB_RULE` | mutualExclusion с одной библиотекой | WARNING
+|===
+
+[[extension-keys]]
+== ExtensionKey
+
+[source,kotlin]
+----
+// Запись результатов:
+metadata.withExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES, issues: List<CompatibilityIssue>)
+
+// Чтение результатов:
+metadata.compatibilityIssues // -> List<CompatibilityIssue>
+----
+
+[[testing]]
+== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `no rules returns unchanged metadata` | Нет правил -> INFO "No rules"
+| `jdkRequirement violation` | targetJdk=11, minJdk=17 -> ERROR
+| `jdkRequirement passes` | targetJdk=21, minJdk=17 -> OK
+| `jdkRequirement no targetJdk` | targetJdk не указан -> WARNING, skip
+| `mutualExclusion both present` | jackson + gson -> ERROR
+| `mutualExclusion one present` | Только jackson -> OK
+| `versionConstraint SAME_MAJOR_MINOR violated` | 2.1.0 vs 2.0.0 -> ERROR
+| `versionConstraint SAME_MAJOR_MINOR passes` | 2.1.0 vs 2.1.20 -> OK
+| `versionConstraint SAME_MAJOR` | 1.0.0 vs 1.9.0 -> OK
+| `customRule triggers` | condition=true -> issue
+| `customRule exception` | throws -> ERROR с message
+| `glob pattern org.springframework:*` | Matching spring-web, spring-data
+| `strict mode with ERROR` | ERROR severity + strict -> diagnostics ERROR
+| `duplicate ruleId` | Два правила с одним ID -> ERROR
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-analysis зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- dependanger-maven-resolver (implementation)
+- org.ow2.asm:asm:9.7.1 (implementation) -- для bytecode-анализа (будущее)
+- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `CompatibilityCheckProcessor.kt` | Реализация `process()` -- проверка правил совместимости. Использует `GlobMatcher` и `VersionComparator` из `dependanger-core`.
+| `VersionConstraintChecker.kt` | **Создать** -- проверка SAME_VERSION/SAME_MAJOR/SAME_MAJOR_MINOR с использованием `VersionComparator` из core
+|===
+
+[[priority]]
+== Приоритет
+
+**P3** (желательно) -- анализ совместимости важен для крупных проектов с множеством зависимостей.
+Включается через `withCompatibilityAnalysis()` или `processing { analyzeCompatibility = true }`.

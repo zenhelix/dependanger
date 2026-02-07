@@ -1,0 +1,1166 @@
+= SPEC-15: dependanger-gradle-plugin -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-gradle-plugin` интегрирует Dependanger в Gradle build lifecycle.
+Плагин предоставляет DSL-конфигурацию через `DependangerExtension` и 14 Gradle-задач для генерации, валидации и анализа зависимостей.
+
+Plugin ID: `io.github.zenhelix.dependanger`
+
+Зависимость: единственная зависимость -- `dependanger-api` (implementation), которая транзитивно тянет все необходимые модули.
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `DependangerPlugin.kt` | Полностью: apply(), registerTasks() -- регистрирует extension и 14 задач
+| `DependangerExtension.kt` | Полностью: dsl, outputDirectory, failOnError, делегирующие методы (versions, libraries, plugins, bundles, bomImports, targetPlatforms, distributions, compatibility, settings, presets, processing)
+| 14 файлов задач | Каркасы: init с group="dependanger" и description. TODO: `execute()` в каждом файле
+| `build.gradle.kts` | Полностью: java-gradle-plugin, plugin-publish, testing (unit + functionalTest с Gradle TestKit)
+|===
+
+=== TODO-заглушки (полный список)
+
+[source,text]
+----
+GenerateMetadataTask.execute()
+GenerateEffectiveTask.execute()
+GenerateTomlTask.execute()
+GenerateBomTask.execute()
+GenerateAllTask.execute()
+ValidateTask.execute()
+ProcessTask.execute()
+CheckUpdatesTask.execute()
+AnalyzeTask.execute()
+ReportTask.execute()
+ListVersionsTask.execute()
+SecurityCheckTask.execute()
+LicenseCheckTask.execute()
+ResolveTransitivesTask.execute()
+----
+
+[[common-pattern]]
+== Общий паттерн задач
+
+Все задачи следуют единому шаблону:
+
+[source,text]
+----
+1. Получить DependangerExtension из project
+2. Извлечь metadata через extension.dsl.toMetadata()
+3. Создать Dependanger через API фасад
+4. Выполнить операцию (process/validate/generate)
+5. Записать результат в extension.outputDirectory
+6. Обработать ошибки с учётом extension.failOnError
+----
+
+=== Базовый код получения extension и metadata
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+    val failOnError = extension.failOnError.get()
+
+    outputDir.mkdirs()
+
+    // ... специфичная логика задачи
+}
+----
+
+=== runBlocking для suspend-функций
+
+Все suspend-функции Dependanger API вызываются через `runBlocking`:
+
+[source,kotlin]
+----
+import kotlinx.coroutines.runBlocking
+
+val result = runBlocking {
+    dependanger.process(distribution)
+}
+----
+
+=== Обработка ошибок
+
+[source,kotlin]
+----
+// Gradle-специфичная обработка ошибок
+try {
+    // ... операция
+} catch (e: DependangerException) {
+    if (failOnError) {
+        throw GradleException("Dependanger: ${e.message}", e)
+    } else {
+        logger.warn("Dependanger: ${e.message}")
+    }
+}
+----
+
+[[task-dependency-graph]]
+== Граф зависимостей задач
+
+[source,text]
+----
+dependangerGenerateMetadata (DSL -> metadata.json)
+    └── dependangerGenerateEffective (metadata -> effective.json)
+        ├── dependangerGenerateToml (effective -> libs.versions.toml)
+        ├── dependangerGenerateBom (effective -> bom.pom.xml)
+        ├── dependangerCheckUpdates
+        ├── dependangerAnalyze
+        ├── dependangerListVersions
+        ├── dependangerSecurityCheck
+        ├── dependangerLicenseCheck
+        └── dependangerResolveTransitives
+    └── dependangerValidate (metadata -> validate)
+
+dependangerGenerate (aggregation task)
+    ├── dependangerGenerateToml
+    └── dependangerGenerateBom
+
+dependangerProcess (metadata -> process -> effective.json)
+dependangerReport (full process -> report)
+----
+
+NOTE: Зависимости задач должны быть зарегистрированы в `DependangerPlugin.registerTasks()`.
+Текущая реализация регистрирует задачи без зависимостей -- это нужно исправить.
+
+=== Регистрация зависимостей задач
+
+Рекомендуется расширить `registerTasks()`:
+
+[source,kotlin]
+----
+private fun registerTasks(project: Project, extension: DependangerExtension) {
+    project.tasks.register("dependangerGenerateMetadata", GenerateMetadataTask::class.java)
+    project.tasks.register("dependangerGenerateEffective", GenerateEffectiveTask::class.java) {
+        it.dependsOn("dependangerGenerateMetadata")
+    }
+    project.tasks.register("dependangerGenerateToml", GenerateTomlTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerGenerateBom", GenerateBomTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerGenerate", GenerateAllTask::class.java) {
+        it.dependsOn("dependangerGenerateToml", "dependangerGenerateBom")
+    }
+    project.tasks.register("dependangerValidate", ValidateTask::class.java) {
+        it.dependsOn("dependangerGenerateMetadata")
+    }
+    project.tasks.register("dependangerProcess", ProcessTask::class.java)
+    project.tasks.register("dependangerCheckUpdates", CheckUpdatesTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerAnalyze", AnalyzeTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerReport", ReportTask::class.java)
+    project.tasks.register("dependangerListVersions", ListVersionsTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerSecurityCheck", SecurityCheckTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerLicenseCheck", LicenseCheckTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+    project.tasks.register("dependangerResolveTransitives", ResolveTransitivesTask::class.java) {
+        it.dependsOn("dependangerGenerateEffective")
+    }
+}
+----
+
+[[gradle-annotations]]
+== Аннотации Gradle для кэширования
+
+Для поддержки инкрементальных билдов и Gradle Build Cache задачи должны декларировать inputs и outputs.
+
+=== Рекомендуемая структура задачи с аннотациями
+
+[source,kotlin]
+----
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.*
+
+public abstract class GenerateMetadataTask : DefaultTask() {
+    init {
+        group = "dependanger"
+        description = "Generate metadata.json from DSL"
+    }
+
+    @get:Internal
+    public val extension: DependangerExtension
+        get() = project.extensions.getByType(DependangerExtension::class.java)
+
+    @get:OutputDirectory
+    public val outputDirectory: DirectoryProperty
+        get() = extension.outputDirectory
+
+    @TaskAction
+    public fun execute() {
+        // реализация
+    }
+}
+----
+
+NOTE: DSL-конфигурация как `@Input` проблематична, т.к. `DependangerDsl` не `Serializable` для Gradle.
+Для полноценного кэширования можно использовать `@Internal` для extension и объявить hashCode/fingerprint DSL через кастомный `@Input`:
+
+[source,kotlin]
+----
+@get:Input
+public val metadataFingerprint: String
+    get() {
+        val metadata = extension.dsl.toMetadata()
+        return metadata.hashCode().toString()
+    }
+----
+
+На первом этапе реализации можно использовать `@Internal` для extension и не кэшировать задачи.
+Кэширование -- отдельная задача оптимизации.
+
+[[dsl-fingerprinting]]
+=== DSL fingerprinting: подход первой итерации
+
+В первой итерации для up-to-date проверок используется простой hashCode от metadata.
+Это не идеально для incremental builds (hashCode может давать коллизии, а Gradle предпочитает детерминированную сериализацию inputs), но работает корректно для определения изменений DSL-конфигурации.
+
+[source,kotlin]
+----
+@Input
+public fun getDslHashCode(): Int = dsl.toMetadata().hashCode()
+----
+
+NOTE: Это решение первой итерации.
+В будущем для более надёжной поддержки incremental builds рекомендуется перейти на полноценный fingerprint -- например, сериализовать `DependangerMetadata` в JSON-строку и использовать её как `@Input`, что даст Gradle точную информацию об изменениях без коллизий hashCode.
+Пометить как area для улучшения.
+
+[[spec-generate-metadata]]
+== SPEC-15.1: GenerateMetadataTask
+
+=== Назначение
+
+Конвертировать DSL-конфигурацию из Gradle build скрипта в сериализованный `metadata.json`.
+
+=== Алгоритм
+
+[source,text]
+----
+1. Получить extension из project
+2. Вызвать extension.dsl.toMetadata() -> DependangerMetadata
+3. Создать JsonSerializationFormat
+4. Записать metadata в outputDir/metadata.json
+5. Логировать результат
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    outputDir.mkdirs()
+
+    val format = JsonSerializationFormat()
+    val outputFile = outputDir.resolve("metadata.json").toPath()
+    format.write(metadata, outputFile)
+
+    logger.lifecycle("Dependanger: Generated metadata.json -> $outputFile")
+    logger.lifecycle("  Versions: ${metadata.versions.size}")
+    logger.lifecycle("  Libraries: ${metadata.libraries.size}")
+    logger.lifecycle("  Plugins: ${metadata.plugins.size}")
+    logger.lifecycle("  Bundles: ${metadata.bundles.size}")
+}
+----
+
+=== Edge cases
+
+[cols="1,2"]
+|===
+| Ситуация | Поведение
+
+| Пустой DSL | Создаёт metadata.json с пустыми списками (валидный сценарий)
+| DSL с ошибками (невалидные координаты) | Ошибка в toMetadata(), оборачивается в GradleException
+| Output-директория не существует | Создаётся через mkdirs()
+|===
+
+[[spec-generate-effective]]
+== SPEC-15.2: GenerateEffectiveTask
+
+=== Назначение
+
+Обработать metadata через pipeline и создать effective-metadata с разрешёнными версиями, применёнными фильтрами и собранной диагностикой.
+
+=== Алгоритм
+
+[source,text]
+----
+1. Получить extension
+2. Построить metadata из DSL
+3. Создать Dependanger через fromMetadata(metadata)
+4. Вызвать process() через runBlocking
+5. Сериализовать effective metadata в outputDir/effective.json
+6. Вывести диагностику (warnings/errors)
+7. Если failOnError && diagnostics.hasErrors -> throw GradleException
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+    val failOnError = extension.failOnError.get()
+
+    outputDir.mkdirs()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.process() }
+
+    // Вывод диагностики
+    result.diagnostics.errors.forEach { logger.error("Dependanger ERROR: ${it.message}") }
+    result.diagnostics.warnings.forEach { logger.warn("Dependanger WARN: ${it.message}") }
+    result.diagnostics.infos.forEach { logger.info("Dependanger INFO: ${it.message}") }
+
+    if (result.diagnostics.hasErrors && failOnError) {
+        throw GradleException(
+            "Dependanger processing failed with ${result.diagnostics.errors.size} error(s). " +
+            "Set dependanger { failOnError = false } to continue despite errors."
+        )
+    }
+
+    if (result.effective != null) {
+        // Сериализация effective metadata
+        // TODO: Зависит от наличия EffectiveJsonFormat или аналога
+        val outputFile = outputDir.resolve("effective.json")
+        // effectiveFormat.write(result.effective, outputFile.toPath())
+        logger.lifecycle("Dependanger: Generated effective.json -> $outputFile")
+    }
+}
+----
+
+[[spec-generate-toml]]
+== SPEC-15.3: GenerateTomlTask
+
+=== Назначение
+
+Сгенерировать TOML Version Catalog из effective metadata.
+
+=== Алгоритм
+
+[source,text]
+----
+1. Получить extension, metadata, outputDir
+2. Создать Dependanger -> process()
+3. Извлечь TomlConfig из settings metadata
+4. Вызвать result.toToml(config)
+5. Записать в outputDir/libs.versions.toml
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    outputDir.mkdirs()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.process() }
+
+    if (!result.isSuccess) {
+        handleProcessingErrors(result, extension.failOnError.get())
+        return
+    }
+
+    // Создание TomlConfig из settings metadata
+    val tomlSettings = metadata.settings?.toml
+    val tomlConfig = TomlConfig(
+        includeComments = tomlSettings?.includeComments ?: true,
+        sortSections = tomlSettings?.sortSections ?: true,
+    )
+
+    val tomlFilename = tomlSettings?.filename ?: "libs.versions.toml"
+    val tomlPath = outputDir.resolve(tomlFilename).toPath()
+    result.writeTomlTo(tomlPath, tomlConfig)
+
+    logger.lifecycle("Dependanger: Generated $tomlFilename -> $tomlPath")
+}
+----
+
+[[spec-generate-bom]]
+== SPEC-15.4: GenerateBomTask
+
+=== Назначение
+
+Сгенерировать Maven BOM (pom.xml с dependencyManagement) из effective metadata.
+
+=== Алгоритм
+
+[source,text]
+----
+1. Получить extension, metadata, outputDir
+2. Создать Dependanger -> process()
+3. Извлечь BomConfig из settings metadata
+4. Вызвать result.toBom(config)
+5. Записать в outputDir/bom.pom.xml
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    outputDir.mkdirs()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.process() }
+
+    if (!result.isSuccess) {
+        handleProcessingErrors(result, extension.failOnError.get())
+        return
+    }
+
+    val bomSettings = metadata.settings?.bom
+    val bomConfig = BomConfig(
+        groupId = bomSettings?.groupId ?: project.group.toString(),
+        artifactId = bomSettings?.artifactId ?: "${project.name}-bom",
+        version = bomSettings?.version ?: project.version.toString(),
+    )
+
+    val bomPath = outputDir.resolve("bom.pom.xml").toPath()
+    result.writeBomTo(bomPath, bomConfig)
+
+    logger.lifecycle("Dependanger: Generated bom.pom.xml -> $bomPath")
+}
+----
+
+NOTE: BomConfig для `toBom()` не имеет значения по умолчанию (в отличие от `toToml()`), поэтому groupId и artifactId обязательны.
+Они берутся из settings или из project properties.
+
+[[spec-generate-all]]
+== SPEC-15.5: GenerateAllTask
+
+=== Назначение
+
+Агрегационная задача, запускающая полный pipeline генерации.
+
+=== Алгоритм
+
+Эта задача является lifecycle-задачей -- она не выполняет логику сама, а зависит от GenerateTomlTask и GenerateBomTask.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    // GenerateAllTask -- агрегационная задача.
+    // Зависит от dependangerGenerateToml и dependangerGenerateBom.
+    // Если зависимости настроены в registerTasks(), этот метод может быть пустым
+    // или выводить summary.
+
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val outputDir = extension.outputDirectory.get().asFile
+
+    logger.lifecycle("Dependanger: Full generation complete.")
+    logger.lifecycle("  Output directory: $outputDir")
+
+    // Перечислить сгенерированные файлы
+    outputDir.listFiles()?.forEach { file ->
+        logger.lifecycle("  Generated: ${file.name}")
+    }
+}
+----
+
+NOTE: Альтернативный подход -- выполнить все генерации внутри одного execute(), чтобы минимизировать повторную обработку pipeline.
+Это более эффективно, но менее гранулярно.
+
+[[spec-validate-task]]
+== SPEC-15.6: ValidateTask
+
+=== Назначение
+
+Валидация DSL-конфигурации без полной обработки.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val failOnError = extension.failOnError.get()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.validate() }
+
+    // Вывод диагностики
+    result.diagnostics.errors.forEach { logger.error("Dependanger validation ERROR: ${it.message}") }
+    result.diagnostics.warnings.forEach { logger.warn("Dependanger validation WARN: ${it.message}") }
+    result.diagnostics.infos.forEach { logger.info("Dependanger validation INFO: ${it.message}") }
+
+    val errCount = result.diagnostics.errors.size
+    val warnCount = result.diagnostics.warnings.size
+
+    logger.lifecycle("Dependanger: Validation completed: $errCount errors, $warnCount warnings")
+
+    if (result.diagnostics.hasErrors && failOnError) {
+        throw GradleException(
+            "Dependanger validation failed with $errCount error(s)."
+        )
+    }
+}
+----
+
+[[spec-process-task]]
+== SPEC-15.7: ProcessTask
+
+=== Назначение
+
+Запуск полного pipeline обработки.
+Аналогичен GenerateEffectiveTask, но самостоятельная задача без зависимости от GenerateMetadataTask.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+    val failOnError = extension.failOnError.get()
+
+    outputDir.mkdirs()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.process() }
+
+    result.diagnostics.errors.forEach { logger.error("Dependanger ERROR: ${it.message}") }
+    result.diagnostics.warnings.forEach { logger.warn("Dependanger WARN: ${it.message}") }
+
+    if (result.diagnostics.hasErrors && failOnError) {
+        throw GradleException(
+            "Dependanger processing failed with ${result.diagnostics.errors.size} error(s)."
+        )
+    }
+
+    if (result.effective != null) {
+        val outputFile = outputDir.resolve("effective.json")
+        // Сериализация effective в JSON
+        logger.lifecycle("Dependanger: Processing complete -> $outputFile")
+    }
+}
+----
+
+[[spec-check-updates-task]]
+== SPEC-15.8: CheckUpdatesTask
+
+=== Назначение
+
+Проверка доступных обновлений зависимостей.
+Запускает pipeline с ProcessingPreset.STRICT для включения update-check процессора.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val failOnError = extension.failOnError.get()
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    if (!result.isSuccess && failOnError) {
+        throw GradleException("Dependanger: Failed to check updates")
+    }
+
+    // Извлечь update-данные из extensions EffectiveMetadata
+    val effective = result.effective ?: return
+    val updates = extractUpdateResults(effective)
+
+    if (updates.isEmpty()) {
+        logger.lifecycle("Dependanger: All dependencies are up to date.")
+    } else {
+        logger.lifecycle("Dependanger: Available updates:")
+        updates.forEach { update ->
+            logger.lifecycle("  ${update.alias}: ${update.currentVersion} -> ${update.availableVersion} (${update.type})")
+        }
+        logger.lifecycle("  Total: ${updates.size} updates available")
+    }
+}
+
+private fun extractUpdateResults(effective: EffectiveMetadata): List<UpdateInfo> {
+    // Извлечение данных из extensions map EffectiveMetadata
+    // Формат зависит от реализации UpdateCheckProcessor
+    return emptyList() // TODO: зависит от feature-модуля dependanger-updates
+}
+----
+
+[[spec-analyze-task]]
+== SPEC-15.9: AnalyzeTask
+
+=== Назначение
+
+Анализ совместимости зависимостей.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val failOnError = extension.failOnError.get()
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .jdkVersion(Runtime.version().feature()) // текущая JDK
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    // Compatibility issues отражаются в diagnostics
+    val errors = result.diagnostics.errors.filter { it.code?.startsWith("COMPAT") == true }
+    val warnings = result.diagnostics.warnings.filter { it.code?.startsWith("COMPAT") == true }
+
+    if (errors.isEmpty() && warnings.isEmpty()) {
+        logger.lifecycle("Dependanger: No compatibility issues found.")
+    } else {
+        errors.forEach { logger.error("Dependanger COMPAT ERROR: ${it.message}") }
+        warnings.forEach { logger.warn("Dependanger COMPAT WARN: ${it.message}") }
+        logger.lifecycle("Dependanger: Analysis complete: ${errors.size} errors, ${warnings.size} warnings")
+    }
+
+    if (errors.isNotEmpty() && failOnError) {
+        throw GradleException("Dependanger: Compatibility analysis found ${errors.size} error(s).")
+    }
+}
+----
+
+[[spec-report-task]]
+== SPEC-15.10: ReportTask
+
+=== Назначение
+
+Генерация полного отчёта по зависимостям.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    outputDir.mkdirs()
+
+    // STRICT preset для включения всех аналитических процессоров
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    if (result.effective == null) {
+        logger.error("Dependanger: Cannot generate report -- processing failed")
+        result.diagnostics.errors.forEach { logger.error("  ${it.message}") }
+        return
+    }
+
+    // Генерация отчёта через ReportGenerator из feature-модуля
+    // TODO: Зависит от реализации dependanger-report модуля
+    val reportFile = outputDir.resolve("dependanger-report.json")
+    // reportGenerator.generate(result.effective, reportFile)
+
+    logger.lifecycle("Dependanger: Report generated -> $reportFile")
+}
+----
+
+[[spec-list-versions-task]]
+== SPEC-15.11: ListVersionsTask
+
+=== Назначение
+
+Вывод всех версий из effective metadata в консоль.
+Информационная задача для отладки.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = runBlocking { dependanger.process() }
+
+    if (result.effective == null) {
+        logger.error("Dependanger: Failed to resolve versions")
+        return
+    }
+
+    val versions = result.effective!!.versions
+
+    logger.lifecycle("Dependanger: Resolved versions (${versions.size}):")
+    logger.lifecycle("")
+
+    val maxAliasLen = versions.keys.maxOfOrNull { it.length } ?: 0
+    versions.entries.sortedBy { it.key }.forEach { (alias, resolved) ->
+        val paddedAlias = alias.padEnd(maxAliasLen)
+        logger.lifecycle("  $paddedAlias = ${resolved.value}")
+    }
+}
+----
+
+[[spec-security-check-task]]
+== SPEC-15.12: SecurityCheckTask
+
+=== Назначение
+
+Проверка зависимостей на известные уязвимости.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val failOnError = extension.failOnError.get()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    val effective = result.effective
+    if (effective == null) {
+        logger.error("Dependanger: Cannot run security check -- processing failed")
+        return
+    }
+
+    // Извлечь security-данные из extensions EffectiveMetadata
+    val vulnerabilities = extractSecurityResults(effective)
+
+    if (vulnerabilities.isEmpty()) {
+        logger.lifecycle("Dependanger: No known vulnerabilities found.")
+    } else {
+        logger.lifecycle("Dependanger: Found ${vulnerabilities.size} vulnerabilities:")
+        vulnerabilities.forEach { vuln ->
+            logger.warn("  ${vuln.library} (${vuln.cveId}): ${vuln.severity} - ${vuln.summary}")
+        }
+
+        // Записать отчёт в файл
+        outputDir.mkdirs()
+        val reportFile = outputDir.resolve("security-report.json")
+        // Сериализация vulnerabilities в JSON
+        logger.lifecycle("Dependanger: Security report -> $reportFile")
+    }
+
+    if (vulnerabilities.any { it.severity == "CRITICAL" || it.severity == "HIGH" } && failOnError) {
+        throw GradleException(
+            "Dependanger: Found ${vulnerabilities.size} vulnerabilities (HIGH or CRITICAL)."
+        )
+    }
+}
+----
+
+[[spec-license-check-task]]
+== SPEC-15.13: LicenseCheckTask
+
+=== Назначение
+
+Проверка лицензий зависимостей на соответствие политикам.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val failOnError = extension.failOnError.get()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    val effective = result.effective
+    if (effective == null) {
+        logger.error("Dependanger: Cannot run license check -- processing failed")
+        return
+    }
+
+    val licenseResults = extractLicenseResults(effective)
+
+    val denied = licenseResults.filter { it.status == "DENIED" }
+    val unknown = licenseResults.filter { it.status == "UNKNOWN" }
+
+    if (denied.isEmpty() && unknown.isEmpty()) {
+        logger.lifecycle("Dependanger: All library licenses are compliant.")
+    } else {
+        denied.forEach { logger.error("Dependanger LICENSE DENIED: ${it.library} - ${it.licenseName}") }
+        unknown.forEach { logger.warn("Dependanger LICENSE UNKNOWN: ${it.library}") }
+    }
+
+    // Записать отчёт
+    outputDir.mkdirs()
+    val reportFile = outputDir.resolve("license-report.json")
+    logger.lifecycle("Dependanger: License report -> $reportFile")
+
+    if (denied.isNotEmpty() && failOnError) {
+        throw GradleException("Dependanger: Found ${denied.size} denied license(s).")
+    }
+}
+----
+
+[[spec-resolve-transitives-task]]
+== SPEC-15.14: ResolveTransitivesTask
+
+=== Назначение
+
+Резолвинг транзитивных зависимостей и вывод дерева/конфликтов.
+
+=== Реализация
+
+[source,kotlin]
+----
+@TaskAction
+public fun execute() {
+    val extension = project.extensions.getByType(DependangerExtension::class.java)
+    val metadata = extension.dsl.toMetadata()
+    val outputDir = extension.outputDirectory.get().asFile
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = runBlocking { dependanger.process() }
+
+    val effective = result.effective
+    if (effective == null) {
+        logger.error("Dependanger: Cannot resolve transitives -- processing failed")
+        return
+    }
+
+    val transitives = extractTransitiveResults(effective)
+
+    logger.lifecycle("Dependanger: Resolved transitive dependencies:")
+    logger.lifecycle("  Direct dependencies: ${effective.libraries.size}")
+    logger.lifecycle("  Transitive dependencies: ${transitives.totalTransitives}")
+    logger.lifecycle("  Version conflicts: ${transitives.conflicts.size}")
+
+    if (transitives.conflicts.isNotEmpty()) {
+        logger.lifecycle("")
+        logger.lifecycle("  Conflicts:")
+        transitives.conflicts.forEach { conflict ->
+            logger.warn("    ${conflict.artifact}: ${conflict.versions.joinToString(" vs ")}")
+        }
+    }
+
+    // Записать полный отчёт
+    outputDir.mkdirs()
+    val reportFile = outputDir.resolve("transitives-report.json")
+    logger.lifecycle("Dependanger: Transitive report -> $reportFile")
+}
+----
+
+[[helper-methods]]
+== Общие вспомогательные методы
+
+Рекомендуется вынести в базовый класс или utility object:
+
+[source,kotlin]
+----
+// DependangerTaskHelper.kt (новый файл)
+internal object DependangerTaskHelper {
+
+    fun getExtension(project: Project): DependangerExtension =
+        project.extensions.getByType(DependangerExtension::class.java)
+
+    fun buildMetadata(extension: DependangerExtension): DependangerMetadata =
+        extension.dsl.toMetadata()
+
+    fun handleProcessingErrors(
+        result: DependangerResult,
+        failOnError: Boolean,
+        logger: Logger,
+    ) {
+        result.diagnostics.errors.forEach { logger.error("Dependanger ERROR: ${it.message}") }
+        result.diagnostics.warnings.forEach { logger.warn("Dependanger WARN: ${it.message}") }
+
+        if (result.diagnostics.hasErrors && failOnError) {
+            throw GradleException(
+                "Dependanger processing failed with ${result.diagnostics.errors.size} error(s)."
+            )
+        }
+    }
+
+    fun ensureOutputDir(extension: DependangerExtension): File {
+        val dir = extension.outputDirectory.get().asFile
+        dir.mkdirs()
+        return dir
+    }
+}
+----
+
+[[error-handling]]
+== Обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Обоснование
+
+| DSL.toMetadata() выбрасывает исключение | GradleException с сообщением об ошибке DSL | Ошибки конфигурации должны быть чётко видны
+| Pipeline processing failure | Если failOnError -> GradleException; иначе -> warning в лог | Конфигурируемое поведение
+| Генератор (TOML/BOM) fails | GradleException всегда | Ошибка генерации -- критическая
+| Output directory не writable | GradleException | Ошибка файловой системы
+| Network error (updates/security) | Если failOnError -> GradleException; иначе -> warning + пропуск feature | Сетевые ошибки не должны блокировать build по умолчанию
+|===
+
+=== Gradle Exception Types
+
+[cols="1,2"]
+|===
+| Тип | Использование
+
+| `GradleException` | Стандартное прерывание build при ошибках
+| `StopExecutionException` | Мягкое прерывание задачи без ошибки build (UP-TO-DATE)
+|===
+
+[[incremental-builds]]
+== Поддержка инкрементальных билдов
+
+=== Первый этап (текущая реализация)
+
+Все задачи выполняются заново при каждом запуске.
+Это приемлемо для первой итерации.
+
+=== Второй этап (оптимизация)
+
+Для полноценной поддержки инкрементальных билдов:
+
+1. **GenerateMetadataTask**: `@Input` = fingerprint DSL, `@OutputFile` = metadata.json
+2. **GenerateEffectiveTask**: `@InputFile` = metadata.json, `@OutputFile` = effective.json
+3. **GenerateTomlTask**: `@InputFile` = effective.json, `@OutputFile` = libs.versions.toml
+4. **GenerateBomTask**: `@InputFile` = effective.json, `@OutputFile` = bom.pom.xml
+5. **ValidateTask**: `@InputFile` = metadata.json (output -- только лог)
+6. **Analysis tasks**: `@InputFile` = effective.json (output -- report file)
+
+NOTE: Для корректной работы incremental build необходимо чтобы задачи читали/писали файлы, а не пересоздавали pipeline при каждом запуске.
+Это потребует рефакторинга -- разделения DSL -> metadata -> effective -> artifacts на отдельные шаги с файловыми inputs/outputs.
+
+[[testing]]
+== Тестовые сценарии
+
+=== Юнит-тесты
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `plugin applies to project` | DependangerPlugin.apply() не выбрасывает исключений
+| `extension has default values` | outputDirectory = build/dependanger, failOnError = true
+| `tasks registered with correct group` | Все 14 задач в группе "dependanger"
+| `task descriptions not empty` | Каждая задача имеет description
+|===
+
+=== Функциональные тесты (Gradle TestKit)
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `empty DSL generates empty metadata` | dependangerGenerateMetadata создаёт пустой metadata.json
+| `DSL with versions generates metadata` | Версии из DSL попадают в metadata.json
+| `generateToml creates TOML file` | dependangerGenerateToml создаёт libs.versions.toml
+| `generateBom creates BOM file` | dependangerGenerateBom создаёт bom.pom.xml
+| `generate runs full pipeline` | dependangerGenerate создаёт и TOML, и BOM
+| `validate passes for valid config` | BUILD SUCCESSFUL для валидной конфигурации
+| `validate fails for invalid config` | BUILD FAILED для невалидной конфигурации с failOnError=true
+| `validate warns for invalid config` | BUILD SUCCESSFUL с warnings для failOnError=false
+| `task dependencies work correctly` | dependangerGenerateToml зависит от dependangerGenerateEffective
+| `outputDirectory customization` | Файлы генерируются в кастомную директорию
+| `failOnError=false continues on errors` | BUILD SUCCESSFUL даже при ошибках в pipeline
+| `listVersions prints versions` | Вывод содержит все версии из DSL
+| `full workflow end-to-end` | DSL -> metadata -> effective -> TOML + BOM
+|===
+
+=== Структура функционального теста
+
+[source,kotlin]
+----
+// src/functionalTest/kotlin/io/github/zenhelix/dependanger/gradle/DependangerPluginFunctionalTest.kt
+class DependangerPluginFunctionalTest {
+
+    @TempDir
+    lateinit var projectDir: File
+
+    private val buildFile get() = projectDir.resolve("build.gradle.kts")
+    private val settingsFile get() = projectDir.resolve("settings.gradle.kts")
+
+    @BeforeEach
+    fun setUp() {
+        settingsFile.writeText("rootProject.name = \"test-project\"")
+    }
+
+    @Test
+    fun `generateMetadata creates metadata json`() {
+        buildFile.writeText("""
+            plugins {
+                id("io.github.zenhelix.dependanger")
+            }
+
+            dependanger {
+                versions {
+                    version("kotlin", "2.1.20")
+                }
+                libraries {
+                    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+                        version = versionRef("kotlin")
+                    }
+                }
+            }
+        """.trimIndent())
+
+        val result = GradleRunner.create()
+            .withProjectDir(projectDir)
+            .withArguments("dependangerGenerateMetadata")
+            .withPluginClasspath()
+            .build()
+
+        assertThat(result.task(":dependangerGenerateMetadata")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+        assertThat(projectDir.resolve("build/dependanger/metadata.json")).exists()
+    }
+}
+----
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-gradle-plugin зависит от:
+  implementation:
+    - dependanger-api (единственная runtime-зависимость)
+  compileOnly:
+    - org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20
+  functionalTest:
+    - gradleTestKit()
+    - org.assertj:assertj-core:3.27.3
+----
+
+[[files-to-modify]]
+== Файлы для изменения
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `DependangerPlugin.kt` | Добавить зависимости между задачами в registerTasks()
+| `tasks/GenerateMetadataTask.kt` | Реализация execute()
+| `tasks/GenerateEffectiveTask.kt` | Реализация execute()
+| `tasks/GenerateTomlTask.kt` | Реализация execute()
+| `tasks/GenerateBomTask.kt` | Реализация execute()
+| `tasks/GenerateAllTask.kt` | Реализация execute()
+| `tasks/ValidateTask.kt` | Реализация execute()
+| `tasks/ProcessTask.kt` | Реализация execute()
+| `tasks/CheckUpdatesTask.kt` | Реализация execute()
+| `tasks/AnalyzeTask.kt` | Реализация execute()
+| `tasks/ReportTask.kt` | Реализация execute()
+| `tasks/ListVersionsTask.kt` | Реализация execute()
+| `tasks/SecurityCheckTask.kt` | Реализация execute()
+| `tasks/LicenseCheckTask.kt` | Реализация execute()
+| `tasks/ResolveTransitivesTask.kt` | Реализация execute()
+|===
+
+=== Новые файлы (рекомендуется создать)
+
+[cols="1,2"]
+|===
+| Файл | Описание
+
+| `DependangerTaskHelper.kt` | Общие утилиты для задач (getExtension, buildMetadata, handleErrors)
+|===
+
+=== Файлы НЕ требующие изменений
+
+[cols="1,2"]
+|===
+| Файл | Причина
+
+| `DependangerExtension.kt` | Полностью реализован
+| `build.gradle.kts` | Полностью настроен (plugin publishing, testing)
+|===
+
+[[priority]]
+== Приоритет
+
+**MEDIUM** -- Gradle Plugin зависит от dependanger-api (SPEC-13).
+Является одним из основных способов использования Dependanger.
+
+Рекомендуемый порядок реализации:
+
+1. **DependangerPlugin.kt** -- регистрация зависимостей задач
+2. **GenerateMetadataTask** -- базовая задача, от которой зависят остальные
+3. **GenerateEffectiveTask** -- ключевая задача обработки pipeline
+4. **GenerateTomlTask** и **GenerateBomTask** -- генерация артефактов
+5. **GenerateAllTask** -- агрегация
+6. **ValidateTask** -- быстрая валидация
+7. **ProcessTask** -- альтернативная обработка
+8. **ListVersionsTask** -- информационная задача
+9. **CheckUpdatesTask**, **AnalyzeTask**, **SecurityCheckTask**, **LicenseCheckTask**, **ResolveTransitivesTask** -- аналитические задачи (зависят от feature-модулей)
+10. **ReportTask** -- финальный отчёт

@@ -1,0 +1,749 @@
+= SPEC-06: dependanger-maven-resolver -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-maven-resolver` обеспечивает интеграцию с Maven-репозиториями: скачивание POM-файлов, парсинг `<dependencyManagement>`, кеширование BOM и резолвинг property-placeholder'ов.
+Это базовый модуль, который используется другими feature-модулями (`dependanger-updates`, `dependanger-analysis`, `dependanger-license`, `dependanger-transitive`).
+
+Приоритет: **P2** (важно).
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `MavenRepository.kt` | Полностью: data class с полями url, name, username, password
+| `BomContent.kt` | Полностью: @Serializable data class с dependencies и properties
+| `BomDependency.kt` | Полностью: @Serializable data class с group, artifact, version
+|===
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// BomImportProcessor.kt
+public class BomImportProcessor : EffectiveMetadataProcessor {
+    override val id: String = "bom-import"
+    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT  // order=15, PARALLEL_IO
+    override val isOptional: Boolean = true
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+}
+
+// BomCache.kt
+public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHours: Long = 1) {
+    public fun get(group: String, artifact: String, version: String): BomContent = TODO()
+    public fun put(group: String, artifact: String, version: String, content: BomContent): Unit = TODO()
+    public fun invalidate(group: String, artifact: String, version: String): Unit = TODO()
+    public fun clear(): Unit = TODO()
+}
+----
+
+[[spec-bom-import-processor]]
+== SPEC-06.1: BomImportProcessor.process()
+
+[[purpose-bom-import]]
+=== Назначение
+
+Импортировать версии из внешних Maven BOM (Bill of Materials) для библиотек, у которых нет явно заданной версии.
+Процессор работает в фазе `BOM_IMPORT` (order=15, `PARALLEL_IO`) после `EXTRACTED_VERSIONS` (order=12) и перед `LIBRARY_FILTER` (order=20).
+
+[[algorithm-bom-import]]
+=== Алгоритм
+
+[source,text]
+----
+1. Получить список bomImports из context.originalMetadata.bomImports
+2. Если bomImports пуст -> вернуть metadata без изменений
+3. Получить настройки из context.settings (bomCache, timeouts). Repositories из `context.settings.repositories.ifEmpty { listOf(MavenCentral) }` (см. xref:index.adoc#repository-convention[конвенция репозиториев])
+4. Создать BomCache на основе настроек
+5. Создать MavenPomDownloader (Ktor HTTP client)
+6. Для каждого BOM (в порядке объявления):
+   a. Попытаться загрузить из кеша -> если есть и TTL не истёк, использовать
+   b. Иначе скачать POM из репозиториев (пробовать по порядку)
+   c. Распарсить XML: извлечь <properties>, <dependencyManagement><dependencies>
+   d. Рекурсивно резолвить parent BOM (если есть <parent>)
+   e. Рекурсивно обработать <dependency scope="import"> (вложенные BOM)
+   f. Резолвить property placeholders: ${property.name} -> значения из <properties>
+   g. Сохранить BomContent в кеш
+   h. При сетевой ошибке: если есть кеш (даже устаревший) -> использовать с WARNING
+7. Объединить все BomContent в единую карту group:artifact -> version (первый BOM побеждает)
+8. Для каждой библиотеки в metadata.libraries:
+   a. Если resolvedVersion != null (DECLARED) -> пропустить
+   b. Найти version в объединённой карте по group:artifact
+   c. Если найдена -> создать ResolvedVersion(source=BOM_IMPORT, originalRef=bomAlias)
+   d. Если не найдена -> оставить как есть (WARNING или ERROR в strict mode)
+9. Вернуть обновлённую EffectiveMetadata с новыми версиями
+----
+
+[[implementation-bom-import]]
+=== Детальная реализация
+
+==== MavenPomDownloader (новый класс)
+
+[source,kotlin]
+----
+public class MavenPomDownloader(
+    private val repositories: List<MavenRepository>,
+    private val httpClient: HttpClient,
+    private val connectTimeoutMs: Long = 30_000,
+    private val readTimeoutMs: Long = 60_000,
+) {
+    public suspend fun downloadPom(
+        group: String,
+        artifact: String,
+        version: String
+    ): String? {
+        // Конвертировать координаты в URL:
+        // group "org.springframework.boot" -> "org/springframework/boot"
+        // URL: {repoUrl}/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom
+        val groupPath = group.replace('.', '/')
+        val pomFileName = "$artifact-$version.pom"
+
+        for (repo in repositories) {
+            val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/$version/$pomFileName"
+            try {
+                val response = httpClient.get(url) {
+                    if (repo.username != null && repo.password != null) {
+                        basicAuth(repo.username, repo.password)
+                    }
+                    timeout {
+                        connectTimeoutMillis = connectTimeoutMs
+                        requestTimeoutMillis = readTimeoutMs
+                    }
+                }
+                if (response.status == HttpStatusCode.OK) {
+                    return response.bodyAsText()
+                }
+                // 404 -> пробуем следующий репозиторий
+            } catch (e: Exception) {
+                logger.warn { "Failed to download POM from ${repo.url}: ${e.message}" }
+            }
+        }
+        return null
+    }
+}
+----
+
+==== Retry Logic
+
+`MavenPomDownloader` ДОЛЖЕН реализовать retry с exponential backoff:
+
+[source,kotlin]
+----
+private suspend fun downloadWithRetry(url: String, maxRetries: Int = 3): String {
+    var delay = 1000L
+    repeat(maxRetries) { attempt ->
+        try {
+            return httpClient.get(url).bodyAsText()
+        } catch (e: Exception) {
+            if (attempt == maxRetries - 1) throw e
+            kotlinx.coroutines.delay(delay)
+            delay *= 2
+        }
+    }
+    throw IllegalStateException("Unreachable")
+}
+----
+
+==== PomXmlParser (новый класс)
+
+[source,kotlin]
+----
+public class PomXmlParser {
+
+    public fun parseBomContent(pomXml: String): PomParseResult {
+        // Использовать javax.xml.parsers.DocumentBuilderFactory
+        val doc = parseXmlDocument(pomXml)
+
+        // 1. Извлечь <properties>
+        val properties = extractProperties(doc)
+
+        // 2. Извлечь <parent> координаты (если есть)
+        val parent = extractParent(doc)
+
+        // 3. Извлечь <dependencyManagement><dependencies>
+        val rawDependencies = extractDependencyManagement(doc)
+
+        return PomParseResult(properties, parent, rawDependencies)
+    }
+
+    private fun resolvePropertyPlaceholders(
+        value: String,
+        properties: Map<String, String>
+    ): String {
+        // Regex: \$\{([^}]+)\}
+        val pattern = Regex("""\$\{([^}]+)\}""")
+        return pattern.replace(value) { match ->
+            val propName = match.groupValues[1]
+            properties[propName]
+                ?: throw IllegalStateException(
+                    "Unresolved property '$propName' in BOM"
+                )
+        }
+    }
+}
+----
+
+==== Property Resolution Precedence
+
+* Child POM properties имеют приоритет над parent POM properties
+* При конфликте -- child побеждает
+* Nested properties (`$\{$\{var\}.version\}`) НЕ поддерживаются в первой итерации
+
+IMPORTANT: Nested property resolution (например `$\{$\{framework\}.version\}`) -- ограничение первой итерации.
+При обнаружении вложенного placeholder'а -- WARNING в diagnostics, значение оставляется как есть.
+
+[source,kotlin]
+----
+public data class PomParseResult(
+    val properties: Map<String, String>,
+    val parent: ParentPom?,
+    val dependencies: List<RawBomDependency>,
+)
+
+public data class ParentPom(
+    val group: String,
+    val artifact: String,
+    val version: String,
+)
+
+public data class RawBomDependency(
+    val group: String,
+    val artifact: String,
+    val version: String,
+    val scope: String? = null,
+    val type: String? = null,
+)
+----
+
+==== BomImportProcessor.process()
+
+[source,kotlin]
+----
+override suspend fun process(
+    metadata: EffectiveMetadata,
+    context: ProcessingContext
+): EffectiveMetadata {
+    val bomImports = context.originalMetadata.bomImports
+    if (bomImports.isEmpty()) return metadata
+
+    val settings = context.settings
+    val cache = BomCache(
+        cacheDirectory = settings.bomCache?.directory ?: "~/.dependanger/cache/bom",
+        ttlHours = settings.bomCache?.ttlHours ?: 24,
+        ttlSnapshotHours = settings.bomCache?.ttlSnapshotHours ?: 1,
+    )
+    val repositories = settings.repositories.ifEmpty {
+        listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
+    }
+    val downloader = MavenPomDownloader(repositories, createHttpClient())
+    val parser = PomXmlParser()
+
+    // Резолвить все BOM (с обнаружением циклов)
+    val resolvedBoms = mutableListOf<BomContent>()
+    val visited = mutableSetOf<String>() // group:artifact:version
+    var diagnostics = metadata.diagnostics
+
+    for (bomImport in bomImports) {
+        val result = resolveBomRecursive(
+            bomImport.group, bomImport.artifact, bomImport.version,
+            cache, downloader, parser, visited, diagnostics, depth = 0
+        )
+        resolvedBoms.add(result.content)
+        diagnostics = result.diagnostics
+    }
+
+    // Объединить: первый BOM имеет приоритет
+    val versionMap = mutableMapOf<String, Pair<String, String>>() // "group:artifact" -> (version, bomAlias)
+    for ((index, bom) in resolvedBoms.withIndex()) {
+        val bomAlias = bomImports[index].alias
+        for (dep in bom.dependencies) {
+            val key = "${dep.group}:${dep.artifact}"
+            versionMap.putIfAbsent(key, dep.version to bomAlias)
+        }
+    }
+
+    // Обогатить библиотеки
+    val updatedLibraries = metadata.libraries.mapValues { (_, lib) ->
+        if (lib.resolvedVersion != null) return@mapValues lib // DECLARED имеет приоритет
+        val key = "${lib.group}:${lib.artifact}"
+        val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
+        lib.copy(
+            resolvedVersion = version,
+            versionSource = VersionSource.BOM_IMPORT,
+        )
+    }
+
+    val updatedVersions = metadata.versions.toMutableMap()
+    // Добавить BOM-резолвнутые версии в map
+    for ((_, lib) in updatedLibraries) {
+        if (lib.versionSource == VersionSource.BOM_IMPORT && lib.resolvedVersion != null) {
+            // Обновить соответствующую version entry если нужно
+        }
+    }
+
+    return metadata.copy(
+        libraries = updatedLibraries,
+        diagnostics = diagnostics,
+    )
+}
+----
+
+==== Обнаружение циклов
+
+[source,kotlin]
+----
+private suspend fun resolveBomRecursive(
+    group: String, artifact: String, version: String,
+    cache: BomCache, downloader: MavenPomDownloader, parser: PomXmlParser,
+    visited: MutableSet<String>, diagnostics: Diagnostics, depth: Int
+): BomResolveResult {
+    val key = "$group:$artifact:$version"
+    if (key in visited) {
+        val msg = DiagnosticMessage("CIRCULAR_BOM", "Circular BOM dependency detected: $key", "bom-import")
+        return BomResolveResult(BomContent(), diagnostics.addError(msg))
+    }
+    if (depth > 10) {
+        val msg = DiagnosticMessage("BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > 10 levels for $key", "bom-import")
+        return BomResolveResult(BomContent(), diagnostics.addWarning(msg))
+    }
+    visited.add(key)
+
+    // Попробовать кеш
+    val cached = try { cache.get(group, artifact, version) } catch (_: Exception) { null }
+    if (cached != null) return BomResolveResult(cached, diagnostics)
+
+    // Скачать POM
+    val pomXml = downloader.downloadPom(group, artifact, version)
+    if (pomXml == null) {
+        // Попробовать стейл кеш
+        val stale = try { cache.getStale(group, artifact, version) } catch (_: Exception) { null }
+        if (stale != null) {
+            val msg = DiagnosticMessage("BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import")
+            return BomResolveResult(stale, diagnostics.addWarning(msg))
+        }
+        val msg = DiagnosticMessage("BOM_FETCH_FAILED", "Cannot fetch BOM: $key", "bom-import")
+        return BomResolveResult(BomContent(), diagnostics.addError(msg))
+    }
+
+    // Парсинг
+    val parseResult = parser.parseBomContent(pomXml)
+
+    // Резолвить parent
+    var mergedProperties = parseResult.properties
+    var mergedDependencies = mutableListOf<BomDependency>()
+
+    parseResult.parent?.let { parent ->
+        val parentResult = resolveBomRecursive(
+            parent.group, parent.artifact, parent.version,
+            cache, downloader, parser, visited, diagnostics, depth + 1
+        )
+        mergedProperties = parentResult.content.properties + mergedProperties // child overrides
+        mergedDependencies.addAll(parentResult.content.dependencies)
+    }
+
+    // Резолвить property placeholders и добавить зависимости
+    for (rawDep in parseResult.dependencies) {
+        if (rawDep.scope == "import" && rawDep.type == "pom") {
+            // Рекурсивный BOM import
+            val importResult = resolveBomRecursive(
+                rawDep.group, rawDep.artifact,
+                parser.resolveProperty(rawDep.version, mergedProperties),
+                cache, downloader, parser, visited, diagnostics, depth + 1
+            )
+            mergedDependencies.addAll(importResult.content.dependencies)
+        } else {
+            mergedDependencies.add(BomDependency(
+                group = parser.resolveProperty(rawDep.group, mergedProperties),
+                artifact = parser.resolveProperty(rawDep.artifact, mergedProperties),
+                version = parser.resolveProperty(rawDep.version, mergedProperties),
+            ))
+        }
+    }
+
+    val content = BomContent(mergedDependencies, mergedProperties)
+    try { cache.put(group, artifact, version, content) } catch (_: Exception) { /* WARNING */ }
+
+    return BomResolveResult(content, diagnostics)
+}
+----
+
+[[spec-bom-cache]]
+== SPEC-06.2: BomCache
+
+[[purpose-bom-cache]]
+=== Назначение
+
+Файловый кеш для скачанных BOM-файлов.
+Хранит сериализованные `BomContent` в локальной файловой системе.
+
+[[algorithm-bom-cache]]
+=== Алгоритм кеширования
+
+==== Структура директории кеша
+
+[source,text]
+----
+~/.dependanger/cache/bom/
+  org/
+    springframework/
+      boot/
+        spring-boot-dependencies/
+          3.4.0/
+            bom-content.json      # Сериализованный BomContent
+            metadata.json         # {fetchedAt, ttl, isSnapshot}
+----
+
+==== BomCache.get()
+
+[source,text]
+----
+1. Построить путь к файлу: {cacheDir}/{groupPath}/{artifact}/{version}/bom-content.json
+2. Проверить существование файла
+3. Прочитать metadata.json -> fetchedAt, isSnapshot
+4. Рассчитать TTL: если isSnapshot -> ttlSnapshotHours, иначе ttlHours
+5. Если (now - fetchedAt) > ttl -> throw CacheExpiredException
+6. Десериализовать bom-content.json в BomContent
+7. Вернуть BomContent
+----
+
+[source,kotlin]
+----
+public fun get(group: String, artifact: String, version: String): BomContent {
+    val dir = resolveCacheDir(group, artifact, version)
+    val contentFile = dir.resolve("bom-content.json")
+    val metaFile = dir.resolve("metadata.json")
+
+    if (!contentFile.exists() || !metaFile.exists()) {
+        throw CacheNotFoundException("BOM not in cache: $group:$artifact:$version")
+    }
+
+    val meta = Json.decodeFromString<CacheMetadata>(metaFile.readText())
+    val ttl = if (version.endsWith("-SNAPSHOT")) ttlSnapshotHours else ttlHours
+    val ageHours = Duration.between(meta.fetchedAt, Instant.now()).toHours()
+
+    if (ageHours > ttl) {
+        throw CacheExpiredException("BOM cache expired: $group:$artifact:$version")
+    }
+
+    return Json.decodeFromString<BomContent>(contentFile.readText())
+}
+----
+
+==== BomCache.put()
+
+[source,kotlin]
+----
+public fun put(group: String, artifact: String, version: String, content: BomContent) {
+    val dir = resolveCacheDir(group, artifact, version)
+    dir.mkdirs()
+
+    val contentFile = dir.resolve("bom-content.json")
+    val metaFile = dir.resolve("metadata.json")
+
+    // Atomic write через temp file
+    val tempContent = File.createTempFile("bom-", ".tmp", dir)
+    tempContent.writeText(Json.encodeToString(content))
+    tempContent.renameTo(contentFile)
+
+    val meta = CacheMetadata(
+        fetchedAt = Instant.now(),
+        isSnapshot = version.endsWith("-SNAPSHOT"),
+    )
+    val tempMeta = File.createTempFile("meta-", ".tmp", dir)
+    tempMeta.writeText(Json.encodeToString(meta))
+    tempMeta.renameTo(metaFile)
+}
+----
+
+==== BomCache.invalidate()
+
+[source,kotlin]
+----
+public fun invalidate(group: String, artifact: String, version: String) {
+    val dir = resolveCacheDir(group, artifact, version)
+    if (dir.exists()) dir.deleteRecursively()
+}
+----
+
+==== BomCache.clear()
+
+[source,kotlin]
+----
+public fun clear() {
+    val dir = File(cacheDirectory)
+    if (dir.exists()) dir.deleteRecursively()
+}
+----
+
+==== Вспомогательные типы
+
+[source,kotlin]
+----
+@Serializable
+private data class CacheMetadata(
+    val fetchedAt: Instant,
+    val isSnapshot: Boolean,
+)
+
+public class CacheNotFoundException(message: String) : RuntimeException(message)
+public class CacheExpiredException(message: String) : RuntimeException(message)
+----
+
+[[http-download]]
+== HTTP-загрузка с Ktor
+
+=== Конфигурация HttpClient
+
+[source,kotlin]
+----
+private fun createHttpClient(): HttpClient = HttpClient(CIO) {
+    install(ContentNegotiation) {
+        json(Json { ignoreUnknownKeys = true })
+    }
+    engine {
+        requestTimeout = 60_000
+        endpoint {
+            connectTimeout = 30_000
+            keepAliveTime = 5_000
+        }
+    }
+    install(HttpTimeout) {
+        connectTimeoutMillis = 30_000
+        requestTimeoutMillis = 60_000
+    }
+    // Retry через ktor-client-logging или ручной retry
+}
+----
+
+=== Формат URL для скачивания POM
+
+[source,text]
+----
+{repositoryUrl}/{groupId.replace('.','/')}/{artifactId}/{version}/{artifactId}-{version}.pom
+
+Примеры:
+https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/3.4.0/spring-boot-dependencies-3.4.0.pom
+https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-bom/2.1.20/kotlin-bom-2.1.20.pom
+----
+
+=== Обработка HTTP ответов
+
+[cols="1,2"]
+|===
+| Код | Поведение
+
+| 200 OK | Успех, парсить тело
+| 404 Not Found | Пробовать следующий репозиторий
+| 401/403 | ERROR "Authentication required for {url}"
+| 429 | Retry с Retry-After header
+| 500+ | Retry 3 раза с exponential backoff (1s, 2s, 4s)
+| Timeout | Retry 1 раз, затем ERROR
+|===
+
+[[pom-xml-parsing]]
+== Парсинг POM XML
+
+=== Структура Maven POM (BOM)
+
+[source,xml]
+----
+<project>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.0</version>
+    </parent>
+
+    <properties>
+        <spring.version>6.2.1</spring.version>
+        <jackson.version>2.17.0</jackson.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Обычная зависимость с property placeholder -->
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-web</artifactId>
+                <version>${spring.version}</version>
+            </dependency>
+
+            <!-- Вложенный BOM import -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
+----
+
+=== Алгоритм парсинга
+
+[source,text]
+----
+1. Распарсить XML через DocumentBuilderFactory (stdlib javax.xml)
+2. Найти /project/properties -> Map<String, String>
+3. Найти /project/parent -> ParentPom? (groupId, artifactId, version)
+4. Найти /project/dependencyManagement/dependencies/dependency[]
+5. Для каждой dependency:
+   a. Извлечь groupId, artifactId, version, scope, type
+   b. Если scope="import" && type="pom" -> отметить как вложенный BOM
+   c. Иначе -> обычная BOM dependency
+6. Property resolution: заменить ${name} на значение из properties
+7. Parent resolution: рекурсивно загрузить parent, объединить properties и dependencies
+----
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Диагностический код
+
+| Пустой bomImports | Процессор пропускается, возврат без изменений | --
+| Невалидный XML | ERROR, pipeline останавливается | `INVALID_BOM_XML`
+| BOM без dependencyManagement | WARNING, BOM игнорируется | `BOM_NO_DEPS`
+| Неразрешённый property | ERROR с именем property | `UNRESOLVED_BOM_PROPERTY`
+| Циклическая зависимость BOM | ERROR, обнаружение через visited set | `CIRCULAR_BOM`
+| Глубокая parent иерархия (>10) | WARNING, остановка рекурсии | `BOM_DEPTH_EXCEEDED`
+| Сеть недоступна, кеш есть | WARNING, использовать стейл кеш | `BOM_STALE_CACHE`
+| Сеть недоступна, кеша нет | ERROR, pipeline останавливается | `BOM_FETCH_FAILED`
+| Snapshot BOM | TTL = ttlSnapshotHours (1h default), WARNING | --
+| Кеш повреждён | WARNING, удалить и перекачать | `BOM_CACHE_CORRUPT`
+| Нет прав на запись в кеш | WARNING, работать без кеша | `BOM_CACHE_READONLY`
+| Дубликат в BOM | WARNING, последний побеждает (как Maven) | `BOM_DUPLICATE_ENTRY`
+| HTTP 401/403 | ERROR с подсказкой настроить credentials | `BOM_AUTH_REQUIRED`
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+[cols="1,2,1"]
+|===
+| Код | Описание | Уровень
+
+| `BOM_VERSION_IMPORTED` | Версия импортирована из BOM | INFO
+| `BOM_NO_DEPS` | BOM не содержит dependencyManagement | WARNING
+| `BOM_STALE_CACHE` | Используется устаревший кеш | WARNING
+| `BOM_DUPLICATE_ENTRY` | Дублирующаяся dependency в BOM | WARNING
+| `BOM_CACHE_CORRUPT` | Повреждённый кеш, перекачка | WARNING
+| `BOM_CACHE_READONLY` | Нет прав на запись в кеш | WARNING
+| `BOM_SNAPSHOT_WARNING` | Snapshot BOM версия нестабильна | WARNING
+| `INVALID_BOM_XML` | Невалидный XML в BOM | ERROR
+| `UNRESOLVED_BOM_PROPERTY` | Неразрешённый property placeholder | ERROR
+| `CIRCULAR_BOM` | Циклическая зависимость BOM | ERROR
+| `BOM_DEPTH_EXCEEDED` | Слишком глубокая parent иерархия | WARNING
+| `BOM_FETCH_FAILED` | Невозможно скачать BOM | ERROR
+| `BOM_AUTH_REQUIRED` | Требуется аутентификация | ERROR
+|===
+
+[[extension-keys]]
+== ExtensionKey
+
+BomImportProcessor не использует ExtensionKey напрямую -- результат записывается непосредственно в `EffectiveMetadata.libraries` (поля `resolvedVersion` и `versionSource`).
+
+[[testing]]
+== Тестовые сценарии
+
+=== Юнит-тесты BomImportProcessor
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `empty bomImports returns unchanged metadata` | Пустой список BOM -> metadata без изменений
+| `single BOM resolves library version` | Spring BOM -> spring-web получает версию
+| `declared version not overridden by BOM` | library с explicit version -> BOM не перезаписывает
+| `multiple BOMs first wins` | BOM-A и BOM-B содержат одну library -> версия из BOM-A
+| `BOM with property placeholders` | `${spring.version}` -> резолвится из `<properties>`
+| `parent BOM inheritance` | BOM наследует dependencies от parent
+| `nested BOM import (scope=import)` | BOM импортирует другой BOM
+| `circular BOM detection` | BOM-A -> BOM-B -> BOM-A -> ERROR
+| `network failure with stale cache` | Сеть недоступна, есть кеш -> WARNING + кеш
+| `network failure without cache` | Сеть недоступна, кеша нет -> ERROR
+| `strict mode unresolved version` | Библиотека без версии, strict -> ERROR
+| `non-strict mode unresolved version` | Библиотека без версии, non-strict -> WARNING
+|===
+
+=== Юнит-тесты BomCache
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `put and get returns content` | Запись и чтение из кеша
+| `expired TTL throws CacheExpiredException` | TTL истёк -> исключение
+| `snapshot has shorter TTL` | SNAPSHOT версия -> ttlSnapshotHours
+| `invalidate removes entry` | Удаление конкретной записи
+| `clear removes all entries` | Полная очистка
+| `corrupted cache file` | Повреждённый JSON -> исключение
+| `concurrent access` | Параллельный put/get -> корректная работа
+|===
+
+=== Юнит-тесты PomXmlParser
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `parse valid BOM POM` | Корректный BOM -> BomContent
+| `parse properties` | `<properties>` -> Map
+| `resolve property placeholders` | `${spring.version}` -> "6.2.1"
+| `unresolved property throws` | `${unknown}` -> IllegalStateException
+| `parse parent POM` | `<parent>` -> ParentPom
+| `nested import scope` | `scope=import type=pom` -> отмечается как вложенный BOM
+| `invalid XML throws` | Невалидный XML -> парсинг-ошибка
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-maven-resolver зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- io.ktor:ktor-client-core:3.1.1 (implementation)
+- io.ktor:ktor-client-cio:3.1.1 (implementation)
+- io.ktor:ktor-client-content-negotiation:3.1.1 (implementation)
+- io.ktor:ktor-serialization-kotlinx-json:3.1.1 (implementation)
+- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+
+Тесты:
+- io.ktor:ktor-client-mock:3.1.1
+- org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `BomImportProcessor.kt` | Реализация `process()` -- основная логика BOM import
+| `BomCache.kt` | Реализация `get()`, `put()`, `invalidate()`, `clear()` -- файловый кеш
+| `MavenPomDownloader.kt` | **Создать** -- HTTP-загрузка POM файлов через Ktor
+| `PomXmlParser.kt` | **Создать** -- парсинг Maven POM XML
+| `CacheMetadata.kt` | **Создать** -- data class для метаданных кеша
+|===
+
+[[priority]]
+== Приоритет
+
+**P2** (важно) -- BOM Import является ключевой feature для продуктивного использования.
+Используется в DSL через `bomImports { }` и включается через `withBomImport()` или `processing { importBoms = true }`.

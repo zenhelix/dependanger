@@ -1,0 +1,1521 @@
+= SPEC-14: dependanger-cli -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-cli` предоставляет standalone command-line интерфейс для Dependanger.
+Построен на базе Clikt 5.0.3 с Mordant 3.0.2 для цветного вывода.
+Содержит **29 файлов**, из которых 25 команд и 2 утилиты имеют TODO-заглушки в методах `run()`.
+
+Уже реализовано: `DependangerCli.kt` (main entry, маршрутизация subcommands), `CliConfig.kt` (data classes конфигурации).
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `DependangerCli.kt` | Полностью: main(), subcommands, маршрутизация
+| `CliConfig.kt` | Полностью: 7 data classes конфигурации (DefaultsConfig, GenerateConfig, TomlGenerateConfig, BomGenerateConfig, CheckUpdatesConfig, AnalyzeConfig, SecurityCheckConfig, LicenseCheckConfig)
+| Все 25 команд | Каркасы: опции/аргументы через Clikt, help через `override fun help()`. TODO: `run()`
+| `OutputFormatter.kt` | Каркас: конструктор с useColor/jsonOutput. TODO: 5 методов форматирования
+| `ConfigLoader.kt` | Каркас: companion с DEFAULT_CONFIG_FILENAME. TODO: `load()`, `findConfigFile()`
+|===
+
+=== TODO-заглушки (полный список)
+
+==== Группа 1: Metadata CRUD (16 команд)
+
+[source,text]
+----
+InitCommand.run()
+AddVersionCommand.run()
+AddLibraryCommand.run()
+AddPluginCommand.run()
+AddBundleCommand.run()
+AddBomCommand.run()
+AddDistributionCommand.run()
+RemoveVersionCommand.run()
+RemoveLibraryCommand.run()
+RemovePluginCommand.run()
+RemoveBundleCommand.run()
+RemoveBomCommand.run()
+RemoveDistributionCommand.run()
+UpdateVersionCommand.run()
+UpdateLibraryCommand.run()
+MigrateDeprecatedCommand.run()
+----
+
+==== Группа 2: Processing (3 команды)
+
+[source,text]
+----
+ValidateCommand.run()
+ProcessCommand.run()
+GenerateCommand.run()
+----
+
+==== Группа 3: Analysis (5 команд)
+
+[source,text]
+----
+CheckUpdatesCommand.run()
+AnalyzeCommand.run()
+SecurityCheckCommand.run()
+LicenseCheckCommand.run()
+ResolveTransitivesCommand.run()
+----
+
+==== Группа 4: Report (1 команда)
+
+[source,text]
+----
+ReportCommand.run()
+----
+
+==== Утилиты (2 файла)
+
+[source,text]
+----
+OutputFormatter: formatSuccess(), formatError(), formatWarning(), formatInfo(), formatTable()
+ConfigLoader: load(), findConfigFile()
+----
+
+[[common-patterns]]
+== Общие паттерны реализации
+
+[[pattern-metadata-io]]
+=== Паттерн: Загрузка/сохранение metadata
+
+Все команды, работающие с metadata.json, используют один и тот же паттерн I/O:
+
+[source,kotlin]
+----
+// Загрузка metadata
+private fun loadMetadata(inputPath: String): DependangerMetadata {
+    val path = Path.of(inputPath)
+    if (!path.exists()) {
+        throw PrintMessage(
+            formatError("File not found: $inputPath"),
+            statusCode = EXIT_FILE_NOT_FOUND,
+        )
+    }
+    val format = JsonSerializationFormat()
+    return try {
+        format.read(path)
+    } catch (e: Exception) {
+        throw PrintMessage(
+            formatError("Failed to read metadata: ${e.message}"),
+            statusCode = EXIT_ERROR,
+        )
+    }
+}
+
+// Сохранение metadata
+private fun saveMetadata(metadata: DependangerMetadata, outputPath: String) {
+    val format = JsonSerializationFormat()
+    try {
+        format.write(metadata, Path.of(outputPath))
+    } catch (e: Exception) {
+        throw PrintMessage(
+            formatError("Failed to write metadata: ${e.message}"),
+            statusCode = EXIT_ERROR,
+        )
+    }
+}
+----
+
+Рекомендуется вынести в общий базовый класс или утилитный объект:
+
+[source,kotlin]
+----
+// MetadataIO.kt (новый файл)
+public object MetadataIO {
+    private val format = JsonSerializationFormat()
+
+    public fun load(path: Path): DependangerMetadata = format.read(path)
+    public fun save(metadata: DependangerMetadata, path: Path): Unit = format.write(metadata, path)
+}
+----
+
+[[pattern-run-blocking]]
+=== Паттерн: runBlocking для suspend-функций
+
+CLI команды используют `runBlocking` для вызова suspend-функций Dependanger API:
+
+[source,kotlin]
+----
+import kotlinx.coroutines.runBlocking
+
+override fun run() {
+    runBlocking {
+        val result = dependanger.process(distribution)
+        // обработка результата
+    }
+}
+----
+
+[[pattern-output-path]]
+=== Паттерн: Определение output-пути
+
+Во всех CRUD-командах: если `output` не указан, перезаписывается `input`:
+
+[source,kotlin]
+----
+val effectiveOutput = output ?: input
+----
+
+[[pattern-exit-codes]]
+=== Паттерн: Exit codes
+
+[cols="1,2,2"]
+|===
+| Код | Константа | Описание
+
+| 0 | `EXIT_SUCCESS` | Успешное выполнение
+| 1 | `EXIT_ERROR` | Ошибки обработки
+| 2 | `EXIT_WARNINGS` | Предупреждения (при --strict)
+| 3 | `EXIT_FILE_NOT_FOUND` | Файл не найден
+| 10 | `EXIT_VULNERABILITIES` | Найдены уязвимости (security-check --fail-on)
+| 11 | `EXIT_UPDATES` | Найдены обновления (check-updates --fail-on-updates)
+| 12 | `EXIT_COMPATIBILITY` | Ошибки совместимости (analyze --fail-on-error)
+| 13 | `EXIT_LICENSE` | Нарушения лицензий (license-check --fail-on-denied)
+|===
+
+Рекомендуется создать объект с константами:
+
+[source,kotlin]
+----
+// ExitCodes.kt (новый файл)
+public object ExitCodes {
+    public const val SUCCESS: Int = 0
+    public const val ERROR: Int = 1
+    public const val WARNINGS: Int = 2
+    public const val FILE_NOT_FOUND: Int = 3
+    public const val VULNERABILITIES: Int = 10
+    public const val UPDATES: Int = 11
+    public const val COMPATIBILITY: Int = 12
+    public const val LICENSE: Int = 13
+}
+----
+
+[[spec-output-formatter]]
+== SPEC-14.1: OutputFormatter
+
+[[purpose-output-formatter]]
+=== Назначение
+
+Форматирование вывода команд с поддержкой цветов (через Mordant) и JSON-вывода.
+
+[[implementation-output-formatter]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+import com.github.ajalt.mordant.rendering.TextColors.*
+import com.github.ajalt.mordant.rendering.TextStyles.*
+import com.github.ajalt.mordant.terminal.Terminal
+import com.github.ajalt.mordant.table.table
+
+public class OutputFormatter(
+    public val useColor: Boolean = true,
+    public val jsonOutput: Boolean = false,
+) {
+    private val terminal: Terminal = Terminal()
+
+    public fun formatSuccess(message: String): String {
+        if (jsonOutput) return """{"status":"success","message":"$message"}"""
+        if (!useColor) return "[OK] $message"
+        return (green + bold)("✓ $message")
+    }
+
+    public fun formatError(message: String): String {
+        if (jsonOutput) return """{"status":"error","message":"$message"}"""
+        if (!useColor) return "[ERROR] $message"
+        return (red + bold)("✗ $message")
+    }
+
+    public fun formatWarning(message: String): String {
+        if (jsonOutput) return """{"status":"warning","message":"$message"}"""
+        if (!useColor) return "[WARN] $message"
+        return (yellow)("⚠ $message")
+    }
+
+    public fun formatInfo(message: String): String {
+        if (jsonOutput) return """{"status":"info","message":"$message"}"""
+        if (!useColor) return "[INFO] $message"
+        return (cyan)("ℹ $message")
+    }
+
+    public fun formatTable(headers: List<String>, rows: List<List<String>>): String {
+        if (jsonOutput) {
+            // Конвертировать в JSON массив объектов
+            val jsonRows = rows.map { row ->
+                headers.zip(row).joinToString(",") { (h, v) -> "\"$h\":\"$v\"" }
+            }
+            return "[${jsonRows.joinToString(",") { "{$it}" }}]"
+        }
+
+        return terminal.render(table {
+            header {
+                row(*headers.toTypedArray())
+            }
+            body {
+                rows.forEach { row ->
+                    row(*row.toTypedArray())
+                }
+            }
+        })
+    }
+}
+----
+
+[[spec-config-loader]]
+== SPEC-14.2: ConfigLoader
+
+[[purpose-config-loader]]
+=== Назначение
+
+Загрузка конфигурации CLI из YAML-файла с поиском в стандартных местах.
+
+[[algorithm-config-loader]]
+=== Алгоритм
+
+[source,text]
+----
+load(configPath):
+1. Если configPath задан -> загрузить из него
+2. Иначе -> findConfigFile() -> загрузить
+3. Если файл не найден -> вернуть CliConfig() с дефолтами
+4. Парсить YAML/JSON в CliConfig
+
+findConfigFile():
+1. Проверить текущую директорию: ./.dependanger.yaml
+2. Проверить текущую директорию: ./.dependanger.yml
+3. Проверить текущую директорию: ./.dependanger.json
+4. Проверить домашнюю: ~/.dependanger/config.yaml
+5. Проверить домашнюю: ~/.dependanger/config.json
+6. Проверить переменную окружения DEPENDANGER_CONFIG
+7. Если ничего не найдено -> вернуть null
+----
+
+[[implementation-config-loader]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+import kotlinx.serialization.json.Json
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+
+public class ConfigLoader {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    public fun load(configPath: Path? = null): CliConfig {
+        val path = configPath ?: findConfigFile() ?: return CliConfig()
+
+        if (!path.exists()) return CliConfig()
+
+        return try {
+            val content = path.readText()
+            json.decodeFromString<CliConfig>(content)
+        } catch (e: Exception) {
+            // Если конфиг-файл невалиден, логируем warning и используем дефолты
+            System.err.println("Warning: Failed to parse config file $path: ${e.message}")
+            CliConfig()
+        }
+    }
+
+    public fun findConfigFile(): Path? {
+        val candidates = buildList {
+            // Текущая директория
+            add(Path.of(".dependanger.yaml"))
+            add(Path.of(".dependanger.yml"))
+            add(Path.of(".dependanger.json"))
+
+            // Домашняя директория
+            val home = System.getProperty("user.home")
+            if (home != null) {
+                add(Path.of(home, ".dependanger", "config.yaml"))
+                add(Path.of(home, ".dependanger", "config.yml"))
+                add(Path.of(home, ".dependanger", "config.json"))
+            }
+
+            // Переменная окружения
+            System.getenv("DEPENDANGER_CONFIG")?.let { add(Path.of(it)) }
+        }
+
+        return candidates.firstOrNull { it.exists() }
+    }
+
+    public companion object {
+        public const val DEFAULT_CONFIG_FILENAME: String = ".dependanger.yaml"
+    }
+}
+----
+
+NOTE: Для поддержки YAML формата используется библиотека `com.charleskorn.kaml:kaml` -- kotlinx-serialization backend для YAML (см. <<dependencies>>).
+Она позволяет десериализовать YAML-конфигурацию через `Yaml.default.decodeFromString<CliConfig>(content)` без дополнительных адаптеров.
+
+[[spec-init-command]]
+== SPEC-14.3: InitCommand
+
+=== Назначение
+
+Создать новый пустой metadata.json файл с минимальной структурой.
+
+=== Алгоритм
+
+[source,text]
+----
+1. Проверить, существует ли output файл
+2. Если существует и !force -> ошибка "File already exists"
+3. Создать пустой DependangerMetadata(schemaVersion = "1.0")
+4. Сериализовать через JsonSerializationFormat.write()
+5. Вывести formatSuccess("Created $output")
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() {
+    val outputPath = Path.of(output)
+    if (outputPath.exists() && !force) {
+        echo(formatError("File already exists: $output. Use --force to overwrite."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val metadata = DependangerMetadata(schemaVersion = "1.0")
+    val format = JsonSerializationFormat()
+
+    try {
+        format.write(metadata, outputPath)
+        echo(formatSuccess("Created $output"))
+    } catch (e: Exception) {
+        echo(formatError("Failed to create metadata file: ${e.message}"))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+}
+----
+
+[[spec-add-commands]]
+== SPEC-14.4: Add-команды (AddVersion, AddLibrary, AddPlugin, AddBundle, AddBom, AddDistribution)
+
+=== Общий паттерн
+
+Все Add-команды следуют единому шаблону:
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Проверить, не существует ли уже entity с таким alias/name
+3. Создать новый entity из аргументов и опций
+4. Добавить entity в соответствующий список metadata
+5. Сохранить обновлённый metadata в output (или input, если output не указан)
+6. Вывести formatSuccess("Added ...")
+----
+
+=== SPEC-14.4.1: AddVersionCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    // Проверка дубликатов
+    if (metadata.versions.any { it.name == alias }) {
+        echo(formatError("Version '$alias' already exists. Use update-version to modify."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    // Парсинг fallback
+    val fallbacks = parseFallback(fallback)
+
+    // Создание новой версии
+    val newVersion = Version(
+        name = alias,
+        value = value,
+        fallbacks = fallbacks,
+    )
+
+    // Обновление metadata
+    val updatedMetadata = metadata.copy(
+        versions = metadata.versions + newVersion
+    )
+
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added version '$alias' = '$value'"))
+}
+
+private fun parseFallback(fallbackStr: String?): List<VersionFallback> {
+    if (fallbackStr == null) return emptyList()
+    // Формат: "condition=value", например "jdkBelow(17)=2.7.18"
+    val parts = fallbackStr.split("=", limit = 2)
+    if (parts.size != 2) {
+        echo(formatError("Invalid fallback format. Expected: condition=value"))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+    val condition = parseFallbackCondition(parts[0].trim())
+    val fallbackValue = parts[1].trim()
+    return listOf(VersionFallback(fallbackValue, condition))
+}
+----
+
+=== SPEC-14.4.2: AddLibraryCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    if (metadata.libraries.any { it.alias == alias }) {
+        echo(formatError("Library '$alias' already exists."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    // Парсинг координат (group:artifact[:version])
+    val parts = coordinates.split(":")
+    if (parts.size < 2) {
+        echo(formatError("Invalid coordinates format. Expected: group:artifact[:version]"))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val group = parts[0]
+    val artifact = parts[1]
+    val inlineVersion = if (parts.size >= 3) parts[2] else null
+
+    // Определение версии: CLI option > inline из координат > null
+    val versionRef = when {
+        versionRef != null -> VersionReference.Reference(versionRef!!)
+        version != null    -> VersionReference.Literal(version!!)
+        inlineVersion != null -> VersionReference.Literal(inlineVersion)
+        else               -> null
+    }
+
+    val parsedTags = tags?.split(",")?.map { it.trim() }?.toSet() ?: emptySet()
+
+    val library = Library(
+        alias = alias,
+        group = group,
+        artifact = artifact,
+        version = versionRef,
+        tags = parsedTags,
+    )
+
+    val updatedMetadata = metadata.copy(
+        libraries = metadata.libraries + library
+    )
+
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added library '$alias' ($group:$artifact)"))
+}
+----
+
+=== SPEC-14.4.3: AddPluginCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    if (metadata.plugins.any { it.alias == alias }) {
+        echo(formatError("Plugin '$alias' already exists."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val versionRef = parseVersionOption(version)
+    val parsedTags = tags?.split(",")?.map { it.trim() }?.toSet() ?: emptySet()
+
+    val plugin = Plugin(
+        alias = alias,
+        id = pluginId,
+        version = versionRef,
+        tags = parsedTags,
+    )
+
+    val updatedMetadata = metadata.copy(
+        plugins = metadata.plugins + plugin
+    )
+
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added plugin '$alias' ($pluginId)"))
+}
+----
+
+=== SPEC-14.4.4: AddBundleCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    if (metadata.bundles.any { it.name == name }) {
+        echo(formatError("Bundle '$name' already exists."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val libraryList = libraries?.split(",")?.map { it.trim() } ?: emptyList()
+    val extendsList = extends?.split(",")?.map { it.trim() } ?: emptyList()
+
+    val bundle = Bundle(
+        name = name,
+        libraries = libraryList,
+        extends = extendsList,
+    )
+
+    val updatedMetadata = metadata.copy(bundles = metadata.bundles + bundle)
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added bundle '$name'"))
+}
+----
+
+=== SPEC-14.4.5: AddBomCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    val parts = coordinates.split(":")
+    if (parts.size < 2) {
+        echo(formatError("Invalid BOM coordinates. Expected: group:artifact[:version]"))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val group = parts[0]
+    val artifact = parts[1]
+    val inlineVersion = if (parts.size >= 3) parts[2] else null
+    val effectiveAlias = alias ?: artifact
+
+    if (metadata.bomImports.any { it.alias == effectiveAlias }) {
+        echo(formatError("BOM '$effectiveAlias' already exists."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val versionRef = when {
+        version != null       -> parseVersionOption(version)
+        inlineVersion != null -> VersionReference.Literal(inlineVersion)
+        else                  -> null
+    }
+
+    val bom = BomImport(
+        alias = effectiveAlias,
+        group = group,
+        artifact = artifact,
+        version = versionRef,
+    )
+
+    val updatedMetadata = metadata.copy(bomImports = metadata.bomImports + bom)
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added BOM '$effectiveAlias' ($group:$artifact)"))
+}
+----
+
+=== SPEC-14.4.6: AddDistributionCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    if (metadata.distributions.any { it.name == name }) {
+        echo(formatError("Distribution '$name' already exists."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val inclTags = includeTags?.split(",")?.map { it.trim() } ?: emptyList()
+    val exclTags = excludeTags?.split(",")?.map { it.trim() } ?: emptyList()
+    val inclBundles = includeBundles?.split(",")?.map { it.trim() } ?: emptyList()
+
+    // Построение FilterSpec из опций
+    val filterSpec = buildFilterSpec(inclTags, exclTags, inclBundles)
+
+    val distribution = Distribution(name = name, spec = filterSpec)
+
+    val updatedMetadata = metadata.copy(distributions = metadata.distributions + distribution)
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Added distribution '$name'"))
+}
+----
+
+[[spec-remove-commands]]
+== SPEC-14.5: Remove-команды
+
+=== Общий паттерн
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Найти entity по alias/name
+3. Если не найден -> ошибка "Not found"
+4. Если !force -> проверить зависимости (ссылки из бандлов, библиотек)
+5. Удалить entity из списка
+6. Сохранить обновлённый metadata
+7. Вывести formatSuccess("Removed ...")
+----
+
+=== Проверка зависимостей (если не --force)
+
+[source,kotlin]
+----
+// RemoveVersionCommand: проверить, что ни одна библиотека/плагин не ссылается на версию
+private fun checkVersionReferences(metadata: DependangerMetadata, versionAlias: String): List<String> {
+    val refs = mutableListOf<String>()
+    metadata.libraries.forEach { lib ->
+        if (lib.version is VersionReference.Reference && lib.version.name == versionAlias) {
+            refs.add("library '${lib.alias}'")
+        }
+    }
+    metadata.plugins.forEach { plugin ->
+        if (plugin.version is VersionReference.Reference && plugin.version.name == versionAlias) {
+            refs.add("plugin '${plugin.alias}'")
+        }
+    }
+    return refs
+}
+----
+
+=== RemoveVersionCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    val existing = metadata.versions.find { it.name == alias }
+    if (existing == null) {
+        echo(formatError("Version '$alias' not found."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    if (!force) {
+        val refs = checkVersionReferences(metadata, alias)
+        if (refs.isNotEmpty()) {
+            echo(formatError("Version '$alias' is referenced by: ${refs.joinToString(", ")}"))
+            echo(formatInfo("Use --force to remove anyway."))
+            throw ProgramResult(ExitCodes.ERROR)
+        }
+    }
+
+    val updatedMetadata = metadata.copy(
+        versions = metadata.versions.filter { it.name != alias }
+    )
+
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Removed version '$alias'"))
+}
+----
+
+=== RemoveLibraryCommand, RemovePluginCommand, RemoveBundleCommand, RemoveBomCommand, RemoveDistributionCommand
+
+Аналогичная структура с соответствующими проверками зависимостей:
+
+- **RemoveLibraryCommand**: проверить ссылки из bundles
+- **RemovePluginCommand**: нет зависимостей, простое удаление
+- **RemoveBundleCommand**: проверить ссылки из других bundles (extends) и distributions
+- **RemoveBomCommand**: нет прямых зависимостей, простое удаление
+- **RemoveDistributionCommand**: проверить ссылки из presets
+
+[[spec-update-commands]]
+== SPEC-14.6: Update-команды
+
+=== UpdateVersionCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    val existingIndex = metadata.versions.indexOfFirst { it.name == alias }
+    if (existingIndex == -1) {
+        echo(formatError("Version '$alias' not found."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val existing = metadata.versions[existingIndex]
+    val updated = existing.copy(value = version)
+
+    val updatedVersions = metadata.versions.toMutableList()
+    updatedVersions[existingIndex] = updated
+
+    val updatedMetadata = metadata.copy(versions = updatedVersions)
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Updated version '$alias': ${existing.value} -> $version"))
+}
+----
+
+=== UpdateLibraryCommand
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    val existingIndex = metadata.libraries.indexOfFirst { it.alias == alias }
+    if (existingIndex == -1) {
+        echo(formatError("Library '$alias' not found."))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val existing = metadata.libraries[existingIndex]
+
+    // Обновить только указанные поля
+    val updatedVersion = version?.let { parseVersionOption(it) } ?: existing.version
+    val updatedTags = tags?.split(",")?.map { it.trim() }?.toSet() ?: existing.tags
+    val updatedRequires = requiresJdk?.toIntOrNull()?.let {
+        existing.requires?.copy(/* minJdk = it */) ?: TODO("Build requires from jdk version")
+    } ?: existing.requires
+
+    val updated = existing.copy(
+        version = updatedVersion,
+        tags = updatedTags,
+    )
+
+    val updatedLibraries = metadata.libraries.toMutableList()
+    updatedLibraries[existingIndex] = updated
+
+    val updatedMetadata = metadata.copy(libraries = updatedLibraries)
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+    echo(formatSuccess("Updated library '$alias'"))
+}
+----
+
+[[spec-migrate-deprecated]]
+== SPEC-14.7: MigrateDeprecatedCommand
+
+=== Алгоритм
+
+[source,text]
+----
+1. Загрузить metadata
+2. Найти все библиотеки с deprecation != null
+3. Для каждой deprecated библиотеки:
+   a. Определить replacement (deprecation.replacedBy)
+   b. Найти бандлы, содержащие deprecated алиас
+4. Если --dry-run:
+   a. Вывести план миграции
+   b. Завершить без изменений
+5. Если --backup -> скопировать input в input.bak
+6. Если --replace:
+   a. В каждом бандле заменить deprecated алиас на replacement
+   b. Если replacement отсутствует -> warning
+7. Если --remove:
+   a. Удалить deprecated библиотеки из списка libraries
+   b. Если --remove-from-bundles -> удалить алиасы из бандлов вместо замены
+8. Сохранить обновлённый metadata
+9. Вывести отчёт
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() {
+    val metadata = MetadataIO.load(Path.of(input))
+    val effectiveOutput = output ?: input
+
+    val deprecated = metadata.libraries.filter { it.deprecation != null }
+    if (deprecated.isEmpty()) {
+        echo(formatSuccess("No deprecated libraries found."))
+        return
+    }
+
+    // Построить план миграции
+    val plan = deprecated.map { lib ->
+        MigrationAction(
+            library = lib,
+            replacement = lib.deprecation?.replacedBy,
+            usedInBundles = metadata.bundles.filter { it.libraries.contains(lib.alias) },
+        )
+    }
+
+    if (dryRun) {
+        printMigrationPlan(plan)
+        return
+    }
+
+    // Создание backup
+    if (backup) {
+        val backupPath = Path.of("$input.bak")
+        Path.of(input).copyTo(backupPath, overwrite = true)
+        echo(formatInfo("Backup created: $backupPath"))
+    }
+
+    // Применение миграции
+    var updatedMetadata = metadata
+    val actions = mutableListOf<String>()
+
+    for (action in plan) {
+        if (replace && action.replacement != null) {
+            // Заменить в бандлах
+            updatedMetadata = replaceInBundles(updatedMetadata, action.library.alias, action.replacement)
+            action.usedInBundles.forEach { bundle ->
+                actions.add("Replaced '${action.library.alias}' with '${action.replacement}' in bundle '${bundle.name}'")
+            }
+        }
+
+        if (removeFromBundles && action.replacement == null) {
+            // Удалить из бандлов без замены
+            updatedMetadata = removeFromBundles(updatedMetadata, action.library.alias)
+        }
+
+        if (remove) {
+            // Удалить определение библиотеки
+            updatedMetadata = updatedMetadata.copy(
+                libraries = updatedMetadata.libraries.filter { it.alias != action.library.alias }
+            )
+            actions.add("Removed library '${action.library.alias}'")
+        }
+    }
+
+    MetadataIO.save(updatedMetadata, Path.of(effectiveOutput))
+
+    actions.forEach { echo(formatSuccess(it)) }
+    echo(formatSuccess("Migration completed. Updated: $effectiveOutput"))
+}
+----
+
+[[spec-validate-command]]
+== SPEC-14.8: ValidateCommand
+
+=== Алгоритм
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Создать Dependanger через fromJson/fromMetadata
+3. Вызвать validate() (suspend -> runBlocking)
+4. Форматировать diagnostics (errors, warnings, infos)
+5. Вывести результат в выбранном формате (text/json)
+6. Выставить exit code:
+   - strict && warnings > 0 -> EXIT_WARNINGS
+   - errors > 0 -> EXIT_ERROR
+   - else -> EXIT_SUCCESS
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = dependanger.validate()
+
+    when (format) {
+        "json" -> printJsonResult(result)
+        else   -> printTextResult(result)
+    }
+
+    val exitCode = when {
+        result.diagnostics.hasErrors -> ExitCodes.ERROR
+        strict && result.diagnostics.warnings.isNotEmpty() -> ExitCodes.WARNINGS
+        else -> ExitCodes.SUCCESS
+    }
+
+    if (exitCode != ExitCodes.SUCCESS) {
+        throw ProgramResult(exitCode)
+    }
+}
+
+private fun printTextResult(result: DependangerResult) {
+    val d = result.diagnostics
+    d.errors.forEach { echo(formatError(it.message)) }
+    d.warnings.forEach { echo(formatWarning(it.message)) }
+    d.infos.forEach { echo(formatInfo(it.message)) }
+
+    echo("")
+    echo("Validation completed: ${d.errors.size} errors, ${d.warnings.size} warnings")
+}
+----
+
+[[spec-process-command]]
+== SPEC-14.9: ProcessCommand
+
+=== Алгоритм
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Преобразовать preset-строку в ProcessingPreset enum
+3. Создать Dependanger: fromMetadata(metadata).preset(preset)
+4. Для каждого disable-processor -> .disableProcessor(id)
+5. build() -> process(distribution) (suspend -> runBlocking)
+6. Если result.isSuccess -> сериализовать effective в output
+7. Иначе -> вывести ошибки и exit
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val presetEnum = try {
+        ProcessingPreset.valueOf(preset.uppercase())
+    } catch (e: IllegalArgumentException) {
+        echo(formatError("Unknown preset: $preset. Available: ${ProcessingPreset.entries.joinToString()}"))
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    var builder = Dependanger.fromMetadata(metadata).preset(presetEnum)
+    disableProcessor.forEach { id -> builder = builder.disableProcessor(id) }
+
+    val dependanger = builder.build()
+    val result = dependanger.process(distribution)
+
+    if (!result.isSuccess) {
+        result.diagnostics.errors.forEach { echo(formatError(it.message)) }
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    result.diagnostics.warnings.forEach { echo(formatWarning(it.message)) }
+
+    // Запись effective в output (нужен EffectiveJsonFormat или аналог)
+    // TODO: зависит от реализации сериализации EffectiveMetadata
+    echo(formatSuccess("Processing complete. Output: $output"))
+}
+----
+
+[[spec-generate-command]]
+== SPEC-14.10: GenerateCommand
+
+=== Алгоритм
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Создать Dependanger -> process(distribution)
+3. Если ни --toml, ни --bom -> по умолчанию --toml
+4. Если --toml:
+   a. Создать TomlConfig из опций (comments, sort, inlineVersions)
+   b. result.toToml(config) -> записать в outputDir/tomlFilename
+5. Если --bom:
+   a. Создать BomConfig из опций (group, artifact, version)
+   b. result.toBom(config) -> записать в outputDir/bom.xml
+6. Вывести список сгенерированных файлов
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+    val dependanger = Dependanger.fromMetadata(metadata).build()
+    val result = dependanger.process(distribution)
+
+    if (!result.isSuccess) {
+        result.diagnostics.errors.forEach { echo(formatError(it.message)) }
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val generateToml = toml || (!toml && !bom) // default: toml если ничего не указано
+    val generateBom = bom
+
+    val outputPath = Path.of(outputDir)
+    outputPath.createDirectories()
+
+    val generatedFiles = mutableListOf<String>()
+
+    if (generateToml) {
+        val tomlConfig = TomlConfig(
+            includeComments = tomlComments,
+            sortSections = tomlSort,
+            inlineVersions = tomlInlineVersions,
+        )
+        val tomlPath = outputPath.resolve(tomlFilename)
+        result.writeTomlTo(tomlPath, tomlConfig)
+        generatedFiles.add(tomlPath.toString())
+    }
+
+    if (generateBom) {
+        val bomConfig = BomConfig(
+            groupId = bomGroup ?: "io.github.zenhelix",
+            artifactId = bomArtifact ?: "dependanger-bom",
+            version = bomVersion ?: "1.0.0",
+            includeOptional = bomIncludeOptional,
+        )
+        val bomPath = outputPath.resolve("bom.pom.xml")
+        result.writeBomTo(bomPath, bomConfig)
+        generatedFiles.add(bomPath.toString())
+    }
+
+    generatedFiles.forEach { echo(formatSuccess("Generated: $it")) }
+}
+----
+
+[[spec-analysis-commands]]
+== SPEC-14.11: Команды анализа (CheckUpdates, Analyze, SecurityCheck, LicenseCheck, ResolveTransitives)
+
+=== Общий паттерн
+
+Все команды анализа следуют единой схеме:
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Создать Dependanger с STRICT preset (все optional процессоры включены)
+3. Вызвать process() (включает feature-процессоры)
+4. Извлечь результаты из extensions EffectiveMetadata
+5. Отформатировать результат (text/json)
+6. Записать в output файл (если указан)
+7. Определить exit code по результатам и fail-on-* опциям
+----
+
+=== CheckUpdatesCommand
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = dependanger.process()
+
+    if (!result.isSuccess) {
+        result.diagnostics.errors.forEach { echo(formatError(it.message)) }
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    // Извлечь данные обновлений из extensions EffectiveMetadata
+    // См. <<helper-extract-extensions>> -- extension-функции в cli/util/
+    val updates = result.effective!!.extractUpdateData()
+
+    when (format) {
+        "json" -> printJsonUpdates(updates)
+        else   -> printTextUpdates(updates)
+    }
+
+    output?.let { path ->
+        writeOutputFile(path, updates, format)
+    }
+
+    if (failOnUpdates && updates.isNotEmpty()) {
+        throw ProgramResult(ExitCodes.UPDATES)
+    }
+}
+----
+
+=== AnalyzeCommand
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val builder = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+    targetJdk?.let { builder.jdkVersion(it) }
+
+    val dependanger = builder.build()
+    val result = dependanger.process()
+
+    // Извлечь данные анализа совместимости из extensions/diagnostics
+    // См. <<helper-extract-extensions>> -- extension-функции в cli/util/
+    val issues = result.effective!!.extractCompatibilityIssues()
+
+    when (format) {
+        "json" -> printJsonAnalysis(issues)
+        else   -> printTextAnalysis(issues)
+    }
+
+    output?.let { writeOutputFile(it, issues, format) }
+
+    if (failOnError && issues.any { it.severity == "ERROR" }) {
+        throw ProgramResult(ExitCodes.COMPATIBILITY)
+    }
+}
+----
+
+=== SecurityCheckCommand
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = dependanger.process()
+
+    val vulnerabilities = result.effective!!.extractSecurityData()
+
+    // Фильтрация по severity и ignore-списку
+    val filtered = vulnerabilities
+        .filter { it.cveId !in ignore }
+        .filter { matchesSeverity(it, failOn) }
+
+    when (format) {
+        "json"  -> printJsonSecurity(filtered)
+        "sarif" -> printSarifSecurity(filtered)
+        else    -> printTextSecurity(filtered)
+    }
+
+    output?.let { writeOutputFile(it, filtered, format) }
+
+    if (failOn != null && filtered.isNotEmpty()) {
+        throw ProgramResult(ExitCodes.VULNERABILITIES)
+    }
+}
+----
+
+=== LicenseCheckCommand
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = dependanger.process()
+
+    val licenses = result.effective!!.extractLicenseData()
+
+    // Применение allow/deny списков из CLI опций
+    val allowList = allow?.split(",")?.map { it.trim() }
+    val denyList = deny?.split(",")?.map { it.trim() }
+
+    val classified = classifyLicenses(licenses, allowList, denyList)
+
+    when (format) {
+        "json" -> printJsonLicenses(classified)
+        else   -> printTextLicenses(classified)
+    }
+
+    output?.let { writeOutputFile(it, classified, format) }
+
+    if (failOnDenied && classified.denied.isNotEmpty()) {
+        throw ProgramResult(ExitCodes.LICENSE)
+    }
+    if (failOnUnknown && classified.unknown.isNotEmpty()) {
+        throw ProgramResult(ExitCodes.LICENSE)
+    }
+}
+----
+
+=== ResolveTransitivesCommand
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = dependanger.process()
+
+    val transitives = result.effective!!.extractTransitiveData()
+
+    when (format) {
+        "json" -> printJsonTransitives(transitives)
+        "tree" -> printTreeTransitives(transitives)
+        "yaml" -> printYamlTransitives(transitives)
+        else   -> printTextTransitives(transitives)
+    }
+
+    output?.let { writeOutputFile(it, transitives, format) }
+}
+----
+
+[[spec-report-command]]
+== SPEC-14.12: ReportCommand
+
+=== Алгоритм
+
+[source,text]
+----
+1. Загрузить metadata из input
+2. Создать Dependanger с STRICT preset (все процессоры)
+3. Вызвать process() для полной обработки
+4. Собрать отчёт из всех секций
+5. Отформатировать по формату (json, yaml, markdown, html)
+6. Записать в outputDir
+----
+
+=== Реализация
+
+[source,kotlin]
+----
+override fun run() = runBlocking {
+    val metadata = MetadataIO.load(Path.of(input))
+
+    val dependanger = Dependanger.fromMetadata(metadata)
+        .preset(ProcessingPreset.STRICT)
+        .build()
+
+    val result = dependanger.process()
+
+    if (!result.isSuccess) {
+        result.diagnostics.errors.forEach { echo(formatError(it.message)) }
+        throw ProgramResult(ExitCodes.ERROR)
+    }
+
+    val requestedSections = sections?.split(",")?.map { it.trim() }
+
+    // Генерация отчёта через ReportGenerator из feature-модуля
+    val reportContent = generateReport(result, format, requestedSections)
+
+    val outputPath = Path.of(outputDir)
+    outputPath.createDirectories()
+
+    val reportFile = outputPath.resolve("dependanger-report.${formatExtension(format)}")
+    reportFile.writeText(reportContent)
+
+    echo(formatSuccess("Report generated: $reportFile"))
+}
+----
+
+[[helper-functions]]
+== Вспомогательные функции
+
+Рекомендуется создать общие утилиты для всех команд в пакете `cli/util/`.
+
+[[helper-extract-extensions]]
+=== Паттерн: extension-функции извлечения данных из EffectiveMetadata
+
+Все функции вида `extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()` и `extractCompatibilityIssues()` определены как `internal` extension-функции на `EffectiveMetadata` в пакете `cli/util/`.
+Они инкапсулируют логику обращения к `extensions` и обеспечивают type-safe доступ к данным, заполненным соответствующими feature-процессорами.
+
+[source,kotlin]
+----
+// cli/util/EffectiveMetadataExtensions.kt
+package io.github.zenhelix.dependanger.cli.util
+
+import io.github.zenhelix.dependanger.effective.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.EffectiveMetadataKeys
+import io.github.zenhelix.dependanger.updates.model.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.security.model.VulnerabilityInfo
+import io.github.zenhelix.dependanger.license.model.LicenseInfo
+import io.github.zenhelix.dependanger.transitive.model.TransitiveDependencyInfo
+
+internal fun EffectiveMetadata.extractUpdateData(): List<UpdateAvailableInfo> =
+    getExtension(EffectiveMetadataKeys.UPDATES) ?: emptyList()
+
+internal fun EffectiveMetadata.extractSecurityData(): List<VulnerabilityInfo> =
+    getExtension(EffectiveMetadataKeys.SECURITY) ?: emptyList()
+
+internal fun EffectiveMetadata.extractLicenseData(): List<LicenseInfo> =
+    getExtension(EffectiveMetadataKeys.LICENSES) ?: emptyList()
+
+internal fun EffectiveMetadata.extractTransitiveData(): List<TransitiveDependencyInfo> =
+    getExtension(EffectiveMetadataKeys.TRANSITIVES) ?: emptyList()
+----
+
+NOTE: Благодаря этому паттерну, команды анализа (<<spec-analysis-commands>>) вызывают extraction-методы как `result.effective!!.extractUpdateData()` вместо прямого обращения к `getExtension(...)`, что повышает читаемость и изолирует знание о ключах extensions в одном месте.
+
+=== parseVersionOption
+
+[source,kotlin]
+----
+// cli/util/VersionParser.kt
+// Парсинг строки версии: "1.0.0" -> Literal, "ref:kotlin" -> Reference
+public fun parseVersionOption(value: String?): VersionReference? {
+    if (value == null) return null
+    return if (value.startsWith("ref:")) {
+        VersionReference.Reference(value.removePrefix("ref:"))
+    } else {
+        VersionReference.Literal(value)
+    }
+}
+----
+
+=== formatError/formatSuccess (без OutputFormatter)
+
+Для первой итерации можно использовать простые методы echo Clikt:
+
+[source,kotlin]
+----
+private fun formatError(msg: String): String = "Error: $msg"
+private fun formatSuccess(msg: String): String = msg
+----
+
+[[testing]]
+== Тестовые сценарии
+
+=== Юнит-тесты для OutputFormatter
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `formatSuccess with color` | Содержит зелёный ANSI-код
+| `formatSuccess without color` | Содержит "[OK]" prefix
+| `formatSuccess json mode` | Возвращает JSON с status=success
+| `formatError with color` | Содержит красный ANSI-код
+| `formatTable renders correctly` | Таблица с заголовками и строками
+| `formatTable json mode` | JSON массив объектов
+|===
+
+=== Юнит-тесты для ConfigLoader
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `load from explicit path` | Загружает конфиг из указанного файла
+| `load from default location` | Ищет .dependanger.yaml в текущей директории
+| `load returns defaults when no config` | CliConfig() с дефолтными значениями
+| `load with invalid file` | Warning + дефолтный конфиг
+| `findConfigFile searches all locations` | Проверяет все стандартные места
+|===
+
+=== Юнит-тесты для CRUD-команд
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `init creates empty metadata` | Создаёт metadata.json с schemaVersion=1.0
+| `init fails if exists without force` | Ошибка при существующем файле
+| `init overwrites with force` | Перезаписывает при --force
+| `add-version creates version` | Версия добавляется в metadata
+| `add-version fails on duplicate` | Ошибка при существующем алиасе
+| `add-version with fallback` | Fallback парсится корректно
+| `add-library parses coordinates` | group:artifact разбираются
+| `add-library with version ref` | ref:kotlin -> VersionReference.Reference
+| `add-library with inline version` | group:artifact:1.0 -> VersionReference.Literal
+| `remove-version checks references` | Ошибка если версия используется
+| `remove-version force skips checks` | --force игнорирует зависимости
+| `update-version changes value` | Значение обновляется
+| `migrate-deprecated dry-run` | Показывает план, не изменяет файл
+| `migrate-deprecated replaces in bundles` | Заменяет алиас в бандлах
+|===
+
+=== Интеграционные тесты
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `validate valid metadata` | Exit code 0, "Validation completed"
+| `validate invalid metadata` | Exit code 1, ошибки в выводе
+| `process generates effective` | Exit code 0, выходной файл создан
+| `generate toml` | Создаёт libs.versions.toml
+| `generate bom` | Создаёт bom.pom.xml
+| `check-updates outputs updates` | Показывает доступные обновления
+| `full workflow: init -> add -> validate -> generate` | E2E-тест полного цикла
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-cli зависит от:
+  implementation:
+    - dependanger-api
+    - dependanger-core
+    - dependanger-effective
+    - dependanger-metadata-json
+    - dependanger-generator-toml
+    - dependanger-generator-bom
+    - dependanger-updates
+    - dependanger-analysis
+    - dependanger-report
+    - dependanger-security
+    - dependanger-license
+    - dependanger-transitive
+    - com.github.ajalt.clikt:clikt:5.0.3
+    - com.github.ajalt.mordant:mordant:3.0.2
+    - kotlinx-coroutines-core:1.10.1
+    - kotlinx-serialization-json:1.8.0
+    - com.charleskorn.kaml:kaml:0.67.0          # kotlinx-serialization backend для YAML (ConfigLoader)
+    - kotlin-logging-jvm:7.0.4
+  runtimeOnly:
+    - ch.qos.logback:logback-classic:1.5.16
+----
+
+[[files-to-modify]]
+== Файлы для изменения
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `OutputFormatter.kt` | Реализация 5 методов: formatSuccess, formatError, formatWarning, formatInfo, formatTable
+| `ConfigLoader.kt` | Реализация load() и findConfigFile()
+| `commands/InitCommand.kt` | Реализация run()
+| `commands/AddVersionCommand.kt` | Реализация run()
+| `commands/AddLibraryCommand.kt` | Реализация run()
+| `commands/AddPluginCommand.kt` | Реализация run()
+| `commands/AddBundleCommand.kt` | Реализация run()
+| `commands/AddBomCommand.kt` | Реализация run()
+| `commands/AddDistributionCommand.kt` | Реализация run()
+| `commands/RemoveVersionCommand.kt` | Реализация run()
+| `commands/RemoveLibraryCommand.kt` | Реализация run()
+| `commands/RemovePluginCommand.kt` | Реализация run()
+| `commands/RemoveBundleCommand.kt` | Реализация run()
+| `commands/RemoveBomCommand.kt` | Реализация run()
+| `commands/RemoveDistributionCommand.kt` | Реализация run()
+| `commands/UpdateVersionCommand.kt` | Реализация run()
+| `commands/UpdateLibraryCommand.kt` | Реализация run()
+| `commands/MigrateDeprecatedCommand.kt` | Реализация run()
+| `commands/ValidateCommand.kt` | Реализация run()
+| `commands/ProcessCommand.kt` | Реализация run()
+| `commands/GenerateCommand.kt` | Реализация run()
+| `commands/CheckUpdatesCommand.kt` | Реализация run()
+| `commands/AnalyzeCommand.kt` | Реализация run()
+| `commands/SecurityCheckCommand.kt` | Реализация run()
+| `commands/LicenseCheckCommand.kt` | Реализация run()
+| `commands/ResolveTransitivesCommand.kt` | Реализация run()
+| `commands/ReportCommand.kt` | Реализация run()
+|===
+
+=== Новые файлы (рекомендуется создать)
+
+[cols="1,2"]
+|===
+| Файл | Описание
+
+| `ExitCodes.kt` | Объект с константами exit codes
+| `MetadataIO.kt` | Утилитный объект для загрузки/сохранения metadata
+| `VersionParser.kt` | Утилиты для парсинга version options (ref:name, literal)
+| `FallbackParser.kt` | Парсинг строки fallback-условий
+| `FilterSpecBuilder.kt` | Построение FilterSpec из CLI-опций для distributions
+|===
+
+[[priority]]
+== Приоритет
+
+**MEDIUM** -- CLI зависит от dependanger-api (SPEC-13) и все feature-модули.
+
+Рекомендуемый порядок реализации:
+
+1. **Утилиты**: ExitCodes, MetadataIO, OutputFormatter, ConfigLoader -- базовая инфраструктура
+2. **CRUD-команды**: InitCommand -> Add* -> Remove* -> Update* -> MigrateDeprecated -- не требуют API фасада
+3. **Processing-команды**: ValidateCommand, ProcessCommand, GenerateCommand -- требуют Dependanger API
+4. **Analysis-команды**: CheckUpdates, Analyze, SecurityCheck, LicenseCheck, ResolveTransitives -- требуют feature-модули
+5. **ReportCommand** -- требует все предыдущие

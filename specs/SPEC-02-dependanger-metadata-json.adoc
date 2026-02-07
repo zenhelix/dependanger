@@ -1,0 +1,1512 @@
+= SPEC-02: dependanger-metadata-json -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-metadata-json` отвечает за сериализацию/десериализацию `DependangerMetadata` в формат JSON через `kotlinx-serialization`.
+Он является реализацией SPI интерфейса `SerializationFormat<String>`, определённого в `dependanger-core`.
+
+Модуль содержит **один файл** с **четырьмя TODO-заглушками**:
+
+* `serialize(metadata: DependangerMetadata): String`
+* `deserialize(input: String): DependangerMetadata`
+* `write(metadata: DependangerMetadata, path: Path)`
+* `read(path: Path): DependangerMetadata`
+
+Модуль критически важен для:
+
+* Хранения конфигурации между запусками (Gradle task `dependangerGenerateMetadata`)
+* Передачи данных между этапами Processing Pipeline
+* CLI команд (`init`, `add-library`, `remove-library`, `update-version`)
+* Кеширования для инкрементальной обработки
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| `JsonSerializationFormat` класс | Создан, реализует `SerializationFormat<String>`
+| `formatId` | Реализовано: `"json"`
+| `fileExtension` | Реализовано: `".json"`
+| `Json` инстанс | Сконфигурирован: `prettyPrint = true`, `ignoreUnknownKeys = true`, `encodeDefaults = true`
+| SPI интерфейс `SerializationFormat<T>` | Полностью определён в `dependanger-core`
+| Все модели (`DependangerMetadata`, `Library`, `Version`, и т.д.) | Полностью определены с `@Serializable`
+| `SchemaMigrator` и `SchemaMigrationChain` | Полностью реализованы в `dependanger-core`
+|===
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// JsonSerializationFormat.kt
+override fun serialize(metadata: DependangerMetadata): String = TODO()
+override fun deserialize(input: String): DependangerMetadata = TODO()
+override fun write(metadata: DependangerMetadata, path: Path): Unit = TODO()
+override fun read(path: Path): DependangerMetadata = TODO()
+----
+
+[[serialization-model-context]]
+== Контекст модели сериализации
+
+=== DependangerMetadata
+
+Корневая `@Serializable` data class со следующими полями:
+
+[cols="1,1,2,1",options="header"]
+|===
+| Поле | Тип | Описание | Default
+
+| `schemaVersion`
+| `String`
+| Версия схемы для обратной совместимости
+| `"1.0"`
+
+| `versions`
+| `List<Version>`
+| Именованные версии с fallback условиями
+| `emptyList()`
+
+| `libraries`
+| `List<Library>`
+| Библиотеки с полными метаданными
+| `emptyList()`
+
+| `plugins`
+| `List<Plugin>`
+| Gradle plugins
+| `emptyList()`
+
+| `bundles`
+| `List<Bundle>`
+| Группы библиотек
+| `emptyList()`
+
+| `bomImports`
+| `List<BomImport>`
+| Импорт версий из Maven BOM
+| `emptyList()`
+
+| `targetPlatforms`
+| `List<TargetPlatform>`
+| Целевые платформы (JDK, Android, KMP)
+| `emptyList()`
+
+| `distributions`
+| `List<Distribution>`
+| Профили фильтрации
+| `emptyList()`
+
+| `compatibility`
+| `List<CompatibilityRule>`
+| Правила совместимости
+| `emptyList()`
+
+| `settings`
+| `Settings`
+| Глобальные настройки
+| `Settings()`
+
+| `presets`
+| `List<Preset>`
+| Именованные presets настроек
+| `emptyList()`
+
+| `extensions`
+| `Map<String, JsonElement>`
+| Пользовательские расширения
+| `emptyMap()`
+|===
+
+=== Полиморфные sealed-иерархии
+
+При сериализации/десериализации участвуют следующие sealed-классы, для которых `kotlinx-serialization` автоматически добавляет дискриминатор `type`:
+
+[cols="1,2",options="header"]
+|===
+| Sealed class | Подтипы
+
+| `VersionReference`
+| `Literal(version)`, `Reference(name)`, `Range(range)`
+
+| `VersionRange`
+| `Simple(notation)`, `Rich(require, strictly, prefer, reject)`
+
+| `FallbackCondition`
+| `JdkBelow`, `JdkAtLeast`, `JdkBetween`, `KotlinVersionBelow`, `KotlinVersionAtLeast`, `GradleVersionBelow`, `GradleVersionAtLeast`, `DistributionCondition`, `EnvironmentCondition`, `All`, `Any`, `Not` (12 подтипов)
+
+| `CompatibilityRule`
+| `JdkRequirement`, `MutualExclusion`, `VersionConstraint`, `CustomRule`
+
+| `Constraint`
+| `VersionConstraintDef`, `Exclude`, `Substitute`
+|===
+
+[[spec-serialize]]
+== SPEC-02.1: serialize()
+
+[[purpose-serialize]]
+=== Назначение
+
+Преобразовать объект `DependangerMetadata` в JSON-строку с pretty-print форматированием.
+Результат должен быть валидным JSON, пригодным для записи в файл и обратной десериализации без потерь.
+
+[[algorithm-serialize]]
+=== Алгоритм
+
+[source,text]
+----
+1. Принять metadata: DependangerMetadata
+2. Использовать сконфигурированный Json инстанс (prettyPrint, ignoreUnknownKeys, encodeDefaults)
+3. Вызвать Json.encodeToString(DependangerMetadata.serializer(), metadata)
+4. Вернуть результирующую строку
+----
+
+[[implementation-serialize]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+override fun serialize(metadata: DependangerMetadata): String =
+    json.encodeToString(DependangerMetadata.serializer(), metadata)
+----
+
+=== Поведение Json-конфигурации
+
+[cols="1,3",options="header"]
+|===
+| Параметр | Влияние на serialize()
+
+| `prettyPrint = true`
+| JSON форматируется с отступами и переносами строк для человекочитаемости
+
+| `encodeDefaults = true`
+| Все поля с default-значениями включаются в JSON (пустые списки, default Settings, и т.д.)
+
+| `ignoreUnknownKeys = true`
+| Не влияет на сериализацию (только на десериализацию)
+|===
+
+=== Пример вывода
+
+[source,json]
+----
+{
+    "schemaVersion": "1.0",
+    "versions": [
+        {
+            "name": "kotlin",
+            "value": "2.1.20",
+            "fallbacks": [
+                {
+                    "value": "1.9.25",
+                    "condition": {
+                        "type": "io.github.zenhelix.dependanger.core.model.FallbackCondition.JdkBelow",
+                        "version": 17
+                    }
+                }
+            ]
+        }
+    ],
+    "libraries": [
+        {
+            "alias": "kotlin-stdlib",
+            "group": "org.jetbrains.kotlin",
+            "artifact": "kotlin-stdlib",
+            "version": {
+                "type": "io.github.zenhelix.dependanger.core.model.VersionReference.Reference",
+                "name": "kotlin"
+            },
+            "description": null,
+            "tags": ["kotlin", "stdlib"],
+            "requires": null,
+            "deprecation": null,
+            "license": null,
+            "constraints": [],
+            "isPlatform": false
+        }
+    ],
+    "plugins": [],
+    "bundles": [],
+    "bomImports": [],
+    "targetPlatforms": [],
+    "distributions": [],
+    "compatibility": [],
+    "settings": {
+        "defaultDistribution": null,
+        "strictVersionResolution": false,
+        "validation": { ... },
+        ...
+    },
+    "presets": [],
+    "extensions": {}
+}
+----
+
+NOTE: Точный формат дискриминатора sealed-классов (`type`) зависит от стратегии `classDiscriminator` в `kotlinx-serialization`.
+По умолчанию используется полное квалифицированное имя класса.
+При необходимости можно настроить через `@SerialName` аннотации на подтипах (рекомендуется для стабильного API).
+
+=== Edge cases (serialize)
+
+[cols="1,3",options="header"]
+|===
+| Ситуация | Поведение
+
+| Пустой `DependangerMetadata()`
+| Валидный JSON со всеми default-значениями (пустые списки, default Settings)
+
+| Metadata с Unicode и спецсимволами
+| `kotlinx-serialization` автоматически экранирует в JSON-формате
+
+| Metadata с `extensions` содержащими вложенные `JsonElement`
+| Сериализуется корректно, `JsonElement` сериализуется как есть
+
+| Очень большой metadata (10000+ библиотек)
+| Работает корректно, результирующая строка может быть большой (мегабайты)
+|===
+
+[[spec-deserialize]]
+== SPEC-02.2: deserialize()
+
+[[purpose-deserialize]]
+=== Назначение
+
+Преобразовать JSON-строку обратно в объект `DependangerMetadata`.
+Обеспечить корректную обработку ошибок при невалидном вводе.
+
+[[algorithm-deserialize]]
+=== Алгоритм
+
+[source,text]
+----
+1. Принять input: String (JSON-строка)
+2. Валидировать, что input не пустой
+3. Вызвать Json.decodeFromString(DependangerMetadata.serializer(), input)
+4. В случае ошибки парсинга — обернуть в понятное исключение
+5. Вернуть результирующий DependangerMetadata
+----
+
+[[implementation-deserialize]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+override fun deserialize(input: String): DependangerMetadata {
+    require(input.isNotBlank()) {
+        "Input JSON string must not be blank"
+    }
+
+    return try {
+        json.decodeFromString(DependangerMetadata.serializer(), input)
+    } catch (e: kotlinx.serialization.SerializationException) {
+        throw MetadataDeserializationException(
+            "Failed to deserialize DependangerMetadata from JSON: ${e.message}",
+            e
+        )
+    } catch (e: IllegalArgumentException) {
+        throw MetadataDeserializationException(
+            "Invalid JSON structure for DependangerMetadata: ${e.message}",
+            e
+        )
+    }
+}
+----
+
+=== Класс исключения
+
+Необходимо создать класс `MetadataDeserializationException` для типизированной обработки ошибок десериализации:
+
+[source,kotlin]
+----
+public class MetadataDeserializationException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+----
+
+=== Поведение Json-конфигурации при десериализации
+
+[cols="1,3",options="header"]
+|===
+| Параметр | Влияние на deserialize()
+
+| `ignoreUnknownKeys = true`
+| Неизвестные поля в JSON тихо пропускаются (forward compatibility)
+
+| `encodeDefaults = true`
+| Не влияет на десериализацию
+
+| `prettyPrint = true`
+| Не влияет на десериализацию (парсит любой валидный JSON)
+|===
+
+=== Edge cases (deserialize)
+
+[cols="1,3,2",options="header"]
+|===
+| Ситуация | Описание | Ожидаемое поведение
+
+| Пустая строка `""`
+| `input.isNotBlank()` = false
+| `IllegalArgumentException: "Input JSON string must not be blank"`
+
+| Строка с пробелами `"   "`
+| `input.isNotBlank()` = false
+| `IllegalArgumentException: "Input JSON string must not be blank"`
+
+| Невалидный JSON `"{broken"`
+| Синтаксическая ошибка JSON
+| `MetadataDeserializationException` с деталями ошибки парсинга
+
+| Отсутствует `schemaVersion`
+| Поле имеет default `"1.0"` в data class
+| Успешная десериализация с `schemaVersion = "1.0"` (default)
+
+| Пустой JSON объект `{}`
+| Все поля имеют default-значения
+| Успешная десериализация: `DependangerMetadata()` с defaults
+
+| Неизвестные поля `{"unknownField": "value", "schemaVersion": "1.0"}`
+| `ignoreUnknownKeys = true`
+| Неизвестное поле игнорируется, десериализация успешна
+
+| Неверный тип поля `{"schemaVersion": 42}`
+| Ожидается String, получен Int
+| `MetadataDeserializationException`
+
+| Неизвестный подтип sealed class
+| `{"type": "UnknownSubtype", ...}` в versions/libraries
+| `MetadataDeserializationException` с деталями о неизвестном подтипе
+
+| Дублирующиеся ключи в JSON
+| `{"versions": [...], "versions": [...]}`
+| Поведение определяется JSON-парсером (обычно последний побеждает)
+
+| UTF-8 с BOM
+| Файл начинается с UTF-8 BOM (\uFEFF)
+| `kotlinx-serialization` обрабатывает корректно
+
+| `null` вместо списка `{"versions": null}`
+| Ожидается `List<Version>`
+| `MetadataDeserializationException` (non-nullable list с default не принимает null)
+|===
+
+[[spec-write]]
+== SPEC-02.3: write()
+
+[[purpose-write]]
+=== Назначение
+
+Сериализовать `DependangerMetadata` и записать результат в файл по указанному пути.
+Создать родительские директории, если они не существуют.
+
+[[algorithm-write]]
+=== Алгоритм
+
+[source,text]
+----
+1. Принять metadata: DependangerMetadata и path: Path
+2. Сериализовать metadata в JSON-строку через serialize()
+3. Создать родительские директории (path.parent), если не существуют
+4. Записать JSON-строку в файл с кодировкой UTF-8
+5. В случае ошибки I/O — обернуть в понятное исключение
+----
+
+[[implementation-write]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+override fun write(metadata: DependangerMetadata, path: Path) {
+    val jsonString = serialize(metadata)
+
+    try {
+        // Создать родительские директории, если не существуют
+        path.parent?.let { parent ->
+            if (!parent.exists()) {
+                parent.createDirectories()
+            }
+        }
+
+        // Записать в файл с UTF-8
+        path.writeText(jsonString, Charsets.UTF_8)
+    } catch (e: java.io.IOException) {
+        throw MetadataWriteException(
+            "Failed to write metadata to '$path': ${e.message}",
+            e
+        )
+    } catch (e: SecurityException) {
+        throw MetadataWriteException(
+            "Permission denied writing metadata to '$path': ${e.message}",
+            e
+        )
+    }
+}
+----
+
+=== Класс исключения
+
+[source,kotlin]
+----
+public class MetadataWriteException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+----
+
+=== Требования к imports
+
+[source,kotlin]
+----
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.writeText
+----
+
+=== Edge cases (write)
+
+[cols="1,3,2",options="header"]
+|===
+| Ситуация | Описание | Ожидаемое поведение
+
+| Родительская директория не существует
+| `path = /tmp/a/b/c/metadata.json`, директории `a/b/c` нет
+| Создаёт `/tmp/a/b/c/` и записывает файл
+
+| Файл уже существует
+| По `path` уже есть файл
+| Файл перезаписывается (overwrite)
+
+| Нет прав на запись
+| Директория read-only
+| `MetadataWriteException: "Permission denied writing metadata to '...'"`
+
+| Диск полон
+| `IOException` при записи
+| `MetadataWriteException: "Failed to write metadata to '...'"`
+
+| Путь указывает на директорию
+| `path` -- это существующая директория, а не файл
+| `MetadataWriteException` (IOException от writeText)
+
+| Символическая ссылка
+| `path` -- это symlink
+| Запись по целевому пути symlink (стандартное поведение NIO)
+|===
+
+=== Атомарность записи
+
+IMPORTANT: Текущая реализация использует прямую запись через `writeText`, что не является атомарной операцией.
+Для production-ready решения рекомендуется:
+
+[source,kotlin]
+----
+// Атомарная запись через temp-файл + rename
+val tempFile = path.resolveSibling("${path.fileName}.tmp")
+tempFile.writeText(jsonString, Charsets.UTF_8)
+tempFile.moveTo(path, overwrite = true)  // атомарная операция на большинстве FS
+----
+
+Эта оптимизация может быть добавлена позже.
+Для MVP прямая запись через `writeText` достаточна.
+
+[[spec-read]]
+== SPEC-02.4: read()
+
+[[purpose-read]]
+=== Назначение
+
+Прочитать файл по указанному пути и десериализовать его содержимое в `DependangerMetadata`.
+
+[[algorithm-read]]
+=== Алгоритм
+
+[source,text]
+----
+1. Принять path: Path
+2. Проверить, что файл существует
+3. Прочитать содержимое файла как String (UTF-8)
+4. Десериализовать через deserialize()
+5. В случае ошибки I/O — обернуть в понятное исключение
+----
+
+[[implementation-read]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+override fun read(path: Path): DependangerMetadata {
+    if (!path.exists()) {
+        throw MetadataReadException(
+            "Metadata file not found: '$path'"
+        )
+    }
+
+    val content = try {
+        path.readText(Charsets.UTF_8)
+    } catch (e: java.io.IOException) {
+        throw MetadataReadException(
+            "Failed to read metadata file '$path': ${e.message}",
+            e
+        )
+    } catch (e: SecurityException) {
+        throw MetadataReadException(
+            "Permission denied reading metadata file '$path': ${e.message}",
+            e
+        )
+    }
+
+    return try {
+        deserialize(content)
+    } catch (e: MetadataDeserializationException) {
+        throw MetadataReadException(
+            "Failed to parse metadata file '$path': ${e.message}",
+            e
+        )
+    }
+}
+----
+
+=== Класс исключения
+
+[source,kotlin]
+----
+public class MetadataReadException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+----
+
+=== Требования к imports
+
+[source,kotlin]
+----
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+----
+
+=== Edge cases (read)
+
+[cols="1,3,2",options="header"]
+|===
+| Ситуация | Описание | Ожидаемое поведение
+
+| Файл не существует
+| `path` указывает на несуществующий файл
+| `MetadataReadException: "Metadata file not found: '...'"`
+
+| Пустой файл
+| Файл существует, но размер 0 байт
+| `MetadataReadException` (через `deserialize` -- blank input)
+
+| Бинарный файл
+| Файл не является текстовым (например, .class)
+| `MetadataReadException` с ошибкой JSON-парсинга
+
+| Файл в процессе записи
+| Другой процесс пишет в этот файл
+| Может прочитать частичный JSON -> `MetadataReadException`
+
+| Очень большой файл (100+ МБ)
+| Metadata с тысячами библиотек
+| Работает, но может потребовать много памяти (String in-memory)
+
+| Нет прав на чтение
+| Файл read-protected
+| `MetadataReadException: "Permission denied reading metadata file '...'"`
+
+| Путь -- symlink на файл
+| Символическая ссылка на metadata.json
+| Читает целевой файл (стандартное поведение NIO)
+
+| Путь -- директория
+| `path` указывает на директорию, а не файл
+| `MetadataReadException` (IOException от readText)
+|===
+
+[[spec-effective-json]]
+== SPEC-02.5: EffectiveJsonFormat
+
+=== Назначение
+
+Сериализация/десериализация `EffectiveMetadata` в JSON.
+Необходимо для:
+
+* CLI — сохранение результатов `process` команды
+* Gradle Plugin — задачи `dependangerGenerateEffective`, передача данных между тасками
+* Report — включение effective metadata в отчёт
+* Отладка и интроспекция pipeline
+
+=== Проблема
+
+`EffectiveMetadata` содержит поле `extensions: Map<ExtensionKey<*>, Any>` с аннотацией `@Transient`, что означает, что стандартная kotlinx-serialization его игнорирует.
+Для полной сериализации необходим отдельный формат, который обрабатывает extensions вручную.
+
+=== Архитектурное решение
+
+`EffectiveJsonFormat` размещается в модуле `dependanger-effective` (не в `dependanger-metadata-json`), так как зависит от типов `EffectiveMetadata`, `ExtensionKey` и моделей extensions.
+
+=== Модуль
+
+`dependanger-effective` — добавить файл `EffectiveJsonFormat.kt` в пакет `io.github.zenhelix.dependanger.effective.serialization`.
+
+=== Реализация
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.effective.serialization
+
+import io.github.zenhelix.dependanger.effective.model.*
+import io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
+import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.plus
+import java.util.ServiceLoader
+
+/**
+ * Сериализация/десериализация EffectiveMetadata в JSON
+ * с поддержкой extensions через ServiceLoader-based discovery.
+ *
+ * Feature-модули регистрируют свои ExtensionSerializerProvider через
+ * META-INF/services/io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
+ */
+public class EffectiveJsonFormat {
+
+    public val formatId: String = "effective-json"
+    public val fileExtension: String = ".effective.json"
+
+    private val providers: List<ExtensionSerializerProvider> =
+        ServiceLoader.load(ExtensionSerializerProvider::class.java).toList()
+
+    private val combinedModule: SerializersModule =
+        providers.fold(SerializersModule { }) { acc, provider -> acc + provider.serializersModule() }
+
+    private val knownKeys: Map<String, ExtensionKey<*>> =
+        providers.flatMap { it.knownKeys().entries }.associate { it.key to it.value }
+
+    private val json: Json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        serializersModule = combinedModule
+    }
+
+    /**
+     * Сериализует EffectiveMetadata в JSON-строку.
+     * Extensions конвертируются через зарегистрированные провайдеры.
+     */
+    public fun serialize(metadata: EffectiveMetadata): String {
+        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata)
+            .jsonObject.toMutableMap()
+
+        if (metadata.extensions.isNotEmpty()) {
+            val extensionsJson = buildJsonObject {
+                for ((key, value) in metadata.extensions) {
+                    val serializer = combinedModule.getPolymorphic(Any::class, value)
+                    if (serializer != null) {
+                        @Suppress("UNCHECKED_CAST")
+                        put(key.name, json.encodeToJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, value))
+                    } else {
+                        logger.warn { "No serializer found for extension key '${key.name}', saving as JsonNull" }
+                        put(key.name, JsonNull)
+                    }
+                }
+            }
+            baseJson["extensions"] = extensionsJson
+        }
+
+        return json.encodeToString(JsonElement.serializer(), JsonObject(baseJson))
+    }
+
+    /**
+     * Десериализует JSON-строку в EffectiveMetadata.
+     * Извлекает extensions через зарегистрированные провайдеры.
+     */
+    public fun deserialize(input: String): EffectiveMetadata {
+        require(input.isNotBlank()) { "Input JSON string must not be blank" }
+
+        val jsonObject = json.parseToJsonElement(input).jsonObject
+        val base = json.decodeFromJsonElement(EffectiveMetadata.serializer(), jsonObject)
+
+        val extensionsJson = jsonObject["extensions"]?.jsonObject ?: return base
+        val extensions = mutableMapOf<ExtensionKey<*>, Any>()
+
+        for ((keyName, element) in extensionsJson) {
+            val extensionKey = knownKeys[keyName]
+            if (extensionKey == null) {
+                logger.warn { "Unknown extension key '$keyName', skipping" }
+                continue
+            }
+            try {
+                val serializer = combinedModule.getPolymorphic(Any::class, keyName)
+                if (serializer != null) {
+                    extensions[extensionKey] = json.decodeFromJsonElement(serializer, element)
+                }
+            } catch (e: Exception) {
+                logger.warn { "Failed to deserialize extension '$keyName': ${e.message}" }
+            }
+        }
+
+        return base.copy(extensions = extensions)
+    }
+
+    /**
+     * Записывает EffectiveMetadata в файл.
+     */
+    public fun write(metadata: EffectiveMetadata, path: java.nio.file.Path) {
+        val jsonString = serialize(metadata)
+        path.parent?.let { parent ->
+            if (!parent.toFile().exists()) parent.toFile().mkdirs()
+        }
+        path.toFile().writeText(jsonString, Charsets.UTF_8)
+    }
+
+    /**
+     * Читает EffectiveMetadata из файла.
+     */
+    public fun read(path: java.nio.file.Path): EffectiveMetadata {
+        if (!path.toFile().exists()) {
+            throw IllegalArgumentException("Effective metadata file not found: '$path'")
+        }
+        val content = path.toFile().readText(Charsets.UTF_8)
+        return deserialize(content)
+    }
+}
+----
+
+=== Требование к extension-моделям
+
+Все модели, хранимые через `EffectiveMetadataKeys`, ДОЛЖНЫ иметь аннотацию `@Serializable`:
+
+[cols="1,2,1"]
+|===
+| ExtensionKey | Тип | Модуль-источник
+
+| `UPDATES` | `List<UpdateAvailableInfo>` | dependanger-updates
+| `VULNERABILITIES` | `List<VulnerabilityInfo>` | dependanger-security
+| `LICENSE_VIOLATIONS` | `List<LicenseViolation>` | dependanger-license
+| `COMPATIBILITY_ISSUES` | `List<CompatibilityIssue>` | dependanger-effective
+| `TRANSITIVES` | `List<TransitiveTree>` | dependanger-transitive
+| `FLAT_DEPENDENCIES` | `List<FlatDependency>` | dependanger-transitive
+| `VERSION_CONFLICTS` | `List<VersionConflict>` | dependanger-transitive
+|===
+
+=== ExtensionSerializerProvider SPI
+
+Интерфейс для регистрации serializer'ов extension-моделей:
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.effective.spi
+
+public interface ExtensionSerializerProvider {
+    /** Возвращает SerializersModule с serializer'ами для extension-моделей этого модуля. */
+    public fun serializersModule(): SerializersModule
+    /** Возвращает маппинг имени ключа -> ExtensionKey для extension'ов этого модуля. */
+    public fun knownKeys(): Map<String, ExtensionKey<*>>
+}
+----
+
+Регистрация через `META-INF/services/io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider`.
+
+=== Ограничения
+
+1. `EffectiveJsonFormat` размещается в `dependanger-effective` и загружает serializer'ы через ServiceLoader
+2. При добавлении нового `ExtensionKey` feature-модуль ДОЛЖЕН предоставить свой `ExtensionSerializerProvider` -- обновление `EffectiveJsonFormat` НЕ требуется
+3. Неизвестные extensions (без зарегистрированного провайдера) пропускаются при десериализации с warning (forward compatibility)
+
+=== Edge cases
+
+[cols="1,3"]
+|===
+| Ситуация | Поведение
+
+| EffectiveMetadata без extensions | Поле `extensions` отсутствует в JSON
+| Неизвестный extension key в JSON | Пропускается при десериализации
+| Extension с пустым списком | Сериализуется как `[]`
+| Пустой EffectiveMetadata | Валидный JSON с defaults
+|===
+
+=== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `serialize empty effective` | EffectiveMetadata() -> валидный JSON без extensions
+| `serialize with updates extension` | extensions содержит UPDATES -> JSON включает "extensions.updates"
+| `serialize with multiple extensions` | Несколько extensions -> все в JSON
+| `deserialize empty` | {} -> EffectiveMetadata с defaults
+| `deserialize with extensions` | JSON с extensions -> типизированные объекты
+| `round-trip effective` | serialize -> deserialize -> assertEqual
+| `round-trip via file` | write -> read -> assertEqual
+| `unknown extension ignored` | JSON с неизвестным ключом -> пропускается
+|===
+
+=== Файлы для изменения
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `effective/serialization/EffectiveJsonFormat.kt` | **Создать** — сериализация EffectiveMetadata + extensions
+| `effective/build.gradle.kts` | Добавить dependency: `implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")`
+|===
+
+=== Влияние на другие спецификации
+
+* **SPEC-14 (CLI):** Заменить `// TODO: зависит от реализации сериализации EffectiveMetadata` на использование `EffectiveJsonFormat`
+* **SPEC-15 (Gradle Plugin):** Заменить `// TODO: Зависит от наличия EffectiveJsonFormat или аналога` на использование `EffectiveJsonFormat`
+* **SPEC-13 (API):** `DependangerResult` может использовать `EffectiveJsonFormat` для `toJson()` метода
+
+[[full-implementation]]
+== Полная реализация файла
+
+Ниже представлен полный код `JsonSerializationFormat.kt` после реализации всех TODO:
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.metadata
+
+import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.core.spi.SerializationFormat
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import java.io.IOException
+import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+
+public class JsonSerializationFormat : SerializationFormat<String> {
+    override val formatId: String = "json"
+    override val fileExtension: String = ".json"
+    override val description: String = "JSON format via kotlinx-serialization"
+
+    private val json: Json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    override fun serialize(metadata: DependangerMetadata): String =
+        json.encodeToString(DependangerMetadata.serializer(), metadata)
+
+    override fun deserialize(input: String): DependangerMetadata {
+        require(input.isNotBlank()) {
+            "Input JSON string must not be blank"
+        }
+
+        return try {
+            json.decodeFromString(DependangerMetadata.serializer(), input)
+        } catch (e: SerializationException) {
+            throw MetadataDeserializationException(
+                "Failed to deserialize DependangerMetadata from JSON: ${e.message}",
+                e
+            )
+        } catch (e: IllegalArgumentException) {
+            throw MetadataDeserializationException(
+                "Invalid JSON structure for DependangerMetadata: ${e.message}",
+                e
+            )
+        }
+    }
+
+    override fun write(metadata: DependangerMetadata, path: Path) {
+        val jsonString = serialize(metadata)
+
+        try {
+            path.parent?.let { parent ->
+                if (!parent.exists()) {
+                    parent.createDirectories()
+                }
+            }
+
+            path.writeText(jsonString, Charsets.UTF_8)
+        } catch (e: IOException) {
+            throw MetadataWriteException(
+                "Failed to write metadata to '$path': ${e.message}",
+                e
+            )
+        } catch (e: SecurityException) {
+            throw MetadataWriteException(
+                "Permission denied writing metadata to '$path': ${e.message}",
+                e
+            )
+        }
+    }
+
+    override fun read(path: Path): DependangerMetadata {
+        if (!path.exists()) {
+            throw MetadataReadException(
+                "Metadata file not found: '$path'"
+            )
+        }
+
+        val content = try {
+            path.readText(Charsets.UTF_8)
+        } catch (e: IOException) {
+            throw MetadataReadException(
+                "Failed to read metadata file '$path': ${e.message}",
+                e
+            )
+        } catch (e: SecurityException) {
+            throw MetadataReadException(
+                "Permission denied reading metadata file '$path': ${e.message}",
+                e
+            )
+        }
+
+        return try {
+            deserialize(content)
+        } catch (e: MetadataDeserializationException) {
+            throw MetadataReadException(
+                "Failed to parse metadata file '$path': ${e.message}",
+                e
+            )
+        }
+    }
+}
+----
+
+[[exceptions]]
+== Иерархия исключений
+
+Необходимо создать файл `Exceptions.kt` в пакете `io.github.zenhelix.dependanger.metadata`:
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.metadata
+
+public open class MetadataSerializationException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+public class MetadataDeserializationException(
+    message: String,
+    cause: Throwable? = null,
+) : MetadataSerializationException(message, cause)
+
+public class MetadataWriteException(
+    message: String,
+    cause: Throwable? = null,
+) : MetadataSerializationException(message, cause)
+
+public class MetadataReadException(
+    message: String,
+    cause: Throwable? = null,
+) : MetadataSerializationException(message, cause)
+----
+
+=== Иерархия
+
+[source,text]
+----
+RuntimeException
+  └── MetadataSerializationException (base)
+        ├── MetadataDeserializationException  (невалидный JSON, неизвестные типы)
+        ├── MetadataWriteException            (ошибки записи файла)
+        └── MetadataReadException             (файл не найден, ошибки чтения)
+----
+
+=== Обоснование иерархии
+
+* Общий базовый класс `MetadataSerializationException` позволяет ловить все ошибки модуля одним `catch`
+* Специализированные подклассы дают гранулярную обработку для CLI и Gradle plugin
+* `RuntimeException` (unchecked) -- стандартный подход в Kotlin
+
+[[error-handling]]
+== Обработка ошибок
+
+[cols="1,2,2,1",options="header"]
+|===
+| Ситуация | Исключение | Сообщение | Метод
+
+| Невалидный JSON (синтаксис)
+| `MetadataDeserializationException`
+| "Failed to deserialize DependangerMetadata from JSON: [details]"
+| `deserialize()`
+
+| Неверные типы полей в JSON
+| `MetadataDeserializationException`
+| "Failed to deserialize DependangerMetadata from JSON: [details]"
+| `deserialize()`
+
+| Неизвестный подтип sealed class
+| `MetadataDeserializationException`
+| "Failed to deserialize DependangerMetadata from JSON: [details]"
+| `deserialize()`
+
+| Пустая JSON-строка
+| `IllegalArgumentException`
+| "Input JSON string must not be blank"
+| `deserialize()`
+
+| Файл не найден
+| `MetadataReadException`
+| "Metadata file not found: '[path]'"
+| `read()`
+
+| Ошибка чтения файла (I/O)
+| `MetadataReadException`
+| "Failed to read metadata file '[path]': [details]"
+| `read()`
+
+| Нет прав на чтение
+| `MetadataReadException`
+| "Permission denied reading metadata file '[path]': [details]"
+| `read()`
+
+| Содержимое файла -- невалидный JSON
+| `MetadataReadException`
+| "Failed to parse metadata file '[path]': [details]"
+| `read()`
+
+| Ошибка записи файла (I/O)
+| `MetadataWriteException`
+| "Failed to write metadata to '[path]': [details]"
+| `write()`
+
+| Нет прав на запись
+| `MetadataWriteException`
+| "Permission denied writing metadata to '[path]': [details]"
+| `write()`
+|===
+
+[[round-trip-guarantee]]
+== Гарантия Round-trip
+
+=== Определение
+
+Round-trip означает, что для любого валидного `DependangerMetadata`:
+
+[source,text]
+----
+deserialize(serialize(metadata)) == metadata
+----
+
+А для файлового round-trip:
+
+[source,text]
+----
+write(metadata, path)
+read(path) == metadata
+----
+
+=== Что обеспечивает round-trip
+
+1. **`encodeDefaults = true`** -- все поля с default-значениями записываются в JSON, не теряются при десериализации
+2. **`@Serializable` на всех моделях** -- kotlinx-serialization генерирует корректные сериализаторы
+3. **Sealed class discriminator** -- подтипы VersionReference, FallbackCondition, CompatibilityRule, Constraint сохраняют информацию о типе
+4. **`data class` == structural equality** -- сравнение через `==` проверяет все поля
+5. **Immutable collections** -- `List`, `Set`, `Map` не изменяются между сериализацией и десериализацией
+
+=== Потенциальные нарушения round-trip
+
+[cols="1,3,2",options="header"]
+|===
+| Проблема | Описание | Решение
+
+| Порядок элементов в Set
+| `Set<String>` может десериализоваться в другом порядке
+| Использовать `LinkedHashSet` или сравнивать содержимое без порядка
+
+| Порядок ключей в Map
+| JSON объекты не гарантируют порядок ключей
+| `kotlinx-serialization` сохраняет порядок при десериализации в `LinkedHashMap`
+
+| Floating point precision
+| Не применимо -- нет Float/Double полей в модели
+| --
+
+| `JsonElement` в extensions
+| `JsonElement` сериализуется/десериализуется as-is
+| Round-trip гарантирован для JsonElement
+|===
+
+[[testing]]
+== Тестовые сценарии
+
+=== Юнит-тесты для serialize()
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `serialize empty metadata`
+| `DependangerMetadata()` -> валидный JSON с `"schemaVersion": "1.0"` и пустыми коллекциями
+
+| `serialize metadata with versions`
+| Metadata с versions -> JSON содержит `"versions"` массив с корректными полями
+
+| `serialize metadata with version fallbacks`
+| Version с FallbackCondition.JdkBelow(17) -> JSON содержит discriminator и поле `version: 17`
+
+| `serialize metadata with libraries`
+| Library с group, artifact, version -> JSON содержит все поля
+
+| `serialize library with VersionReference.Literal`
+| Library с `version = Literal("2.0")` -> JSON содержит discriminator и `version: "2.0"`
+
+| `serialize library with VersionReference.Reference`
+| Library с `version = Reference("kotlin")` -> JSON содержит discriminator и `name: "kotlin"`
+
+| `serialize library with VersionReference.Range`
+| Library с `version = Range(Simple("[1.0, 2.0)"))` -> JSON содержит вложенную структуру
+
+| `serialize library with deprecation`
+| Library с DeprecationInfo(replacedBy, message, since, removalVersion) -> все поля в JSON
+
+| `serialize library with constraints`
+| Library с Constraint.Exclude, Substitute, VersionConstraintDef -> все подтипы в JSON
+
+| `serialize plugins`
+| Plugin(alias, id, version, tags) -> все поля в JSON
+
+| `serialize bundles with extends`
+| Bundle с extends = listOf("base") -> JSON содержит `"extends": ["base"]`
+
+| `serialize bom imports`
+| BomImport с VersionReference -> корректная структура
+
+| `serialize target platforms`
+| TargetPlatform с jdkConstraints, androidConstraints, kotlinConstraints, supportedTargets -> все поля
+
+| `serialize distributions with filter spec`
+| Distribution с FilterSpec(byTags, byGroups, byAliases) -> вложенные фильтры в JSON
+
+| `serialize compatibility rules - all types`
+| Все 4 подтипа CompatibilityRule -> JSON с дискриминаторами
+
+| `serialize settings with all sub-settings`
+| Settings со всеми вложенными *Settings -> полная структура
+
+| `serialize presets`
+| Preset с bundles, distributions, settings -> все поля
+
+| `serialize extensions`
+| extensions = mapOf("key" to JsonPrimitive("value")) -> JSON содержит расширения
+
+| `serialize produces pretty-printed JSON`
+| Результат содержит отступы и переносы строк
+
+| `serialize all FallbackCondition subtypes`
+| Каждый из 12 подтипов FallbackCondition сериализуется корректно
+|===
+
+=== Юнит-тесты для deserialize()
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `deserialize empty JSON object`
+| `{}` -> `DependangerMetadata()` с default-значениями
+
+| `deserialize full metadata`
+| JSON со всеми полями -> DependangerMetadata со всеми данными
+
+| `deserialize with unknown fields`
+| JSON с `"unknownField": "value"` -> поле игнорируется, десериализация успешна
+
+| `deserialize blank string throws`
+| `""` -> `IllegalArgumentException`
+
+| `deserialize whitespace-only string throws`
+| `"   "` -> `IllegalArgumentException`
+
+| `deserialize invalid JSON throws`
+| `"{broken"` -> `MetadataDeserializationException`
+
+| `deserialize wrong type throws`
+| `{"schemaVersion": 42}` -> `MetadataDeserializationException`
+
+| `deserialize unknown sealed subtype throws`
+| JSON с неизвестным type дискриминатором -> `MetadataDeserializationException`
+
+| `deserialize null for non-nullable field throws`
+| `{"versions": null}` -> `MetadataDeserializationException`
+
+| `deserialize all VersionReference subtypes`
+| Literal, Reference, Range -> корректные Kotlin объекты
+
+| `deserialize all FallbackCondition subtypes`
+| Все 12 подтипов -> корректные Kotlin объекты
+
+| `deserialize nested FallbackCondition (All, Any, Not)`
+| Вложенные условия -> рекурсивно десериализованные объекты
+
+| `deserialize all CompatibilityRule subtypes`
+| JdkRequirement, MutualExclusion, VersionConstraint, CustomRule -> корректные объекты
+
+| `deserialize all Constraint subtypes`
+| VersionConstraintDef, Exclude, Substitute -> корректные объекты
+|===
+
+=== Юнит-тесты для write()
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `write creates file`
+| write(metadata, path) -> файл создан с корректным JSON
+
+| `write creates parent directories`
+| write(metadata, /tmp/a/b/c/meta.json) -> директории a/b/c созданы
+
+| `write overwrites existing file`
+| Файл существует -> файл перезаписан новым содержимым
+
+| `write produces UTF-8 file`
+| Metadata с Unicode -> файл в кодировке UTF-8
+
+| `write to read-only directory throws`
+| Директория без прав записи -> `MetadataWriteException`
+|===
+
+=== Юнит-тесты для read()
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `read existing valid file`
+| Файл с валидным JSON -> DependangerMetadata
+
+| `read non-existing file throws`
+| Несуществующий файл -> `MetadataReadException: "Metadata file not found: '...'"`
+
+| `read file with invalid JSON throws`
+| Файл с невалидным JSON -> `MetadataReadException`
+
+| `read empty file throws`
+| Пустой файл -> `MetadataReadException` (blank input)
+
+| `read file without read permission throws`
+| Файл без прав чтения -> `MetadataReadException`
+|===
+
+=== Тесты Round-trip
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `round-trip empty metadata`
+| serialize -> deserialize -> assertEqual
+
+| `round-trip full metadata`
+| Metadata со всеми полями -> serialize -> deserialize -> assertEqual
+
+| `round-trip via file`
+| write -> read -> assertEqual
+
+| `round-trip preserves version fallbacks`
+| Metadata с FallbackCondition -> write -> read -> fallbacks идентичны
+
+| `round-trip preserves sealed class hierarchies`
+| Metadata со всеми подтипами VersionReference, CompatibilityRule, Constraint -> write -> read -> assertEqual
+
+| `round-trip preserves nested FallbackConditions`
+| FallbackCondition.All(listOf(JdkBelow(17), Any(listOf(...)))) -> write -> read -> assertEqual
+
+| `round-trip preserves extensions`
+| extensions с вложенными JsonElement -> write -> read -> assertEqual
+
+| `round-trip preserves all settings`
+| Settings со всеми sub-settings -> write -> read -> assertEqual
+
+| `round-trip preserves library metadata`
+| Library с deprecation, requirements, constraints, license -> write -> read -> assertEqual
+
+| `round-trip preserves distributions with filters`
+| Distribution с FilterSpec -> write -> read -> assertEqual
+|===
+
+=== Тесты интеграции с SchemaMigrationChain
+
+[cols="1,3",options="header"]
+|===
+| Тест | Описание
+
+| `read old schema and migrate`
+| JSON с `schemaVersion = "1.0"` + SchemaMigrator 1.0->1.1 -> read -> migrate -> metadata с версией 1.1
+
+| `deserialize unsupported schema version`
+| JSON с `schemaVersion = "99.0"` -> десериализация успешна (поле -- просто String), проверка версии -- ответственность вызывающего кода
+|===
+
+NOTE: `JsonSerializationFormat` не проверяет `schemaVersion` самостоятельно -- это ответственность вызывающего кода или Processing Pipeline.
+`SchemaMigrationChain` используется на уровне выше.
+
+[[dependencies]]
+== Зависимости модуля
+
+=== Gradle зависимости (build.gradle.kts)
+
+[source,kotlin]
+----
+dependencies {
+    api(project(":components:core:dependanger-core"))
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
+}
+----
+
+=== Транзитивные зависимости через dependanger-core
+
+* `kotlinx-serialization-core` (api) -- базовые аннотации и интерфейсы сериализации
+* `kotlin-logging-jvm` (implementation) -- логирование
+
+=== Зависимости для тестов (рекомендуемые)
+
+[source,kotlin]
+----
+dependencies {
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
+    testImplementation("io.kotest:kotest-assertions-core:5.9.0")
+    // Для temp files в тестах write/read
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
+}
+----
+
+[[files-to-modify]]
+== Файлы для изменения
+
+[cols="1,2,1",options="header"]
+|===
+| Файл | Изменение | Приоритет
+
+| `components/core/dependanger-metadata-json/src/main/kotlin/io/github/zenhelix/dependanger/metadata/JsonSerializationFormat.kt`
+| Реализация всех 4 TODO методов: `serialize()`, `deserialize()`, `write()`, `read()`. Добавить override для `description`. Добавить imports.
+| CRITICAL
+
+| `components/core/dependanger-metadata-json/src/main/kotlin/io/github/zenhelix/dependanger/metadata/Exceptions.kt`
+| **Создать новый файл**. Иерархия исключений: `MetadataSerializationException`, `MetadataDeserializationException`, `MetadataWriteException`, `MetadataReadException`.
+| CRITICAL
+
+| `components/core/dependanger-metadata-json/build.gradle.kts`
+| Добавить тестовые зависимости (JUnit 5, Kotest assertions)
+| HIGH
+
+| `components/core/dependanger-effective/src/main/kotlin/io/github/zenhelix/dependanger/effective/serialization/EffectiveJsonFormat.kt`
+| **Создать новый файл**. Сериализация/десериализация `EffectiveMetadata` с поддержкой extensions.
+| HIGH
+|===
+
+[[implementation-notes]]
+== Заметки по реализации
+
+=== Почему используется `DependangerMetadata.serializer()` явно
+
+Вместо reified `Json.encodeToString<DependangerMetadata>(metadata)` используется явный вызов `DependangerMetadata.serializer()`:
+
+* Явный вызов гарантирует использование правильного сериализатора
+* Не зависит от reified type resolution
+* Совместимо с `explicitApi()` режимом
+
+=== Конфигурация Json
+
+Текущая конфигурация:
+
+[cols="1,3,1",options="header"]
+|===
+| Параметр | Обоснование | Значение
+
+| `prettyPrint`
+| Человекочитаемый вывод для CLI и отладки. FR-008.
+| `true`
+
+| `ignoreUnknownKeys`
+| Forward compatibility при чтении JSON более новой версии схемы. FR-006.
+| `true`
+
+| `encodeDefaults`
+| Гарантия round-trip: все поля записываются, включая default. FR-002.
+| `true`
+|===
+
+=== Рекомендация по `@SerialName`
+
+Для стабильного JSON API рекомендуется добавить `@SerialName` аннотации на подтипы sealed-классов в `dependanger-core`:
+
+[source,kotlin]
+----
+@Serializable
+public sealed class VersionReference {
+    @Serializable
+    @SerialName("literal")
+    public data class Literal(val version: String) : VersionReference()
+
+    @Serializable
+    @SerialName("reference")
+    public data class Reference(val name: String) : VersionReference()
+
+    @Serializable
+    @SerialName("range")
+    public data class Range(val range: VersionRange) : VersionReference()
+}
+----
+
+Это обеспечит:
+
+* Короткие имена дискриминатора (`"literal"` вместо `"io.github.zenhelix.dependanger.core.model.VersionReference.Literal"`)
+* Стабильность при рефакторинге (переименование/перемещение класса не ломает JSON)
+* Читаемость JSON-файлов
+
+NOTE: Это изменение в `dependanger-core`, а не в `dependanger-metadata-json`.
+Может быть выполнено отдельно.
+
+[[priority]]
+== Приоритет
+
+**CRITICAL** -- модуль блокирует:
+
+* **F003 Processing Pipeline** -- pipeline читает/пишет metadata через SerializationFormat
+* **CLI** -- команды `init`, `add-library`, `remove-library`, `update-version` используют `write()`/`read()`
+* **Gradle Plugin** -- task `dependangerGenerateMetadata` использует `write()`
+* **Тестирование остальных модулей** -- для интеграционных тестов нужна возможность сериализовать/десериализовать metadata
+
+=== Порядок реализации
+
+1. Создать файл `Exceptions.kt` с иерархией исключений
+2. Реализовать `serialize()` (самый простой, одна строка)
+3. Реализовать `deserialize()` (зависит от исключений)
+4. Реализовать `write()` (зависит от `serialize()`)
+5. Реализовать `read()` (зависит от `deserialize()`)
+6. Написать тесты round-trip
+7. (Опционально) Добавить `@SerialName` аннотации в core
+
+=== Оценка трудозатрат
+
+[cols="1,1",options="header"]
+|===
+| Задача | Оценка
+
+| Реализация 4 методов + исключения
+| 1-2 часа
+
+| Юнит-тесты (все сценарии)
+| 3-4 часа
+
+| Итого
+| 4-6 часов
+|===
+
+[[related-docs]]
+== Связанные документы
+
+* xref:SPEC-01-dependanger-core.adoc[SPEC-01: dependanger-core] -- реализация `toMetadata()`, которая создаёт `DependangerMetadata`
+* xref:../docs/02-features/F002-metadata-serialization.adoc[F002: Metadata Serialization] -- функциональные требования
+* xref:../docs/06-reference/model-schema.adoc[Model Schema Reference] -- структуры данных

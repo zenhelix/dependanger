@@ -1,0 +1,493 @@
+= SPEC-10: dependanger-security -- Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-security` проверяет библиотеки на известные уязвимости (CVE) через OSV API (https://api.osv.dev).
+Результаты хранятся в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.VULNERABILITIES`.
+
+Приоритет: **P3** (желательно).
+
+[[current-state]]
+== Текущее состояние
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// SecurityCheckProcessor.kt
+public class SecurityCheckProcessor : EffectiveMetadataProcessor {
+    override val id: String = "security-check"
+    override val phase: ProcessingPhase = ProcessingPhase.SECURITY_CHECK  // order=120, PARALLEL_IO
+    override val isOptional: Boolean = true
+    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+}
+
+// OsvApiClient.kt
+public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
+    public suspend fun queryVulnerabilities(group: String, artifact: String, version: String): List<VulnerabilityInfo> = TODO()
+}
+----
+
+[[spec-security-check]]
+== SPEC-10.1: SecurityCheckProcessor.process()
+
+[[purpose-security]]
+=== Назначение
+
+Собрать все библиотеки из EffectiveMetadata, batch-запросом отправить в OSV API, получить уязвимости, классифицировать по severity и сохранить в extensions.
+
+[[algorithm-security]]
+=== Алгоритм
+
+[source,text]
+----
+1. Получить настройки securityCheck из context.settings
+2. Собрать библиотеки для проверки:
+   a. Все библиотеки из metadata.libraries с resolvedVersion != null
+   b. Исключить библиотеки из ignoreLibraries
+   c. Если includeTransitives=true -> добавить транзитивные из extensions
+3. Проверить кеш: для каждой библиотеки проверить ~/.dependanger/cache/security/
+4. Библиотеки без кеша -> batch-запрос в OSV API:
+   a. Разбить на batches по 1000 (лимит OSV API)
+   b. POST https://api.osv.dev/v1/querybatch
+   c. Парсить ответ: OSV batch API гарантирует `results[i]` соответствует `queries[i]` (1:1 по индексу). Если пакет не найден, `results[i].vulns` будет `null` или пустой список
+5. Для каждой найденной уязвимости:
+   a. Извлечь CVE ID из aliases
+   b. Парсить CVSS score из severity
+   c. Определить severity (CRITICAL/HIGH/MEDIUM/LOW) по CVSS score
+   d. Извлечь fixedVersion из affected[].ranges
+   e. Создать VulnerabilityInfo
+6. Отфильтровать по minSeverity и minCvssScore
+7. Отфильтровать ignoreCves
+8. Записать в кеш
+9. Записать в metadata: withExtension(EffectiveMetadataKeys.VULNERABILITIES, vulns)
+10. Добавить diagnostics:
+    a. INFO: "Scanned X libraries, found Y vulnerabilities"
+    b. Если failOnCritical && есть CRITICAL -> ERROR
+    c. Если failOnHigh && есть HIGH -> ERROR
+----
+
+[[spec-osv-client]]
+== SPEC-10.2: OsvApiClient.queryVulnerabilities()
+
+[[algorithm-osv]]
+=== Алгоритм
+
+[source,text]
+----
+1. Проверить кеш для group:artifact:version
+2. Если нет в кеше:
+   a. Сформировать запрос для batch endpoint
+   b. POST https://api.osv.dev/v1/querybatch с JSON body
+   c. Парсить ответ: results[i].vulns[]
+   d. Для каждой vulns[]:
+      i.   Извлечь id (OSV ID, например GHSA-xxx)
+      ii.  Извлечь aliases (CVE-xxx)
+      iii. Извлечь summary
+      iv.  Парсить severity[].score (CVSS v3 vector string)
+      v.   Рассчитать cvssScore из CVSS vector
+      vi.  Определить VulnerabilitySeverity по score
+      vii. Извлечь fixedVersion из affected[].ranges[].events[].fixed
+      viii.Извлечь references[].url
+   e. Создать VulnerabilityInfo для каждой уязвимости
+   f. Сохранить в кеш
+3. Вернуть List<VulnerabilityInfo>
+----
+
+[[implementation-osv]]
+=== Детальная реализация
+
+==== OsvApiClient
+
+[source,kotlin]
+----
+public class OsvApiClient(
+    public val apiUrl: String = "https://api.osv.dev",
+    private val httpClient: HttpClient = createDefaultClient(),
+    private val batchSize: Int = 1000,
+    private val retries: Int = 3,
+    private val timeout: Long = 30_000,
+) {
+    public suspend fun queryBatch(
+        packages: List<PackageQuery>
+    ): List<List<VulnerabilityInfo>> {
+        val results = mutableListOf<List<VulnerabilityInfo>>()
+
+        for (batch in packages.chunked(batchSize)) {
+            val response = executeWithRetry {
+                httpClient.post("$apiUrl/v1/querybatch") {
+                    contentType(ContentType.Application.Json)
+                    timeout { requestTimeoutMillis = this@OsvApiClient.timeout }
+                    setBody(OsvBatchRequest(
+                        queries = batch.map { pkg ->
+                            OsvQuery(
+                                version = pkg.version,
+                                `package` = OsvPackage(
+                                    name = "${pkg.group}:${pkg.artifact}",
+                                    ecosystem = "Maven"
+                                )
+                            )
+                        }
+                    ))
+                }
+            }
+
+            val osvResponse = response.body<OsvBatchResponse>()
+            results.addAll(osvResponse.results.map { result ->
+                result.vulns?.map { vuln -> mapToVulnerabilityInfo(vuln) } ?: emptyList()
+            })
+        }
+        return results
+    }
+
+    private fun mapToVulnerabilityInfo(vuln: OsvVulnerability): VulnerabilityInfo {
+        val cveId = vuln.aliases?.firstOrNull { it.startsWith("CVE-") }
+        val cvssScore = vuln.severity
+            ?.firstOrNull { it.type == "CVSS_V3" }
+            ?.let { parseCvssScore(it.score) }
+        val severity = cvssScoreToSeverity(cvssScore)
+        val fixedVersion = vuln.affected
+            ?.flatMap { it.ranges ?: emptyList() }
+            ?.flatMap { it.events ?: emptyList() }
+            ?.firstOrNull { it.fixed != null }
+            ?.fixed
+
+        return VulnerabilityInfo(
+            id = vuln.id,
+            aliases = vuln.aliases ?: emptyList(),
+            summary = vuln.summary ?: "",
+            severity = severity,
+            cvssScore = cvssScore,
+            fixedVersion = fixedVersion,
+            url = vuln.references?.firstOrNull()?.url,
+            affectedGroup = "", // заполняется вызывающим кодом
+            affectedArtifact = "",
+            affectedVersion = "",
+        )
+    }
+}
+----
+
+==== CVSS Score парсинг
+
+[source,kotlin]
+----
+/**
+ * Парсит CVSS v3 vector string и извлекает score.
+ * Пример: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H" -> 10.0
+ *
+ * Для упрощения используется приблизительный расчёт по Base Score metrics.
+ * В production рекомендуется использовать библиотеку для точного расчёта.
+ */
+private fun parseCvssScore(vector: String): Double? {
+    // Упрощённый парсинг: если вектор содержит числовой score
+    // OSV иногда возвращает score напрямую
+    vector.toDoubleOrNull()?.let { return it }
+
+    // Парсинг CVSS:3.x/... vector
+    if (!vector.startsWith("CVSS:3")) return null
+
+    // Приблизительный расчёт по ключевым метрикам
+    val metrics = vector.substringAfter("/").split("/").associate {
+        val (key, value) = it.split(":")
+        key to value
+    }
+    // Используем lookup таблицу для основных комбинаций
+    // или делегируем к CVSS calculator library
+    return approximateCvssScore(metrics)
+}
+
+private fun cvssScoreToSeverity(score: Double?): VulnerabilitySeverity = when {
+    score == null -> VulnerabilitySeverity.UNKNOWN
+    score >= 9.0 -> VulnerabilitySeverity.CRITICAL
+    score >= 7.0 -> VulnerabilitySeverity.HIGH
+    score >= 4.0 -> VulnerabilitySeverity.MEDIUM
+    score >= 0.1 -> VulnerabilitySeverity.LOW
+    else -> VulnerabilitySeverity.NONE
+}
+----
+
+==== CVSS Fallback: Severity Lookup Table
+
+Если CVSS_V3 score недоступен, используется lookup table по severity string из OSV response:
+
+[source,kotlin]
+----
+private fun severityStringToScore(severity: String): Double = when (severity.uppercase()) {
+    "CRITICAL" -> 9.0
+    "HIGH" -> 7.0
+    "MEDIUM" -> 4.0
+    "LOW" -> 1.0
+    else -> 0.0
+}
+----
+
+Приоритет: точный CVSS v3 score > lookup по severity string.
+
+[[api-spec]]
+== API: OSV Batch Query
+
+=== Endpoint
+
+[source,text]
+----
+POST https://api.osv.dev/v1/querybatch
+Content-Type: application/json
+----
+
+=== Request
+
+[source,json]
+----
+{
+  "queries": [
+    {
+      "package": {
+        "ecosystem": "Maven",
+        "name": "org.apache.logging.log4j:log4j-core"
+      },
+      "version": "2.14.0"
+    },
+    {
+      "package": {
+        "ecosystem": "Maven",
+        "name": "com.fasterxml.jackson.core:jackson-databind"
+      },
+      "version": "2.9.0"
+    }
+  ]
+}
+----
+
+=== Response
+
+[source,json]
+----
+{
+  "results": [
+    {
+      "vulns": [
+        {
+          "id": "GHSA-jfh8-c2jp-5v3q",
+          "aliases": ["CVE-2021-44228"],
+          "summary": "Remote code injection in Log4j",
+          "severity": [
+            {"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"}
+          ],
+          "affected": [
+            {
+              "ranges": [
+                {
+                  "type": "ECOSYSTEM",
+                  "events": [
+                    {"introduced": "2.0"},
+                    {"fixed": "2.17.0"}
+                  ]
+                }
+              ]
+            }
+          ],
+          "references": [
+            {"type": "ADVISORY", "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"}
+          ]
+        }
+      ]
+    },
+    {"vulns": []}
+  ]
+}
+----
+
+=== Batching
+
+- Максимум 1000 packages за один запрос
+- При > 1000 библиотек -- разбить на несколько запросов
+
+[[osv-serialization-models]]
+== Модели сериализации OSV API
+
+[source,kotlin]
+----
+@Serializable
+internal data class OsvBatchRequest(val queries: List<OsvQuery>)
+
+@Serializable
+internal data class OsvQuery(
+    val version: String,
+    val `package`: OsvPackage,
+)
+
+@Serializable
+internal data class OsvPackage(
+    val name: String,
+    val ecosystem: String = "Maven",
+)
+
+@Serializable
+internal data class OsvBatchResponse(val results: List<OsvQueryResult>)
+
+@Serializable
+internal data class OsvQueryResult(val vulns: List<OsvVulnerability>? = null)
+
+@Serializable
+internal data class OsvVulnerability(
+    val id: String,
+    val aliases: List<String>? = null,
+    val summary: String? = null,
+    val severity: List<OsvSeverity>? = null,
+    val affected: List<OsvAffected>? = null,
+    val references: List<OsvReference>? = null,
+)
+
+@Serializable
+internal data class OsvSeverity(val type: String, val score: String)
+
+@Serializable
+internal data class OsvAffected(val ranges: List<OsvRange>? = null)
+
+@Serializable
+internal data class OsvRange(val type: String, val events: List<OsvEvent>? = null)
+
+@Serializable
+internal data class OsvEvent(val introduced: String? = null, val fixed: String? = null)
+
+@Serializable
+internal data class OsvReference(val type: String? = null, val url: String? = null)
+----
+
+[[cache-impl]]
+== Кеш уязвимостей
+
+=== Структура
+
+[source,text]
+----
+~/.dependanger/cache/security/
+  org.apache.logging.log4j/
+    log4j-core/
+      2.14.0.json    # List<VulnerabilityInfo> сериализованный
+----
+
+=== TTL
+
+- Default: 24 часа
+- Ключ кеша: `{group}/{artifact}/{version}`
+- При недоступности сети: используется стейл кеш с WARNING
+
+[[edge-cases]]
+== Edge Cases и обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Диагностический код
+
+| OSV API недоступен, кеш пуст | WARNING, проверка пропускается | `SECURITY_API_UNREACHABLE`
+| OSV API недоступен, кеш есть | Используется кеш + WARNING | `SECURITY_STALE_CACHE`
+| Таймаут запроса | Retry 3 раза с exponential backoff (1s, 2s, 4s), затем WARNING | `SECURITY_TIMEOUT`
+| Rate limiting (429) | HTTP 429 -> retry с exponential backoff (1s, 2s, 4s). Максимум 3 попытки | `SECURITY_RATE_LIMITED`
+| Библиотека не найдена в OSV | Считается безопасной (нет данных != уязвима) | --
+| Уязвимость без CVE | Используется OSV ID, cveId=null | --
+| fixedVersion недоступен | fixedVersion=null, рекомендация "check manually" | --
+| Множественные уязвимости | Отдельный VulnerabilityInfo для каждой | --
+| Пустой каталог | 0 уязвимостей, INFO | `SECURITY_NO_VULNS`
+| Невалидный CVSS | WARNING, severity по текстовому полю | `SECURITY_INVALID_CVSS`
+| Игнорируемая CRITICAL + failOnCritical | Pipeline продолжается (игнорируется) | --
+| > 1000 библиотек | Batch splitting по 1000 | --
+| CVSS v2 only | Конвертация -> approximate v3 + WARNING | `SECURITY_CVSS_V2`
+|===
+
+[[diagnostic-codes]]
+== Диагностические коды
+
+[cols="1,2,1"]
+|===
+| Код | Описание | Уровень
+
+| `SECURITY_SCAN_COMPLETE` | Сканирование завершено с результатами | INFO
+| `SECURITY_NO_VULNS` | Уязвимости не найдены | INFO
+| `SECURITY_CRITICAL_FOUND` | Найдены CRITICAL уязвимости | ERROR (если failOnCritical)
+| `SECURITY_HIGH_FOUND` | Найдены HIGH уязвимости | ERROR (если failOnHigh)
+| `SECURITY_API_UNREACHABLE` | OSV API недоступен | WARNING
+| `SECURITY_STALE_CACHE` | Используется устаревший кеш | WARNING
+| `SECURITY_TIMEOUT` | Таймаут запроса к OSV | WARNING
+| `SECURITY_RATE_LIMITED` | Rate limiting от OSV | WARNING
+| `SECURITY_INVALID_CVSS` | Невалидный CVSS score | WARNING
+| `SECURITY_CVSS_V2` | Только CVSS v2 доступен | WARNING
+|===
+
+[[extension-keys]]
+== ExtensionKey
+
+[source,kotlin]
+----
+// Запись результатов:
+metadata.withExtension(EffectiveMetadataKeys.VULNERABILITIES, vulns: List<VulnerabilityInfo>)
+
+// Чтение результатов:
+metadata.vulnerabilities // -> List<VulnerabilityInfo>
+----
+
+[[testing]]
+== Тестовые сценарии
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `no libraries returns empty` | Пустой каталог -> 0 уязвимостей
+| `known vulnerable library detected` | log4j:2.14.0 -> CVE-2021-44228 обнаружена
+| `safe library no vulns` | Безопасная библиотека -> пустой список
+| `batch splitting at 1000` | 1500 библиотек -> 2 batch запроса
+| `CVSS score parsed correctly` | CVSS:3.1/... -> numeric score
+| `severity classification` | 10.0->CRITICAL, 7.5->HIGH, 5.0->MEDIUM, 2.0->LOW
+| `fixedVersion extracted` | affected[].ranges[].events[].fixed -> fixedVersion
+| `CVE alias extracted` | aliases содержит CVE-xxx
+| `ignoreCves filter works` | CVE в ignore list -> не включается
+| `ignoreLibraries filter works` | Библиотека в ignore -> не сканируется
+| `failOnCritical adds ERROR` | CRITICAL + failOnCritical -> ERROR в diagnostics
+| `cache prevents duplicate requests` | Повторный запуск -> из кеша
+| `API failure with cache fallback` | 500 error + cache -> WARNING + кеш
+| `API failure without cache` | 500 error + no cache -> WARNING, пропуск
+| `retry on timeout` | Таймаут -> retry 3 раза
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-security зависит от:
+- dependanger-core (api)
+- dependanger-effective (api)
+- io.ktor:ktor-client-core:3.1.1 (implementation)
+- io.ktor:ktor-client-cio:3.1.1 (implementation)
+- io.ktor:ktor-client-content-negotiation:3.1.1 (implementation)
+- io.ktor:ktor-serialization-kotlinx-json:3.1.1 (implementation)
+- org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0 (implementation)
+- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
+- io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+----
+
+[[files-to-modify]]
+== Файлы для изменения/создания
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `SecurityCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, batch-запрос, фильтрация
+| `OsvApiClient.kt` | Реализация `queryVulnerabilities()` и `queryBatch()` -- HTTP-запросы к OSV
+| `OsvModels.kt` | **Создать** -- @Serializable модели для OSV API request/response
+| `CvssParser.kt` | **Создать** -- парсинг CVSS v3 vector string
+| `SecurityCache.kt` | **Создать** -- файловый кеш результатов сканирования
+|===
+
+[[priority]]
+== Приоритет
+
+**P3** (желательно) -- сканирование безопасности критично для enterprise-проектов.
+Включается через `withSecurityCheck()` или `processing { checkSecurity = true }`.

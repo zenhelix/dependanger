@@ -1,0 +1,804 @@
+= SPEC-01: dependanger-core — Реализация TODO-заглушек
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[[overview]]
+== Обзор
+
+Модуль `dependanger-core` содержит доменную модель, DSL и SPI интерфейсы.
+Модели и DSL-классы уже полностью реализованы.
+Остались **две TODO-заглушки** в `DependangerDsl`:
+
+1. `DependangerDsl.toMetadata(): DependangerMetadata`
+2. `DependangerDsl.applyPreset(name: String)`
+
+[[current-state]]
+== Текущее состояние
+
+=== Реализовано
+
+[cols="1,3"]
+|===
+| Компонент | Статус
+
+| Модели (model/) | Полностью: Library, Plugin, Version, Bundle, BomImport, Distribution, TargetPlatform, CompatibilityRule, Settings, Preset, Constraint, FallbackCondition, Diagnostics, Enums, LibraryTypes, FilterSpec и фильтры
+| DSL (dsl/) | Полностью: 17 DSL-классов (VersionsDsl, LibrariesDsl, PluginsDsl, BundlesDsl, и т.д.)
+| SPI (spi/) | Полностью: SerializationFormat, LibraryFilter, PluginFilter, CustomFilterInterpreter, SchemaMigrator, SchemaMigrationChain
+| Validation | Полностью: ValidationResult (type aliases)
+|===
+
+=== TODO-заглушки
+
+[source,kotlin]
+----
+// DependangerDsl.kt
+public fun applyPreset(name: String): Unit = TODO()
+public fun toMetadata(): DependangerMetadata = TODO()
+----
+
+[[spec-to-metadata]]
+== SPEC-01.1: DependangerDsl.toMetadata()
+
+[[purpose-to-metadata]]
+=== Назначение
+
+Конвертировать in-memory DSL-конфигурацию в сериализуемую модель `DependangerMetadata`.
+Это ключевая точка перехода из «мира DSL» в «мир данных».
+
+[[algorithm-to-metadata]]
+=== Алгоритм
+
+[source,text]
+----
+1. Собрать versions из versionsDsl
+2. Собрать libraries из librariesDsl
+3. Собрать plugins из pluginsDsl
+4. Собрать bundles из bundlesDsl
+5. Собрать bomImports из bomImportsDsl
+6. Собрать targetPlatforms из targetPlatformsDsl
+7. Собрать distributions из distributionsDsl
+8. Собрать compatibility rules из compatibilityDsl
+9. Собрать settings из settingsDsl
+10. Собрать presets из presetsDsl
+11. Собрать extensions из allExtensions() -> конвертировать в Map<String, JsonElement>
+12. Создать DependangerMetadata со всеми данными
+----
+
+[[implementation-to-metadata]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+public fun toMetadata(): DependangerMetadata = DependangerMetadata(
+    schemaVersion = "1.0",
+    versions = versionsDsl.build(),
+    libraries = librariesDsl.build(),
+    plugins = pluginsDsl.build(),
+    bundles = bundlesDsl.build(),
+    bomImports = bomImportsDsl.build(),
+    targetPlatforms = targetPlatformsDsl.build(),
+    distributions = distributionsDsl.build(),
+    compatibility = compatibilityDsl.build(),
+    settings = settingsDsl.build(),
+    presets = presetsDsl.build(),
+    extensions = buildExtensionsMap(),
+)
+----
+
+[[build-methods]]
+=== Методы build() в каждом DSL
+
+Каждый DSL-класс должен предоставить метод `build()`, возвращающий соответствующую модель.
+Ниже — спецификация каждого.
+
+==== VersionsDsl.build(): List<Version>
+
+[source,kotlin]
+----
+public fun build(): List<Version>
+----
+
+*Алгоритм:*
+
+1. Итерировать по внутреннему списку зарегистрированных версий
+2. Для каждой записи создать `Version(name, value, fallbacks)`
+3. Fallbacks берутся из `VersionDsl.fallbacks` — список `VersionFallback(value, condition)`
+4. Condition строится из `FallbackConditionDsl`
+
+*Валидация (опциональная, может быть перенесена в ValidationProcessor):*
+
+- Имена версий уникальны
+- Значения версий не пустые
+
+*Input/Output пример:*
+
+[source,kotlin]
+----
+// DSL
+versions {
+    version("kotlin", "2.1.20") {
+        fallback("1.9.25") { jdkBelow(17) }
+    }
+    version("spring-boot", "3.4.0")
+}
+
+// Output
+listOf(
+    Version("kotlin", "2.1.20", listOf(
+        VersionFallback("1.9.25", FallbackCondition.JdkBelow(17))
+    )),
+    Version("spring-boot", "3.4.0", emptyList()),
+)
+----
+
+==== LibrariesDsl.build(): List<Library>
+
+[source,kotlin]
+----
+public fun build(): List<Library>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным библиотекам
+2. Для каждой создать `Library` из данных `LibraryDsl`
+3. `group` и `artifact` разбираются из строки координат `"group:artifact"` (уже реализовано в DSL через `parseCoordinates`)
+4. `version` — опциональный `VersionReference` (Literal, Reference или Range)
+5. Собрать tags, requires, deprecation, license, constraints, isPlatform из LibraryDsl
+
+*Парсинг координат:*
+
+- `"org.jetbrains.kotlin:kotlin-stdlib"` → group=`org.jetbrains.kotlin`, artifact=`kotlin-stdlib`
+- `"org.jetbrains.kotlin:kotlin-stdlib:2.1.20"` → group, artifact + version=Literal("2.1.20")
+
+*Input/Output пример:*
+
+[source,kotlin]
+----
+// DSL
+libraries {
+    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+        version = versionRef("kotlin")
+        tags("kotlin", "stdlib")
+    }
+}
+
+// Output
+listOf(
+    Library(
+        alias = "kotlin-stdlib",
+        group = "org.jetbrains.kotlin",
+        artifact = "kotlin-stdlib",
+        version = VersionReference.Reference("kotlin"),
+        tags = setOf("kotlin", "stdlib"),
+    ),
+)
+----
+
+==== PluginsDsl.build(): List<Plugin>
+
+[source,kotlin]
+----
+public fun build(): List<Plugin>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным плагинам
+2. Для каждого создать `Plugin(alias, id, version, tags)`
+
+==== BundlesDsl.build(): List<Bundle>
+
+[source,kotlin]
+----
+public fun build(): List<Bundle>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным бандлам
+2. Для каждого создать `Bundle(alias, libraries, extends)`
+3. `libraries` — список алиасов библиотек
+4. `extends` — список алиасов других бандлов
+
+==== BomImportsDsl.build(): List<BomImport>
+
+[source,kotlin]
+----
+public fun build(): List<BomImport>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным BOM
+2. Для каждого создать `BomImport(alias, group, artifact, version)`
+3. Координаты парсятся аналогично библиотекам
+
+==== TargetPlatformsDsl.build(): List<TargetPlatform>
+
+[source,kotlin]
+----
+public fun build(): List<TargetPlatform>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным платформам
+2. Для каждой создать `TargetPlatform(name, jdkConstraints, androidConstraints, kotlinConstraints, supportedTargets)`
+
+==== DistributionsDsl.build(): List<Distribution>
+
+[source,kotlin]
+----
+public fun build(): List<Distribution>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным дистрибуциям
+2. Для каждой создать `Distribution(name, spec)`
+3. `spec` — `FilterSpec` из `FilterDsl.build()`
+
+==== CompatibilityDsl.build(): List<CompatibilityRule>
+
+[source,kotlin]
+----
+public fun build(): List<CompatibilityRule>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным правилам
+2. Для каждого типа правила (JdkRequirement, MutualExclusion, VersionConstraint, CustomRule) создать соответствующий sealed-подтип
+
+==== SettingsDsl.build(): Settings
+
+[source,kotlin]
+----
+public fun build(): Settings
+----
+
+*Алгоритм:*
+
+1. Собрать все вложенные настройки из под-DSL
+2. Создать `Settings` с all sub-settings: validation, toml, bom, bomCache, updateCheck, compatibilityAnalysis, securityCheck, licenseCheck, transitiveResolution, report, customSettings
+
+==== PresetsDsl.build(): List<Preset>
+
+[source,kotlin]
+----
+public fun build(): List<Preset>
+----
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным пресетам
+2. Для каждого создать `Preset(name, bundles, distributions, settings)`
+
+[[build-extensions]]
+=== buildExtensionsMap(): Map<String, JsonElement>
+
+[source,kotlin]
+----
+private fun buildExtensionsMap(): Map<String, JsonElement> {
+    val result = mutableMapOf<String, JsonElement>()
+    for ((key, value) in allExtensions()) {
+        // Попытка сериализовать через kotlinx-serialization
+        // Если значение @Serializable — сериализовать в JsonElement
+        // Если нет — пропустить с warning или выбросить исключение
+        result[key.name] = Json.encodeToJsonElement(serializer(value::class.starProjectedType), value)
+    }
+    return result
+}
+----
+
+*Edge cases:*
+
+- Extension не @Serializable → выбрасывать `IllegalStateException` с сообщением о несериализуемом расширении
+- Пустой map extensions → пустой map в metadata (OK)
+- Extension с одинаковым именем → последний побеждает (уже обеспечивается Map)
+
+[[spec-apply-preset]]
+== SPEC-01.2: DependangerDsl.applyPreset(name: String)
+
+[[purpose-apply-preset]]
+=== Назначение
+
+Найти зарегистрированный пресет по имени и применить его настройки к текущему DSL.
+
+[[algorithm-apply-preset]]
+=== Алгоритм
+
+[source,text]
+----
+1. Найти preset по name в presetsDsl.presets
+2. Если не найден → throw IllegalArgumentException("Preset '$name' not found")
+3. Применить preset.bundles → добавить в bundlesDsl
+4. Применить preset.distributions → добавить в distributionsDsl
+5. Применить preset.settings → merge с текущими settingsDsl (preset значения перезаписывают текущие)
+----
+
+[[implementation-apply-preset]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+public fun applyPreset(name: String) {
+    val preset = presetsDsl.findByName(name)
+        ?: throw IllegalArgumentException(
+            "Preset '$name' not found. Available presets: ${presetsDsl.availableNames()}"
+        )
+
+    // Применяем бандлы из пресета
+    preset.bundles.forEach { bundleName ->
+        // Бандлы из пресета уже должны быть определены в bundlesDsl
+        // applyPreset не создаёт новые бандлы, а отмечает их для включения
+    }
+
+    // Применяем дистрибуции из пресета
+    preset.distributions.forEach { distName ->
+        // Аналогично — дистрибуции должны быть определены
+    }
+
+    // Мержим настройки: значения пресета перезаписывают текущие
+    preset.settings?.let { presetSettings ->
+        settingsDsl.mergeFrom(presetSettings)
+    }
+}
+----
+
+*Edge cases:*
+
+- Preset не найден → `IllegalArgumentException` с перечислением доступных
+- Preset ссылается на несуществующий бандл → обработается позже в ValidationProcessor
+- Множественный applyPreset → каждый последующий мержит свои настройки поверх предыдущих
+- Пустой пресет (без bundles/distributions/settings) → no-op
+
+[[dsl-build-contract]]
+== Контракт build() методов
+
+Каждый DSL-класс (VersionsDsl, LibrariesDsl, etc.) должен предоставить:
+
+[source,kotlin]
+----
+public fun build(): ResultType
+----
+
+Где `ResultType` соответствует полю в `DependangerMetadata`.
+
+=== Требования к build():
+
+1. **Идемпотентность** — вызов `build()` несколько раз возвращает одинаковый результат
+2. **Иммутабельность результата** — возвращаемые объекты неизменяемые (data class)
+3. **Нет побочных эффектов** — build() не изменяет состояние DSL
+4. **Нет валидации** — build() конвертирует «as is», валидация происходит в pipeline
+
+=== Требования к SettingsDsl.mergeFrom():
+
+[source,kotlin]
+----
+public fun mergeFrom(settings: Settings)
+----
+
+1. Перезаписывает только не-default значения из `settings`
+2. Вложенные settings (ValidationSettings, TomlSettings, etc.) мержатся рекурсивно
+3. Списки (allowedLicenses, excludePatterns) заменяются целиком, не дополняются
+
+[[error-handling]]
+== Обработка ошибок
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Обоснование
+
+| Пустой DSL | Возвращает DependangerMetadata с пустыми списками | Валидный сценарий для init
+| Дублирующиеся алиасы | Конвертирует как есть | Валидация в pipeline
+| Невалидные координаты | Ошибка парсинга в DSL (уже при вызове library()) | Fail-fast в DSL
+| Несериализуемое extension | IllegalStateException | Контракт extension API
+|===
+
+[[testing]]
+== Тестовые сценарии
+
+=== Юнит-тесты для toMetadata()
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `empty DSL produces empty metadata` | DependangerDsl().toMetadata() == DependangerMetadata()
+| `versions are converted correctly` | Проверить все поля Version
+| `libraries with versionRef` | Library.version = VersionReference.Reference("name")
+| `libraries with literal version` | Library.version = VersionReference.Literal("1.0")
+| `libraries with version range` | Library.version = VersionReference.Range(...)
+| `library with full metadata` | tags, requires, deprecation, license, constraints, isPlatform
+| `plugins converted` | Все поля Plugin
+| `bundles with extends` | Bundle.extends = listOf("other")
+| `bom imports` | BomImport с version reference
+| `target platforms with all constraints` | JDK, Android, Kotlin constraints + KMP targets
+| `distributions with filters` | FilterSpec со всеми типами фильтров
+| `compatibility rules — all types` | 4 типа CompatibilityRule
+| `settings with all sub-settings` | Все вложенные settings
+| `presets converted` | Preset с bundles, distributions, settings
+| `extensions serialized` | Map extensions → Map<String, JsonElement>
+| `round-trip DSL → metadata → json → metadata` | Нет потерь данных
+|===
+
+=== Юнит-тесты для applyPreset()
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `apply existing preset` | Настройки мержатся
+| `apply non-existing preset` | IllegalArgumentException
+| `apply empty preset` | Нет изменений
+| `apply multiple presets` | Последний перезаписывает
+| `preset settings merge` | Только non-default значения перезаписываются
+|===
+
+[[dependencies]]
+== Зависимости модуля
+
+[source,text]
+----
+dependanger-core зависит от:
+- kotlinx-serialization-core (api)
+- kotlinx-serialization-json (api)
+- kotlin-logging-jvm (implementation)
+----
+
+Нет зависимостей на другие модули проекта — core является корневым модулем.
+
+[[files-to-modify]]
+== Файлы для изменения
+
+[cols="1,2"]
+|===
+| Файл | Изменение
+
+| `DependangerDsl.kt` | Реализация `toMetadata()` и `applyPreset()`
+| `VersionsDsl.kt` | Добавить `build(): List<Version>` (если отсутствует)
+| `LibrariesDsl.kt` | Добавить `build(): List<Library>` (если отсутствует)
+| `PluginsDsl.kt` | Добавить `build(): List<Plugin>` (если отсутствует)
+| `BundlesDsl.kt` | Добавить `build(): List<Bundle>` (если отсутствует)
+| `BomImportsDsl.kt` | Добавить `build(): List<BomImport>` (если отсутствует)
+| `TargetPlatformsDsl.kt` | Добавить `build(): List<TargetPlatform>` (если отсутствует)
+| `DistributionsDsl.kt` | Добавить `build(): List<Distribution>` (если отсутствует)
+| `CompatibilityDsl.kt` | Добавить `build(): List<CompatibilityRule>` (если отсутствует)
+| `SettingsDsl.kt` | Добавить `build(): Settings` и `mergeFrom()` (если отсутствуют)
+| `PresetsDsl.kt` | Добавить `build(): List<Preset>` и `findByName()` (если отсутствуют)
+| `FilterDsl.kt` | Добавить `build(): FilterSpec` (если отсутствует)
+| `GlobMatcher.kt` | **Создать** `io.github.zenhelix.dependanger.core.util.GlobMatcher` — glob-matching утилита
+| `VersionComparator.kt` | **Создать** `io.github.zenhelix.dependanger.core.util.VersionComparator` — сравнение версий
+| `SemanticVersion.kt` | **Создать** `io.github.zenhelix.dependanger.core.util.SemanticVersion` — модель парсированной версии
+|===
+
+[[core-utilities]]
+== Общие утилиты core-модуля
+
+Утилиты, используемые несколькими модулями проекта.
+Размещаются в пакете `io.github.zenhelix.dependanger.core.util`.
+
+Эти утилиты определены здесь как канонические реализации.
+Модули `dependanger-effective`, `dependanger-analysis`, `dependanger-updates`, `dependanger-transitive` должны использовать именно эти реализации, а не собственные копии.
+
+=== GlobMatcher
+
+Утилита для glob-matching паттернов по Maven-координатам.
+Используется в: LibraryFilterProcessor (SPEC-03), CompatRulesProcessor (SPEC-03), CompatibilityCheckProcessor (SPEC-08), UpdateCheckProcessor (SPEC-07).
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.core.util
+
+/**
+ * Glob-matcher для Maven-координат и строковых паттернов.
+ *
+ * Поддерживаемые wildcard-символы:
+ * - `*` — любая подстрока (включая пустую)
+ * - `?` — любой одиночный символ
+ *
+ * Примеры паттернов:
+ * - `"org.springframework:*"` — все артефакты группы org.springframework
+ * - `"org.springframework*:*"` — org.springframework И org.springframework.boot
+ * - `"*:spring-*"` — все группы, артефакты начинающиеся с "spring-"
+ * - `"org.jetbrains.kotlin:kotlin-stdlib"` — точное совпадение
+ */
+public object GlobMatcher {
+
+    /**
+     * Проверяет совпадение координат "group:artifact" с glob-паттерном.
+     *
+     * @param pattern glob-паттерн в формате "groupPattern:artifactPattern"
+     * @param group Maven groupId библиотеки
+     * @param artifact Maven artifactId библиотеки
+     * @return true если координаты соответствуют паттерну
+     */
+    public fun matches(pattern: String, group: String, artifact: String): Boolean {
+        val (patternGroup, patternArtifact) = pattern.split(":", limit = 2)
+            .let { if (it.size == 2) it[0] to it[1] else it[0] to "*" }
+
+        return matchesGlob(patternGroup, group) && matchesGlob(patternArtifact, artifact)
+    }
+
+    /**
+     * Проверяет совпадение строки с glob-паттерном.
+     *
+     * @param pattern glob-паттерн (может содержать * и ?)
+     * @param value проверяемая строка
+     * @return true если строка соответствует паттерну
+     */
+    public fun matchesGlob(pattern: String, value: String): Boolean {
+        if (pattern == "*") return true
+
+        // Экранируем ВСЕ regex-спецсимволы кроме * и ?
+        val regex = buildString {
+            append("^")
+            for (ch in pattern) {
+                when (ch) {
+                    '*' -> append(".*")
+                    '?' -> append(".")
+                    '.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\' ->
+                        append("\\").append(ch)
+                    else -> append(ch)
+                }
+            }
+            append("$")
+        }
+        return Regex(regex).matches(value)
+    }
+
+    /**
+     * Проверяет совпадение строки координат "group:artifact" с glob-паттерном.
+     * Удобный метод для случаев, когда координаты уже объединены.
+     */
+    public fun matchesCoordinate(pattern: String, coordinate: String): Boolean {
+        val parts = coordinate.split(":", limit = 2)
+        return if (parts.size == 2) {
+            matches(pattern, parts[0], parts[1])
+        } else {
+            matchesGlob(pattern, coordinate)
+        }
+    }
+}
+----
+
+==== Отличия от предыдущих наивных реализаций
+
+IMPORTANT: Предыдущие реализации в SPEC-03 и SPEC-08 содержали баг: regex-спецсимволы (`.`, `+`, `^`, `$`, etc.) не экранировались корректно.
+Например, паттерн `"org.springframework:*"` при наивной замене `"."` → `"\\."` и `"*"` → `".*"` мог некорректно обрабатывать символы вроде `+` или `$` в group/artifact.
+
+Каноническая реализация `GlobMatcher` экранирует все 12 regex-спецсимволов: `. + ^ $ { } ( ) | [ ] \`
+
+==== Тестовые сценарии GlobMatcher
+
+[cols="1,2,1"]
+|===
+| Паттерн | Вход (group:artifact) | Результат
+
+| `org.springframework:*` | `org.springframework:spring-core` | true
+| `org.springframework:*` | `org.springframework.boot:spring-boot` | false
+| `org.springframework*:*` | `org.springframework.boot:spring-boot` | true
+| `*:spring-*` | `org.springframework:spring-web` | true
+| `*:*` | любые координаты | true
+| `org.jetbrains.kotlin:kotlin-stdlib` | `org.jetbrains.kotlin:kotlin-stdlib` | true
+| `org.jetbrains.kotlin:kotlin-stdlib` | `org.jetbrains.kotlin:kotlin-test` | false
+| `org.example+plus:artifact` | `org.example+plus:artifact` | true (+ экранирован)
+| `*:*-internal` | `com.company:utils-internal` | true
+|===
+
+=== VersionComparator и SemanticVersion
+
+Каноническая реализация сравнения семантических версий.
+Используется в: VersionFallbackProcessor (SPEC-03), CompatRulesProcessor (SPEC-03), UpdateCheckProcessor (SPEC-07), CompatibilityCheckProcessor (SPEC-08), TransitiveResolverProcessor (SPEC-12).
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.core.util
+
+/**
+ * Парсированная семантическая версия.
+ *
+ * Поддерживаемые форматы:
+ * - `1.0.0`, `1.0`, `1`
+ * - `1.0.0-RC1`, `1.0.0.RELEASE`, `1.0.0-beta.2`
+ * - `2.1.20`, `3.4.0.Final`
+ *
+ * Суффиксы RELEASE, FINAL, GA удаляются при парсинге (считаются стабильными).
+ */
+@Serializable
+public data class SemanticVersion(
+    val major: Int,
+    val minor: Int,
+    val patch: Int,
+    val qualifier: String? = null,
+) : Comparable<SemanticVersion> {
+
+    override fun compareTo(other: SemanticVersion): Int {
+        if (major != other.major) return major.compareTo(other.major)
+        if (minor != other.minor) return minor.compareTo(other.minor)
+        if (patch != other.patch) return patch.compareTo(other.patch)
+        // stable (qualifier=null) > prerelease (qualifier!=null)
+        return when {
+            qualifier == null && other.qualifier == null -> 0
+            qualifier == null -> 1   // this is stable, other is prerelease
+            other.qualifier == null -> -1
+            else -> qualifier.compareTo(other.qualifier)
+        }
+    }
+
+    override fun toString(): String = buildString {
+        append("$major.$minor.$patch")
+        qualifier?.let { append("-$it") }
+    }
+}
+----
+
+NOTE: Compound qualifiers (например `"RC1.2"`) парсятся как единая строка `qualifier="RC1.2"`.
+Дальнейшая декомпозиция qualifier не выполняется.
+
+==== UpdateType enum
+
+Перечисление типов обновлений.
+Ordinal используется для фильтрации (PATCH < MINOR < MAJOR).
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.core.util
+
+@Serializable
+public enum class UpdateType { PATCH, MINOR, MAJOR, PRERELEASE }
+----
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.core.util
+
+/**
+ * Утилита для парсинга и сравнения семантических версий.
+ */
+public object VersionComparator {
+
+    private val STABLE_SUFFIXES = setOf("release", "final", "ga")
+
+    private val PRERELEASE_PATTERNS = listOf(
+        "alpha", "beta", "rc", "cr", "snapshot", "dev", "pre", "ea",
+        "m\\d+",  // M1, M2, ...
+    )
+
+    private val prereleaseRegex: Regex = Regex(
+        PRERELEASE_PATTERNS.joinToString("|") { "(?i)[-.]?$it" }
+    )
+
+    /**
+     * Парсит строку версии в [SemanticVersion].
+     * Возвращает null если парсинг невозможен (нечисловой major).
+     */
+    public fun parse(version: String): SemanticVersion? {
+        // Удаляем стабильные суффиксы: 1.0.0.RELEASE -> 1.0.0
+        val cleaned = version.replace(
+            Regex("[-.]?(${STABLE_SUFFIXES.joinToString("|")})$", RegexOption.IGNORE_CASE), ""
+        )
+        val parts = cleaned.split(Regex("[.-]"), limit = 4)
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return null
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: 0
+        val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+        val qualifier = parts.getOrNull(3)
+        return SemanticVersion(major, minor, patch, qualifier)
+    }
+
+    /**
+     * Определяет, является ли версия предварительным релизом.
+     */
+    public fun isPrerelease(version: String): Boolean =
+        prereleaseRegex.containsMatchIn(version)
+
+    /**
+     * Сравнивает две строковые версии.
+     * Если парсинг невозможен — fallback на строковое сравнение.
+     */
+    public fun compare(a: String, b: String): Int {
+        val va = parse(a)
+        val vb = parse(b)
+        return when {
+            va != null && vb != null -> va.compareTo(vb)
+            else -> a.compareTo(b)
+        }
+    }
+
+    /**
+     * Классифицирует тип обновления между двумя версиями.
+     */
+    public fun classifyUpdate(current: SemanticVersion, latest: SemanticVersion): UpdateType =
+        when {
+            latest.major > current.major -> UpdateType.MAJOR
+            latest.minor > current.minor -> UpdateType.MINOR
+            latest.patch > current.patch -> UpdateType.PATCH
+            else -> UpdateType.PRERELEASE
+        }
+
+    /**
+     * Извлекает major-компонент версии.
+     */
+    public fun parseMajor(version: String): String =
+        version.split(".").firstOrNull() ?: version
+
+    /**
+     * Извлекает major.minor компонент версии.
+     */
+    public fun parseMajorMinor(version: String): String =
+        version.split(".").take(2).joinToString(".")
+
+    /**
+     * Выбирает наивысшую версию из списка.
+     */
+    public fun selectHighest(versions: List<String>): String? =
+        versions.maxWithOrNull(Comparator { a, b -> compare(a, b) })
+}
+----
+
+==== Тестовые сценарии VersionComparator
+
+[cols="1,2,1"]
+|===
+| Метод | Вход | Ожидаемый результат
+
+| `parse("2.1.20")` | | `SemanticVersion(2, 1, 20, null)`
+| `parse("1.0.0-RC1")` | | `SemanticVersion(1, 0, 0, "RC1")`
+| `parse("3.4.0.RELEASE")` | | `SemanticVersion(3, 4, 0, null)` (RELEASE удалён)
+| `parse("1.0.Final")` | | `SemanticVersion(1, 0, 0, null)` (Final удалён)
+| `parse("abc")` | | `null`
+| `isPrerelease("2.0.0-RC1")` | | `true`
+| `isPrerelease("2.0.0")` | | `false`
+| `isPrerelease("1.0.0-M3")` | | `true`
+| `isPrerelease("1.0.0-SNAPSHOT")` | | `true`
+| `compare("2.1.0", "2.1.20")` | | `< 0`
+| `compare("3.0.0", "2.9.99")` | | `> 0`
+| `compare("1.0.0", "1.0.0")` | | `0`
+| `compare("1.0.0", "1.0.0-RC1")` | | `> 0` (stable > prerelease)
+| `classifyUpdate(parse("2.1.0"), parse("3.0.0"))` | | `MAJOR`
+| `classifyUpdate(parse("2.1.0"), parse("2.2.0"))` | | `MINOR`
+| `classifyUpdate(parse("2.1.0"), parse("2.1.1"))` | | `PATCH`
+| `selectHighest(["1.0", "2.0", "1.5"])` | | `"2.0"`
+|===
+
+=== CustomRuleHandler SPI
+
+Интерфейс для обработки пользовательских правил совместимости (`CompatibilityRule.CustomRule`).
+Регистрация через ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.core.spi.CustomRuleHandler`.
+
+[source,kotlin]
+----
+package io.github.zenhelix.dependanger.core.spi
+
+/**
+ * SPI для обработки пользовательских правил совместимости.
+ * Реализации обнаруживаются через ServiceLoader.
+ */
+public interface CustomRuleHandler {
+    /** Уникальный идентификатор типа правила. */
+    public val ruleType: String
+
+    /**
+     * Выполнить проверку правила и вернуть найденные проблемы.
+     */
+    public fun evaluate(
+        rule: CompatibilityRule.CustomRule,
+        libraries: Map<String, EffectiveLibrary>,
+        context: ProcessingContext,
+    ): List<CompatibilityIssue>
+}
+----
+
+Используется в:
+
+* xref:SPEC-08-dependanger-analysis.adoc[SPEC-08] -- `CompatibilityCheckProcessor` для обработки `CustomRule`
+* xref:SPEC-03-dependanger-effective.adoc[SPEC-03] -- `CompatRulesProcessor` для обработки `CustomRule`
+
+[[priority]]
+== Приоритет
+
+**CRITICAL** — это первый модуль, который нужно реализовать.
+Все остальные модули зависят от `toMetadata()` для получения `DependangerMetadata`.

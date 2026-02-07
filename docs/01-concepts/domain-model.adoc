@@ -130,9 +130,11 @@ erDiagram
     Library {
         string alias PK
         string group
-        string name
+        string artifact
         VersionRef version
         set tags
+        LicenseInfo license
+        list constraints
         Requirements requires
     }
 
@@ -140,6 +142,7 @@ erDiagram
         string alias PK
         string id
         VersionRef version
+        set tags
     }
 
     Version {
@@ -149,7 +152,7 @@ erDiagram
     }
 
     Bundle {
-        string name PK
+        string alias PK
         list libraries
         list extends
     }
@@ -183,6 +186,13 @@ erDiagram
         ValidationSettings validation
         TomlSettings toml
         BomSettings bom
+        BomCacheSettings bomCache
+        UpdateCheckSettings updateCheck
+        CompatibilityAnalysisSettings compatibilityAnalysis
+        SecurityCheckSettings securityCheck
+        LicenseCheckSettings licenseCheck
+        TransitiveResolutionSettings transitiveResolution
+        ReportSettings report
     }
 
     Preset {
@@ -352,7 +362,7 @@ ____
 | Да
 | Maven groupId (например: `org.jetbrains.kotlin`)
 
-| name
+| artifact
 | String
 | Да
 | Maven artifactId (например: `kotlin-stdlib`)
@@ -366,6 +376,16 @@ ____
 | Set<String>
 | Нет
 | Теги для фильтрации и группировки (например: `testing`, `database`, `spring`)
+
+| license
+| LicenseInfo?
+| Нет
+| Информация о лицензии библиотеки (SPDX идентификатор, категория)
+
+| constraints
+| List<Constraint>
+| Нет
+| Ограничения для библиотеки (версионные, исключения, подстановки). См. <<constraint>>
 
 | requires
 | Requirements
@@ -405,6 +425,55 @@ ____
 | String
 | Нет
 | Версия каталога, в которой библиотека будет удалена
+|===
+
+[[constraint]]
+==== Constraint
+
+Ограничение для библиотеки — sealed class с тремя подтипами.
+
+[source,kotlin]
+----
+sealed class Constraint {
+    data class VersionConstraintDef(val constraint: String) : Constraint()
+    data class Exclude(val group: String?, val module: String?) : Constraint()
+    data class Substitute(val with: String) : Constraint()
+}
+----
+
+[cols="1,3",options="header"]
+|===
+| Подтип | Описание
+
+| `VersionConstraintDef`
+| Ограничение версии (например: `strictly`, `require`, `prefer`)
+
+| `Exclude`
+| Исключение транзитивной зависимости по group/module
+
+| `Substitute`
+| Подмена зависимости на другую библиотеку (alias)
+|===
+
+==== LicenseInfo
+
+Информация о лицензии библиотеки.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `spdxId`
+| String?
+| SPDX идентификатор лицензии (например: `Apache-2.0`, `MIT`)
+
+| `name`
+| String?
+| Человекочитаемое название лицензии
+
+| `category`
+| LicenseCategory?
+| Категория лицензии (см. xref:../06-reference/model-schema.adoc#license-category[LicenseCategory])
 |===
 
 ==== VersionReference
@@ -496,6 +565,11 @@ ____
 | VersionReference
 | Нет
 | Ссылка на version alias или inline значение
+
+| tags
+| Set<String>
+| Нет
+| Теги для фильтрации и группировки (аналогично Library.tags)
 |===
 
 ==== DSL синтаксис
@@ -642,7 +716,7 @@ ____
 |===
 | Атрибут | Тип | Обязательность | Описание
 
-| name
+| alias
 | String
 | Да
 | Уникальный идентификатор бандла
@@ -1130,6 +1204,34 @@ settings {
 | `bom`
 | BomSettings
 | Настройки генерации Maven BOM
+
+| `bomCache`
+| BomCacheSettings
+| Настройки кэширования BOM-импорта
+
+| `updateCheck`
+| UpdateCheckSettings
+| Настройки проверки обновлений зависимостей
+
+| `compatibilityAnalysis`
+| CompatibilityAnalysisSettings
+| Настройки анализа совместимости
+
+| `securityCheck`
+| SecurityCheckSettings
+| Настройки проверки безопасности (уязвимости)
+
+| `licenseCheck`
+| LicenseCheckSettings
+| Настройки проверки лицензий
+
+| `transitiveResolution`
+| TransitiveResolutionSettings
+| Настройки разрешения транзитивных зависимостей
+
+| `report`
+| ReportSettings
+| Настройки генерации отчётов (формат, секции)
 |===
 
 ==== TomlSettings
@@ -1172,6 +1274,127 @@ settings {
 | `includeOptionalDependencies`
 | Boolean
 | Включать зависимости с `optional=true`
+|===
+
+==== BomCacheSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить кэширование BOM-импорта
+
+| `ttl`
+| Duration?
+| Время жизни кэша
+|===
+
+==== UpdateCheckSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку обновлений
+
+| `includePreRelease`
+| Boolean
+| Учитывать pre-release версии
+|===
+
+==== CompatibilityAnalysisSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить анализ совместимости
+
+| `targetJdk`
+| Int?
+| Целевая версия JDK для проверки
+
+| `failOnErrors`
+| Boolean
+| Прерывать обработку при ошибках совместимости
+|===
+
+==== SecurityCheckSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку уязвимостей
+
+| `minSeverity`
+| VulnerabilitySeverity?
+| Минимальный уровень серьёзности для срабатывания (см. xref:../06-reference/model-schema.adoc#vulnerability-severity[VulnerabilitySeverity])
+|===
+
+==== LicenseCheckSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку лицензий
+
+| `allowedCategories`
+| Set<LicenseCategory>
+| Разрешённые категории лицензий (см. xref:../06-reference/model-schema.adoc#license-category[LicenseCategory])
+
+| `deniedLicenses`
+| Set<String>
+| Запрещённые SPDX идентификаторы лицензий
+|===
+
+==== TransitiveResolutionSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить разрешение транзитивных зависимостей
+
+| `conflictStrategy`
+| ConflictResolutionStrategy
+| Стратегия разрешения конфликтов версий (см. xref:../06-reference/model-schema.adoc#conflict-resolution-strategy[ConflictResolutionStrategy])
+|===
+
+==== ReportSettings
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить генерацию отчётов
+
+| `format`
+| ReportFormat
+| Формат отчёта (см. xref:../06-reference/model-schema.adoc#report-format[ReportFormat])
+
+| `sections`
+| Set<ReportSection>
+| Секции для включения в отчёт (см. xref:../06-reference/model-schema.adoc#report-section[ReportSection])
+
+| `outputDir`
+| String?
+| Директория для сохранения отчётов
 |===
 
 ==== ValidationAction
@@ -1438,7 +1661,7 @@ ____
 | Используемые версии с указанием источника
 
 | diagnostics
-| ProcessingDiagnostics
+| Diagnostics
 | Результаты валидации, предупреждения, ошибки
 |===
 
@@ -1457,6 +1680,10 @@ ____
 |===
 | Атрибут | Тип | Описание
 
+| alias
+| String
+| Alias версии из DSL (PK в map)
+
 | value
 | String
 | Значение версии (например: `3.4.0`)
@@ -1464,6 +1691,10 @@ ____
 | source
 | VersionSource
 | Источник версии
+
+| originalRef
+| VersionReference?
+| Оригинальная ссылка на версию из DSL (до резолвинга)
 |===
 
 ==== VersionSource (приоритет)

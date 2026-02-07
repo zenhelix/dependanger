@@ -25,7 +25,7 @@
 == Описание
 
 Security Scanning проверяет библиотеки из каталога на наличие известных уязвимостей (CVE) через OSV API (https://osv.dev).
-Результат добавляется в `ProcessingDiagnostics` и включается в отчёт.
+Результат добавляется в `Diagnostics` и включается в отчёт.
 
 == User Stories
 
@@ -429,7 +429,7 @@ Dependanger группирует библиотеки в batches для эффе
 1. Собирает все библиотеки из EffectiveMetadata
 2. Batch-запросом отправляет в OSV API
 3. Парсит ответ и создаёт `VulnerabilityInfo` для каждой уязвимости
-4. Добавляет результаты в `ProcessingDiagnostics`
+4. Добавляет результаты в `Diagnostics`
 5. При `failOnCritical/failOnHigh` добавляет ERROR в diagnostics
 
 Включается через `withSecurityCheck()` в builder API.
@@ -680,7 +680,7 @@ dependanger {
 
 | FR-003
 | MUST
-| Система ДОЛЖНА добавлять результаты в `ProcessingDiagnostics`
+| Система ДОЛЖНА добавлять результаты в `Diagnostics`
 
 | FR-004
 | MUST

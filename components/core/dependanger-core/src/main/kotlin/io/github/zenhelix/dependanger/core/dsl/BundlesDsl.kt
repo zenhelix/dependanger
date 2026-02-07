@@ -8,7 +8,7 @@ public class BundlesDsl {
 
     public fun bundle(name: String, block: BundleDsl.() -> Unit) {
         val dsl = BundleDsl().apply(block)
-        bundles.add(Bundle(name = name, libraries = dsl.libraries.toList(), extends = dsl.extendsList.toList()))
+        bundles.add(Bundle(alias = name, libraries = dsl.libraries.toList(), extends = dsl.extendsList.toList()))
     }
 }
 

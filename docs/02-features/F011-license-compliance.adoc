@@ -26,7 +26,7 @@
 
 License Compliance проверяет лицензии библиотек из каталога и валидирует их соответствие политикам организации (whitelist/blacklist).
 Информация о лицензиях получается из нескольких источников по приоритету.
-Результат добавляется в `ProcessingDiagnostics` и включается в отчёт.
+Результат добавляется в `Diagnostics` и включается в отчёт.
 
 == Источники лицензий
 
@@ -482,7 +482,7 @@ licenses.forEach { info ->
 2. Для каждой библиотеки резолвит лицензию по приоритету источников
 3. Классифицирует лицензии по категориям
 4. Проверяет соответствие whitelist/blacklist
-5. Добавляет `LicenseInfo` и violations в `ProcessingDiagnostics`
+5. Добавляет `LicenseInfo` и violations в `Diagnostics`
 
 Включается через `withLicenseCheck()` в builder API.
 
@@ -882,7 +882,7 @@ dependanger {
 
 | FR-006
 | MUST
-| Система ДОЛЖНА добавлять результаты в `ProcessingDiagnostics`
+| Система ДОЛЖНА добавлять результаты в `Diagnostics`
 
 | FR-007
 | SHOULD

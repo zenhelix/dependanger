@@ -289,7 +289,7 @@ NOTE: Правила проверяются только против **effectiv
 
 | FR-004
 | MUST
-| Система ДОЛЖНА добавлять результаты в `ProcessingDiagnostics` как `CompatibilityIssue`
+| Система ДОЛЖНА добавлять результаты в `Diagnostics` как `CompatibilityIssue`
 
 | FR-005
 | MUST

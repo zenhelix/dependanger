@@ -64,7 +64,7 @@ Processing Pipeline выполняет многоэтапную обработк
 
 | Диагностика
 | —
-| `ProcessingDiagnostics` с ошибками/предупреждениями
+| `Diagnostics` с ошибками/предупреждениями
 |===
 
 === Структура EffectiveMetadata
@@ -78,7 +78,7 @@ data class EffectiveMetadata(
     val plugins: Map<String, EffectivePlugin>,
     val bundles: Map<String, EffectiveBundle>,
     val versions: Map<String, ResolvedVersion>,
-    val diagnostics: ProcessingDiagnostics,
+    val diagnostics: Diagnostics,
     val processingInfo: ProcessingInfo
 )
 
@@ -182,7 +182,7 @@ enum class VersionSource {
 ----
 
 [[processing-diagnostics]]
-== ProcessingDiagnostics
+== Diagnostics
 
 Структура для сбора ошибок и предупреждений во время выполнения pipeline.
 
@@ -209,7 +209,7 @@ enum class VersionSource {
 
 [source,kotlin]
 ----
-data class ProcessingDiagnostics(
+data class Diagnostics(
     val errors: List<DiagnosticMessage>,
     val warnings: List<DiagnosticMessage>,
     val infos: List<DiagnosticMessage>
@@ -921,7 +921,7 @@ flowchart TD
 
 | FR-006
 | MUST
-| Система ДОЛЖНА валидировать модель и добавлять ошибки в `ProcessingDiagnostics`
+| Система ДОЛЖНА валидировать модель и добавлять ошибки в `Diagnostics`
 
 | FR-007
 | MUST
@@ -981,7 +981,7 @@ flowchart TD
 
 | FR-021
 | SHOULD
-| Система ДОЛЖНА сохранять диагностику (errors, warnings, infos) в `ProcessingDiagnostics`
+| Система ДОЛЖНА сохранять диагностику (errors, warnings, infos) в `Diagnostics`
 
 | FR-022
 | SHOULD

@@ -599,7 +599,7 @@ dependanger report --output /path/to/report.json effective-metadata.json
 * `effective-\{distribution\}.json` от `dependangerGenerateEffective`
 * `updates.json` от `dependangerCheckUpdates` (если есть)
 * `compatibility.json` от `dependangerAnalyze` (если есть)
-* `ProcessingDiagnostics` из pipeline
+* `Diagnostics` из pipeline
 
 **Outputs:**
 
@@ -924,7 +924,7 @@ dependanger {
 
 == Связи
 
-* **Входные данные:** `EffectiveMetadata`, `ProcessingDiagnostics`
+* **Входные данные:** `EffectiveMetadata`, `Diagnostics`
 * **Выходные данные:** `dependanger-report.json`
 
 == Связанные документы

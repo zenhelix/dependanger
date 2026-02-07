@@ -110,6 +110,10 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 |===
 | Атрибут | Тип | Описание
 
+| `alias`
+| String
+| Alias версии из DSL (PK в map)
+
 | `value`
 | String
 | Значение версии (например: `3.4.0`)
@@ -117,6 +121,10 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | `source`
 | VersionSource
 | Источник версии (DECLARED или BOM_IMPORT)
+
+| `originalRef`
+| VersionReference?
+| Оригинальная ссылка на версию из DSL (до резолвинга)
 |===
 
 '''
@@ -409,6 +417,148 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | Включать зависимости с `optional=true`
 |===
 
+[[bom-cache-settings]]
+=== BomCacheSettings
+
+Настройки кэширования BOM-импорта.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить кэширование BOM-импорта
+
+| `ttl`
+| Duration?
+| Время жизни кэша
+|===
+
+[[update-check-settings]]
+=== UpdateCheckSettings
+
+Настройки проверки обновлений.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку обновлений
+
+| `includePreRelease`
+| Boolean
+| Учитывать pre-release версии
+|===
+
+[[compatibility-analysis-settings]]
+=== CompatibilityAnalysisSettings
+
+Настройки анализа совместимости.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить анализ совместимости
+
+| `targetJdk`
+| Int?
+| Целевая версия JDK для проверки
+
+| `failOnErrors`
+| Boolean
+| Прерывать обработку при ошибках совместимости
+|===
+
+[[security-check-settings]]
+=== SecurityCheckSettings
+
+Настройки проверки безопасности.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку уязвимостей
+
+| `minSeverity`
+| VulnerabilitySeverity?
+| Минимальный уровень серьёзности для срабатывания
+|===
+
+[[license-check-settings]]
+=== LicenseCheckSettings
+
+Настройки проверки лицензий.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить проверку лицензий
+
+| `allowedCategories`
+| Set<LicenseCategory>
+| Разрешённые категории лицензий
+
+| `deniedLicenses`
+| Set<String>
+| Запрещённые SPDX идентификаторы лицензий
+|===
+
+[[transitive-resolution-settings]]
+=== TransitiveResolutionSettings
+
+Настройки разрешения транзитивных зависимостей.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить разрешение транзитивных зависимостей
+
+| `conflictStrategy`
+| ConflictResolutionStrategy
+| Стратегия разрешения конфликтов версий
+|===
+
+[[report-settings]]
+=== ReportSettings
+
+Настройки генерации отчётов.
+
+[cols="1,1,3",options="header"]
+|===
+| Атрибут | Тип | Описание
+
+| `enabled`
+| Boolean
+| Включить генерацию отчётов
+
+| `format`
+| ReportFormat
+| Формат отчёта
+
+| `sections`
+| Set<ReportSection>
+| Секции для включения в отчёт
+
+| `outputDir`
+| String?
+| Директория для сохранения отчётов
+|===
+
 '''
 
 [[processing-types]]
@@ -466,8 +616,8 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | Список ID процессоров для отключения
 |===
 
-[[processing-diagnostics]]
-=== ProcessingDiagnostics
+[[diagnostics]]
+=== Diagnostics
 
 Результаты валидации pipeline (в Effective Model).
 
@@ -486,6 +636,28 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | `infos`
 | List<DiagnosticMessage>
 | Информационные сообщения
+|===
+
+[[diagnostic-message]]
+=== DiagnosticMessage
+
+Отдельное диагностическое сообщение от процессора pipeline.
+
+[cols="1,1,3",options="header"]
+|===
+| Поле | Тип | Описание
+
+| `message`
+| String
+| Текст диагностического сообщения
+
+| `processorId`
+| String
+| Идентификатор процессора, который сгенерировал сообщение
+
+| `context`
+| Map<String, String>
+| Дополнительный контекст сообщения (пары ключ-значение)
 |===
 
 '''
@@ -532,6 +704,194 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 
 | `SAME_MAJOR_MINOR`
 | Все библиотеки должны иметь одинаковые major.minor
+|===
+
+'''
+
+[[additional-enums]]
+== Дополнительные перечисления
+
+[[conflict-resolution-strategy]]
+=== ConflictResolutionStrategy
+
+Стратегия разрешения конфликтов версий при транзитивном разрешении зависимостей.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `HIGHEST`
+| Выбирается наибольшая версия
+
+| `FIRST`
+| Выбирается первая встреченная версия
+
+| `FAIL`
+| Конфликт считается ошибкой, обработка прерывается
+|===
+
+[[report-format]]
+=== ReportFormat
+
+Формат генерируемого отчёта.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `JSON`
+| JSON формат
+
+| `YAML`
+| YAML формат
+
+| `MARKDOWN`
+| Markdown формат
+
+| `HTML`
+| HTML формат
+|===
+
+[[report-section]]
+=== ReportSection
+
+Секция отчёта для включения/исключения.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `SUMMARY`
+| Общая сводка
+
+| `LIBRARIES`
+| Список библиотек
+
+| `PLUGINS`
+| Список плагинов
+
+| `VERSIONS`
+| Список версий
+
+| `BUNDLES`
+| Список бандлов
+
+| `UPDATES`
+| Доступные обновления
+
+| `COMPATIBILITY`
+| Результаты анализа совместимости
+
+| `SECURITY`
+| Результаты проверки безопасности
+
+| `LICENSES`
+| Информация о лицензиях
+|===
+
+[[license-category]]
+=== LicenseCategory
+
+Категория лицензии для проверки совместимости.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `PERMISSIVE`
+| Разрешительная лицензия (MIT, Apache-2.0, BSD)
+
+| `WEAK_COPYLEFT`
+| Слабый copyleft (LGPL, MPL-2.0)
+
+| `STRONG_COPYLEFT`
+| Сильный copyleft (GPL, AGPL)
+
+| `PROPRIETARY`
+| Проприетарная лицензия
+
+| `UNKNOWN`
+| Неизвестная лицензия
+|===
+
+[[vulnerability-severity]]
+=== VulnerabilitySeverity
+
+Уровень серьёзности уязвимости.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `CRITICAL`
+| Критическая уязвимость
+
+| `HIGH`
+| Высокая серьёзность
+
+| `MEDIUM`
+| Средняя серьёзность
+
+| `LOW`
+| Низкая серьёзность
+
+| `INFORMATIONAL`
+| Информационная
+|===
+
+[[update-type]]
+=== UpdateType
+
+Тип доступного обновления.
+
+[cols="1,3",options="header"]
+|===
+| Значение | Описание
+
+| `MAJOR`
+| Обновление major версии
+
+| `MINOR`
+| Обновление minor версии
+
+| `PATCH`
+| Обновление patch версии
+
+| `PRE_RELEASE`
+| Pre-release обновление
+|===
+
+'''
+
+[[constraint-types]]
+== Типы ограничений
+
+[[constraint]]
+=== Constraint
+
+Ограничение для библиотеки — sealed class.
+
+[source,kotlin]
+----
+sealed class Constraint {
+    data class VersionConstraintDef(val constraint: String) : Constraint()
+    data class Exclude(val group: String?, val module: String?) : Constraint()
+    data class Substitute(val with: String) : Constraint()
+}
+----
+
+[cols="1,3",options="header"]
+|===
+| Подтип | Описание
+
+| `VersionConstraintDef`
+| Ограничение версии (например: `strictly`, `require`, `prefer`)
+
+| `Exclude`
+| Исключение транзитивной зависимости по group/module
+
+| `Substitute`
+| Подмена зависимости на другую библиотеку (alias)
 |===
 
 == Связанные документы

@@ -347,7 +347,7 @@ io.github.zenhelix.dependanger/
 │   ├── dsl/            # DependangerDsl, VersionsDsl, LibrariesDsl, SettingsDsl...
 │   ├── metadata/       # DependangerMetadata (serializable)
 │   ├── validation/     # Validators
-│   └── filter/         # LibraryFilter, TagFilter, CompositeFilter
+│   └── filter/         # LibraryFilter, PluginFilter, TagFilter, CompositeFilter
 ├── effective/
 │   ├── model/          # EffectiveMetadata, ProcessingContext
 │   ├── builder/        # EffectiveMetadataBuilder
@@ -491,6 +491,21 @@ interface LibraryFilter {
 ----
 
 **Встроенные реализации:** `TagFilter`, `CompositeLibraryFilter`
+
+'''
+
+=== PluginFilter
+
+Стратегия фильтрации плагинов (аналогично `LibraryFilter`).
+
+[source,kotlin]
+----
+interface PluginFilter {
+    fun filter(plugins: Collection<Plugin>): Collection<Plugin>
+}
+----
+
+**Встроенные реализации:** `TagPluginFilter`, `CompositePluginFilter`
 
 == SPI Discovery
 

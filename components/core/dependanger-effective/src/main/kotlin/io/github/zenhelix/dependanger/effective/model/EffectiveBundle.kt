@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class EffectiveBundle(
-    val name: String,
+    val alias: String,
     val libraries: List<String> = emptyList(),
 )

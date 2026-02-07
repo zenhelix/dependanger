@@ -1006,6 +1006,9 @@ distributions {
 
 | `byDeprecated`
 | Фильтрация deprecated библиотек. По умолчанию deprecated **включаются** (с WARNING). Используйте `exclude()` для исключения
+
+| `customFilters`
+| `Map<String, JsonElement>` — расширяемые фильтры для custom SPI-процессоров. Ключ — идентификатор фильтра, значение — конфигурация в JSON. Сериализуется в metadata.json
 |===
 
 ==== Логика комбинирования фильтров
@@ -1232,7 +1235,43 @@ settings {
 | `report`
 | ReportSettings
 | Настройки генерации отчётов (формат, секции)
+
+| `customSettings`
+| Map<String, JsonElement>
+| Настройки для custom SPI-процессоров. Ключ — идентификатор процессора, значение — произвольный JSON. Сериализуется в metadata.json
 |===
+
+==== Custom Settings
+
+Для custom SPI-процессоров предусмотрен механизм расширяемых настроек через `customSettings`.
+В отличие от `EffectiveMetadata.extensions` (runtime-only), `customSettings` сериализуется в metadata.json и может быть задан пользователем в DSL.
+
+[source,kotlin]
+----
+// В metadata.json
+{
+  "settings": {
+    "customSettings": {
+      "my-custom-processor": {
+        "enabled": true,
+        "threshold": 0.8,
+        "excludeGroups": ["com.internal"]
+      }
+    }
+  }
+}
+
+// Чтение в процессоре
+override suspend fun process(
+    metadata: EffectiveMetadata,
+    context: ProcessingContext
+): EffectiveMetadata {
+    val mySettings = context.settings.customSettings["my-custom-processor"]
+    // Десериализовать JsonElement в типизированную конфигурацию
+    val config = Json.decodeFromJsonElement<MyProcessorConfig>(mySettings!!)
+    // ...
+}
+----
 
 ==== TomlSettings
 
@@ -1663,6 +1702,50 @@ ____
 | diagnostics
 | Diagnostics
 | Результаты валидации, предупреждения, ошибки
+
+| extensions
+| Map<ExtensionKey<*>, Any>
+| Типобезопасное хранилище для результатов custom SPI-процессоров (runtime-only, не сериализуется)
+|===
+
+==== Расширения (Extensions)
+
+`EffectiveMetadata` содержит встроенные поля для результатов built-in фич (`updates`, `vulnerabilities`, `licenseViolations` и др.), обеспечивая удобный прямой доступ.
+
+Для custom SPI-процессоров предусмотрен механизм расширений через типобезопасный `ExtensionKey<T>`:
+
+[source,kotlin]
+----
+// Объявление ключа (в модуле custom-процессора)
+val MY_RESULT_KEY = ExtensionKey<MyCustomResult>("my-custom-result")
+
+// Запись результата в процессоре
+override suspend fun process(
+    metadata: EffectiveMetadata,
+    context: ProcessingContext
+): EffectiveMetadata {
+    val result = MyCustomResult(...)
+    return metadata.withExtension(MY_RESULT_KEY, result)
+}
+
+// Чтение результата
+val result = effectiveMetadata.getExtension(MY_RESULT_KEY)
+----
+
+NOTE: Extensions имеют аннотацию `@Transient` и не участвуют в JSON-сериализации.
+Это runtime-only механизм для передачи данных между процессорами и генераторами.
+
+===== Вспомогательные функции
+
+[cols="1,3",options="header"]
+|===
+| Функция | Описание
+
+| `getExtension(key: ExtensionKey<T>): T?`
+| Получить значение расширения по типобезопасному ключу
+
+| `withExtension(key: ExtensionKey<T>, value: T): EffectiveMetadata`
+| Создать копию `EffectiveMetadata` с добавленным расширением (immutable)
 |===
 
 '''

@@ -257,20 +257,27 @@ class FixedVersionStrategy(private val version: Version) : VersionResolutionStra
 ----
 // ✅ Процессор в цепочке
 interface EffectiveMetadataProcessor {
-    val order: Int
-    suspend fun process(metadata: EffectiveMetadata): EffectiveMetadata
+    val id: String
+    val phase: ProcessingPhase
+    val order: Int          // По умолчанию = phase.order
+    val isOptional: Boolean
+    suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata
 }
 
-// Pipeline исполнитель
+// Pipeline исполнитель — группирует процессоры по ExecutionMode
 class ProcessingPipeline(
     private val processors: List<EffectiveMetadataProcessor>
 ) {
-    suspend fun execute(initial: EffectiveMetadata): EffectiveMetadata {
-        return processors
-            .sortedBy { it.order }
-            .fold(initial) { metadata, processor ->
-                processor.process(metadata)
+    suspend fun process(context: ProcessingContext): EffectiveMetadata {
+        val groups = groupByExecutionMode(processors.sortedBy { it.order })
+        var result = EffectiveMetadata(...)
+        for (group in groups) {
+            result = when (group.executionMode) {
+                PARALLEL_IO, PARALLEL_COMPUTE -> executeParallel(result, group.processors, context)
+                else -> executeSequential(result, group.processors, context)
             }
+        }
+        return result
     }
 }
 ----

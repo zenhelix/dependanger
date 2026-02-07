@@ -638,6 +638,21 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | Информационные сообщения
 |===
 
+==== Утилиты
+
+`Diagnostics` предоставляет оператор `+` для агрегации и фабричные методы для создания:
+
+[source,kotlin]
+----
+// Агрегация результатов нескольких процессоров
+val combined = diagnostics1 + diagnostics2
+
+// Фабричные методы
+val err = Diagnostics.error("UNRESOLVED_VERSION", "Version 'foo' not found", processorId = "version-resolver")
+val warn = Diagnostics.warning("DEPRECATED", "Library 'old-lib' is deprecated")
+val diag = Diagnostics.of(message1, message2, message3) // автоматически распределяет по severity
+----
+
 [[diagnostic-message]]
 === DiagnosticMessage
 

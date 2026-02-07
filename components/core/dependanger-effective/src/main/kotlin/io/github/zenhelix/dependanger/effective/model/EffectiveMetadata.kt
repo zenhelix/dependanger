@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.effective.model
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 public data class EffectiveMetadata(
@@ -20,4 +21,6 @@ public data class EffectiveMetadata(
     val transitives: List<TransitiveTree> = emptyList(),
     val flatDependencies: List<FlatDependency> = emptyList(),
     val versionConflicts: List<VersionConflict> = emptyList(),
+    @Transient
+    val extensions: Map<ExtensionKey<*>, Any> = emptyMap(),
 )

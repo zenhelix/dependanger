@@ -441,6 +441,26 @@ interface SerializationFormat<T> {
 
 '''
 
+=== SchemaMigrator
+
+Миграция `DependangerMetadata` между версиями схемы.
+Миграция отделена от сериализации (Single Responsibility) и поддерживает цепочку: 1.0 → 1.1 → 2.0.
+
+[source,kotlin]
+----
+interface SchemaMigrator {
+    val fromVersion: String   // e.g. "1.0"
+    val toVersion: String     // e.g. "1.1"
+
+    fun migrate(metadata: DependangerMetadata): DependangerMetadata
+}
+----
+
+Обнаружение — через ServiceLoader.
+Несколько мигратров автоматически выстраиваются в цепочку по `fromVersion` → `toVersion`.
+
+'''
+
 === EffectiveMetadataProcessor
 
 Процессор в pipeline обработки.
@@ -448,16 +468,72 @@ interface SerializationFormat<T> {
 [source,kotlin]
 ----
 interface EffectiveMetadataProcessor {
-    val order: Int          // Порядок выполнения (меньше = раньше)
-    val processorId: String // Уникальный идентификатор
+    val id: String          // Уникальный идентификатор
     val phase: ProcessingPhase
+    val order: Int          // По умолчанию = phase.order, можно переопределить
     val isOptional: Boolean // Можно ли отключить
 
-    suspend fun process(context: ProcessingContext): ProcessingContext
+    suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata
 }
 ----
 
+==== ProcessingPhase
+
+`ProcessingPhase` — open class с предопределёнными фазами в companion object.
+Третьи стороны могут создавать собственные фазы:
+
+[source,kotlin]
+----
+// Встроенные фазы доступны через companion object
+ProcessingPhase.PROFILE           // order=5
+ProcessingPhase.METADATA_CONVERSION // order=10
+ProcessingPhase.VALIDATION        // order=65
+// ... и другие
+
+// Создание кастомной фазы
+val MY_PHASE = ProcessingPhase("MY_ANALYSIS", 55, ExecutionMode.PARALLEL_IO)
+----
+
 **Встроенные процессоры:** см. xref:../02-features/F003-processing-pipeline.adoc[F003: Processing Pipeline]
+
+'''
+
+==== ProcessingCallback и ProcessingEvent
+
+Pipeline уведомляет о ходе обработки через event-based callback.
+Новые типы событий добавляются без нарушения существующих реализаций — `when` с exhaustive matching подскажет необработанные варианты.
+
+[source,kotlin]
+----
+// События pipeline
+sealed class ProcessingEvent {
+    data class PhaseStarted(val phase: ProcessingPhase) : ProcessingEvent()
+    data class PhaseCompleted(val phase: ProcessingPhase, val duration: Duration) : ProcessingEvent()
+    data class PhaseError(val phase: ProcessingPhase, val error: Throwable) : ProcessingEvent()
+    data class DiagnosticAdded(val message: DiagnosticMessage) : ProcessingEvent()
+    data class Progress(val phase: ProcessingPhase, val current: Int, val total: Int) : ProcessingEvent()
+}
+
+// Единый callback — fun interface для удобства
+fun interface ProcessingCallback {
+    fun onEvent(event: ProcessingEvent)
+}
+----
+
+**Пример использования:**
+
+[source,kotlin]
+----
+val result = dependanger.process(distribution = "backend") { event ->
+    when (event) {
+        is ProcessingEvent.PhaseStarted -> println("▸ ${event.phase.name}")
+        is ProcessingEvent.PhaseCompleted -> println("✓ ${event.phase.name} (${event.duration})")
+        is ProcessingEvent.PhaseError -> println("✗ ${event.phase.name}: ${event.error.message}")
+        is ProcessingEvent.DiagnosticAdded -> println("  ⚠ ${event.message.message}")
+        is ProcessingEvent.Progress -> println("  ${event.current}/${event.total}")
+    }
+}
+----
 
 '''
 
@@ -515,6 +591,7 @@ interface PluginFilter {
 ----
 META-INF/services/
 ├── io.github.zenhelix.dependanger.core.spi.SerializationFormat
+├── io.github.zenhelix.dependanger.core.spi.SchemaMigrator
 ├── io.github.zenhelix.dependanger.effective.spi.EffectiveMetadataProcessor
 └── io.github.zenhelix.dependanger.generator.spi.ArtifactGenerator
 ----
@@ -528,18 +605,29 @@ META-INF/services/
 // my-processor/src/main/kotlin/MyProcessor.kt
 package com.example
 
+// Кастомная фаза — выполняется после PLUGIN (50), перед USED_VERSIONS (60)
+val MY_PHASE = ProcessingPhase("MY_ANALYSIS", 55, ExecutionMode.PARALLEL_IO)
+
+// Типобезопасный ключ для хранения результатов в EffectiveMetadata.extensions
+val MY_ANALYSIS_KEY = ExtensionKey<MyAnalysisResult>("my-analysis")
+
 class MyCustomProcessor : EffectiveMetadataProcessor {
-    override val name = "my-custom"
-    override val order = 90
+    override val id = "my-custom"
+    override val phase = MY_PHASE
+    override val isOptional = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
         context: ProcessingContext
     ): EffectiveMetadata {
-        // Логика обработки
-        return metadata
+        val result = MyAnalysisResult(...)
+        // Результат сохраняется в extensions (runtime-only, типобезопасно)
+        return metadata.withExtension(MY_ANALYSIS_KEY, result)
     }
 }
+
+// Чтение результата (например, в генераторе или после pipeline)
+val analysis = effectiveMetadata.getExtension(MY_ANALYSIS_KEY)
 ----
 
 **2. Регистрация в ServiceLoader:**
@@ -586,13 +674,18 @@ val result = Dependanger.fromDsl {
     }
 }.build()
 
-// Генерация артефактов
+// Генерация артефактов — convenience-методы для built-in генераторов
 val toml = result.toToml()
 val bom = result.toBom()
 
 // Запись в файлы
 result.writeTomlTo(Path.of("gradle/libs.versions.toml"))
 result.writeBomTo(Path.of("build/dependanger-bom.pom"))
+
+// Generic API — для любого ArtifactGenerator (включая custom)
+val customGenerator = MyCustomGenerator(config)
+val output = result.generate(customGenerator)
+result.writeTo(customGenerator, Path.of("output/custom-artifact"))
 ----
 
 === Builder Pattern

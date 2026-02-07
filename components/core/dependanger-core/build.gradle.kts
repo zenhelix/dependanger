@@ -7,6 +7,7 @@ description = "Dependanger Core - Models, DSL, and validation"
 
 dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")

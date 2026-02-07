@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.core.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 public data class Settings(
@@ -16,6 +17,7 @@ public data class Settings(
     val licenseCheck: LicenseCheckSettings = LicenseCheckSettings(),
     val transitiveResolution: TransitiveResolutionSettings = TransitiveResolutionSettings(),
     val report: ReportSettings = ReportSettings(),
+    val customSettings: Map<String, JsonElement> = emptyMap(),
 )
 
 @Serializable

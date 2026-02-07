@@ -789,11 +789,13 @@ dependanger {
 
 == Parallel Pipeline Execution
 
-Pipeline поддерживает параллельное выполнение процессоров через фазы:
+Pipeline группирует последовательные процессоры с одинаковым `ExecutionMode` и выполняет каждую группу соответствующим образом:
 
-* **SEQUENTIAL** — строго последовательное выполнение
-* **PARALLEL_IO** — параллельно I/O-bound операции (сетевые запросы)
-* **PARALLEL_COMPUTE** — параллельно CPU-bound операции (валидация)
+* **SEQUENTIAL** — строго последовательное выполнение, каждый процессор получает результат предыдущего
+* **PARALLEL_IO** — параллельно I/O-bound операции (сетевые запросы) через `coroutineScope` + `async`
+* **PARALLEL_COMPUTE** — параллельно CPU-bound операции (валидация) через `coroutineScope` + `async`
+
+Параллельные процессоры получают одну и ту же базовую `EffectiveMetadata`, а результаты объединяются через merge-стратегию: новые diagnostics, updates, vulnerabilities и другие enrichment-поля каждого процессора добавляются к общему результату.
 
 === Фазы выполнения
 
@@ -872,13 +874,22 @@ NOTE: Property-style (`importBoms = true`) и Builder-style (`withBomImport()`) 
 
 == Pipeline Flow
 
+Pipeline группирует процессоры по `ExecutionMode` (последовательные группы одного режима объединяются) и выполняет каждую группу соответствующим образом:
+
+* **SEQUENTIAL** — процессоры выполняются последовательно, каждый получает результат предыдущего
+* **PARALLEL_IO / PARALLEL_COMPUTE** — процессоры запускаются параллельно через `coroutineScope` + `async`, результаты объединяются через merge-стратегию
+
 [mermaid,target=pipeline-flow,format=svg]
 ----
 flowchart TD
     Input["DependangerMetadata<br/>(input)"]
 
     subgraph Pipeline["Processing Pipeline"]
-        Loop["for processor in processors.sortedBy { it.order }:<br/>if processor.isEnabled(context):<br/>metadata = processor.process(metadata, context)"]
+        Group["groupByExecutionMode(processors.sortedBy \{ it.order \})"]
+        Seq["SEQUENTIAL group:<br/>fold(metadata) \{ processor.process(it) \}"]
+        Par["PARALLEL group:<br/>coroutineScope \{ async \{ processor.process(base) \} \}<br/>→ mergeParallelResults()"]
+        Group --> Seq
+        Group --> Par
     end
 
     Output["EffectiveMetadata<br/>(output)"]

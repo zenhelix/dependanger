@@ -9,4 +9,5 @@ public data class CompatibilityIssue(
     val message: String,
     val severity: Severity,
     val affectedLibraries: List<String> = emptyList(),
+    val suggestion: String? = null,
 )

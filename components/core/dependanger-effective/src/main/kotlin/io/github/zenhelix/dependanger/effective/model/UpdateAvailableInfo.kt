@@ -9,5 +9,8 @@ public data class UpdateAvailableInfo(
     val artifact: String,
     val currentVersion: String,
     val latestVersion: String,
+    val latestStable: String? = null,
+    val latestAny: String? = null,
     val updateType: UpdateType,
+    val repository: String? = null,
 )

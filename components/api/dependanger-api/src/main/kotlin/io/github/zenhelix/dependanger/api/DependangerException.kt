@@ -16,6 +16,12 @@ public class DependangerProcessingException(
     cause: Throwable? = null,
 ) : DependangerException(message, cause)
 
+public class DependangerGenerationException(
+    message: String,
+    public val generatorId: String? = null,
+    cause: Throwable? = null,
+) : DependangerException(message, cause)
+
 public class DependangerConfigurationException(
     message: String,
     cause: Throwable? = null,

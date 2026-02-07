@@ -15,14 +15,14 @@ dependencies {
     api(project(":components:generators:dependanger-generator-toml"))
     api(project(":components:generators:dependanger-generator-bom"))
 
-    // Features (optional processors) - exposed as api for plugin and CLI consumers
-    api(project(":components:features:dependanger-maven-resolver"))
-    api(project(":components:features:dependanger-updates"))
-    api(project(":components:features:dependanger-analysis"))
-    api(project(":components:features:dependanger-report"))
-    api(project(":components:features:dependanger-security"))
-    api(project(":components:features:dependanger-license"))
-    api(project(":components:features:dependanger-transitive"))
+    // Built-in features (optional processors) - implementation, not exposed to consumers
+    implementation(project(":components:features:dependanger-maven-resolver"))
+    implementation(project(":components:features:dependanger-updates"))
+    implementation(project(":components:features:dependanger-analysis"))
+    implementation(project(":components:features:dependanger-report"))
+    implementation(project(":components:features:dependanger-security"))
+    implementation(project(":components:features:dependanger-license"))
+    implementation(project(":components:features:dependanger-transitive"))
 
     // Serialization - needed transitively by consumers
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")

@@ -11,6 +11,7 @@ import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.TargetPlatform
 import io.github.zenhelix.dependanger.core.model.Version
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 public data class DependangerMetadata(
@@ -25,4 +26,5 @@ public data class DependangerMetadata(
     val compatibility: List<CompatibilityRule> = emptyList(),
     val settings: Settings = Settings(),
     val presets: List<Preset> = emptyList(),
+    val extensions: Map<String, JsonElement> = emptyMap(),
 )

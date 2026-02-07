@@ -14,13 +14,6 @@ public data class EffectiveMetadata(
     val bundles: Map<String, EffectiveBundle> = emptyMap(),
     val diagnostics: Diagnostics = Diagnostics(),
     val processingInfo: ProcessingInfo? = null,
-    val updates: List<UpdateAvailableInfo> = emptyList(),
-    val vulnerabilities: List<VulnerabilityInfo> = emptyList(),
-    val licenseViolations: List<LicenseViolation> = emptyList(),
-    val compatibilityIssues: List<CompatibilityIssue> = emptyList(),
-    val transitives: List<TransitiveTree> = emptyList(),
-    val flatDependencies: List<FlatDependency> = emptyList(),
-    val versionConflicts: List<VersionConflict> = emptyList(),
     @Transient
     val extensions: Map<ExtensionKey<*>, Any> = emptyMap(),
 )

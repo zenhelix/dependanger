@@ -11,13 +11,11 @@ public class ProcessingContext(
     public val environment: ProcessingEnvironment,
     public val activeDistribution: String? = null,
     public val callback: ProcessingCallback? = null,
+    private val properties: Map<ProcessingContextKey<*>, Any> = emptyMap(),
 ) {
-    private val properties: MutableMap<ProcessingContextKey<*>, Any> = mutableMapOf()
-
-    public operator fun <T : Any> set(key: ProcessingContextKey<T>, value: T) {
-        properties[key] = value
-    }
-
     @Suppress("UNCHECKED_CAST")
     public operator fun <T : Any> get(key: ProcessingContextKey<T>): T? = properties[key] as? T
+
+    public fun <T : Any> with(key: ProcessingContextKey<T>, value: T): ProcessingContext =
+        ProcessingContext(originalMetadata, settings, environment, activeDistribution, callback, properties + (key to value))
 }

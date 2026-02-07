@@ -2,6 +2,12 @@ package io.github.zenhelix.dependanger.core.dsl
 
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 
+public class DslExtensionKey<T : Any>(public val name: String) {
+    override fun equals(other: Any?): Boolean = other is DslExtensionKey<*> && name == other.name
+    override fun hashCode(): Int = name.hashCode()
+    override fun toString(): String = "DslExtensionKey($name)"
+}
+
 @DependangerDslMarker
 public class DependangerDsl {
     public val versionsDsl: VersionsDsl = VersionsDsl()
@@ -15,6 +21,7 @@ public class DependangerDsl {
     public val settingsDsl: SettingsDsl = SettingsDsl()
     public val presetsDsl: PresetsDsl = PresetsDsl()
     public val processingDsl: ProcessingDsl = ProcessingDsl()
+    private val extensions: MutableMap<DslExtensionKey<*>, Any> = mutableMapOf()
 
     public fun versions(block: VersionsDsl.() -> Unit) {
         versionsDsl.apply(block)
@@ -60,9 +67,23 @@ public class DependangerDsl {
         processingDsl.apply(block)
     }
 
+    public fun <T : Any> registerExtension(key: DslExtensionKey<T>, extension: T) {
+        extensions[key] = extension
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    public fun <T : Any> extension(key: DslExtensionKey<T>): T? = extensions[key] as? T
+
+    public fun allExtensions(): Map<DslExtensionKey<*>, Any> = extensions.toMap()
+
     public fun applyPreset(name: String): Unit = TODO()
 
     public fun toMetadata(): DependangerMetadata = TODO()
+}
+
+public fun <T : Any> DependangerDsl.configure(key: DslExtensionKey<T>, block: T.() -> Unit) {
+    val ext = extension(key) ?: error("DSL extension '${key.name}' is not registered. Call registerExtension() first.")
+    ext.block()
 }
 
 public fun dependanger(block: DependangerDsl.() -> Unit): DependangerDsl =

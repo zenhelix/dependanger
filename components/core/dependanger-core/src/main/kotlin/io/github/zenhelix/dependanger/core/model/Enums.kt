@@ -18,11 +18,6 @@ public enum class VersionConstraintType {
 }
 
 @Serializable
-public enum class RuleType {
-    JDK_REQUIREMENT, MUTUAL_EXCLUSION, VERSION_CONSTRAINT, CUSTOM
-}
-
-@Serializable
 public enum class KmpTarget {
     JVM, JS, ANDROID, IOS, MACOS, LINUX, MINGW, NATIVE, WASM_JS, WASM_WASI
 }

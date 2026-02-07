@@ -66,6 +66,10 @@ public class ProcessingPipeline(
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
+        if (!processor.supports(context)) {
+            return metadata
+        }
+
         val callback = context.callback
         callback?.onEvent(ProcessingEvent.PhaseStarted(processor.phase))
         val mark = TimeSource.Monotonic.markNow()
@@ -87,13 +91,6 @@ public class ProcessingPipeline(
         for (result in results) {
             merged = merged.copy(
                 diagnostics = merged.diagnostics + collectNewDiagnostics(base.diagnostics, result.diagnostics),
-                updates = merged.updates + result.updates.drop(base.updates.size),
-                vulnerabilities = merged.vulnerabilities + result.vulnerabilities.drop(base.vulnerabilities.size),
-                licenseViolations = merged.licenseViolations + result.licenseViolations.drop(base.licenseViolations.size),
-                compatibilityIssues = merged.compatibilityIssues + result.compatibilityIssues.drop(base.compatibilityIssues.size),
-                transitives = merged.transitives + result.transitives.drop(base.transitives.size),
-                flatDependencies = merged.flatDependencies + result.flatDependencies.drop(base.flatDependencies.size),
-                versionConflicts = merged.versionConflicts + result.versionConflicts.drop(base.versionConflicts.size),
                 extensions = merged.extensions + (result.extensions - base.extensions.keys),
             )
         }

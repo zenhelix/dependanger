@@ -1,9 +1,9 @@
 package io.github.zenhelix.dependanger.effective.builder
 
+import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPreset
 
 public class EffectiveMetadataBuilder {
     public var preset: ProcessingPreset = ProcessingPreset.DEFAULT

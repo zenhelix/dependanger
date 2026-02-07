@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.effective.pipeline
+package io.github.zenhelix.dependanger.core.model
 
 public enum class ProcessingPreset {
     DEFAULT, MINIMAL, STRICT, DISTRIBUTION

@@ -87,6 +87,10 @@ public class ProcessingPipeline(
         base: EffectiveMetadata,
         results: List<EffectiveMetadata>,
     ): EffectiveMetadata {
+        for (result in results) {
+            validateParallelResult(base, result)
+        }
+
         var merged = base
         for (result in results) {
             merged = merged.copy(
@@ -95,6 +99,33 @@ public class ProcessingPipeline(
             )
         }
         return merged
+    }
+
+    private fun validateParallelResult(base: EffectiveMetadata, result: EffectiveMetadata) {
+        if (result.versions != base.versions) {
+            throw IllegalStateException(
+                "Parallel processor modified 'versions' which is not supported. " +
+                        "Only diagnostics and extensions can be modified in parallel execution mode."
+            )
+        }
+        if (result.libraries != base.libraries) {
+            throw IllegalStateException(
+                "Parallel processor modified 'libraries' which is not supported. " +
+                        "Only diagnostics and extensions can be modified in parallel execution mode."
+            )
+        }
+        if (result.plugins != base.plugins) {
+            throw IllegalStateException(
+                "Parallel processor modified 'plugins' which is not supported. " +
+                        "Only diagnostics and extensions can be modified in parallel execution mode."
+            )
+        }
+        if (result.bundles != base.bundles) {
+            throw IllegalStateException(
+                "Parallel processor modified 'bundles' which is not supported. " +
+                        "Only diagnostics and extensions can be modified in parallel execution mode."
+            )
+        }
     }
 
     private fun collectNewDiagnostics(base: Diagnostics, result: Diagnostics): Diagnostics = Diagnostics(

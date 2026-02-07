@@ -1,10 +1,10 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
+import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPreset
 
 public class Dependanger private constructor(
     private val metadata: DependangerMetadata,

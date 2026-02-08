@@ -649,9 +649,15 @@ import kotlin.io.path.readText
 `EffectiveMetadata` содержит поле `extensions: Map<ExtensionKey<*>, Any>` с аннотацией `@Transient`, что означает, что стандартная kotlinx-serialization его игнорирует.
 Для полной сериализации необходим отдельный формат, который обрабатывает extensions вручную.
 
-=== Архитектурное решение
+=== Архитектурное решение: Typed ExtensionKey
 
-`EffectiveJsonFormat` размещается в модуле `dependanger-effective` (не в `dependanger-metadata-json`), так как зависит от типов `EffectiveMetadata`, `ExtensionKey` и моделей extensions.
+Каждый `ExtensionKey<T>` хранит `KSerializer<T>` для своего типа.
+Это позволяет `EffectiveJsonFormat` сериализовать/десериализовать extensions без `SerializersModule` и polymorphic dispatch:
+
+* **Сериализация:** `ExtensionKey.serializer` используется напрямую — `json.encodeToJsonElement(key.serializer, value)`
+* **Десериализация:** `ExtensionSerializerProvider` SPI (ServiceLoader) поставляет `knownKeys()` — маппинг `name -> ExtensionKey` с serializer'ом
+
+Такой подход типобезопасен: каждый ключ сам отвечает за сериализацию своего типа (Single Responsibility).
 
 === Модуль
 
@@ -665,17 +671,19 @@ package io.github.zenhelix.dependanger.effective.serialization
 
 import io.github.zenhelix.dependanger.effective.model.*
 import io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.plus
 import java.util.ServiceLoader
 
 /**
  * Сериализация/десериализация EffectiveMetadata в JSON
- * с поддержкой extensions через ServiceLoader-based discovery.
+ * с поддержкой extensions через typed ExtensionKey.
  *
- * Feature-модули регистрируют свои ExtensionSerializerProvider через
- * META-INF/services/io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
+ * Сериализация: каждый ExtensionKey<T> содержит KSerializer<T>,
+ * поэтому SerializersModule не требуется.
+ *
+ * Десериализация: ExtensionSerializerProvider SPI (ServiceLoader)
+ * обеспечивает маппинг имени ключа -> ExtensionKey с serializer'ом.
  */
 public class EffectiveJsonFormat {
 
@@ -685,9 +693,6 @@ public class EffectiveJsonFormat {
     private val providers: List<ExtensionSerializerProvider> =
         ServiceLoader.load(ExtensionSerializerProvider::class.java).toList()
 
-    private val combinedModule: SerializersModule =
-        providers.fold(SerializersModule { }) { acc, provider -> acc + provider.serializersModule() }
-
     private val knownKeys: Map<String, ExtensionKey<*>> =
         providers.flatMap { it.knownKeys().entries }.associate { it.key to it.value }
 
@@ -695,12 +700,11 @@ public class EffectiveJsonFormat {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
-        serializersModule = combinedModule
     }
 
     /**
      * Сериализует EffectiveMetadata в JSON-строку.
-     * Extensions конвертируются через зарегистрированные провайдеры.
+     * Extensions сериализуются через KSerializer из ExtensionKey.
      */
     public fun serialize(metadata: EffectiveMetadata): String {
         val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata)
@@ -709,14 +713,9 @@ public class EffectiveJsonFormat {
         if (metadata.extensions.isNotEmpty()) {
             val extensionsJson = buildJsonObject {
                 for ((key, value) in metadata.extensions) {
-                    val serializer = combinedModule.getPolymorphic(Any::class, value)
-                    if (serializer != null) {
-                        @Suppress("UNCHECKED_CAST")
-                        put(key.name, json.encodeToJsonElement(serializer as kotlinx.serialization.KSerializer<Any>, value))
-                    } else {
-                        logger.warn { "No serializer found for extension key '${key.name}', saving as JsonNull" }
-                        put(key.name, JsonNull)
-                    }
+                    @Suppress("UNCHECKED_CAST")
+                    val serializer = key.serializer as KSerializer<Any>
+                    put(key.name, json.encodeToJsonElement(serializer, value))
                 }
             }
             baseJson["extensions"] = extensionsJson
@@ -727,7 +726,7 @@ public class EffectiveJsonFormat {
 
     /**
      * Десериализует JSON-строку в EffectiveMetadata.
-     * Извлекает extensions через зарегистрированные провайдеры.
+     * Извлекает extensions через knownKeys (ServiceLoader discovery).
      */
     public fun deserialize(input: String): EffectiveMetadata {
         require(input.isNotBlank()) { "Input JSON string must not be blank" }
@@ -745,10 +744,8 @@ public class EffectiveJsonFormat {
                 continue
             }
             try {
-                val serializer = combinedModule.getPolymorphic(Any::class, keyName)
-                if (serializer != null) {
-                    extensions[extensionKey] = json.decodeFromJsonElement(serializer, element)
-                }
+                val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
+                extensions[extensionKey] = deserialized
             } catch (e: Exception) {
                 logger.warn { "Failed to deserialize extension '$keyName': ${e.message}" }
             }

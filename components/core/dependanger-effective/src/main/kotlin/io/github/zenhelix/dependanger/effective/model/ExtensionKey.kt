@@ -1,6 +1,11 @@
 package io.github.zenhelix.dependanger.effective.model
 
-public class ExtensionKey<T : Any>(public val name: String) {
+import kotlinx.serialization.KSerializer
+
+public class ExtensionKey<T : Any>(
+    public val name: String,
+    public val serializer: KSerializer<T>,
+) {
     override fun equals(other: Any?): Boolean = other is ExtensionKey<*> && name == other.name
     override fun hashCode(): Int = name.hashCode()
     override fun toString(): String = "ExtensionKey($name)"

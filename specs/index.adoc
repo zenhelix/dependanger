@@ -308,7 +308,7 @@ Core-процессоры: 1-99.
 | xref:SPEC-08-dependanger-analysis.adoc[SPEC-08]
 | 110
 | SEQUENTIAL
-| После core, дополняет CompatRulesProcessor(66)
+| Расширенный анализ: CustomRule handlers через SPI, bytecode (будущее). Дополняет CompatRulesProcessor(66), который обрабатывает статические правила (JDK/mutual/version)
 
 | `SecurityCheckProcessor`
 | xref:SPEC-10-dependanger-security.adoc[SPEC-10]
@@ -337,14 +337,13 @@ Core-процессоры: 1-99.
 [source,kotlin]
 ----
 public interface ExtensionSerializerProvider {
-    public fun serializersModule(): SerializersModule
     public fun knownKeys(): Map<String, ExtensionKey<*>>
 }
 ----
 
 * Каждый feature-модуль предоставляет провайдер для своих extension-типов
 * Регистрация через `META-INF/services/io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider`
-* `EffectiveJsonFormat` загружает все провайдеры через ServiceLoader, собирает общий `SerializersModule`, и использует его при сериализации/десериализации
+* `EffectiveJsonFormat` загружает все провайдеры через ServiceLoader, собирает `knownKeys`, и использует `ExtensionKey.serializer` при сериализации/десериализации (см. xref:SPEC-02-dependanger-metadata-json.adoc#spec-effective-json[SPEC-02.5])
 * Неизвестные extensions сохраняются как `JsonNull` с warning
 
 [[repository-convention]]

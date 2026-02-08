@@ -1,4 +1,4 @@
-= SPEC-08: dependanger-analysis -- Реализация TODO-заглушек
+= SPEC-08: dependanger-analysis -- Расширенный анализ совместимости
 :toc: left
 :toclevels: 3
 :sectnums:
@@ -6,9 +6,18 @@
 [[overview]]
 == Обзор
 
-Модуль `dependanger-analysis` проверяет совместимость библиотек на основе правил, определённых в блоке `compatibility { }` DSL.
-Поддерживает четыре типа правил: `jdkRequirement`, `mutualExclusion`, `versionConstraint`, `customRule`.
-Результаты сохраняются в `EffectiveMetadata.extensions` через `CompatibilityIssuesExtensionKey`.
+Модуль `dependanger-analysis` выполняет расширенный анализ совместимости, который ДОПОЛНЯЕТ базовый `CompatRulesProcessor` (order=66) из `dependanger-effective`.
+
+Разделение ответственности:
+
+* **`CompatRulesProcessor`** (order=66, core, non-optional) -- статические декларативные проверки: `JdkRequirement`, `MutualExclusion`, `VersionConstraint`.
+Не требуют I/O, всегда включены.
+См. xref:SPEC-03-dependanger-effective.adoc#spec-compat-rules[SPEC-03.12].
+* **`CompatibilityCheckProcessor`** (order=110, feature, optional) -- расширенный анализ: `CustomRule` handlers через SPI, bytecode-анализ (будущее).
+Может требовать I/O, SPI-зависимости, ASM.
+
+Результаты обоих процессоров хранятся в `EffectiveMetadata.extensions` через `CompatibilityIssuesExtensionKey`.
+`CompatibilityCheckProcessor` читает существующие issues (от `CompatRulesProcessor`) и добавляет свои.
 
 Приоритет: **P3** (желательно).
 
@@ -28,12 +37,6 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
 }
 ----
 
-NOTE: Базовая проверка правил совместимости (`compat-rules`, order=66) реализована в `dependanger-effective` (xref:SPEC-03-dependanger-effective.adoc[SPEC-03]).
-Данный модуль `CompatibilityCheckProcessor` (order=110) ДОПОЛНЯЕТ `CompatRulesProcessor`, а НЕ переопределяет его.
-Если один и тот же rule ID проверен обоими процессорами -- оба результата сохраняются в diagnostics.
-
-Расширенный анализ может включать bytecode-анализ и другие тяжёлые проверки.
-
 [[spec-compatibility-check]]
 == SPEC-08.1: CompatibilityCheckProcessor.process()
 
@@ -41,7 +44,16 @@ NOTE: Базовая проверка правил совместимости (`
 === Назначение
 
 Выполнить расширенный анализ совместимости, который дополняет базовый `compat-rules` процессор (order=66).
-Включает: pattern matching по координатам, проверку constraints SAME_VERSION/SAME_MAJOR/SAME_MAJOR_MINOR, расширенный JDK анализ, и вызов customRule handlers.
+Обрабатывает ТОЛЬКО типы проверок, которые НЕ покрыты core-процессором:
+
+* **CustomRule** -- вызов пользовательских handler'ов через SPI (`CustomRuleHandler`)
+* **Bytecode-анализ** (будущее) -- определение JDK class file version, бинарная совместимость
+
+НЕ обрабатывает (уже покрыто `CompatRulesProcessor`):
+
+* `JdkRequirement` -- статическая проверка числа JDK version
+* `MutualExclusion` -- проверка наличия библиотек в map
+* `VersionConstraint` -- сравнение строк версий
 
 [[algorithm-compat]]
 === Алгоритм
@@ -49,152 +61,141 @@ NOTE: Базовая проверка правил совместимости (`
 [source,text]
 ----
 1. Получить правила совместимости из context.originalMetadata.compatibility
-2. Получить настройки из context.settings.compatibilityAnalysis
-3. Получить targetJdk:
-      i.   `context.environment.jdkVersion` (explicit) -- приоритет
-      ii.  `Runtime.version().feature()` (auto-detect)
-      iii. `null` -> пропуск JDK-проверок с WARNING
-   Получить targetKotlin:
-      i.   `context.environment.kotlinVersion` (explicit)
-      ii.  `null` -> пропуск Kotlin-проверок с WARNING
-4. Если правил нет -> вернуть metadata, INFO "No compatibility rules defined"
-5. Для каждого правила:
-   a. JdkRequirement:
-      i.   Найти все библиотеки matching `matches` glob pattern
-      ii.  Если targetJdk < minJdk -> CompatibilityIssue(severity, message, affectedLibraries)
-      iii. Если targetJdk > maxJdk (если задан) -> аналогично
-   b. MutualExclusion:
-      i.   Проверить наличие библиотек из списка в effective metadata
-      ii.  Если 2+ присутствуют -> CompatibilityIssue(affectedLibraries = присутствующие)
-   c. VersionConstraint:
-      i.   Получить версии всех указанных библиотек
-      ii.  Проверить constraint:
-           - SAME_VERSION: все версии идентичны
-           - SAME_MAJOR: все major совпадают
-           - SAME_MAJOR_MINOR: все major.minor совпадают
-      iii. При несовпадении -> CompatibilityIssue
-   d. CustomRule:
-      i.   Найти handler по ruleId через `CustomRuleHandler` SPI из xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01]. ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`
-      ii.  Вызвать `handler.evaluate(rule, libraries, context)` в try-catch
-      iii. Обработать результат -> CompatibilityIssue
-6. Собрать все CompatibilityIssue
-7. Записать в metadata через withExtension(CompatibilityIssuesExtensionKey, issues)
+2. Отфильтровать только CustomRule правила (остальные обработаны CompatRulesProcessor)
+3. ЕСЛИ CustomRule правил нет -> вернуть metadata, INFO "No custom rules to process"
+
+4. ДЛЯ КАЖДОГО CustomRule:
+   a. Найти handler по ruleId через SPI:
+      ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`
+   b. ЕСЛИ handler не найден:
+      - WARNING "Custom rule handler not found for '{ruleId}'"
+      - Продолжить к следующему правилу
+   c. ЕСЛИ handler найден:
+      - Вызвать `handler.evaluate(rule, metadata.libraries, context)` в try-catch
+      - ЕСЛИ exception -> ERROR "Custom rule '{ruleId}' failed: {message}", продолжить pipeline
+      - ЕСЛИ результат содержит issues -> собрать CompatibilityIssue
+
+5. Прочитать существующие issues из metadata (от CompatRulesProcessor):
+   val existingIssues = metadata.compatibilityIssues
+
+6. Объединить: allIssues = existingIssues + newIssues
+7. Записать через withExtension(CompatibilityIssuesExtensionKey, allIssues)
 8. Добавить diagnostics: INFO/WARNING/ERROR в зависимости от severity
-9. В strict mode при severity=ERROR -> отметить в diagnostics как ERROR
 ----
 
 [[implementation-compat]]
 === Детальная реализация
 
-==== Pattern Matching (Glob)
-
-NOTE: `GlobMatcher` определён в `dependanger-core` (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01: Общие утилиты]).
-Модуль `dependanger-analysis` использует каноническую реализацию из `io.github.zenhelix.dependanger.core.util.GlobMatcher`.
-
-Используемые методы:
-
-* `GlobMatcher.matches(pattern, group, artifact)` — проверка координат "group:artifact" против glob-паттерна
-* `GlobMatcher.matchesGlob(pattern, value)` — проверка строки против glob-паттерна
-
-Поддерживаемые паттерны:
-
-* `"org.springframework:*"` — все артефакты группы org.springframework
-* `"org.springframework*:*"` — org.springframework И org.springframework.boot
-* `"*:spring-*"` — все группы, артефакты начинающиеся с "spring-"
-
-==== Version Constraint проверка
-
-NOTE: Используется `VersionComparator` из `dependanger-core` (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01: Общие утилиты]).
+==== CustomRuleHandler SPI
 
 [source,kotlin]
 ----
-private fun checkVersionConstraint(
-    rule: CompatibilityRule.VersionConstraint,
-    libraries: Map<String, EffectiveLibrary>
-): CompatibilityIssue? {
-    val involvedLibs = rule.libraries.mapNotNull { alias -> libraries[alias] }
-    if (involvedLibs.size < 2) return null
+// Определён в dependanger-effective/spi/
+public interface CustomRuleHandler {
+    /** Уникальный идентификатор правила, которое обрабатывает этот handler */
+    public val ruleId: String
 
-    val versions = involvedLibs.mapNotNull { it.version?.value }
-    if (versions.size < 2) return null
-
-    val parsed = versions.map { VersionComparator.parse(it) ?: return null }
-
-    val compatible = when (rule.constraint) {
-        VersionConstraintType.SAME_VERSION -> parsed.distinct().size == 1
-        VersionConstraintType.SAME_MAJOR -> parsed.map { it.major }.distinct().size == 1
-        VersionConstraintType.SAME_MAJOR_MINOR ->
-            parsed.map { it.major to it.minor }.distinct().size == 1
-    }
-
-    return if (!compatible) {
-        CompatibilityIssue(
-            ruleId = rule.name,
-            message = rule.message ?: "Version constraint violated: ${rule.constraint}",
-            severity = rule.severity,
-            affectedLibraries = involvedLibs.map { it.alias },
-            suggestion = "Align versions of: ${involvedLibs.joinToString { "${it.alias}:${it.version?.value}" }}"
-        )
-    } else null
+    /**
+     * Оценить пользовательское правило совместимости.
+     * @param rule Правило из DSL
+     * @param libraries Текущие effective-библиотеки
+     * @param context Контекст обработки
+     * @return Список обнаруженных issues (пустой если проверка пройдена)
+     */
+    public suspend fun evaluate(
+        rule: CompatibilityRule.CustomRule,
+        libraries: Map<String, EffectiveLibrary>,
+        context: ProcessingContext,
+    ): List<CompatibilityIssue>
 }
 ----
 
-==== JDK Requirement проверка
+Регистрация:
+`META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`
+
+==== Основная реализация
 
 [source,kotlin]
 ----
-private fun checkJdkRequirement(
-    rule: CompatibilityRule.JdkRequirement,
-    libraries: Map<String, EffectiveLibrary>,
-    targetJdk: Int?
-): CompatibilityIssue? {
-    if (targetJdk == null) {
-        logger.warn { "targetJdk not specified, skipping jdkRequirement rule '${rule.name}'" }
-        return null
-    }
+override suspend fun process(
+    metadata: EffectiveMetadata,
+    context: ProcessingContext,
+): EffectiveMetadata {
+    val rules = context.originalMetadata.compatibility
+    val customRules = rules.filterIsInstance<CompatibilityRule.CustomRule>()
 
-    val matchingLibs = libraries.values.filter { lib ->
-        GlobMatcher.matches(rule.matches, lib.group, lib.artifact)
-    }
-
-    if (matchingLibs.isEmpty()) return null
-
-    val violated = when {
-        rule.minJdk != null && targetJdk < rule.minJdk -> true
-        rule.maxJdk != null && targetJdk > rule.maxJdk -> true
-        else -> false
-    }
-
-    return if (violated) {
-        CompatibilityIssue(
-            ruleId = rule.name,
-            message = rule.message ?: "Requires JDK ${rule.minJdk}+, but target is $targetJdk",
-            severity = rule.severity,
-            affectedLibraries = matchingLibs.map { it.alias },
-            suggestion = "Upgrade to JDK ${rule.minJdk} or use compatible library versions"
+    if (customRules.isEmpty()) {
+        return metadata.copy(
+            diagnostics = metadata.diagnostics + Diagnostics.info(
+                code = "COMPAT_NO_CUSTOM_RULES",
+                message = "No custom compatibility rules to process",
+                processorId = id,
+            )
         )
-    } else null
-}
-----
+    }
 
-==== Mutual Exclusion проверка
+    // Загрузка handlers через SPI
+    val handlers = ServiceLoader.load(CustomRuleHandler::class.java)
+        .associateBy { it.ruleId }
 
-[source,kotlin]
-----
-private fun checkMutualExclusion(
-    rule: CompatibilityRule.MutualExclusion,
-    libraries: Map<String, EffectiveLibrary>
-): CompatibilityIssue? {
-    val present = rule.libraries.filter { it in libraries }
-    return if (present.size >= 2) {
-        CompatibilityIssue(
-            ruleId = rule.name,
-            message = rule.message ?: "Mutually exclusive libraries found: ${present.joinToString()}",
-            severity = rule.severity,
-            affectedLibraries = present,
-            suggestion = "Remove one of: ${present.joinToString()}"
-        )
-    } else null
+    val newIssues = mutableListOf<CompatibilityIssue>()
+    var diagnostics = metadata.diagnostics
+
+    for (rule in customRules) {
+        val handler = handlers[rule.ruleId]
+        if (handler == null) {
+            diagnostics = diagnostics + Diagnostics.warning(
+                code = "COMPAT_CUSTOM_HANDLER_NOT_FOUND",
+                message = "Custom rule handler not found for '${rule.ruleId}'",
+                processorId = id,
+            )
+            continue
+        }
+
+        try {
+            val issues = handler.evaluate(rule, metadata.libraries, context)
+            newIssues.addAll(issues)
+
+            for (issue in issues) {
+                diagnostics = diagnostics + when (issue.severity) {
+                    Severity.ERROR -> Diagnostics.error(
+                        code = "COMPAT_CUSTOM_RULE",
+                        message = "[${rule.ruleId}] ${issue.message}",
+                        processorId = id,
+                    )
+                    Severity.WARNING -> Diagnostics.warning(
+                        code = "COMPAT_CUSTOM_RULE",
+                        message = "[${rule.ruleId}] ${issue.message}",
+                        processorId = id,
+                    )
+                    Severity.INFO -> Diagnostics.info(
+                        code = "COMPAT_CUSTOM_RULE",
+                        message = "[${rule.ruleId}] ${issue.message}",
+                        processorId = id,
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            diagnostics = diagnostics + Diagnostics.error(
+                code = "COMPAT_CUSTOM_RULE_FAILED",
+                message = "Custom rule '${rule.ruleId}' failed: ${e.message}",
+                processorId = id,
+            )
+            newIssues.add(CompatibilityIssue(
+                ruleId = rule.name,
+                message = "Custom rule evaluation failed: ${e.message}",
+                severity = Severity.ERROR,
+                suggestion = "Check custom rule handler implementation for '${rule.ruleId}'",
+            ))
+        }
+    }
+
+    // Merge с существующими issues (от CompatRulesProcessor)
+    val existingIssues = metadata.compatibilityIssues
+    val allIssues = existingIssues + newIssues
+
+    val result = metadata.withExtension(CompatibilityIssuesExtensionKey, allIssues)
+    return result.copy(diagnostics = diagnostics)
 }
 ----
 
@@ -209,6 +210,8 @@ private fun checkMutualExclusion(
 - Анализ бинарной совместимости библиотек
 - Обнаружение split packages
 
+При реализации bytecode-анализа он будет добавлен в `CompatibilityCheckProcessor` как дополнительный шаг после обработки `CustomRule`.
+
 [[edge-cases]]
 == Edge Cases и обработка ошибок
 
@@ -216,15 +219,12 @@ private fun checkMutualExclusion(
 |===
 | Ситуация | Поведение | Диагностический код
 
-| Нет правил совместимости | Процессор пропускается, INFO | `COMPAT_NO_RULES`
-| Все правила проходят | Пустой список issues, INFO | `COMPAT_ALL_PASSED`
-| targetJdk не указан | jdkRequirement правила пропускаются с WARNING | `COMPAT_NO_TARGET_JDK`
-| Невалидный glob pattern | ERROR для конкретного правила | `COMPAT_INVALID_PATTERN`
-| Exception в customRule | ERROR с message, pipeline продолжается | `COMPAT_CUSTOM_RULE_FAILED`
-| Дубликат ruleId | ERROR | `COMPAT_DUPLICATE_RULE`
-| Неизвестная библиотека в правиле | WARNING | `COMPAT_UNKNOWN_LIB`
-| Одна библиотека в mutualExclusion | WARNING "rule has only one library" | `COMPAT_SINGLE_LIB_RULE`
-| Версии с разным форматом | Нормализация перед сравнением | --
+| Нет CustomRule правил | Процессор возвращает metadata с INFO | `COMPAT_NO_CUSTOM_RULES`
+| Handler не найден для ruleId | WARNING, правило пропускается | `COMPAT_CUSTOM_HANDLER_NOT_FOUND`
+| Exception в handler.evaluate() | ERROR, issue с severity=ERROR, pipeline продолжается | `COMPAT_CUSTOM_RULE_FAILED`
+| Handler возвращает пустой список | Правило прошло проверку, без issues | --
+| Существующие issues от CompatRulesProcessor | Merge: existingIssues + newIssues | --
+| Несколько handlers с одним ruleId | ServiceLoader: последний загруженный побеждает (associateBy) | --
 | Strict mode + ERROR severity | ERROR в diagnostics | --
 |===
 
@@ -235,15 +235,10 @@ private fun checkMutualExclusion(
 |===
 | Код | Описание | Уровень
 
-| `COMPAT_NO_RULES` | Нет правил совместимости | INFO
-| `COMPAT_ALL_PASSED` | Все проверки прошли | INFO
-| `COMPAT_VIOLATION` | Нарушение правила совместимости | ERROR/WARNING
-| `COMPAT_NO_TARGET_JDK` | targetJdk не указан | WARNING
-| `COMPAT_INVALID_PATTERN` | Невалидный glob pattern | ERROR
-| `COMPAT_CUSTOM_RULE_FAILED` | Exception в customRule | ERROR
-| `COMPAT_DUPLICATE_RULE` | Дубликат ruleId | ERROR
-| `COMPAT_UNKNOWN_LIB` | Неизвестная библиотека | WARNING
-| `COMPAT_SINGLE_LIB_RULE` | mutualExclusion с одной библиотекой | WARNING
+| `COMPAT_NO_CUSTOM_RULES` | Нет CustomRule правил для обработки | INFO
+| `COMPAT_CUSTOM_RULE` | Результат выполнения custom rule | varies
+| `COMPAT_CUSTOM_HANDLER_NOT_FOUND` | Handler не зарегистрирован для ruleId | WARNING
+| `COMPAT_CUSTOM_RULE_FAILED` | Exception при вызове handler | ERROR
 |===
 
 [[extension-keys]]
@@ -251,10 +246,11 @@ private fun checkMutualExclusion(
 
 [source,kotlin]
 ----
-// Запись результатов:
-metadata.withExtension(CompatibilityIssuesExtensionKey, issues: List<CompatibilityIssue>)
+// Запись результатов (merge с существующими от CompatRulesProcessor):
+val existingIssues = metadata.compatibilityIssues
+metadata.withExtension(CompatibilityIssuesExtensionKey, existingIssues + newIssues)
 
-// Чтение результатов:
+// Чтение результатов (все issues от обоих процессоров):
 metadata.compatibilityIssues // -> List<CompatibilityIssue>
 ----
 
@@ -265,20 +261,15 @@ metadata.compatibilityIssues // -> List<CompatibilityIssue>
 |===
 | Тест | Описание
 
-| `no rules returns unchanged metadata` | Нет правил -> INFO "No rules"
-| `jdkRequirement violation` | targetJdk=11, minJdk=17 -> ERROR
-| `jdkRequirement passes` | targetJdk=21, minJdk=17 -> OK
-| `jdkRequirement no targetJdk` | targetJdk не указан -> WARNING, skip
-| `mutualExclusion both present` | jackson + gson -> ERROR
-| `mutualExclusion one present` | Только jackson -> OK
-| `versionConstraint SAME_MAJOR_MINOR violated` | 2.1.0 vs 2.0.0 -> ERROR
-| `versionConstraint SAME_MAJOR_MINOR passes` | 2.1.0 vs 2.1.20 -> OK
-| `versionConstraint SAME_MAJOR` | 1.0.0 vs 1.9.0 -> OK
-| `customRule triggers` | condition=true -> issue
-| `customRule exception` | throws -> ERROR с message
-| `glob pattern org.springframework:*` | Matching spring-web, spring-data
+| `no custom rules returns unchanged` | Нет CustomRule -> INFO, metadata без изменений (кроме diagnostics)
+| `custom rule handler found and passes` | Handler возвращает emptyList() -> без issues
+| `custom rule handler found and triggers` | Handler возвращает issues -> merge в extensions
+| `custom rule handler not found` | ruleId без handler -> WARNING
+| `custom rule handler throws exception` | handler.evaluate() бросает -> ERROR + issue
+| `merge with existing issues` | CompatRulesProcessor issues сохраняются + новые добавлены
+| `multiple custom rules` | Несколько CustomRule -> все обработаны последовательно
+| `jdk/mutual/version rules ignored` | JdkRequirement/MutualExclusion/VersionConstraint не обрабатываются
 | `strict mode with ERROR` | ERROR severity + strict -> diagnostics ERROR
-| `duplicate ruleId` | Два правила с одним ID -> ERROR
 |===
 
 [[dependencies]]
@@ -289,7 +280,6 @@ metadata.compatibilityIssues // -> List<CompatibilityIssue>
 dependanger-analysis зависит от:
 - dependanger-core (api)
 - dependanger-effective (api)
-- dependanger-maven-resolver (implementation)
 - org.ow2.asm:asm:9.7.1 (implementation) -- для bytecode-анализа (будущее)
 - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
 - io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
@@ -302,12 +292,13 @@ dependanger-analysis зависит от:
 |===
 | Файл | Изменение
 
-| `CompatibilityCheckProcessor.kt` | Реализация `process()` -- проверка правил совместимости. Использует `GlobMatcher` и `VersionComparator` из `dependanger-core`.
-| `VersionConstraintChecker.kt` | **Создать** -- проверка SAME_VERSION/SAME_MAJOR/SAME_MAJOR_MINOR с использованием `VersionComparator` из core
+| `CompatibilityCheckProcessor.kt` | Реализация `process()` -- обработка CustomRule через SPI, merge результатов с CompatRulesProcessor
 |===
+
+NOTE: `VersionConstraintChecker` больше не нужен -- проверка `SAME_VERSION`/`SAME_MAJOR`/`SAME_MAJOR_MINOR` выполняется в `CompatRulesProcessor` (xref:SPEC-03-dependanger-effective.adoc#spec-compat-rules[SPEC-03.12]).
 
 [[priority]]
 == Приоритет
 
-**P3** (желательно) -- анализ совместимости важен для крупных проектов с множеством зависимостей.
+**P3** (желательно) -- расширенный анализ совместимости через CustomRule handlers.
 Включается через `withCompatibilityAnalysis()` или `processing { analyzeCompatibility = true }`.

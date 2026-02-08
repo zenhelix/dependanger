@@ -1,4 +1,4 @@
-= SPEC-03: dependanger-effective -- 12 Core Processors
+= SPEC-03: dependanger-effective -- 12 Core Processors + Early Feature Processors
 :toc: left
 :toclevels: 4
 :sectnums:
@@ -39,28 +39,34 @@ ProcessingContext (metadata + settings + environment + distribution)
   v
 ProcessingPipeline (List<EffectiveMetadataProcessor>, sorted by order)
   |
-  +-- [order=5]  ProfileProcessor
-  +-- [order=10] MetadataConversionProcessor
-  +-- [order=12] ExtractedVersionsProcessor
-  +-- [order=20] LibraryFilterProcessor
-  +-- [order=25] VersionFallbackProcessor
-  +-- [order=30] VersionResolverProcessor
-  +-- [order=40] BundleFilterProcessor
-  +-- [order=45] PluginFilterProcessor
-  +-- [order=50] PluginProcessor
-  +-- [order=60] UsedVersionsProcessor
-  +-- [order=65] ValidationProcessor
-  +-- [order=66] CompatRulesProcessor
+  +-- [order=5]  ProfileProcessor          (core)
+  +-- [order=10] MetadataConversionProcessor (core)
+  +-- [order=12] ExtractedVersionsProcessor  (core)
+  +-- [order=15] BomImportProcessor          (early feature, isOptional=true)
+  +-- [order=20] LibraryFilterProcessor      (core)
+  +-- [order=25] VersionFallbackProcessor    (core)
+  +-- [order=30] VersionResolverProcessor    (core)
+  +-- [order=40] BundleFilterProcessor       (core)
+  +-- [order=45] PluginFilterProcessor       (core)
+  +-- [order=50] PluginProcessor             (core)
+  +-- [order=60] UsedVersionsProcessor       (core)
+  +-- [order=65] ValidationProcessor         (core)
+  +-- [order=66] CompatRulesProcessor        (core)
   |
   v
 EffectiveMetadata (versions, libraries, plugins, bundles, diagnostics)
 ----
 
+NOTE: `BomImportProcessor` (order=15) -- **early feature processor**.
+Он `isOptional = true` и живёт в feature-модуле `dependanger-maven-resolver`, но размещён в core-диапазоне (order=15), т.к. data flow требует применения BOM-версий до фильтрации и version resolution.
+Подробности см. в xref:index.adoc#feature-processor-orders[cross-cutting секции index.adoc].
+
 === Режимы выполнения
 
 Все 12 core-процессоров работают в режиме `ExecutionMode.SEQUENTIAL`.
-Параллельные фазы (`PARALLEL_IO`) используются опциональными feature-процессорами (UPDATE_CHECK, SECURITY_CHECK, LICENSE_CHECK, TRANSITIVE_RESOLVER).
-BOM_IMPORT работает в `SEQUENTIAL` режиме, т.к. модифицирует `libraries` (внутренняя параллельность через coroutines).
+`BomImportProcessor` (early feature) также работает в `SEQUENTIAL` режиме, т.к. модифицирует `libraries` (внутренняя параллельность через coroutines).
+Параллельные фазы (`PARALLEL_IO`) используются стандартными feature-процессорами (UPDATE_CHECK, SECURITY_CHECK, LICENSE_CHECK).
+`TransitiveResolverProcessor` работает в `SEQUENTIAL` режиме (order=101), т.к. записывает данные в extensions (FLAT_DEPENDENCIES), от которых зависят SecurityCheck и LicenseCheck при `includeTransitives=true`.
 
 При параллельном выполнении процессоры могут модифицировать только `diagnostics` и `extensions`.
 Модификация `versions`, `libraries`, `plugins`, `bundles` в параллельном режиме вызывает `IllegalStateException`.

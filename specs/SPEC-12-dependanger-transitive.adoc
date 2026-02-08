@@ -32,7 +32,7 @@
 // TransitiveResolverProcessor.kt
 public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = "transitive-resolver"
-    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=140, PARALLEL_IO
+    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=101, SEQUENTIAL
     override val isOptional: Boolean = true
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }
@@ -44,7 +44,9 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 [[purpose-transitive]]
 === Назначение
 
-Для каждой прямой библиотеки из EffectiveMetadata скачать POM из Maven repository, рекурсивно разрезолвить дерево зависимостей (до maxDepth), обнаружить конфликты версий, применить constraints и предоставить результат следующим процессорам (security-check, license-check через includeTransitives).
+Для каждой прямой библиотеки из EffectiveMetadata скачать POM из Maven repository, рекурсивно разрезолвить дерево зависимостей (до maxDepth), обнаружить конфликты версий, применить constraints и предоставить результат следующим процессорам (security-check(120), license-check(130) через `includeTransitives`).
+
+NOTE: `TransitiveResolverProcessor` имеет order=101 (SEQUENTIAL) и выполняется **до** SecurityCheck(120) и LicenseCheck(130), чтобы данные `FLAT_DEPENDENCIES` были доступны при `includeTransitives=true`.
 
 [[algorithm-transitive]]
 === Алгоритм
@@ -112,7 +114,7 @@ public class TransitiveResolverProcessor(
     private val maxDepth: Int = 10,
 ) : EffectiveMetadataProcessor {
     override val id: String = "transitive-resolver"
-    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=140, PARALLEL_IO
+    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=101, SEQUENTIAL
     override val isOptional: Boolean = true
 
     override suspend fun process(

@@ -803,8 +803,6 @@ public class EffectiveJsonFormat {
 package io.github.zenhelix.dependanger.effective.spi
 
 public interface ExtensionSerializerProvider {
-    /** Возвращает SerializersModule с serializer'ами для extension-моделей этого модуля. */
-    public fun serializersModule(): SerializersModule
     /** Возвращает маппинг имени ключа -> ExtensionKey для extension'ов этого модуля. */
     public fun knownKeys(): Map<String, ExtensionKey<*>>
 }

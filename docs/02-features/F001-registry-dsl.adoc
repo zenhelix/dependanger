@@ -815,10 +815,10 @@ val json = SerializationFormat.JSON.write(metadata)
 
 === Что происходит при toMetadata()
 
-1. **Валидация DSL** — проверка уникальности alias, существования ссылок, отсутствия циклов
-2. **Применение пресетов** — если вызван `applyPreset()`, настройки мержатся
-3. **Создание Metadata** — все сущности конвертируются в сериализуемые DTO
-4. **НЕ резолвятся версии** — резолвинг происходит позже в xref:F003-processing-pipeline.adoc[Processing Pipeline]
+1. **Создание Metadata** — все сущности конвертируются в сериализуемые DTO через defensive copy (`.toList()`)
+2. **НЕ выполняется валидация** — проверка уникальности alias, существования ссылок, отсутствия циклов происходит в xref:F003-processing-pipeline.adoc#validation-processor[ValidationProcessor] (order=65)
+3. **НЕ резолвятся версии** — резолвинг происходит позже в xref:F003-processing-pipeline.adoc[Processing Pipeline]
+4. **НЕ применяются пресеты** — `applyPreset()` вызывается явно до `toMetadata()`, если нужно
 
 NOTE: `processing { }` блок **НЕ сериализуется** в metadata.json.
 Это runtime-only конфигурация.

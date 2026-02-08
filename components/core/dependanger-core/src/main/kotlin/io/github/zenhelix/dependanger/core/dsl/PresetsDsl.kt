@@ -5,9 +5,11 @@ import io.github.zenhelix.dependanger.core.model.Preset
 @DependangerDslMarker
 public class PresetsDsl {
     public val presets: MutableList<Preset> = mutableListOf()
+    private val presetDsls: MutableMap<String, PresetDsl> = mutableMapOf()
 
     public fun preset(name: String, block: PresetDsl.() -> Unit) {
         val dsl = PresetDsl().apply(block)
+        presetDsls[name] = dsl
         presets.add(
             Preset(
                 name = name,
@@ -18,9 +20,11 @@ public class PresetsDsl {
         )
     }
 
-    public fun findByName(name: String): Preset? = TODO()
+    public fun findByName(name: String): Preset? = presets.find { it.name == name }
 
-    public fun availableNames(): List<String> = TODO()
+    public fun findDslByName(name: String): PresetDsl? = presetDsls[name]
+
+    public fun availableNames(): List<String> = presets.map { it.name }
 }
 
 @DependangerDslMarker

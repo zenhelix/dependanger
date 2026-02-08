@@ -298,26 +298,43 @@ private fun buildExtensionsMap(): Map<String, JsonElement> {
 3. Применить preset.settings → merge с текущими settingsDsl (preset значения перезаписывают текущие)
 ----
 
-NOTE: Поля `preset.bundles` и `preset.distributions` — декларативные метаданные пресета.
-Они НЕ применяются в DSL, а используются потребителями (CLI, Gradle Plugin) для определения, какие бандлы и дистрибуции актуальны при генерации артефактов.
-Например, CLI может итерировать `metadata.presets[name].distributions` и вызывать `process(distribution=...)` для каждой.
+NOTE: `preset.bundles` и `preset.distributions` содержат имена (ссылки) на бандлы и дистрибуции, определённые в DSL.
+При вызове `applyPreset()` они не мержатся в DSL-списки (типы несовместимы: `List<String>` vs `MutableList<Bundle/Distribution>`).
+Эти данные доступны через `metadata.presets` и используются потребителями (API facade, CLI, Gradle Plugin) для определения scope обработки.
+Например, API facade при `process(preset="android")` читает `preset.distributions` и запускает pipeline для каждой дистрибуции, а `preset.bundles` определяет, какие бандлы включить.
 
 [[implementation-apply-preset]]
 === Детальная реализация
 
+Используется двухуровневый подход к merge:
+
+* **DSL-путь** (основной): `PresetsDsl` хранит `PresetDsl`-объекты рядом с `Preset` data classes.
+При `applyPreset()` используется `PresetDsl.settingsDsl`, где каждое поле обёрнуто в `Trackable<T>` delegate.
+`Trackable.isSet` отслеживает, было ли поле явно установлено пользователем.
+Применяются только те поля, для которых `isSet == true`.
+
+* **JSON-путь** (fallback): Если preset загружен из JSON (нет DSL-объекта), `mergeFrom(Settings)` сравнивает поля с `Settings()` defaults.
+Отличающиеся от default значения перезаписывают текущие.
+
 [source,kotlin]
 ----
 public fun applyPreset(name: String) {
+    // bundles и distributions — строковые ссылки на определённые в DSL сущности.
+    // Доступны через metadata.presets для потребителей (API, CLI, Gradle Plugin),
+    // которые используют их для определения scope обработки.
+
+    val presetDsl = presetsDsl.findDslByName(name)
+    if (presetDsl != null) {
+        // DSL-путь: точный merge через Trackable — применяются только явно установленные поля
+        presetDsl.settingsDsl?.applyTo(settingsDsl)
+        return
+    }
+
+    // JSON-путь (fallback): preset загружен из файла, DSL-объекта нет
     val preset = presetsDsl.findByName(name)
         ?: throw IllegalArgumentException(
             "Preset '$name' not found. Available presets: ${presetsDsl.availableNames()}"
         )
-
-    // bundles и distributions — декларативные поля пресета.
-    // Используются потребителями (CLI/Gradle Plugin) для выбора
-    // активных бандлов и дистрибуций. DSL их не применяет.
-
-    // Мержим только настройки: значения пресета перезаписывают текущие
     preset.settings?.let { presetSettings ->
         settingsDsl.mergeFrom(presetSettings)
     }
@@ -328,7 +345,9 @@ public fun applyPreset(name: String) {
 
 - Preset не найден → `IllegalArgumentException` с перечислением доступных
 - Множественный applyPreset → каждый последующий мержит свои настройки поверх предыдущих
-- Пустой пресет (без settings) → no-op
+- Пустой пресет (без settings) → no-op (bundles/distributions всё равно доступны через metadata.presets)
+- Поле явно установлено в default значение через DSL → `Trackable.isSet == true` → применяется корректно
+- Поле не тронуто в preset → `Trackable.isSet == false` → текущее значение сохраняется
 
 [[dsl-build-contract]]
 == Контракт доступа к данным DSL
@@ -343,16 +362,44 @@ public fun applyPreset(name: String) {
 2. **Нет валидации** — `toMetadata()` конвертирует «as is», валидация происходит в pipeline
 3. **Данные — data class** — все возвращаемые модели неизменяемые
 
-=== Требования к SettingsDsl.mergeFrom():
+=== Требования к merge настроек
+
+==== DSL-путь: `SettingsDsl.applyTo()` через Trackable delegates
+
+Каждое поле в `PresetDsl`-версии settings DSL использует `Trackable<T>` delegate:
+
+[source,kotlin]
+----
+public class Trackable<T>(default: T) : ReadWriteProperty<Any?, T> {
+    public var isSet: Boolean = false; private set
+    private var value: T = default
+
+    override fun getValue(thisRef: Any?, property: KProperty<*>): T = value
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        this.value = value
+        isSet = true
+    }
+}
+----
+
+Метод `applyTo(target: SettingsDsl)` применяет к target только поля с `isSet == true`.
+Вложенные sub-settings (validation, toml, bom, etc.) трекаются целиком: если блок `validation { }` был вызван, весь `ValidationSettings` считается установленным.
+Списки (allowedLicenses, excludePatterns) заменяются целиком, не дополняются.
+
+==== JSON-путь (fallback): `SettingsDsl.mergeFrom(Settings)`
 
 [source,kotlin]
 ----
 public fun mergeFrom(settings: Settings)
 ----
 
-1. Перезаписывает только не-default значения из `settings`
-2. Вложенные settings (ValidationSettings, TomlSettings, etc.) мержатся рекурсивно
-3. Списки (allowedLicenses, excludePatterns) заменяются целиком, не дополняются
+1. Сравнивает каждое поле `settings` с `Settings()` (конструктор без аргументов)
+2. Если значение отличается от default → перезаписывает текущее
+3. Вложенные settings (ValidationSettings, TomlSettings, etc.) сравниваются целиком (`!=`)
+4. Списки заменяются целиком, не дополняются
+
+NOTE: JSON-путь не может отличить "явно установлено в default" от "не установлено".
+Это допустимое ограничение: при создании preset из JSON пользователь задаёт только нужные поля, остальные отсутствуют и получают default при десериализации.
 
 [[error-handling]]
 == Обработка ошибок

@@ -653,6 +653,74 @@ fun main() {
 }
 ----
 
+== Extraction API
+
+Extension-функции для извлечения feature-специфичных данных из `DependangerResult`.
+Полезны для custom reporting, CI-интеграций и программного анализа зависимостей.
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.extractUpdateData
+import io.github.zenhelix.dependanger.api.extractSecurityData
+import io.github.zenhelix.dependanger.api.extractLicenseData
+import io.github.zenhelix.dependanger.api.extractTransitiveData
+import io.github.zenhelix.dependanger.api.extractCompatibilityIssues
+import io.github.zenhelix.dependanger.api.extractVersionConflicts
+
+val result: DependangerResult = dependanger.process(metadata)
+
+// Данные об обновлениях
+val updates: List<UpdateAvailableInfo> = result.extractUpdateData()
+updates.forEach { println("${it.alias}: ${it.currentVersion} -> ${it.latestVersion}") }
+
+// Уязвимости (CVE)
+val vulnerabilities: List<VulnerabilityInfo> = result.extractSecurityData()
+vulnerabilities.forEach { println("${it.cveId} (CVSS: ${it.cvssScore}): ${it.summary}") }
+
+// Нарушения лицензий
+val licenseIssues: List<LicenseViolation> = result.extractLicenseData()
+
+// Дерево транзитивных зависимостей
+val transitives: List<TransitiveTree> = result.extractTransitiveData()
+
+// Проблемы совместимости
+val compatIssues: List<CompatibilityIssue> = result.extractCompatibilityIssues()
+
+// Конфликты версий транзитивных зависимостей
+val conflicts: List<VersionConflict> = result.extractVersionConflicts()
+----
+
+[cols="1,2,1",options="header"]
+|===
+| Метод | Описание | Возвращаемый тип
+
+| `extractUpdateData()`
+| Доступные обновления версий
+| `List<UpdateAvailableInfo>`
+
+| `extractSecurityData()`
+| Найденные уязвимости (CVE)
+| `List<VulnerabilityInfo>`
+
+| `extractLicenseData()`
+| Нарушения лицензионных политик
+| `List<LicenseViolation>`
+
+| `extractTransitiveData()`
+| Деревья транзитивных зависимостей
+| `List<TransitiveTree>`
+
+| `extractCompatibilityIssues()`
+| Проблемы совместимости
+| `List<CompatibilityIssue>`
+
+| `extractVersionConflicts()`
+| Конфликты версий транзитивных зависимостей
+| `List<VersionConflict>`
+|===
+
+NOTE: Все extraction-методы безопасны — при отсутствии данных или failed result возвращают пустой список.
+
 == Связи с другими разделами
 
 * xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — описание DSL синтаксиса

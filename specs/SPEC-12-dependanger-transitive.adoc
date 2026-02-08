@@ -108,7 +108,6 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 [source,kotlin]
 ----
 public class TransitiveResolverProcessor(
-    private val pomDownloader: MavenPomDownloader = MavenPomDownloader(),
     private val cache: TransitiveCache = TransitiveCache(),
     private val maxDepth: Int = 10,
 ) : EffectiveMetadataProcessor {
@@ -126,6 +125,12 @@ public class TransitiveResolverProcessor(
                 listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
             }
         }
+        // NOTE: MavenPomDownloader создаётся здесь, а не в конструкторе,
+        // т.к. требует repositories и httpClient из context (см. SPEC-06)
+        val pomDownloader = MavenPomDownloader(
+            repositories = repositories,
+            httpClient = context.httpClient,
+        )
         val constraints = context.originalMetadata.constraints ?: emptyList()
         val effectiveMaxDepth = settings.maxDepth ?: maxDepth
         val scopes = settings.scopes
@@ -815,6 +820,7 @@ dependanger-transitive зависит от:
 | `ConstraintApplier.kt` | **Создать** -- применение constraints (VERSION, EXCLUDE, SUBSTITUTE) к дереву
 | `FlatListBuilder.kt` | **Создать** -- построение flat list из дерева с дедупликацией
 | `TransitiveCache.kt` | **Создать** -- файловый кеш результатов резолвинга (TTL 24 часа)
+| `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `TransitiveResolverProcessor` для discovery через ServiceLoader
 |===
 
 [[priority]]

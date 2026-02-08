@@ -1,13 +1,6 @@
 package io.github.zenhelix.dependanger.features.analysis.model
 
-import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
-import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.ExtensionKey
-import io.github.zenhelix.dependanger.effective.model.getExtension
-import kotlinx.serialization.builtins.ListSerializer
-
-public val CompatibilityIssuesExtensionKey: ExtensionKey<List<CompatibilityIssue>> =
-    ExtensionKey("compatibilityIssues", ListSerializer(CompatibilityIssue.serializer()))
-
-public val EffectiveMetadata.compatibilityIssues: List<CompatibilityIssue>
-    get() = getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
+// CompatibilityIssuesExtensionKey and EffectiveMetadata.compatibilityIssues
+// are defined in dependanger-effective module (effective.model.CompatibilityExtensions)
+// because they are also used by CompatRulesProcessor (core processor, order=66).
+// Import from: io.github.zenhelix.dependanger.effective.model.CompatibilityIssuesExtensionKey

@@ -392,6 +392,7 @@ dependanger-updates зависит от:
 | `UpdateCheckProcessor.kt` | Реализация `process()` -- основная логика проверки обновлений
 | `MavenMetadataFetcher.kt` | **Создать** -- HTTP-загрузка и парсинг maven-metadata.xml
 | `VersionCache.kt` | **Создать** -- файловый кеш результатов проверки версий
+| `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `UpdateCheckProcessor` для discovery через ServiceLoader
 |===
 
 [[priority]]

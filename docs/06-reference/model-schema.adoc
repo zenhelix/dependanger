@@ -889,9 +889,22 @@ val diag = Diagnostics.of(message1, message2, message3) // автоматиче�
 [source,kotlin]
 ----
 sealed class Constraint {
-    data class VersionConstraintDef(val constraint: String) : Constraint()
-    data class Exclude(val group: String?, val module: String?) : Constraint()
-    data class Substitute(val with: String) : Constraint()
+    data class VersionConstraintDef(
+        val coordinates: String,
+        val version: VersionReference? = null,
+        val because: String? = null,
+    ) : Constraint()
+
+    data class Exclude(
+        val group: String,
+        val artifact: String,
+    ) : Constraint()
+
+    data class Substitute(
+        val from: String,
+        val to: String,
+        val because: String? = null,
+    ) : Constraint()
 }
 ----
 
@@ -900,13 +913,13 @@ sealed class Constraint {
 | Подтип | Описание
 
 | `VersionConstraintDef`
-| Ограничение версии (например: `strictly`, `require`, `prefer`)
+| Ограничение версии для координат (`coordinates`). Опционально содержит целевую версию (`version`) и причину (`because`)
 
 | `Exclude`
-| Исключение транзитивной зависимости по group/module
+| Исключение транзитивной зависимости по `group` и `artifact`
 
 | `Substitute`
-| Подмена зависимости на другую библиотеку (alias)
+| Подмена зависимости `from` на `to`. Опционально содержит причину (`because`)
 |===
 
 == Связанные документы

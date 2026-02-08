@@ -879,6 +879,7 @@ dependanger-license зависит от:
 | `ClearlyDefinedModels.kt` | **Создать** -- @Serializable модели для ClearlyDefined API response
 | `LicenseCache.kt` | **Создать** -- файловый кеш результатов лицензий (TTL 7 дней)
 | `PomLicenseParser.kt` | **Создать** -- парсинг секции <licenses> из Maven POM XML
+| `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `LicenseCheckProcessor` для discovery через ServiceLoader
 |===
 
 [[priority]]

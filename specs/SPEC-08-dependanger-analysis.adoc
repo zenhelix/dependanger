@@ -293,6 +293,7 @@ dependanger-analysis зависит от:
 | Файл | Изменение
 
 | `CompatibilityCheckProcessor.kt` | Реализация `process()` -- обработка CustomRule через SPI, merge результатов с CompatRulesProcessor
+| `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `CompatibilityCheckProcessor` для discovery через ServiceLoader
 |===
 
 NOTE: `VersionConstraintChecker` больше не нужен -- проверка `SAME_VERSION`/`SAME_MAJOR`/`SAME_MAJOR_MINOR` выполняется в `CompatRulesProcessor` (xref:SPEC-03-dependanger-effective.adoc#spec-compat-rules[SPEC-03.12]).

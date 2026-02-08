@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -8,7 +9,7 @@ public sealed class CompatibilityRule {
     public abstract val severity: Severity
     public abstract val message: String?
 
-    @Serializable
+    @Serializable @SerialName("jdkRequirement")
     public data class JdkRequirement(
         override val name: String,
         val matches: String,
@@ -18,7 +19,7 @@ public sealed class CompatibilityRule {
         override val message: String? = null,
     ) : CompatibilityRule()
 
-    @Serializable
+    @Serializable @SerialName("mutualExclusion")
     public data class MutualExclusion(
         override val name: String,
         val libraries: List<String>,
@@ -26,7 +27,7 @@ public sealed class CompatibilityRule {
         override val message: String? = null,
     ) : CompatibilityRule()
 
-    @Serializable
+    @Serializable @SerialName("versionConstraint")
     public data class VersionConstraint(
         override val name: String,
         val libraries: List<String>,
@@ -35,7 +36,7 @@ public sealed class CompatibilityRule {
         override val message: String? = null,
     ) : CompatibilityRule()
 
-    @Serializable
+    @Serializable @SerialName("customRule")
     public data class CustomRule(
         override val name: String,
         val ruleId: String,

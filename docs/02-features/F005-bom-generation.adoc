@@ -142,17 +142,17 @@ ____
 | AC-004-1
 | Deprecated библиотека `old-http` с `replacedBy = "new-http"`
 | Генерирую BOM
-| XML комментарий перед `<dependency>`: `<!-- DEPRECATED: Use new-http -->`
+| Single-line XML комментарий перед `<dependency>`: `<!-- DEPRECATED: Use new-http instead. -->`
 
 | AC-004-2
-| Deprecated библиотека с `removalVersion = "2.0.0"`
+| Deprecated библиотека с `removalVersion = "2.0.0"` и `replacedBy = "new-http"`
 | Генерирую BOM
-| Комментарий содержит: `Will be removed in 2.0.0`
+| Комментарий: `<!-- DEPRECATED: Use new-http instead. Removal: 2.0.0. -->`
 
 | AC-004-3
 | Deprecated библиотека с `message`
 | Генерирую BOM
-| Комментарий содержит сообщение из `message`
+| Комментарий: `<!-- DEPRECATED: {message}. -->` (single-line)
 |===
 
 === US-005: Генерация через CLI
@@ -235,9 +235,7 @@ ____
                 <version>3.2.0</version>
             </dependency>
 
-            <!-- DEPRECATED: Use new-http which supports HTTP/2 -->
-            <!-- Replacement: new-http -->
-            <!-- Will be removed in: 2.0.0 -->
+            <!-- DEPRECATED: Use new-http which supports HTTP/2. Use new-http instead. Removal: 2.0.0. -->
             <dependency>
                 <groupId>com.example</groupId>
                 <artifactId>old-http</artifactId>

@@ -472,6 +472,7 @@ dependanger-security зависит от:
 | `OsvApiClient.kt` | Реализация `queryBatch()` -- HTTP-запросы к OSV. Стаб-метод `queryVulnerabilities()` заменяется на `queryBatch()`
 | `OsvModels.kt` | **Создать** -- @Serializable модели для OSV API request/response
 | `SecurityCache.kt` | **Создать** -- файловый кеш результатов сканирования
+| `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `SecurityCheckProcessor` для discovery через ServiceLoader
 |===
 
 [[priority]]

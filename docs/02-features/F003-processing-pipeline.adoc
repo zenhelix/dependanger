@@ -73,13 +73,13 @@ Processing Pipeline выполняет многоэтапную обработк
 ----
 data class EffectiveMetadata(
     val schemaVersion: String,
-    val distributionProfile: String?,
+    val distribution: String?,
     val libraries: Map<String, EffectiveLibrary>,
     val plugins: Map<String, EffectivePlugin>,
     val bundles: Map<String, EffectiveBundle>,
     val versions: Map<String, ResolvedVersion>,
     val diagnostics: Diagnostics,
-    val processingInfo: ProcessingInfo
+    val processingInfo: ProcessingInfo? = null
 )
 
 data class EffectiveLibrary(
@@ -112,7 +112,7 @@ enum class VersionSource {
 ----
 {
   "schemaVersion": "1.0",
-  "distributionProfile": "backend",
+  "distribution": "backend",
   "libraries": {
     "spring-web": {
       "alias": "spring-web",
@@ -630,31 +630,31 @@ ____
 | ❌
 | —
 
-| 70
+| 100
 | `update-check`
 | Проверка обновлений в Maven repos
 | ✅
 | xref:F007-update-check.adoc[F007]
 
-| 75
+| 110
 | `compatibility-analysis`
 | Анализ совместимости
 | ✅
 | xref:F008-compatibility-analysis.adoc[F008]
 
-| 80
+| 120
 | `security-check`
 | Проверка уязвимостей через OSV API
 | ✅
 | xref:F010-security-scanning.adoc[F010]
 
-| 85
+| 130
 | `license-check`
 | Проверка лицензий через Maven POM / ClearlyDefined API
 | ✅
 | xref:F011-license-compliance.adoc[F011]
 
-| 90
+| 140
 | `transitive-resolver`
 | Резолвинг транзитивных зависимостей из Maven repositories
 | ✅
@@ -744,7 +744,7 @@ dependanger {
 * `jdkVersion` — версия JDK (для условий fallback)
 * `kotlinVersion` — версия Kotlin (опционально)
 * `gradleVersion` — версия Gradle (опционально)
-* `distributionProfile` — активный Distribution
+* `distribution` — активный Distribution
 * `environment` — переменные окружения
 * `strictVersionResolution` — режим строгой резолюции версий
 * `enabledProcessors` / `disabledProcessors` — управление процессорами

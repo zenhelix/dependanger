@@ -1,25 +1,26 @@
 package io.github.zenhelix.dependanger.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 public sealed class VersionReference {
-    @Serializable
+    @Serializable @SerialName("literal")
     public data class Literal(val version: String) : VersionReference()
 
-    @Serializable
+    @Serializable @SerialName("reference")
     public data class Reference(val name: String) : VersionReference()
 
-    @Serializable
+    @Serializable @SerialName("range")
     public data class Range(val range: VersionRange) : VersionReference()
 }
 
 @Serializable
 public sealed class VersionRange {
-    @Serializable
+    @Serializable @SerialName("simple")
     public data class Simple(val notation: String) : VersionRange()
 
-    @Serializable
+    @Serializable @SerialName("rich")
     public data class Rich(
         val require: String? = null,
         val strictly: String? = null,

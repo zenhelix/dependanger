@@ -117,18 +117,18 @@ ____
 
 | AC-003-1
 | Deprecated библиотека `old-http` с `replacedBy = "new-http"`
-| Генерирую TOML с `includeComments = true`
-| Перед библиотекой комментарий: `# DEPRECATED: Use new-http`
+| Генерирую TOML с `includeDeprecationComments = true`
+| Перед библиотекой single-line комментарий: `# DEPRECATED: Use new-http instead.`
 
 | AC-003-2
-| Deprecated библиотека с `removalVersion = "2.0.0"`
+| Deprecated библиотека с `removalVersion = "2.0.0"` и `replacedBy = "new-http"`
 | Генерирую TOML
-| Комментарий содержит: `Will be removed in 2.0.0`
+| Комментарий: `# DEPRECATED: Use new-http instead. Removal: 2.0.0.`
 
 | AC-003-3
 | Deprecated библиотека с `message = "Use new-http which supports HTTP/2"`
 | Генерирую TOML
-| Комментарий содержит сообщение из `message`
+| Комментарий: `# DEPRECATED: Use new-http which supports HTTP/2.`
 
 | AC-003-4
 | Генерация с `includeComments = false`
@@ -204,9 +204,7 @@ kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", versio
 spring-boot-starter = { group = "org.springframework.boot", name = "spring-boot-starter", version.ref = "spring-boot" }
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
 
-# DEPRECATED: Use new-http which supports HTTP/2
-# Replacement: new-http
-# Will be removed in: 2.0.0
+# DEPRECATED: Use new-http which supports HTTP/2. Use new-http instead. Removal: 2.0.0.
 old-http = { group = "com.example", name = "old-http", version.ref = "old-http" }
 
 [bundles]
@@ -564,11 +562,11 @@ plugins {
 
 | Deprecated с многострочным message
 | `message` содержит перенос строки
-| Каждая строка message становится отдельным комментарием
+| Переносы заменяются на пробел, комментарий остаётся single-line
 
 | Deprecated без replacedBy
 | Только message указан
-| Комментарий: `# DEPRECATED: {message}` без строки Replacement
+| Комментарий: `# DEPRECATED: {message}.` (single-line, без Replacement)
 |===
 
 == Связи

@@ -416,25 +416,40 @@ processing {
 
 === Задачи анализа
 
+NOTE: Аналитические задачи являются **standalone** — каждая самостоятельно создаёт Metadata из DSL и запускает свой pipeline.
+Они НЕ зависят от generative задач.
+
 [cols="1,2,1",options="header"]
 |===
 | Задача | Описание | Зависимости
 
 | `dependangerValidate`
 | Валидация DSL конфигурации
-| `dependangerGenerateMetadata`
+| — (standalone)
 
 | `dependangerCheckUpdates`
 | Проверка доступных обновлений
-| `dependangerGenerateEffective`
+| — (standalone)
 
 | `dependangerAnalyze`
 | Анализ совместимости
-| `dependangerGenerateEffective`
+| — (standalone)
+
+| `dependangerSecurityCheck`
+| Проверка на уязвимости (CVE) через OSV API
+| — (standalone)
+
+| `dependangerLicenseCheck`
+| Проверка лицензий на соответствие политикам
+| — (standalone)
+
+| `dependangerResolveTransitives`
+| Резолвинг транзитивных зависимостей
+| — (standalone)
 
 | `dependangerReport`
 | Генерация unified JSON отчёта
-| `dependangerCheckUpdates`, `dependangerAnalyze`
+| — (standalone, STRICT preset)
 
 | `dependangerListVersions`
 | Вывод всех версий в консоль
@@ -456,6 +471,18 @@ processing {
 
 # Проверка обновлений
 ./gradlew dependangerCheckUpdates
+
+# Анализ совместимости
+./gradlew dependangerAnalyze
+
+# Проверка уязвимостей
+./gradlew dependangerSecurityCheck
+
+# Проверка лицензий
+./gradlew dependangerLicenseCheck
+
+# Резолвинг транзитивных
+./gradlew dependangerResolveTransitives
 
 # Генерация отчёта
 ./gradlew dependangerReport

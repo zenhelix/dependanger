@@ -299,8 +299,8 @@ dependanger {
 
 При десериализации:
 
-* Проверяется `schemaVersion`
-* Поддерживается миграция между версиями
+* `schemaVersion` десериализуется как обычное поле (default = `"1.0"`)
+* Проверка и миграция `schemaVersion` — ответственность Processing Pipeline (xref:F003-processing-pipeline.adoc[F003]), не сериализатора
 * Неизвестные поля игнорируются (forward compatibility)
 
 == Функциональные требования
@@ -322,8 +322,8 @@ dependanger {
 | Система ДОЛЖНА включать `schemaVersion` в сериализованные данные
 
 | FR-004
-| MUST
-| Система ДОЛЖНА валидировать `schemaVersion` при десериализации
+| SHOULD
+| Система ДОЛЖНА валидировать `schemaVersion` в Processing Pipeline (не в сериализаторе). Сериализатор десериализует `schemaVersion` как обычное поле с default `"1.0"`
 
 | FR-005
 | MUST
@@ -390,15 +390,15 @@ dependanger {
 
 | Неизвестная версия схемы
 | `schemaVersion` в файле = "99.0", текущая поддерживаемая = "1.1"
-| ERROR: "Unsupported schema version '99.0'. Supported: 1.0, 1.1"
+| Десериализация успешна (`schemaVersion = "99.0"`). Валидация — в Pipeline (ValidationProcessor)
 
 | Старая версия схемы
 | `schemaVersion` = "1.0", текущая = "1.1"
-| Успешная миграция, WARNING: "Migrating from schema 1.0 to 1.1"
+| Десериализация успешна. Миграция — через `SchemaMigrationChain` в Pipeline
 
 | Отсутствует schemaVersion
 | JSON файл без поля `schemaVersion`
-| ERROR: "Missing required field 'schemaVersion'"
+| Десериализация успешна (`schemaVersion = "1.0"` — default value)
 
 | Неизвестные поля в JSON
 | JSON содержит поле `"unknownField": "value"`
@@ -406,7 +406,7 @@ dependanger {
 
 | Пустой JSON файл
 | Файл существует, но содержит `{}`
-| ERROR: "Missing required field 'schemaVersion'"
+| Десериализация успешна — все поля получают default values (schemaVersion = "1.0", пустые коллекции)
 
 | Файл не существует
 | Путь указывает на несуществующий файл

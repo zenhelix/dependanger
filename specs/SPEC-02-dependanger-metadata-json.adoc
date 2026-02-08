@@ -249,9 +249,8 @@ override fun serialize(metadata: DependangerMetadata): String =
 }
 ----
 
-NOTE: Точный формат дискриминатора sealed-классов (`type`) зависит от стратегии `classDiscriminator` в `kotlinx-serialization`.
-По умолчанию используется полное квалифицированное имя класса.
-При необходимости можно настроить через `@SerialName` аннотации на подтипах (рекомендуется для стабильного API).
+NOTE: Все sealed-подтипы в `dependanger-core` аннотированы `@SerialName` с camelCase-именами.
+Дискриминатор `type` использует короткие имена: `"literal"`, `"jdkBelow"`, `"exclude"` и т.д.
 
 === Edge cases (serialize)
 
@@ -1434,36 +1433,16 @@ dependencies {
 | `true`
 |===
 
-=== Рекомендация по `@SerialName`
+=== `@SerialName` аннотации (ВЫПОЛНЕНО)
 
-Для стабильного JSON API рекомендуется добавить `@SerialName` аннотации на подтипы sealed-классов в `dependanger-core`:
+Все sealed-подтипы в `dependanger-core` аннотированы `@SerialName` с camelCase-именами:
 
-[source,kotlin]
-----
-@Serializable
-public sealed class VersionReference {
-    @Serializable
-    @SerialName("literal")
-    public data class Literal(val version: String) : VersionReference()
-
-    @Serializable
-    @SerialName("reference")
-    public data class Reference(val name: String) : VersionReference()
-
-    @Serializable
-    @SerialName("range")
-    public data class Range(val range: VersionRange) : VersionReference()
-}
-----
-
-Это обеспечит:
-
-* Короткие имена дискриминатора (`"literal"` вместо `"io.github.zenhelix.dependanger.core.model.VersionReference.Literal"`)
-* Стабильность при рефакторинге (переименование/перемещение класса не ломает JSON)
-* Читаемость JSON-файлов
-
-NOTE: Это изменение в `dependanger-core`, а не в `dependanger-metadata-json`.
-Может быть выполнено отдельно.
+* `VersionReference`: `literal`, `reference`, `range`
+* `VersionRange`: `simple`, `rich`
+* `FallbackCondition`: `jdkBelow`, `jdkAtLeast`, `jdkBetween`, `kotlinVersionBelow`, `kotlinVersionAtLeast`, `gradleVersionBelow`, `gradleVersionAtLeast`, `distribution`, `environment`, `all`, `any`, `not`
+* `CompatibilityRule`: `jdkRequirement`, `mutualExclusion`, `versionConstraint`, `customRule`
+* `Constraint`: `versionConstraintDef`, `exclude`, `substitute`
+* `Repository`: `maven` (было ранее)
 
 [[priority]]
 == Приоритет
@@ -1483,7 +1462,7 @@ NOTE: Это изменение в `dependanger-core`, а не в `dependanger-m
 4. Реализовать `write()` (зависит от `serialize()`)
 5. Реализовать `read()` (зависит от `deserialize()`)
 6. Написать тесты round-trip
-7. (Опционально) Добавить `@SerialName` аннотации в core
+7. ~~(Опционально) Добавить `@SerialName` аннотации в core~~ -- ВЫПОЛНЕНО
 
 === Оценка трудозатрат
 

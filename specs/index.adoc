@@ -203,7 +203,7 @@
 [source,kotlin]
 ----
 // Запись (в процессорах):
-metadata.withExtension(EffectiveMetadataKeys.UPDATES, updates)
+metadata.withExtension(UpdatesExtensionKey, updates)
 
 // Чтение — через extension properties:
 metadata.updates               // List<UpdateAvailableInfo>
@@ -215,10 +215,10 @@ metadata.flatDependencies      // List<FlatDependency>
 metadata.versionConflicts      // List<VersionConflict>
 
 // Чтение — через getExtension (nullable):
-metadata.getExtension(EffectiveMetadataKeys.UPDATES) // List<UpdateAvailableInfo>?
+metadata.getExtension(UpdatesExtensionKey) // List<UpdateAvailableInfo>?
 ----
 
-Extension properties определены в `EffectiveMetadataKeys.kt` (модуль `dependanger-effective`).
+Extension keys и extension properties определены в каждом feature-модуле в соответствующем `*Extensions.kt` файле.
 Все extension-модели ДОЛЖНЫ быть `@Serializable` для поддержки `EffectiveJsonFormat`.
 
 === Сериализация EffectiveMetadata

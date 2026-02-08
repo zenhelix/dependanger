@@ -17,6 +17,7 @@ public class DependangerDsl {
     public val bomImportsDsl: BomImportsDsl = BomImportsDsl()
     public val targetPlatformsDsl: TargetPlatformsDsl = TargetPlatformsDsl()
     public val distributionsDsl: DistributionsDsl = DistributionsDsl()
+    public val constraintsDsl: ConstraintsDsl = ConstraintsDsl()
     public val compatibilityDsl: CompatibilityDsl = CompatibilityDsl()
     public val settingsDsl: SettingsDsl = SettingsDsl()
     public val presetsDsl: PresetsDsl = PresetsDsl()
@@ -49,6 +50,10 @@ public class DependangerDsl {
 
     public fun distributions(block: DistributionsDsl.() -> Unit) {
         distributionsDsl.apply(block)
+    }
+
+    public fun constraints(block: ConstraintsDsl.() -> Unit) {
+        constraintsDsl.apply(block)
     }
 
     public fun compatibility(block: CompatibilityDsl.() -> Unit) {

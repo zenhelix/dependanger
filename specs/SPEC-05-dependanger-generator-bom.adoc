@@ -223,9 +223,10 @@ private fun buildXml(dependencies: List<EffectiveLibrary>): String {
     sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>$nl")
 
     // <project>
-    sb.append("<project xmlns=\"$MAVEN_POM_NS\"$nl")
-    sb.append("${indent.repeat(2)}xmlns:xsi=\"$MAVEN_XSI_NS\"$nl")
-    sb.append("${indent.repeat(2)}xsi:schemaLocation=\"$MAVEN_XSD_LOCATION\">$nl")
+    val attrSep = if (config.prettyPrint) "\n${indent.repeat(2)}" else " "
+    sb.append("<project xmlns=\"$MAVEN_POM_NS\"")
+    sb.append("${attrSep}xmlns:xsi=\"$MAVEN_XSI_NS\"")
+    sb.append("${attrSep}xsi:schemaLocation=\"$MAVEN_XSD_LOCATION\">$nl")
 
     // Координаты
     sb.append("$indent<modelVersion>$MODEL_VERSION</modelVersion>$nl")

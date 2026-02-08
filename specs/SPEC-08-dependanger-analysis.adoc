@@ -8,7 +8,7 @@
 
 Модуль `dependanger-analysis` проверяет совместимость библиотек на основе правил, определённых в блоке `compatibility { }` DSL.
 Поддерживает четыре типа правил: `jdkRequirement`, `mutualExclusion`, `versionConstraint`, `customRule`.
-Результаты сохраняются в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.COMPATIBILITY_ISSUES`.
+Результаты сохраняются в `EffectiveMetadata.extensions` через `CompatibilityIssuesExtensionKey`.
 
 Приоритет: **P3** (желательно).
 
@@ -78,7 +78,7 @@ NOTE: Базовая проверка правил совместимости (`
       ii.  Вызвать `handler.evaluate(rule, libraries, context)` в try-catch
       iii. Обработать результат -> CompatibilityIssue
 6. Собрать все CompatibilityIssue
-7. Записать в metadata через withExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES, issues)
+7. Записать в metadata через withExtension(CompatibilityIssuesExtensionKey, issues)
 8. Добавить diagnostics: INFO/WARNING/ERROR в зависимости от severity
 9. В strict mode при severity=ERROR -> отметить в diagnostics как ERROR
 ----
@@ -252,7 +252,7 @@ private fun checkMutualExclusion(
 [source,kotlin]
 ----
 // Запись результатов:
-metadata.withExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES, issues: List<CompatibilityIssue>)
+metadata.withExtension(CompatibilityIssuesExtensionKey, issues: List<CompatibilityIssue>)
 
 // Чтение результатов:
 metadata.compatibilityIssues // -> List<CompatibilityIssue>

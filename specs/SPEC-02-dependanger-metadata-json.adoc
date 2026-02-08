@@ -783,7 +783,7 @@ public class EffectiveJsonFormat {
 
 === Требование к extension-моделям
 
-Все модели, хранимые через `EffectiveMetadataKeys`, ДОЛЖНЫ иметь аннотацию `@Serializable`:
+Все модели, хранимые через extension keys defined in each feature module, ДОЛЖНЫ иметь аннотацию `@Serializable`:
 
 [cols="1,2,1"]
 |===

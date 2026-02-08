@@ -48,9 +48,8 @@ public enum class ReportFormat { JSON, YAML, MARKDOWN, HTML }
 
 @Serializable
 public enum class ReportSection {
-    SUMMARY, LIBRARIES, PLUGINS, BUNDLES, VERSIONS,
-    DEPRECATED, UPDATES, VULNERABILITIES, LICENSES,
-    COMPATIBILITY, TRANSITIVES, DIAGNOSTICS
+    SUMMARY, LIBRARIES, PLUGINS, BUNDLES, VERSIONS, UPDATES, COMPATIBILITY,
+    VULNERABILITIES, DEPRECATED, LICENSES, TRANSITIVES, CONSTRAINTS, VALIDATION
 }
 ----
 
@@ -333,13 +332,13 @@ ReportGenerator читает из extensions:
 
 [source,kotlin]
 ----
-metadata.updates                // EffectiveMetadataKeys.UPDATES
-metadata.vulnerabilities        // EffectiveMetadataKeys.VULNERABILITIES
-metadata.compatibilityIssues    // EffectiveMetadataKeys.COMPATIBILITY_ISSUES
-metadata.licenseViolations      // EffectiveMetadataKeys.LICENSE_VIOLATIONS
-metadata.transitives            // EffectiveMetadataKeys.TRANSITIVES
-metadata.flatDependencies       // EffectiveMetadataKeys.FLAT_DEPENDENCIES
-metadata.versionConflicts       // EffectiveMetadataKeys.VERSION_CONFLICTS
+metadata.updates                // UpdatesExtensionKey
+metadata.vulnerabilities        // VulnerabilitiesExtensionKey
+metadata.compatibilityIssues    // CompatibilityIssuesExtensionKey
+metadata.licenseViolations      // LicenseViolationsExtensionKey
+metadata.transitives            // TransitivesExtensionKey
+metadata.flatDependencies       // FlatDependenciesExtensionKey
+metadata.versionConflicts       // VersionConflictsExtensionKey
 ----
 
 [[testing]]

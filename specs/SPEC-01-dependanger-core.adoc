@@ -72,32 +72,31 @@ public fun toMetadata(): DependangerMetadata = TODO()
 ----
 public fun toMetadata(): DependangerMetadata = DependangerMetadata(
     schemaVersion = "1.0",
-    versions = versionsDsl.build(),
-    libraries = librariesDsl.build(),
-    plugins = pluginsDsl.build(),
-    bundles = bundlesDsl.build(),
-    bomImports = bomImportsDsl.build(),
-    targetPlatforms = targetPlatformsDsl.build(),
-    distributions = distributionsDsl.build(),
-    compatibility = compatibilityDsl.build(),
-    settings = settingsDsl.build(),
-    presets = presetsDsl.build(),
+    versions = versionsDsl.versions.toList(),
+    libraries = librariesDsl.libraries.toList(),
+    plugins = pluginsDsl.plugins.toList(),
+    bundles = bundlesDsl.bundles.toList(),
+    bomImports = bomImportsDsl.boms.toList(),
+    constraints = constraintsDsl.constraints.toList(),
+    targetPlatforms = targetPlatformsDsl.platforms.toList(),
+    distributions = distributionsDsl.distributions.toList(),
+    compatibility = compatibilityDsl.rules.toList(),
+    settings = settingsDsl.toSettings(),
+    presets = presetsDsl.presets.toList(),
     extensions = buildExtensionsMap(),
 )
 ----
 
-[[build-methods]]
-=== Методы build() в каждом DSL
+[[dsl-data-access]]
+=== Доступ к данным DSL
 
-Каждый DSL-класс должен предоставить метод `build()`, возвращающий соответствующую модель.
-Ниже — спецификация каждого.
+Списковые DSL хранят данные в `MutableList` полях (напр. `versionsDsl.versions`).
+`SettingsDsl` предоставляет `toSettings(): Settings`.
+В `toMetadata()` данные копируются через `.toList()` для иммутабельности.
 
-==== VersionsDsl.build(): List<Version>
+==== VersionsDsl: versions: MutableList<Version>
 
-[source,kotlin]
-----
-public fun build(): List<Version>
-----
+Доступ: `versionsDsl.versions.toList()`
 
 *Алгоритм:*
 
@@ -132,12 +131,9 @@ listOf(
 )
 ----
 
-==== LibrariesDsl.build(): List<Library>
+==== LibrariesDsl: libraries: MutableList<Library>
 
-[source,kotlin]
-----
-public fun build(): List<Library>
-----
+Доступ: `librariesDsl.libraries.toList()`
 
 *Алгоритм:*
 
@@ -176,24 +172,18 @@ listOf(
 )
 ----
 
-==== PluginsDsl.build(): List<Plugin>
+==== PluginsDsl: plugins: MutableList<Plugin>
 
-[source,kotlin]
-----
-public fun build(): List<Plugin>
-----
+Доступ: `pluginsDsl.plugins.toList()`
 
 *Алгоритм:*
 
 1. Итерировать по зарегистрированным плагинам
 2. Для каждого создать `Plugin(alias, id, version, tags)`
 
-==== BundlesDsl.build(): List<Bundle>
+==== BundlesDsl: bundles: MutableList<Bundle>
 
-[source,kotlin]
-----
-public fun build(): List<Bundle>
-----
+Доступ: `bundlesDsl.bundles.toList()`
 
 *Алгоритм:*
 
@@ -202,12 +192,9 @@ public fun build(): List<Bundle>
 3. `libraries` — список алиасов библиотек
 4. `extends` — список алиасов других бандлов
 
-==== BomImportsDsl.build(): List<BomImport>
+==== BomImportsDsl: boms: MutableList<BomImport>
 
-[source,kotlin]
-----
-public fun build(): List<BomImport>
-----
+Доступ: `bomImportsDsl.boms.toList()`
 
 *Алгоритм:*
 
@@ -215,61 +202,55 @@ public fun build(): List<BomImport>
 2. Для каждого создать `BomImport(alias, group, artifact, version)`
 3. Координаты парсятся аналогично библиотекам
 
-==== TargetPlatformsDsl.build(): List<TargetPlatform>
+==== TargetPlatformsDsl: platforms: MutableList<TargetPlatform>
 
-[source,kotlin]
-----
-public fun build(): List<TargetPlatform>
-----
+Доступ: `targetPlatformsDsl.platforms.toList()`
 
 *Алгоритм:*
 
 1. Итерировать по зарегистрированным платформам
 2. Для каждой создать `TargetPlatform(name, jdkConstraints, androidConstraints, kotlinConstraints, supportedTargets)`
 
-==== DistributionsDsl.build(): List<Distribution>
+==== DistributionsDsl: distributions: MutableList<Distribution>
 
-[source,kotlin]
-----
-public fun build(): List<Distribution>
-----
+Доступ: `distributionsDsl.distributions.toList()`
 
 *Алгоритм:*
 
 1. Итерировать по зарегистрированным дистрибуциям
 2. Для каждой создать `Distribution(name, spec)`
-3. `spec` — `FilterSpec` из `FilterDsl.build()`
+3. `spec` — `FilterSpec` из `FilterDsl.toFilterSpec()`
 
-==== CompatibilityDsl.build(): List<CompatibilityRule>
+==== ConstraintsDsl: constraints: MutableList<Constraint>
 
-[source,kotlin]
-----
-public fun build(): List<CompatibilityRule>
-----
+Доступ: `constraintsDsl.constraints.toList()`
+
+*Алгоритм:*
+
+1. Итерировать по зарегистрированным ограничениям
+2. Для каждого типа (VersionConstraintDef, Exclude, Substitute) создать соответствующий sealed-подтип
+
+==== CompatibilityDsl: rules: MutableList<CompatibilityRule>
+
+Доступ: `compatibilityDsl.rules.toList()`
 
 *Алгоритм:*
 
 1. Итерировать по зарегистрированным правилам
 2. Для каждого типа правила (JdkRequirement, MutualExclusion, VersionConstraint, CustomRule) создать соответствующий sealed-подтип
 
-==== SettingsDsl.build(): Settings
+==== SettingsDsl: toSettings(): Settings
 
-[source,kotlin]
-----
-public fun build(): Settings
-----
+Доступ: `settingsDsl.toSettings()`
 
 *Алгоритм:*
 
 1. Собрать все вложенные настройки из под-DSL
 2. Создать `Settings` с all sub-settings: validation, toml, bom, bomCache, updateCheck, compatibilityAnalysis, securityCheck, licenseCheck, transitiveResolution, report, customSettings
 
-==== PresetsDsl.build(): List<Preset>
+==== PresetsDsl: presets: MutableList<Preset>
 
-[source,kotlin]
-----
-public fun build(): List<Preset>
-----
+Доступ: `presetsDsl.presets.toList()`
 
 *Алгоритм:*
 
@@ -356,23 +337,17 @@ public fun applyPreset(name: String) {
 - Пустой пресет (без bundles/distributions/settings) → no-op
 
 [[dsl-build-contract]]
-== Контракт build() методов
+== Контракт доступа к данным DSL
 
-Каждый DSL-класс (VersionsDsl, LibrariesDsl, etc.) должен предоставить:
+Списковые DSL (VersionsDsl, LibrariesDsl, etc.) хранят данные в публичных `MutableList` полях.
+`SettingsDsl` предоставляет `toSettings(): Settings`.
+В `toMetadata()` списки копируются через `.toList()`.
 
-[source,kotlin]
-----
-public fun build(): ResultType
-----
+=== Требования:
 
-Где `ResultType` соответствует полю в `DependangerMetadata`.
-
-=== Требования к build():
-
-1. **Идемпотентность** — вызов `build()` несколько раз возвращает одинаковый результат
-2. **Иммутабельность результата** — возвращаемые объекты неизменяемые (data class)
-3. **Нет побочных эффектов** — build() не изменяет состояние DSL
-4. **Нет валидации** — build() конвертирует «as is», валидация происходит в pipeline
+1. **Иммутабельность результата** — `toMetadata()` создаёт defensive copies через `.toList()`
+2. **Нет валидации** — `toMetadata()` конвертирует «as is», валидация происходит в pipeline
+3. **Данные — data class** — все возвращаемые модели неизменяемые
 
 === Требования к SettingsDsl.mergeFrom():
 

@@ -254,8 +254,26 @@ override suspend fun process(
     var diagnostics = metadata.diagnostics
 
     for (bomImport in bomImports) {
+        // Разрешить VersionReference в строку версии
+        val resolvedVersion = when (val v = bomImport.version) {
+            is VersionReference.Literal -> v.value
+            is VersionReference.Reference -> {
+                val found = context.originalMetadata.versions.find { it.name == v.name }
+                if (found == null) {
+                    diagnostics = diagnostics + Diagnostics.error("BOM_UNRESOLVED_VERSION",
+                        "Version reference '${v.name}' not found for BOM '${bomImport.alias}'")
+                    continue
+                }
+                found.value
+            }
+            is VersionReference.Range -> {
+                diagnostics = diagnostics + Diagnostics.warning("BOM_VERSION_RANGE",
+                    "Version ranges not supported for BOM imports, skipping '${bomImport.alias}'")
+                continue
+            }
+        }
         val result = resolveBomRecursive(
-            bomImport.group, bomImport.artifact, bomImport.version,
+            bomImport.group, bomImport.artifact, resolvedVersion,
             cache, downloader, parser, visited, diagnostics, depth = 0
         )
         resolvedBoms.add(result.content)

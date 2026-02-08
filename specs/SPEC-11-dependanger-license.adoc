@@ -8,7 +8,7 @@
 
 Модуль `dependanger-license` проверяет лицензии библиотек и их соответствие политикам организации (whitelist/blacklist).
 Информация о лицензиях получается из нескольких источников по приоритету: User-defined > Maven POM > ClearlyDefined API.
-Результаты хранятся в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.LICENSE_VIOLATIONS`.
+Результаты хранятся в `EffectiveMetadata.extensions` через `LicenseViolationsExtensionKey`.
 
 Приоритет: **P3** (желательно).
 
@@ -79,7 +79,7 @@ public class LicenseResolver {
    d. Если warnOnUnknown и category == UNKNOWN -> WARNING
 6. Собрать все LicenseViolation
 7. Записать в metadata:
-   a. withExtension(EffectiveMetadataKeys.LICENSE_VIOLATIONS, violations)
+   a. withExtension(LicenseViolationsExtensionKey, violations)
 8. Добавить diagnostics:
    a. INFO: "License check completed: X libraries, Y violations"
    b. Если failOnDenied && есть DENIED violations -> ERROR
@@ -173,7 +173,7 @@ public class LicenseCheckProcessor(
 
         // Записать результаты
         var updatedMetadata = metadata
-            .withExtension(EffectiveMetadataKeys.LICENSE_VIOLATIONS, violations)
+            .withExtension(LicenseViolationsExtensionKey, violations)
 
         for (diag in diagnostics) {
             updatedMetadata = updatedMetadata.withDiagnostic(diag)
@@ -732,7 +732,7 @@ internal class LicenseCache(
 [source,kotlin]
 ----
 // Запись результатов:
-metadata.withExtension(EffectiveMetadataKeys.LICENSE_VIOLATIONS, violations: List<LicenseViolation>)
+metadata.withExtension(LicenseViolationsExtensionKey, violations: List<LicenseViolation>)
 
 // Чтение результатов:
 metadata.licenseViolations // -> List<LicenseViolation>

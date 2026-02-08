@@ -1315,23 +1315,26 @@ override fun run() = runBlocking {
 package io.github.zenhelix.dependanger.cli.util
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.EffectiveMetadataKeys
+import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
+import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
 import io.github.zenhelix.dependanger.effective.model.getExtension
 import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
 
 internal fun EffectiveMetadata.extractUpdateData(): List<UpdateAvailableInfo> =
-    getExtension(EffectiveMetadataKeys.UPDATES) ?: emptyList()
+    getExtension(UpdatesExtensionKey) ?: emptyList()
 
 internal fun EffectiveMetadata.extractSecurityData(): List<VulnerabilityInfo> =
-    getExtension(EffectiveMetadataKeys.VULNERABILITIES) ?: emptyList()
+    getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
 
 internal fun EffectiveMetadata.extractLicenseData(): List<LicenseViolation> =
-    getExtension(EffectiveMetadataKeys.LICENSE_VIOLATIONS) ?: emptyList()
+    getExtension(LicenseViolationsExtensionKey) ?: emptyList()
 
 internal fun EffectiveMetadata.extractTransitiveData(): List<TransitiveTree> =
-    getExtension(EffectiveMetadataKeys.TRANSITIVES) ?: emptyList()
+    getExtension(TransitivesExtensionKey) ?: emptyList()
 ----
 
 NOTE: Благодаря этому паттерну, команды анализа (<<spec-analysis-commands>>) вызывают extraction-методы как `result.effective!!.extractUpdateData()` вместо прямого обращения к `getExtension(...)`, что повышает читаемость и изолирует знание о ключах extensions в одном месте.

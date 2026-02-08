@@ -15,7 +15,7 @@
 | Компонент | Статус
 
 | Инфраструктура пайплайна | *Реализовано:* ProcessingPipeline, ProcessingPhase, ProcessingContext, PipelineBuilder, ProcessingPresetConfigurator, ProcessingCallback, ProcessingEvent
-| Модели effective | *Реализовано:* EffectiveMetadata, EffectiveLibrary, EffectivePlugin, EffectiveBundle, ResolvedVersion, ProcessingInfo, ExtensionKey, CompatibilityIssue, EffectiveMetadataKeys
+| Модели effective | *Реализовано:* EffectiveMetadata, EffectiveLibrary, EffectivePlugin, EffectiveBundle, ResolvedVersion, ProcessingInfo, ExtensionKey, CompatibilityIssue
 | EffectiveMetadataBuilder.build() | *TODO-заглушка*
 | 12 Core Processors | *Все TODO-заглушки*
 |===
@@ -2141,7 +2141,7 @@ private fun ValidationAction.toSeverity(): Severity = when (this) {
 === Назначение
 
 Проверка правил совместимости (`CompatibilityRule`) против эффективных метаданных.
-Результаты записываются в `extensions` через `EffectiveMetadataKeys.COMPATIBILITY_ISSUES`
+Результаты записываются в `extensions` через `CompatibilityIssuesExtensionKey`
 и дублируются в `diagnostics`.
 
 === Зависимости от других процессоров
@@ -2185,7 +2185,7 @@ private fun ValidationAction.toSeverity(): Severity = when (this) {
       - ЕСЛИ handler найден -> вызвать с parameters, получить результат
 
 4. Собрать все CompatibilityIssue
-5. Записать в extensions через EffectiveMetadataKeys.COMPATIBILITY_ISSUES
+5. Записать в extensions через CompatibilityIssuesExtensionKey
 6. Добавить diagnostics на основе severity каждого issue
 7. Вернуть обновленный metadata
 ----
@@ -2226,7 +2226,7 @@ override suspend fun process(
     val allIssues = existingIssues + issues
 
     var result = metadata.withExtension(
-        EffectiveMetadataKeys.COMPATIBILITY_ISSUES,
+        CompatibilityIssuesExtensionKey,
         allIssues,
     )
 
@@ -2523,7 +2523,7 @@ IMPORTANT: Все процессоры ДОЛЖНЫ использовать `Gl
 [source,kotlin]
 ----
 // Запись (в процессорах):
-metadata.withExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES, issues)
+metadata.withExtension(CompatibilityIssuesExtensionKey, issues)
 
 // Чтение (в потребителях — CLI, Gradle Plugin, Report):
 val issues = metadata.compatibilityIssues  // extension property, возвращает List или emptyList()
@@ -2531,10 +2531,10 @@ val updates = metadata.updates
 val vulns = metadata.vulnerabilities
 
 // Или через getExtension (для nullable):
-val issues: List<CompatibilityIssue>? = metadata.getExtension(EffectiveMetadataKeys.COMPATIBILITY_ISSUES)
+val issues: List<CompatibilityIssue>? = metadata.getExtension(CompatibilityIssuesExtensionKey)
 ----
 
-Все extension property определены в `EffectiveMetadataKeys.kt`.
+Extension keys и extension properties определены в каждом feature-модуле в соответствующем `*Extensions.kt` файле.
 Все модели extensions (`UpdateAvailableInfo`, `VulnerabilityInfo`, `LicenseViolation`, `CompatibilityIssue`, `TransitiveTree`, `FlatDependency`, `VersionConflict`) ДОЛЖНЫ быть `@Serializable`.
 
 [[priority]]

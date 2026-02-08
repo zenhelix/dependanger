@@ -7,7 +7,7 @@
 == Обзор
 
 Модуль `dependanger-security` проверяет библиотеки на известные уязвимости (CVE) через OSV API (https://api.osv.dev).
-Результаты хранятся в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.VULNERABILITIES`.
+Результаты хранятся в `EffectiveMetadata.extensions` через `VulnerabilitiesExtensionKey`.
 
 Приоритет: **P3** (желательно).
 
@@ -64,7 +64,7 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
 6. Отфильтровать по minSeverity и minCvssScore
 7. Отфильтровать ignoreCves
 8. Записать в кеш
-9. Записать в metadata: withExtension(EffectiveMetadataKeys.VULNERABILITIES, vulns)
+9. Записать в metadata: withExtension(VulnerabilitiesExtensionKey, vulns)
 10. Добавить diagnostics:
     a. INFO: "Scanned X libraries, found Y vulnerabilities"
     b. Если failOnCritical && есть CRITICAL -> ERROR
@@ -425,7 +425,7 @@ internal data class OsvReference(val type: String? = null, val url: String? = nu
 [source,kotlin]
 ----
 // Запись результатов:
-metadata.withExtension(EffectiveMetadataKeys.VULNERABILITIES, vulns: List<VulnerabilityInfo>)
+metadata.withExtension(VulnerabilitiesExtensionKey, vulns: List<VulnerabilityInfo>)
 
 // Чтение результатов:
 metadata.vulnerabilities // -> List<VulnerabilityInfo>

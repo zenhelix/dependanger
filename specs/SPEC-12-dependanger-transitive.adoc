@@ -7,7 +7,7 @@
 == Обзор
 
 Модуль `dependanger-transitive` резолвит транзитивные зависимости из Maven repositories, строит дерево зависимостей, обнаруживает конфликты версий и применяет constraints (VERSION, EXCLUDE, SUBSTITUTE).
-Результаты хранятся в `EffectiveMetadata.extensions` через `EffectiveMetadataKeys.TRANSITIVES`, `EffectiveMetadataKeys.FLAT_DEPENDENCIES` и `EffectiveMetadataKeys.VERSION_CONFLICTS`.
+Результаты хранятся в `EffectiveMetadata.extensions` через `TransitivesExtensionKey`, `FlatDependenciesExtensionKey` и `VersionConflictsExtensionKey`.
 
 Приоритет: **P4** (будущее).
 
@@ -81,9 +81,9 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
    a. Deduplicate по group:artifact
    b. Записать isDirectDependency, isOptional
 9. Записать в metadata:
-   a. withExtension(EffectiveMetadataKeys.TRANSITIVES, trees: List<TransitiveTree>)
-   b. withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flat: List<FlatDependency>)
-   c. withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts: List<VersionConflict>)
+   a. withExtension(TransitivesExtensionKey, trees: List<TransitiveTree>)
+   b. withExtension(FlatDependenciesExtensionKey, flat: List<FlatDependency>)
+   c. withExtension(VersionConflictsExtensionKey, conflicts: List<VersionConflict>)
 10. Добавить diagnostics:
     a. INFO: "Resolved X direct, Y transitive dependencies, Z conflicts"
     b. Для каждого конфликта -> WARNING с деталями
@@ -159,9 +159,9 @@ public class TransitiveResolverProcessor(
 
         // Записать результаты
         var updatedMetadata = metadata
-            .withExtension(EffectiveMetadataKeys.TRANSITIVES, constrainedTrees)
-            .withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flatList)
-            .withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts)
+            .withExtension(TransitivesExtensionKey, constrainedTrees)
+            .withExtension(FlatDependenciesExtensionKey, flatList)
+            .withExtension(VersionConflictsExtensionKey, conflicts)
 
         updatedMetadata = updatedMetadata.withDiagnostic(
             Diagnostics.info(
@@ -632,9 +632,9 @@ internal class TransitiveCache(
 [source,kotlin]
 ----
 // Запись результатов:
-metadata.withExtension(EffectiveMetadataKeys.TRANSITIVES, trees: List<TransitiveTree>)
-metadata.withExtension(EffectiveMetadataKeys.FLAT_DEPENDENCIES, flat: List<FlatDependency>)
-metadata.withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts: List<VersionConflict>)
+metadata.withExtension(TransitivesExtensionKey, trees: List<TransitiveTree>)
+metadata.withExtension(FlatDependenciesExtensionKey, flat: List<FlatDependency>)
+metadata.withExtension(VersionConflictsExtensionKey, conflicts: List<VersionConflict>)
 
 // Чтение результатов:
 metadata.transitives       // -> List<TransitiveTree>

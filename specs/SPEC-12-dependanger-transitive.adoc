@@ -62,9 +62,9 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
    b. Если нет в кеше:
       i.   Скачать POM из repository через MavenPomDownloader
       ii.  Распарсить <dependencies> секцию (исключить test, provided scope по умолчанию)
-      iii. Для каждой зависимости в POM рекурсивно резолвить (до maxDepth)
-      iv.  Обнаружить циклические зависимости (Set<"group:artifact"> visited)
-      v.   Пометить дубликаты (isDuplicate=true)
+      iii. Для каждой зависимости в POM рекурсивно резолвить (до maxDepth, default=10)
+      iv.  Обнаружить циклические зависимости (visited: Set<"group:artifact"> — path-specific, иммутабельный)
+      v.   Пометить дубликаты (isDuplicate=true) через sessionSeen: ConcurrentSet (session-global, shared между ветками)
    c. Построить TransitiveTree для библиотеки
    d. Сохранить в кеш
 6. Обнаружить конфликты версий:
@@ -100,7 +100,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 public class TransitiveResolverProcessor(
     private val pomDownloader: MavenPomDownloader = MavenPomDownloader(),
     private val cache: TransitiveCache = TransitiveCache(),
-    private val maxDepth: Int = 50,
+    private val maxDepth: Int = 10,
 ) : EffectiveMetadataProcessor {
     override val id: String = "transitive-resolver"
     override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=140, PARALLEL_IO
@@ -129,6 +129,9 @@ public class TransitiveResolverProcessor(
             )
         }
 
+        // Session-global set для isDuplicate (shared между всеми ветками)
+        val sessionSeen: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
         // Параллельный резолвинг
         val trees = coroutineScope {
             libraries.map { lib ->
@@ -141,7 +144,8 @@ public class TransitiveResolverProcessor(
                         depth = 0,
                         maxDepth = effectiveMaxDepth,
                         scopes = scopes,
-                        visited = mutableSetOf("${lib.group}:${lib.artifact}"),
+                        visited = setOf("${lib.group}:${lib.artifact}"),
+                        sessionSeen = sessionSeen,
                     )
                 }
             }.awaitAll()
@@ -188,6 +192,17 @@ public class TransitiveResolverProcessor(
 
 [source,kotlin]
 ----
+/**
+ * Рекурсивный резолвинг дерева зависимостей.
+ *
+ * Два раздельных механизма отслеживания:
+ * - `visited: Set<String>` — path-specific (иммутабельный), для обнаружения ЦИКЛОВ.
+ *   Содержит координаты предков текущего узла. Каждый child получает копию + свою координату.
+ *   Если coordinate in visited → цикл, ветка прерывается.
+ * - `sessionSeen: MutableSet<String>` — session-global (ConcurrentHashMap.newKeySet()),
+ *   для маркировки ДУБЛИКАТОВ. Shared между всеми параллельными ветками.
+ *   Если coordinate уже в sessionSeen → isDuplicate=true (зависимость уже резолвлена в другой ветке).
+ */
 private suspend fun resolveTree(
     group: String,
     artifact: String,
@@ -196,20 +211,29 @@ private suspend fun resolveTree(
     depth: Int,
     maxDepth: Int,
     scopes: List<String>,
-    visited: MutableSet<String>,
+    visited: Set<String>,
+    sessionSeen: MutableSet<String>,
 ): TransitiveTree {
     val coordinate = "$group:$artifact"
 
     // Проверить максимальную глубину
     if (depth >= maxDepth) {
         logger.warn { "Max depth $maxDepth reached for $coordinate:$version, branch truncated" }
-        // WARNING в diagnostics добавляется вызывающим кодом
         return TransitiveTree(group, artifact, version, children = emptyList())
     }
 
-    // Проверить кеш
+    // Проверить дубликат (уже резолвлен в другой ветке)
+    val isDuplicate = !sessionSeen.add(coordinate) // returns false если уже присутствовал
+    if (isDuplicate) {
+        // Зависимость уже резолвлена в другой ветке — вернуть из кеша с isDuplicate=true
+        val cached = cache.get(group, artifact, version)
+        return cached?.copy(isDuplicate = true, children = emptyList())
+            ?: TransitiveTree(group, artifact, version, isDuplicate = true, children = emptyList())
+    }
+
+    // Проверить кеш (не дубликат, но может быть в кеше от предыдущей сессии)
     cache.get(group, artifact, version)?.let { cached ->
-        return cached.copy(isDuplicate = coordinate in visited)
+        return cached.copy(isDuplicate = false)
     }
 
     // Скачать и распарсить POM
@@ -233,10 +257,9 @@ private suspend fun resolveTree(
             async {
                 val childCoordinate = "${dep.group}:${dep.artifact}"
                 if (childCoordinate in visited) {
-                    // Циклическая зависимость
-                    TransitiveTree(dep.group, dep.artifact, dep.version, isDuplicate = true, scope = dep.scope)
+                    // Цикл: зависимость уже в предках текущего пути
+                    TransitiveTree(dep.group, dep.artifact, dep.version, isDuplicate = true, scope = dep.scope, children = emptyList())
                 } else {
-                    val newVisited = visited.toMutableSet().apply { add(childCoordinate) }
                     resolveTree(
                         group = dep.group,
                         artifact = dep.artifact,
@@ -245,7 +268,8 @@ private suspend fun resolveTree(
                         depth = depth + 1,
                         maxDepth = maxDepth,
                         scopes = scopes,
-                        visited = newVisited,
+                        visited = visited + childCoordinate,
+                        sessionSeen = sessionSeen,
                     ).copy(scope = dep.scope)
                 }
             }
@@ -586,8 +610,9 @@ internal class TransitiveCache(
 
 | POM не найден (404) | WARNING, пустое дерево для библиотеки | `TRANSITIVE_POM_NOT_FOUND`
 | Repository недоступен | Retry с exponential backoff, затем WARNING | `TRANSITIVE_REPO_UNAVAILABLE`
-| Циклическая зависимость (A -> B -> C -> A) | Цикл обнаруживается, прерывается, isDuplicate=true | `TRANSITIVE_CYCLE_DETECTED`
-| Глубина > maxDepth (default=50) | Резолвинг останавливается, ветка обрезается, WARNING. Настраивается через `settings.transitiveResolution.maxDepth` | `TRANSITIVE_MAX_DEPTH`
+| Циклическая зависимость (A -> B -> C -> A) | Цикл обнаруживается через path-specific `visited` set, ветка прерывается, isDuplicate=true | `TRANSITIVE_CYCLE_DETECTED`
+| Дубликат (A->B->D, A->C->D) | D обнаруживается через session-global `sessionSeen` set, isDuplicate=true, children из кеша | --
+| Глубина > maxDepth (default=10) | Резолвинг останавливается, ветка обрезается, WARNING. Настраивается через `settings.transitiveResolution.maxDepth` | `TRANSITIVE_MAX_DEPTH`
 | > 5000 транзитивных | WARNING при >5000 транзитивных зависимостей | `TRANSITIVE_LARGE_TREE`
 | > 10000 транзитивных (maxTransitives) | ERROR и остановка резолвинга. Ограничение по умолчанию `maxTransitives = 10000`, настраивается через `settings.transitiveResolution.maxTransitives` | `TRANSITIVE_MAX_EXCEEDED`
 | Constraint на несуществующую библиотеку | WARNING "Constraint does not match" | `TRANSITIVE_UNUSED_CONSTRAINT`
@@ -599,7 +624,8 @@ internal class TransitiveCache(
 | BOM в dependencyManagement | BOM резолвится, managed versions применяются | --
 | Пустой каталог | 0 транзитивных, INFO | `TRANSITIVE_NO_LIBS`
 | Таймаут при скачивании POM | Retry 3 раза, затем WARNING, пустое дерево | `TRANSITIVE_TIMEOUT`
-| Дубликаты в дереве | Помечаются isDuplicate=true, в flat list -- одна запись | --
+| Дубликаты в дереве | Помечаются isDuplicate=true через sessionSeen, children=emptyList() для дубликатов, в flat list -- одна запись | --
+| Параллельный доступ к sessionSeen | ConcurrentHashMap.newKeySet() -- thread-safe | --
 | Кеш устарел (TTL) | Перезапрос из repository | --
 | Сеть недоступна, кеш есть | Используется стейл кеш + WARNING | `TRANSITIVE_STALE_CACHE`
 | Параллельный резолвинг | Общие зависимости резолвятся один раз через кеш | --
@@ -656,8 +682,9 @@ metadata.versionConflicts  // -> List<VersionConflict>
 | `single library resolved` | spring-web:6.2.0 -> дерево с spring-beans, spring-core
 | `recursive resolution` | A -> B -> C -> дерево глубины 3
 | `max depth stops recursion` | maxDepth=2, дерево глубже -> обрезка
-| `cycle detection` | A -> B -> A -> isDuplicate=true, WARNING
-| `duplicate detection` | spring-core тянется из 2 библиотек -> isDuplicate для второго
+| `cycle detection` | A -> B -> A -> isDuplicate=true via visited (path-specific), WARNING
+| `duplicate detection via sessionSeen` | A->B->D, A->C->D -> D isDuplicate=true для второго вхождения via sessionSeen
+| `duplicate children empty` | Дубликат получает children=emptyList() (не резолвится повторно)
 | `version conflict HIGHEST` | guava 31.0 vs 33.0 -> resolved=33.0 (HIGHEST)
 | `version conflict with constraint` | constraint=2.17.0 -> resolved=2.17.0 (CONSTRAINT)
 | `VERSION constraint applied` | constraint на log4j:2.17.0 -> версия заменена в дереве

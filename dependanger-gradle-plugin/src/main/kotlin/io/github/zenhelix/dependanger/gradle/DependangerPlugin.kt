@@ -16,7 +16,6 @@ public class DependangerPlugin : Plugin<Project> {
         project.tasks.register("dependangerGenerateBom", GenerateBomTask::class.java)
         project.tasks.register("dependangerGenerate", GenerateAllTask::class.java)
         project.tasks.register("dependangerValidate", ValidateTask::class.java)
-        project.tasks.register("dependangerProcess", ProcessTask::class.java)
         project.tasks.register("dependangerCheckUpdates", CheckUpdatesTask::class.java)
         project.tasks.register("dependangerAnalyze", AnalyzeTask::class.java)
         project.tasks.register("dependangerReport", ReportTask::class.java)

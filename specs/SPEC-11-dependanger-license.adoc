@@ -41,7 +41,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
 
 // LicenseResolver.kt
 public class LicenseResolver {
-    public suspend fun resolve(group: String, artifact: String, version: String): LicenseResult = TODO()
+    public suspend fun resolve(group: String, artifact: String, version: String): List<LicenseResult> = TODO()
 }
 ----
 
@@ -51,7 +51,7 @@ public class LicenseResolver {
 [[purpose-license]]
 === Назначение
 
-Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензию из нескольких источников по приоритету (DECLARED > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам и сохранить нарушения в extensions.
+Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензии (одну или несколько — dual-license) из нескольких источников по приоритету (DECLARED > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам с учётом dual-license OR-семантики и сохранить нарушения в extensions.
 
 [[algorithm-license]]
 === Алгоритм
@@ -67,16 +67,16 @@ public class LicenseResolver {
 4. Для каждой библиотеки (параллельно, PARALLEL_IO):
    a. Проверить user-defined лицензию в context (если есть -> LicenseSource.DECLARED)
    b. Если нет -> вызвать licenseResolver.resolve(group, artifact, version)
-   c. Результат: LicenseResult(spdxId, licenseName, source, category)
-5. Для каждого LicenseResult проверить политики:
-   a. Если deniedLicenses не пуст и spdxId в deniedLicenses:
-      - Для dual-license: если хотя бы одна альтернативная лицензия не в denied -> OK
-      - Иначе -> LicenseViolation(violation="DENIED")
-   b. Если allowedLicenses не пуст и spdxId НЕ в allowedLicenses:
-      - Для dual-license: если хотя бы одна лицензия в allowed -> OK
-      - Иначе -> LicenseViolation(violation="NOT_ALLOWED")
-   c. Если warnOnCopyleft и category in (WEAK_COPYLEFT, STRONG_COPYLEFT) -> WARNING
-   d. Если warnOnUnknown и category == UNKNOWN -> WARNING
+   c. Результат: List<LicenseResult> -- одна или несколько лицензий (dual-license)
+5. Для каждого List<LicenseResult> проверить политики (OR-семантика для dual-license):
+   a. Если deniedLicenses не пуст:
+      - Violation ТОЛЬКО если ВСЕ лицензии из списка в denied (нет допустимой альтернативы)
+      - Если хотя бы одна НЕ в denied -> OK
+   b. Если allowedLicenses не пуст:
+      - OK если ХОТЯ БЫ ОДНА лицензия в allowed
+      - Violation если НИ ОДНА не в allowed
+   c. Если warnOnCopyleft и ЛЮБАЯ category in (WEAK_COPYLEFT, STRONG_COPYLEFT) -> WARNING
+   d. Если warnOnUnknown и ВСЕ category == UNKNOWN -> WARNING
 6. Собрать все LicenseViolation
 7. Записать в metadata:
    a. withExtension(LicenseViolationsExtensionKey, violations)
@@ -93,6 +93,9 @@ public class LicenseResolver {
 [[algorithm-resolver]]
 === Алгоритм
 
+Возвращает `List<LicenseResult>` -- одну или несколько лицензий для библиотеки.
+Множественные лицензии возникают при dual-license (POM с несколькими `<license>`) или SPDX expression ("MIT OR Apache-2.0").
+
 [source,text]
 ----
 1. Проверить кеш для group:artifact:version
@@ -101,24 +104,26 @@ public class LicenseResolver {
    a. DECLARED:
       - Проверить контекст на user-defined лицензию для данной библиотеки
       - Если есть -> нормализовать SPDX ID, определить категорию
-      - Вернуть LicenseResult(source=DECLARED)
+      - Вернуть listOf(LicenseResult(source=DECLARED))
    b. MAVEN_POM:
       - Скачать POM файл через MavenPomDownloader (из dependanger-maven-resolver)
       - Распарсить секцию <licenses>
-      - Для каждой <license>:
+      - Для КАЖДОЙ <license> (не только первой):
         i.   Извлечь <name> и <url>
         ii.  Нормализовать name -> SPDX ID через SpdxLicenseMapper
         iii. Определить LicenseCategory по SPDX ID
-      - Если найдены лицензии -> вернуть LicenseResult(source=MAVEN_POM)
+        iv.  Создать LicenseResult(source=MAVEN_POM)
+      - Если найдены лицензии -> вернуть List<LicenseResult>
    c. CLEARLY_DEFINED:
       - GET https://api.clearlydefined.io/definitions/maven/mavencentral/{group}/{artifact}/{version}
       - Парсить response -> licensed.declared (SPDX expression)
-      - Если есть -> нормализовать, определить категорию
-      - Вернуть LicenseResult(source=CLEARLY_DEFINED)
+      - Если expression содержит "OR" -> split и создать LicenseResult для каждой
+      - Если одна лицензия -> listOf(LicenseResult(source=CLEARLY_DEFINED))
+      - Вернуть List<LicenseResult>
 4. Если ни один источник не дал результата:
-   - Вернуть LicenseResult(spdxId=null, licenseName=null, source=UNKNOWN, category=UNKNOWN)
+   - Вернуть listOf(LicenseResult(spdxId=null, licenseName=null, source=UNKNOWN, category=UNKNOWN))
 5. Сохранить результат в кеш
-6. Вернуть LicenseResult
+6. Вернуть List<LicenseResult>
 ----
 
 [[implementation-license]]
@@ -148,27 +153,27 @@ public class LicenseCheckProcessor(
             )
         }
 
-        // Параллельный резолвинг лицензий
-        val results = coroutineScope {
+        // Параллельный резолвинг лицензий (каждая библиотека -> List<LicenseResult>)
+        val results: List<Pair<EffectiveLibrary, List<LicenseResult>>> = coroutineScope {
             libraries.map { lib ->
                 async {
                     val declared = context.getDeclaredLicense(lib.alias)
-                    val result = if (declared != null) {
-                        resolveDeclared(declared)
+                    val licenses = if (declared != null) {
+                        listOf(resolveDeclared(declared))
                     } else {
                         licenseResolver.resolve(lib.group, lib.artifact, lib.version!!.value)
                     }
-                    lib to result
+                    lib to licenses
                 }
             }.awaitAll()
         }
 
-        // Проверить политики
+        // Проверить политики (с dual-license OR-семантикой)
         val violations = mutableListOf<LicenseViolation>()
         val diagnostics = mutableListOf<Diagnostics>()
 
-        for ((lib, result) in results) {
-            checkPolicies(lib, result, settings, violations, diagnostics)
+        for ((lib, licenses) in results) {
+            checkPolicies(lib, licenses, settings, violations, diagnostics)
         }
 
         // Записать результаты
@@ -192,14 +197,16 @@ public class LicenseCheckProcessor(
             )
         }
 
-        if (settings.failOnUnknown && results.any { it.second.category == LicenseCategory.UNKNOWN }) {
+        if (settings.failOnUnknown && results.any { (_, licenses) ->
+                licenses.all { it.category == LicenseCategory.UNKNOWN }
+            }) {
             updatedMetadata = updatedMetadata.withDiagnostic(
                 Diagnostics.error("LICENSE_UNKNOWN_FOUND", "Unknown licenses found")
             )
         }
 
-        if (settings.failOnCopyleft && results.any {
-                it.second.category in listOf(LicenseCategory.WEAK_COPYLEFT, LicenseCategory.STRONG_COPYLEFT)
+        if (settings.failOnCopyleft && results.any { (_, licenses) ->
+                licenses.any { it.category in listOf(LicenseCategory.WEAK_COPYLEFT, LicenseCategory.STRONG_COPYLEFT) }
             }) {
             updatedMetadata = updatedMetadata.withDiagnostic(
                 Diagnostics.error("LICENSE_COPYLEFT_FOUND", "Copyleft licenses found")
@@ -223,37 +230,42 @@ public class LicenseResolver(
     private val timeout: Long = 30_000,
     private val retries: Int = 3,
 ) {
+    /**
+     * Резолвит лицензии для библиотеки.
+     * Возвращает List<LicenseResult> -- одна или несколько лицензий (dual-license).
+     * При dual-license ("MIT OR Apache-2.0") возвращает по элементу на каждую альтернативу.
+     */
     public suspend fun resolve(
         group: String,
         artifact: String,
         version: String,
-    ): LicenseResult {
+    ): List<LicenseResult> {
         // 1. Проверить кеш
         cache.get(group, artifact, version)?.let { return it }
 
-        // 2. Maven POM
-        val pomResult = tryResolveMavenPom(group, artifact, version)
-        if (pomResult != null && pomResult.source != LicenseSource.UNKNOWN) {
-            cache.put(group, artifact, version, pomResult)
-            return pomResult
+        // 2. Maven POM (может вернуть несколько <license>)
+        val pomResults = tryResolveMavenPom(group, artifact, version)
+        if (pomResults.isNotEmpty()) {
+            cache.put(group, artifact, version, pomResults)
+            return pomResults
         }
 
-        // 3. ClearlyDefined API
-        val cdResult = tryResolveClearlyDefined(group, artifact, version)
-        if (cdResult != null && cdResult.source != LicenseSource.UNKNOWN) {
-            cache.put(group, artifact, version, cdResult)
-            return cdResult
+        // 3. ClearlyDefined API (может содержать SPDX expression с OR)
+        val cdResults = tryResolveClearlyDefined(group, artifact, version)
+        if (cdResults.isNotEmpty()) {
+            cache.put(group, artifact, version, cdResults)
+            return cdResults
         }
 
         // 4. Неизвестная лицензия
-        val unknownResult = LicenseResult(
+        val unknownResults = listOf(LicenseResult(
             spdxId = null,
             licenseName = null,
             source = LicenseSource.UNKNOWN,
             category = LicenseCategory.UNKNOWN,
-        )
-        cache.put(group, artifact, version, unknownResult)
-        return unknownResult
+        ))
+        cache.put(group, artifact, version, unknownResults)
+        return unknownResults
     }
 }
 ----
@@ -266,26 +278,27 @@ private suspend fun tryResolveMavenPom(
     group: String,
     artifact: String,
     version: String,
-): LicenseResult? {
+): List<LicenseResult> {
     return try {
-        val pomXml = pomDownloader?.download(group, artifact, version) ?: return null
-        val licenses = parseLicensesFromPom(pomXml)
+        val pomXml = pomDownloader?.download(group, artifact, version) ?: return emptyList()
+        val pomLicenses = parseLicensesFromPom(pomXml)
 
-        if (licenses.isEmpty()) return null
+        if (pomLicenses.isEmpty()) return emptyList()
 
-        val firstLicense = licenses.first()
-        val spdxId = spdxMapper.normalize(firstLicense.name)
-        val category = spdxMapper.categorize(spdxId)
-
-        LicenseResult(
-            spdxId = spdxId,
-            licenseName = firstLicense.name,
-            source = LicenseSource.MAVEN_POM,
-            category = category,
-        )
+        // Все <license> элементы из POM -> List<LicenseResult>
+        pomLicenses.map { pomLicense ->
+            val spdxId = spdxMapper.normalize(pomLicense.name)
+            val category = spdxMapper.categorize(spdxId)
+            LicenseResult(
+                spdxId = spdxId,
+                licenseName = pomLicense.name,
+                source = LicenseSource.MAVEN_POM,
+                category = category,
+            )
+        }
     } catch (e: Exception) {
         logger.warn(e) { "Failed to resolve license from Maven POM for $group:$artifact:$version" }
-        null
+        emptyList()
     }
 }
 
@@ -318,7 +331,7 @@ private suspend fun tryResolveClearlyDefined(
     group: String,
     artifact: String,
     version: String,
-): LicenseResult? {
+): List<LicenseResult> {
     return try {
         val response = executeWithRetry {
             httpClient.get("https://api.clearlydefined.io/definitions/maven/mavencentral/$group/$artifact/$version") {
@@ -326,26 +339,43 @@ private suspend fun tryResolveClearlyDefined(
             }
         }
 
-        if (response.status != HttpStatusCode.OK) return null
+        if (response.status != HttpStatusCode.OK) return emptyList()
 
         val cdResponse = response.body<ClearlyDefinedResponse>()
-        val declared = cdResponse.licensed?.declared ?: return null
+        val declared = cdResponse.licensed?.declared ?: return emptyList()
 
-        if (declared.isBlank() || declared == "NOASSERTION") return null
+        if (declared.isBlank() || declared == "NOASSERTION") return emptyList()
 
-        val spdxId = spdxMapper.normalize(declared)
-        val category = spdxMapper.categorize(spdxId)
+        // Парсинг SPDX expression: "MIT OR Apache-2.0" -> ["MIT", "Apache-2.0"]
+        // Базовый парсер: split по " OR " (top-level OR, без скобок)
+        val licenseIds = parseSpdxExpression(declared)
 
-        LicenseResult(
-            spdxId = spdxId,
-            licenseName = declared,
-            source = LicenseSource.CLEARLY_DEFINED,
-            category = category,
-        )
+        licenseIds.map { rawId ->
+            val spdxId = spdxMapper.normalize(rawId.trim())
+            val category = spdxMapper.categorize(spdxId)
+            LicenseResult(
+                spdxId = spdxId,
+                licenseName = rawId.trim(),
+                source = LicenseSource.CLEARLY_DEFINED,
+                category = category,
+            )
+        }
     } catch (e: Exception) {
         logger.warn(e) { "Failed to resolve license from ClearlyDefined for $group:$artifact:$version" }
-        null
+        emptyList()
     }
+}
+
+/**
+ * Базовый парсер SPDX expressions.
+ * Поддерживает: "MIT", "MIT OR Apache-2.0", "GPL-3.0-only OR MIT OR BSD-3-Clause"
+ * Split по " OR " (case-insensitive). "AND" не разделяется -- трактуется как одна лицензия.
+ * Скобки не поддерживаются (edge case для будущей реализации).
+ */
+private fun parseSpdxExpression(expression: String): List<String> {
+    return expression.split(Regex("\\s+OR\\s+", RegexOption.IGNORE_CASE))
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
 }
 ----
 
@@ -504,114 +534,77 @@ public class SpdxLicenseMapper {
 [[policy-check]]
 == Проверка политик
 
-=== Алгоритм проверки
+=== Алгоритм проверки (единый, с dual-license OR-семантикой)
 
 [source,kotlin]
 ----
+/**
+ * Проверяет список лицензий библиотеки против политик.
+ * Для dual-license (несколько LicenseResult) применяется OR-семантика:
+ * - Denied: violation ТОЛЬКО если ВСЕ лицензии в denied (нет допустимой альтернативы)
+ * - Allowed: OK если ХОТЯ БЫ ОДНА лицензия в allowed
+ * - Copyleft: warning если ЛЮБАЯ лицензия copyleft
+ * - Unknown: warning если ВСЕ лицензии unknown
+ */
 private fun checkPolicies(
     lib: EffectiveLibrary,
-    result: LicenseResult,
+    licenses: List<LicenseResult>,
     settings: LicenseCheckSettings,
     violations: MutableList<LicenseViolation>,
     diagnostics: MutableList<Diagnostics>,
 ) {
-    val spdxId = result.spdxId
+    val spdxIds = licenses.mapNotNull { it.spdxId }
+    val licenseExpression = spdxIds.joinToString(" OR ").ifEmpty { "UNKNOWN" }
 
-    // 1. Denied list check
-    if (settings.deniedLicenses.isNotEmpty() && spdxId != null) {
-        if (spdxId in settings.deniedLicenses) {
+    // 1. Denied list check (OR-семантика: violation если ВСЕ denied)
+    if (settings.deniedLicenses.isNotEmpty() && spdxIds.isNotEmpty()) {
+        val allDenied = spdxIds.all { it in settings.deniedLicenses }
+        if (allDenied) {
             violations.add(LicenseViolation(
                 alias = lib.alias,
                 group = lib.group,
                 artifact = lib.artifact,
-                detectedLicense = spdxId,
-                category = result.category,
-                message = "License '$spdxId' is in denied list",
+                detectedLicense = licenseExpression,
+                category = licenses.first().category,
+                message = "All licenses are in denied list: $licenseExpression",
             ))
         }
     }
 
-    // 2. Allowed list check (whitelist)
-    if (settings.allowedLicenses.isNotEmpty() && spdxId != null) {
-        if (spdxId !in settings.allowedLicenses) {
+    // 2. Allowed list check (OR-семантика: OK если хотя бы одна в allowed)
+    if (settings.allowedLicenses.isNotEmpty() && spdxIds.isNotEmpty()) {
+        val anyAllowed = spdxIds.any { it in settings.allowedLicenses }
+        if (!anyAllowed) {
             violations.add(LicenseViolation(
                 alias = lib.alias,
                 group = lib.group,
                 artifact = lib.artifact,
-                detectedLicense = spdxId,
-                category = result.category,
-                message = "License '$spdxId' is not in allowed list",
+                detectedLicense = licenseExpression,
+                category = licenses.first().category,
+                message = "None of the licenses are in allowed list: $licenseExpression",
             ))
         }
     }
 
-    // 3. Copyleft warning
-    if (settings.warnOnCopyleft && result.category in listOf(
-            LicenseCategory.WEAK_COPYLEFT,
-            LicenseCategory.STRONG_COPYLEFT
-        )) {
+    // 3. Copyleft warning (любая из лицензий copyleft)
+    val copyleftLicenses = licenses.filter {
+        it.category in listOf(LicenseCategory.WEAK_COPYLEFT, LicenseCategory.STRONG_COPYLEFT)
+    }
+    if (settings.warnOnCopyleft && copyleftLicenses.isNotEmpty()) {
+        val copyleftIds = copyleftLicenses.mapNotNull { it.spdxId }.joinToString(", ")
         diagnostics.add(Diagnostics.warning(
             "LICENSE_COPYLEFT",
-            "Library '${lib.alias}' uses copyleft license '$spdxId' (${result.category})"
+            "Library '${lib.alias}' has copyleft license(s): $copyleftIds"
         ))
     }
 
-    // 4. Unknown warning
-    if (settings.warnOnUnknown && result.category == LicenseCategory.UNKNOWN) {
+    // 4. Unknown warning (все лицензии unknown)
+    if (settings.warnOnUnknown && licenses.all { it.category == LicenseCategory.UNKNOWN }) {
         diagnostics.add(Diagnostics.warning(
             "LICENSE_UNKNOWN",
             "License for library '${lib.alias}' (${lib.group}:${lib.artifact}:${lib.version?.value}) is unknown"
         ))
     }
-}
-----
-
-=== Dual-license логика
-
-[source,kotlin]
-----
-/**
- * Для dual-licensed библиотек (MIT OR Apache-2.0):
- * - Denied: если хотя бы одна альтернативная лицензия НЕ denied -> OK
- * - Allowed: если хотя бы одна лицензия в allowed -> OK
- * - Все лицензии denied -> violation
- */
-private fun checkDualLicensePolicies(
-    lib: EffectiveLibrary,
-    licenses: List<LicenseResult>,
-    settings: LicenseCheckSettings,
-): LicenseViolation? {
-    // Denied check: все лицензии в denied list -> violation
-    if (settings.deniedLicenses.isNotEmpty()) {
-        val allDenied = licenses.all { it.spdxId in settings.deniedLicenses }
-        if (allDenied) {
-            return LicenseViolation(
-                alias = lib.alias,
-                group = lib.group,
-                artifact = lib.artifact,
-                detectedLicense = licenses.mapNotNull { it.spdxId }.joinToString(" OR "),
-                category = licenses.first().category,
-                message = "All licenses are in denied list: ${licenses.mapNotNull { it.spdxId }.joinToString(" OR ")}",
-            )
-        }
-    }
-
-    // Allowed check: ни одна лицензия не в allowed list -> violation
-    if (settings.allowedLicenses.isNotEmpty()) {
-        val anyAllowed = licenses.any { it.spdxId in settings.allowedLicenses }
-        if (!anyAllowed) {
-            return LicenseViolation(
-                alias = lib.alias,
-                group = lib.group,
-                artifact = lib.artifact,
-                detectedLicense = licenses.mapNotNull { it.spdxId }.joinToString(" OR "),
-                category = licenses.first().category,
-                message = "None of the licenses are in allowed list: ${licenses.mapNotNull { it.spdxId }.joinToString(" OR ")}",
-            )
-        }
-    }
-
-    return null
 }
 ----
 
@@ -646,7 +639,7 @@ internal class LicenseCache(
     private val ttl: Duration = 7.days,
     private val json: Json = Json { prettyPrint = true; ignoreUnknownKeys = true },
 ) {
-    suspend fun get(group: String, artifact: String, version: String): LicenseResult? {
+    suspend fun get(group: String, artifact: String, version: String): List<LicenseResult>? {
         val file = cacheFile(group, artifact, version)
         if (!file.exists()) return null
 
@@ -654,17 +647,17 @@ internal class LicenseCache(
         if (age > ttl) return null
 
         return try {
-            json.decodeFromString<LicenseResult>(file.readText())
+            json.decodeFromString<List<LicenseResult>>(file.readText())
         } catch (e: Exception) {
             logger.warn(e) { "Failed to read license cache for $group:$artifact:$version" }
             null
         }
     }
 
-    suspend fun put(group: String, artifact: String, version: String, result: LicenseResult) {
+    suspend fun put(group: String, artifact: String, version: String, results: List<LicenseResult>) {
         val file = cacheFile(group, artifact, version)
         file.parentFile.mkdirs()
-        file.writeText(json.encodeToString(result))
+        file.writeText(json.encodeToString(results))
     }
 
     fun invalidate(group: String, artifact: String, version: String) {
@@ -692,9 +685,9 @@ internal class LicenseCache(
 | Оба источника недоступны, кеш пуст | category=UNKNOWN, WARNING/ERROR | `LICENSE_ALL_SOURCES_FAILED`
 | Кеш есть, сеть недоступна | Используется стейл кеш + WARNING | `LICENSE_STALE_CACHE`
 | Лицензия не в SPDX | spdxId=null, category=PROPRIETARY | `LICENSE_NON_SPDX`
-| Dual-license (MIT OR Apache-2.0) | Обе лицензии сохраняются, при проверке достаточно одной в allowed | --
-| Dual-license с denied | Если есть альтернатива не в denied -> OK | --
-| Все лицензии denied | violation "All licenses are in denied list" | `LICENSE_ALL_DENIED`
+| Dual-license (MIT OR Apache-2.0) | resolve() возвращает 2 LicenseResult, checkPolicies проверяет обе с OR-семантикой | --
+| Dual-license с denied | GPL-3.0 OR MIT, denied=[GPL-3.0] -> OK (MIT альтернатива не denied) | --
+| Все лицензии denied | GPL-3.0 OR AGPL-3.0, обе denied -> violation "All licenses are in denied list" | `LICENSE_ALL_DENIED`
 | Пустой whitelist | Whitelist отключён, все разрешены кроме denied | --
 | Whitelist + denied конфликт | Denied имеет приоритет -> violation | --
 | User-defined override | DSL license("MIT") приоритет над POM | --
@@ -702,7 +695,8 @@ internal class LicenseCache(
 | POM без секции licenses | Переход к ClearlyDefined | --
 | Deprecated SPDX ID | Нормализация к актуальному (GPL-2.0 -> GPL-2.0-only) | --
 | Private библиотека | ClearlyDefined не найдёт, category=UNKNOWN | --
-| SPDX expression (MIT AND Apache-2.0) | Парсинг expression, проверка каждой лицензии | --
+| SPDX expression "MIT OR Apache-2.0" | parseSpdxExpression() split по OR -> 2 LicenseResult | --
+| SPDX expression "MIT AND Apache-2.0" | AND не split, трактуется как одна лицензия | --
 | Пустой каталог | 0 violations, INFO | `LICENSE_NO_LIBS`
 | Таймаут ClearlyDefined | Retry 3 раза, затем WARNING | `LICENSE_CD_TIMEOUT`
 | Rate limiting (429) | Exponential backoff (1s, 2s, 4s) | `LICENSE_RATE_LIMITED`
@@ -754,16 +748,22 @@ metadata.licenseViolations // -> List<LicenseViolation>
 | Тест | Описание
 
 | `no libraries returns empty` | Пустой каталог -> 0 violations, INFO
-| `license from Maven POM` | POM содержит Apache-2.0 -> LicenseResult(source=MAVEN_POM)
-| `license from ClearlyDefined` | POM пуст, CD возвращает MIT -> LicenseResult(source=CLEARLY_DEFINED)
-| `user-defined license has priority` | DSL license("MIT"), POM Apache-2.0 -> MIT используется
-| `unknown license when all fail` | POM и CD недоступны -> category=UNKNOWN
+| `license from Maven POM` | POM содержит Apache-2.0 -> listOf(LicenseResult(source=MAVEN_POM))
+| `multiple licenses from POM` | POM содержит 2 <license> -> listOf(LicenseResult, LicenseResult)
+| `license from ClearlyDefined` | POM пуст, CD возвращает MIT -> listOf(LicenseResult(source=CLEARLY_DEFINED))
+| `SPDX expression from CD` | CD declared="MIT OR Apache-2.0" -> 2 LicenseResult
+| `user-defined license has priority` | DSL license("MIT"), POM Apache-2.0 -> listOf(MIT)
+| `unknown license when all fail` | POM и CD недоступны -> listOf(category=UNKNOWN)
 | `SPDX normalization` | "The Apache License, Version 2.0" -> "Apache-2.0"
 | `category classification` | Apache-2.0 -> PERMISSIVE, GPL-3.0 -> STRONG_COPYLEFT
 | `denied license violation` | GPL-3.0 в deniedLicenses -> LicenseViolation
 | `allowed license not in list` | BSD-3-Clause не в allowedLicenses -> LicenseViolation
-| `dual-license with alternative` | GPL-3.0 OR MIT, denied=GPL-3.0 -> OK (MIT альтернатива)
-| `dual-license all denied` | GPL-3.0 OR AGPL-3.0, обе denied -> violation
+| `dual-license denied with alternative` | GPL-3.0 OR MIT, denied=[GPL-3.0] -> OK (MIT not denied)
+| `dual-license all denied` | GPL-3.0 OR AGPL-3.0, denied=[GPL-3.0, AGPL-3.0] -> violation
+| `dual-license allowed one match` | GPL-3.0 OR MIT, allowed=[MIT] -> OK
+| `dual-license allowed none match` | GPL-3.0 OR AGPL-3.0, allowed=[MIT] -> violation
+| `SPDX OR parsing` | "MIT OR Apache-2.0" -> ["MIT", "Apache-2.0"]
+| `SPDX AND not split` | "MIT AND Apache-2.0" -> ["MIT AND Apache-2.0"] (single entry)
 | `copyleft warning` | LGPL-2.1 + warnOnCopyleft -> WARNING
 | `unknown warning` | category=UNKNOWN + warnOnUnknown -> WARNING
 | `failOnDenied adds ERROR` | denied + failOnDenied -> ERROR в diagnostics
@@ -805,7 +805,7 @@ dependanger-license зависит от:
 | Файл | Изменение
 
 | `LicenseCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, резолвинг лицензий, проверка политик
-| `LicenseResolver.kt` | Реализация `resolve()` -- мульти-источниковый резолвинг (DECLARED > MAVEN_POM > CLEARLY_DEFINED)
+| `LicenseResolver.kt` | Реализация `resolve()` -> `List<LicenseResult>` -- мульти-источниковый резолвинг (DECLARED > MAVEN_POM > CLEARLY_DEFINED) с поддержкой dual-license
 | `SpdxLicenseMapper.kt` | **Создать** -- нормализация названий лицензий в SPDX ID + категоризация
 | `ClearlyDefinedClient.kt` | **Создать** -- HTTP клиент для ClearlyDefined API
 | `ClearlyDefinedModels.kt` | **Создать** -- @Serializable модели для ClearlyDefined API response

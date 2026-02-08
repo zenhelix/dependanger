@@ -104,12 +104,12 @@
 
 | xref:SPEC-15-dependanger-gradle-plugin.adoc[SPEC-15]
 | `dependanger-gradle-plugin`
-| 14 Gradle-тасков
+| 13 Gradle-тасков (ProcessTask удалена)
 | HIGH
-| 14
+| 13
 |===
 
-**Итого TODO-заглушек:** ~90
+**Итого TODO-заглушек:** ~89
 
 [[dependency-graph]]
 == Граф зависимостей модулей

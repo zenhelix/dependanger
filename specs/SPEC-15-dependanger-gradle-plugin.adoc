@@ -667,8 +667,8 @@ public fun execute() {
         throw GradleException("Dependanger: Failed to check updates")
     }
 
-    val effective = result.effective ?: return
-    val updates = effective.updates
+    // Extraction-методы определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
+    val updates = result.extractUpdateData()
 
     if (updates.isEmpty()) {
         logger.lifecycle("Dependanger: All dependencies are up to date.")
@@ -841,13 +841,12 @@ public fun execute() {
 
     val result = runBlocking { dependanger.process() }
 
-    val effective = result.effective
-    if (effective == null) {
+    if (!result.isSuccess) {
         logger.error("Dependanger: Cannot run security check -- processing failed")
         return
     }
 
-    val vulnerabilities = effective.vulnerabilities
+    val vulnerabilities = result.extractSecurityData()
 
     if (vulnerabilities.isEmpty()) {
         logger.lifecycle("Dependanger: No known vulnerabilities found.")
@@ -897,13 +896,12 @@ public fun execute() {
 
     val result = runBlocking { dependanger.process() }
 
-    val effective = result.effective
-    if (effective == null) {
+    if (!result.isSuccess) {
         logger.error("Dependanger: Cannot run license check -- processing failed")
         return
     }
 
-    val licenseViolations = effective.licenseViolations
+    val licenseViolations = result.extractLicenseData()
 
     val denied = licenseViolations.filter { it.status == "DENIED" }
     val unknown = licenseViolations.filter { it.status == "UNKNOWN" }
@@ -950,17 +948,16 @@ public fun execute() {
 
     val result = runBlocking { dependanger.process() }
 
-    val effective = result.effective
-    if (effective == null) {
+    if (!result.isSuccess) {
         logger.error("Dependanger: Cannot resolve transitives -- processing failed")
         return
     }
 
-    val trees = effective.transitives
-    val conflicts = effective.versionConflicts
+    val trees = result.extractTransitiveData()
+    val conflicts = result.extractVersionConflicts()
 
     logger.lifecycle("Dependanger: Resolved transitive dependencies:")
-    logger.lifecycle("  Direct dependencies: ${effective.libraries.size}")
+    logger.lifecycle("  Direct dependencies: ${result.effective?.libraries?.size ?: 0}")
     logger.lifecycle("  Dependency trees: ${trees.size}")
     logger.lifecycle("  Version conflicts: ${conflicts.size}")
 

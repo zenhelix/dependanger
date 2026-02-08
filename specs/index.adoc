@@ -92,9 +92,9 @@
 
 | xref:SPEC-13-dependanger-api.adoc[SPEC-13]
 | `dependanger-api`
-| Фасад API (`Dependanger`, `DependangerBuilder`, `DependangerResult`)
+| Фасад API (`Dependanger`, `DependangerBuilder`, `DependangerResult`, extraction-методы)
 | CRITICAL
-| 4
+| ~5
 
 | xref:SPEC-14-dependanger-cli.adoc[SPEC-14]
 | `dependanger-cli`
@@ -109,7 +109,7 @@
 | 13
 |===
 
-**Итого TODO-заглушек:** ~89
+**Итого TODO-заглушек:** ~95
 
 [[dependency-graph]]
 == Граф зависимостей модулей

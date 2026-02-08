@@ -1077,13 +1077,16 @@ override fun run() = runBlocking {
 [source,text]
 ----
 1. Загрузить metadata из input
-2. Создать Dependanger с STRICT preset (все optional процессоры включены)
-3. Вызвать process() (включает feature-процессоры)
-4. Извлечь результаты из extensions EffectiveMetadata
+2. Создать Dependanger с DEFAULT preset + enableOptional для нужного feature-процессора
+3. Вызвать process() (запускает только нужный feature-процессор)
+4. Извлечь результаты через extraction-методы DependangerResult (определены в dependanger-api, см. SPEC-13)
 5. Отформатировать результат (text/json)
 6. Записать в output файл (если указан)
 7. Определить exit code по результатам и fail-on-* опциям
 ----
+
+NOTE: Каждая команда анализа включает только тот feature-процессор, который ей нужен, через `configureProcessing { enableOptional("processor-id") }`.
+Это консистентно с подходом Gradle-тасков (SPEC-15) и избегает ненужного запуска всех 19 процессоров.
 
 === CheckUpdatesCommand
 
@@ -1093,7 +1096,7 @@ override fun run() = runBlocking {
     val metadata = MetadataIO.load(Path.of(input))
 
     val dependanger = Dependanger.fromMetadata(metadata)
-        .preset(ProcessingPreset.STRICT)
+        .configureProcessing { enableOptional("update-check") }
         .build()
 
     val result = dependanger.process()
@@ -1103,9 +1106,8 @@ override fun run() = runBlocking {
         throw ProgramResult(ExitCodes.ERROR)
     }
 
-    // Извлечь данные обновлений из extensions EffectiveMetadata
-    // См. <<helper-extract-extensions>> -- extension-функции в cli/util/
-    val updates = result.effective!!.extractUpdateData()
+    // Extraction-методы определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
+    val updates = result.extractUpdateData()
 
     when (format) {
         "json" -> printJsonUpdates(updates)
@@ -1130,15 +1132,13 @@ override fun run() = runBlocking {
     val metadata = MetadataIO.load(Path.of(input))
 
     val builder = Dependanger.fromMetadata(metadata)
-        .preset(ProcessingPreset.STRICT)
+        .configureProcessing { enableOptional("compatibility-analysis") }
     targetJdk?.let { builder.jdkVersion(it) }
 
     val dependanger = builder.build()
     val result = dependanger.process()
 
-    // Извлечь данные анализа совместимости из extensions/diagnostics
-    // См. <<helper-extract-extensions>> -- extension-функции в cli/util/
-    val issues = result.effective!!.extractCompatibilityIssues()
+    val issues = result.extractCompatibilityIssues()
 
     when (format) {
         "json" -> printJsonAnalysis(issues)
@@ -1161,12 +1161,12 @@ override fun run() = runBlocking {
     val metadata = MetadataIO.load(Path.of(input))
 
     val dependanger = Dependanger.fromMetadata(metadata)
-        .preset(ProcessingPreset.STRICT)
+        .configureProcessing { enableOptional("security-check") }
         .build()
 
     val result = dependanger.process()
 
-    val vulnerabilities = result.effective!!.extractSecurityData()
+    val vulnerabilities = result.extractSecurityData()
 
     // Фильтрация по severity и ignore-списку
     val filtered = vulnerabilities
@@ -1195,12 +1195,12 @@ override fun run() = runBlocking {
     val metadata = MetadataIO.load(Path.of(input))
 
     val dependanger = Dependanger.fromMetadata(metadata)
-        .preset(ProcessingPreset.STRICT)
+        .configureProcessing { enableOptional("license-check") }
         .build()
 
     val result = dependanger.process()
 
-    val licenses = result.effective!!.extractLicenseData()
+    val licenses = result.extractLicenseData()
 
     // Применение allow/deny списков из CLI опций
     val allowList = allow?.split(",")?.map { it.trim() }
@@ -1232,12 +1232,12 @@ override fun run() = runBlocking {
     val metadata = MetadataIO.load(Path.of(input))
 
     val dependanger = Dependanger.fromMetadata(metadata)
-        .preset(ProcessingPreset.STRICT)
+        .configureProcessing { enableOptional("transitive-resolver") }
         .build()
 
     val result = dependanger.process()
 
-    val transitives = result.effective!!.extractTransitiveData()
+    val transitives = result.extractTransitiveData()
 
     when (format) {
         "json" -> printJsonTransitives(transitives)
@@ -1258,12 +1258,14 @@ override fun run() = runBlocking {
 [source,text]
 ----
 1. Загрузить metadata из input
-2. Создать Dependanger с STRICT preset (все процессоры)
+2. Создать Dependanger с STRICT preset (все процессоры -- отчёт требует данных из всех features)
 3. Вызвать process() для полной обработки
 4. Собрать отчёт из всех секций
 5. Отформатировать по формату (json, yaml, markdown, html)
 6. Записать в outputDir
 ----
+
+NOTE: ReportCommand -- единственная команда анализа, использующая STRICT preset, т.к. отчёт агрегирует данные из всех feature-процессоров (обновления, уязвимости, лицензии, транзитивы, совместимость).
 
 === Реализация
 
@@ -1304,40 +1306,21 @@ override fun run() = runBlocking {
 Рекомендуется создать общие утилиты для всех команд в пакете `cli/util/`.
 
 [[helper-extract-extensions]]
-=== Паттерн: extension-функции извлечения данных из EffectiveMetadata
+=== Паттерн: extraction-методы через DependangerResult (dependanger-api)
 
-Все функции вида `extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()` и `extractCompatibilityIssues()` определены как `internal` extension-функции на `EffectiveMetadata` в пакете `cli/util/`.
-Они инкапсулируют логику обращения к `extensions` и обеспечивают type-safe доступ к данным, заполненным соответствующими feature-процессорами.
+[IMPORTANT]
+====
+Extraction-методы (`extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()`, `extractCompatibilityIssues()`) определены как extension-функции на `DependangerResult` в модуле `dependanger-api` (файл `DependangerResultExtensions.kt`, см.
+SPEC-13).
 
-[source,kotlin]
-----
-// cli/util/EffectiveMetadataExtensions.kt
-package io.github.zenhelix.dependanger.cli.util
+Это позволяет:
 
-import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
-import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
-import io.github.zenhelix.dependanger.effective.model.getExtension
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
+* CLI не зависеть напрямую от feature-модулей (соблюдается 4-слойная архитектура: INTERFACES -> API -> FEATURES)
+* API инкапсулирует знание о ExtensionKey (API и так зависит от feature-модулей как `implementation`)
+* Вызов из CLI: `result.extractUpdateData()` вместо `result.effective!!.extractUpdateData()`
 
-internal fun EffectiveMetadata.extractUpdateData(): List<UpdateAvailableInfo> =
-    getExtension(UpdatesExtensionKey) ?: emptyList()
-
-internal fun EffectiveMetadata.extractSecurityData(): List<VulnerabilityInfo> =
-    getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
-
-internal fun EffectiveMetadata.extractLicenseData(): List<LicenseViolation> =
-    getExtension(LicenseViolationsExtensionKey) ?: emptyList()
-
-internal fun EffectiveMetadata.extractTransitiveData(): List<TransitiveTree> =
-    getExtension(TransitivesExtensionKey) ?: emptyList()
-----
-
-NOTE: Благодаря этому паттерну, команды анализа (<<spec-analysis-commands>>) вызывают extraction-методы как `result.effective!!.extractUpdateData()` вместо прямого обращения к `getExtension(...)`, что повышает читаемость и изолирует знание о ключах extensions в одном месте.
+Файл `EffectiveMetadataExtensions.kt` в CLI **НЕ СОЗДАЁТСЯ** -- вместо него используются методы из dependanger-api.
+====
 
 === parseVersionOption
 
@@ -1439,18 +1422,8 @@ private fun formatSuccess(msg: String): String = msg
 ----
 dependanger-cli зависит от:
   implementation:
-    - dependanger-api
-    - dependanger-core
-    - dependanger-effective
-    - dependanger-metadata-json
-    - dependanger-generator-toml
-    - dependanger-generator-bom
-    - dependanger-updates
-    - dependanger-analysis
-    - dependanger-report
-    - dependanger-security
-    - dependanger-license
-    - dependanger-transitive
+    - dependanger-api                            # Фасад + extraction-методы (транзитивно: core, effective, generators)
+    - dependanger-metadata-json                  # Для MetadataIO (загрузка/сохранение metadata.json)
     - com.github.ajalt.clikt:clikt:5.0.3
     - com.github.ajalt.mordant:mordant:3.0.2
     - kotlinx-coroutines-core:1.10.1
@@ -1513,12 +1486,13 @@ dependanger-cli зависит от:
 [[priority]]
 == Приоритет
 
-**MEDIUM** -- CLI зависит от dependanger-api (SPEC-13) и все feature-модули.
+**MEDIUM** -- CLI зависит от dependanger-api (SPEC-13).
+Feature-модули доступны транзитивно через API.
 
 Рекомендуемый порядок реализации:
 
 1. **Утилиты**: ExitCodes, MetadataIO, OutputFormatter, ConfigLoader -- базовая инфраструктура
 2. **CRUD-команды**: InitCommand -> Add* -> Remove* -> Update* -> MigrateDeprecated -- не требуют API фасада
 3. **Processing-команды**: ValidateCommand, ProcessCommand, GenerateCommand -- требуют Dependanger API
-4. **Analysis-команды**: CheckUpdates, Analyze, SecurityCheck, LicenseCheck, ResolveTransitives -- требуют feature-модули
+4. **Analysis-команды**: CheckUpdates, Analyze, SecurityCheck, LicenseCheck, ResolveTransitives -- требуют extraction-методы из dependanger-api
 5. **ReportCommand** -- требует все предыдущие

@@ -55,8 +55,8 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
    c. Парсить ответ: OSV batch API гарантирует `results[i]` соответствует `queries[i]` (1:1 по индексу). Если пакет не найден, `results[i].vulns` будет `null` или пустой список
 5. Для каждой найденной уязвимости:
    a. Извлечь CVE ID из aliases
-   b. Парсить CVSS score из severity
-   c. Определить severity (CRITICAL/HIGH/MEDIUM/LOW) по CVSS score
+   b. Парсить CVSS score из severity vector через cvss-calculator (приоритет: v4 > v3 > v2)
+   c. Определить severity (CRITICAL/HIGH/MEDIUM/LOW) по CVSS base score
    d. Извлечь fixedVersion из affected[].ranges
    e. Создать VulnerabilityInfo
 6. Отфильтровать ignoreVulnerabilities
@@ -84,9 +84,9 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
       i.   Извлечь id (OSV ID, например GHSA-xxx)
       ii.  Извлечь aliases (CVE-xxx)
       iii. Извлечь summary
-      iv.  Парсить severity[].score (CVSS v3 vector string)
-      v.   Рассчитать cvssScore из CVSS vector
-      vi.  Определить VulnerabilitySeverity по score
+      iv.  Парсить severity[].score через Cvss.fromVector() (CVSS v2/v3/v3.1/v4 auto-detect)
+      v.   Получить baseScore через cvss.calculateScore().baseScore
+      vi.  Определить VulnerabilitySeverity по baseScore
       vii. Извлечь fixedVersion из affected[].ranges[].events[].fixed
       viii.Извлечь references[].url
    e. Создать VulnerabilityInfo для каждой уязвимости
@@ -142,9 +142,11 @@ public class OsvApiClient(
 
     private fun mapToVulnerabilityInfo(vuln: OsvVulnerability): VulnerabilityInfo {
         val cveId = vuln.aliases?.firstOrNull { it.startsWith("CVE-") }
-        val cvssScore = vuln.severity
-            ?.firstOrNull { it.type == "CVSS_V3" }
-            ?.let { parseCvssScore(it.score) }
+        // Приоритет: CVSS_V4 > CVSS_V3 > CVSS_V2
+        val cvssEntry = vuln.severity?.firstOrNull { it.type == "CVSS_V4" }
+            ?: vuln.severity?.firstOrNull { it.type == "CVSS_V3" }
+            ?: vuln.severity?.firstOrNull { it.type == "CVSS_V2" }
+        val cvssScore = cvssEntry?.let { parseCvssScore(it.score) }
         val severity = cvssScoreToSeverity(cvssScore)
         val fixedVersion = vuln.affected
             ?.flatMap { it.ranges ?: emptyList() }
@@ -170,31 +172,35 @@ public class OsvApiClient(
 
 ==== CVSS Score парсинг
 
+Для вычисления numeric CVSS score из vector string используется библиотека https://github.com/stevespringett/cvss-calculator[cvss-calculator] (`us.springett:cvss-calculator:1.5.1`).
+
+Библиотека поддерживает CVSS v2, v3.0, v3.1 и v4.0.
+Auto-detect формата через `Cvss.fromVector()`.
+
 [source,kotlin]
 ----
+import us.springett.cvss.Cvss
+
 /**
- * Парсит CVSS v3 vector string и извлекает score.
- * Пример: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H" -> 10.0
+ * Парсит CVSS vector string и вычисляет Base Score.
+ * Поддерживает CVSS v2, v3.0, v3.1, v4.0.
  *
- * Для упрощения используется приблизительный расчёт по Base Score metrics.
- * В production рекомендуется использовать библиотеку для точного расчёта.
+ * Примеры:
+ *   "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H" -> 10.0
+ *   "AV:N/AC:L/Au:N/C:C/I:C/A:C" -> 10.0 (CVSS v2)
+ *   "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/..." -> score (CVSS v4)
  */
 private fun parseCvssScore(vector: String): Double? {
-    // Упрощённый парсинг: если вектор содержит числовой score
-    // OSV иногда возвращает score напрямую
+    // Если вектор уже содержит числовой score (редко, но возможно)
     vector.toDoubleOrNull()?.let { return it }
 
-    // Парсинг CVSS:3.x/... vector
-    if (!vector.startsWith("CVSS:3")) return null
-
-    // Приблизительный расчёт по ключевым метрикам
-    val metrics = vector.substringAfter("/").split("/").associate {
-        val (key, value) = it.split(":")
-        key to value
+    return try {
+        val cvss = Cvss.fromVector(vector)
+        cvss.calculateScore().baseScore
+    } catch (e: Exception) {
+        logger.warn { "Failed to parse CVSS vector: $vector (${e.message})" }
+        null
     }
-    // Используем lookup таблицу для основных комбинаций
-    // или делегируем к CVSS calculator library
-    return approximateCvssScore(metrics)
 }
 
 private fun cvssScoreToSeverity(score: Double?): VulnerabilitySeverity = when {
@@ -207,22 +213,8 @@ private fun cvssScoreToSeverity(score: Double?): VulnerabilitySeverity = when {
 }
 ----
 
-==== CVSS Fallback: Severity Lookup Table
-
-Если CVSS_V3 score недоступен, используется lookup table по severity string из OSV response:
-
-[source,kotlin]
-----
-private fun severityStringToScore(severity: String): Double = when (severity.uppercase()) {
-    "CRITICAL" -> 9.0
-    "HIGH" -> 7.0
-    "MEDIUM" -> 4.0
-    "LOW" -> 1.0
-    else -> 0.0
-}
-----
-
-Приоритет: точный CVSS v3 score > lookup по severity string.
+NOTE: Библиотека `cvss-calculator` нативно обрабатывает CVSS v2 vector strings (формат `AV:N/AC:L/Au:N/...`), поэтому отдельная конвертация v2 → v3 не нужна.
+`Cvss.fromVector()` автоматически определяет версию и применяет соответствующую формулу.
 
 [[api-spec]]
 == API: OSV Batch Query
@@ -390,10 +382,12 @@ internal data class OsvReference(val type: String? = null, val url: String? = nu
 | fixedVersion недоступен | fixedVersion=null, рекомендация "check manually" | --
 | Множественные уязвимости | Отдельный VulnerabilityInfo для каждой | --
 | Пустой каталог | 0 уязвимостей, INFO | `SECURITY_NO_VULNS`
-| Невалидный CVSS | WARNING, severity по текстовому полю | `SECURITY_INVALID_CVSS`
+| Невалидный CVSS vector | WARNING, severity = UNKNOWN | `SECURITY_INVALID_CVSS`
 | Игнорируемая уязвимость + failOnVulnerability | Уязвимость из ignoreVulnerabilities не учитывается при проверке failOnVulnerability, pipeline продолжается | --
 | > 1000 библиотек | Batch splitting по 1000 | --
-| CVSS v2 only | Конвертация -> approximate v3 + WARNING | `SECURITY_CVSS_V2`
+| CVSS v2 only | Нативный расчёт v2 score через cvss-calculator, WARNING | `SECURITY_CVSS_V2`
+| CVSS v4 | Нативный расчёт v4 score через cvss-calculator | --
+| Нет severity в OSV response | severity = UNKNOWN, cvssScore = null | --
 |===
 
 [[diagnostic-codes]]
@@ -410,8 +404,8 @@ internal data class OsvReference(val type: String? = null, val url: String? = nu
 | `SECURITY_STALE_CACHE` | Используется устаревший кеш | WARNING
 | `SECURITY_TIMEOUT` | Таймаут запроса к OSV | WARNING
 | `SECURITY_RATE_LIMITED` | Rate limiting от OSV | WARNING
-| `SECURITY_INVALID_CVSS` | Невалидный CVSS score | WARNING
-| `SECURITY_CVSS_V2` | Только CVSS v2 доступен | WARNING
+| `SECURITY_INVALID_CVSS` | Невалидный CVSS vector (не удалось распарсить) | WARNING
+| `SECURITY_CVSS_V2` | Только CVSS v2 доступен (score вычислен по v2 формуле) | INFO
 |===
 
 [[extension-keys]]
@@ -457,6 +451,7 @@ metadata.vulnerabilities // -> List<VulnerabilityInfo>
 dependanger-security зависит от:
 - dependanger-core (api)
 - dependanger-effective (api)
+- us.springett:cvss-calculator:1.5.1 (implementation) -- CVSS v2/v3/v3.1/v4 score calculation
 - io.ktor:ktor-client-core:3.1.1 (implementation)
 - io.ktor:ktor-client-cio:3.1.1 (implementation)
 - io.ktor:ktor-client-content-negotiation:3.1.1 (implementation)
@@ -474,9 +469,8 @@ dependanger-security зависит от:
 | Файл | Изменение
 
 | `SecurityCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, batch-запрос, фильтрация
-| `OsvApiClient.kt` | Реализация `queryVulnerabilities()` и `queryBatch()` -- HTTP-запросы к OSV
+| `OsvApiClient.kt` | Реализация `queryBatch()` -- HTTP-запросы к OSV. Стаб-метод `queryVulnerabilities()` заменяется на `queryBatch()`
 | `OsvModels.kt` | **Создать** -- @Serializable модели для OSV API request/response
-| `CvssParser.kt` | **Создать** -- парсинг CVSS v3 vector string
 | `SecurityCache.kt` | **Создать** -- файловый кеш результатов сканирования
 |===
 

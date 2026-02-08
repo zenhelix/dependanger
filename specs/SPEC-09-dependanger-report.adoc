@@ -81,6 +81,79 @@ public data class ReportBundle(
     val alias: String,
     val libraries: List<String>,
 )
+
+@Serializable
+public data class ReportDeprecated(
+    val alias: String,
+    val reason: String? = null,
+    val replacement: String? = null,
+)
+
+@Serializable
+public data class ReportUpdate(
+    val alias: String,
+    val currentVersion: String,
+    val availableVersion: String,
+    val type: String, // MAJOR, MINOR, PATCH
+)
+
+@Serializable
+public data class ReportCompatibilityIssue(
+    val ruleId: String,
+    val severity: String,
+    val message: String,
+    val suggestion: String? = null,
+)
+
+@Serializable
+public data class ReportVulnerability(
+    val id: String,
+    val cveId: String? = null,
+    val library: String,
+    val severity: String,
+    val cvssScore: Double? = null,
+    val fixedVersion: String? = null,
+    val summary: String,
+)
+
+@Serializable
+public data class ReportLicense(
+    val library: String,
+    val licenseName: String,
+    val status: String, // ALLOWED, DENIED, UNKNOWN
+)
+
+@Serializable
+public data class ReportTransitives(
+    val directCount: Int,
+    val transitiveCount: Int,
+    val conflictCount: Int,
+    val conflicts: List<ReportConflict> = emptyList(),
+)
+
+@Serializable
+public data class ReportConflict(
+    val artifact: String,
+    val versions: List<String>,
+)
+
+@Serializable
+public data class ReportConstraint(
+    val type: String,
+    val description: String,
+)
+
+@Serializable
+public data class ReportValidation(
+    val errors: List<ReportDiagnostic> = emptyList(),
+    val warnings: List<ReportDiagnostic> = emptyList(),
+)
+
+@Serializable
+public data class ReportDiagnostic(
+    val code: String,
+    val message: String,
+)
 ----
 
 [[spec-report-generator]]
@@ -120,9 +193,9 @@ public data class ReportBundle(
    - validationErrors, validationWarnings
 4. Сериализовать в формат:
    a. JSON -> kotlinx-serialization Json.encodeToString с prettyPrint
-   b. YAML -> конвертация из JSON: kotlinx-serialization-json -> JSON string -> manual YAML conversion (простая конвертация без внешних зависимостей)
-   c. Markdown -> шаблонный рендеринг
-   d. HTML -> шаблонный рендеринг (обёртка над Markdown)
+   b. YAML -> kaml (kotlinx-serialization YAML): Yaml.default.encodeToString(data)
+   c. Markdown -> шаблонный рендеринг (buildString, все 13 секций)
+   d. HTML -> Markdown -> commonmark-java Parser+HtmlRenderer -> HTML template с CSS
 5. Если outputDir указан -> записать файл (atomic write)
 6. Вернуть DependangerReport(format, content, outputPath)
 ----
@@ -230,7 +303,22 @@ private fun renderJson(data: ReportData): String =
     json.encodeToString(data)
 ----
 
+==== YAML рендеринг
+
+Используется библиотека https://github.com/charleskorn/kaml[kaml] -- нативная kotlinx-serialization поддержка YAML.
+`ReportData` уже `@Serializable`, рендеринг -- одна строка.
+
+[source,kotlin]
+----
+import com.charleskorn.kaml.Yaml
+
+private fun renderYaml(data: ReportData): String =
+    Yaml.default.encodeToString(ReportData.serializer(), data)
+----
+
 ==== Markdown рендеринг
+
+Полный шаблонный рендеринг всех 13 секций отчёта.
 
 [source,kotlin]
 ----
@@ -241,7 +329,7 @@ private fun renderMarkdown(data: ReportData): String = buildString {
     data.distribution?.let { appendLine("Distribution: $it") }
     appendLine()
 
-    // Summary
+    // Summary (всегда)
     appendLine("## Summary")
     appendLine()
     appendLine("| Metric | Count |")
@@ -249,26 +337,220 @@ private fun renderMarkdown(data: ReportData): String = buildString {
     appendLine("| Libraries | ${data.summary.libraryCount} |")
     appendLine("| Plugins | ${data.summary.pluginCount} |")
     appendLine("| Bundles | ${data.summary.bundleCount} |")
+    if (data.summary.deprecatedCount > 0)
+        appendLine("| Deprecated | ${data.summary.deprecatedCount} |")
     if (data.summary.updatesAvailable > 0)
         appendLine("| Updates Available | ${data.summary.updatesAvailable} |")
-    if (data.summary.vulnerabilitiesCount > 0)
+    if (data.summary.vulnerabilitiesCount > 0) {
         appendLine("| Vulnerabilities | ${data.summary.vulnerabilitiesCount} |")
-    // ... остальные секции
+        appendLine("| Critical | ${data.summary.criticalVulnerabilities} |")
+        appendLine("| High | ${data.summary.highVulnerabilities} |")
+    }
+    if (data.summary.deniedLicenses > 0)
+        appendLine("| Denied Licenses | ${data.summary.deniedLicenses} |")
+    if (data.summary.compatibilityIssues > 0)
+        appendLine("| Compatibility Issues | ${data.summary.compatibilityIssues} |")
+    if (data.summary.validationErrors > 0)
+        appendLine("| Validation Errors | ${data.summary.validationErrors} |")
+    if (data.summary.validationWarnings > 0)
+        appendLine("| Validation Warnings | ${data.summary.validationWarnings} |")
 
     // Libraries
     data.libraries?.let { libs ->
         appendLine()
-        appendLine("## Libraries")
+        appendLine("## Libraries (${libs.size})")
         appendLine()
         appendLine("| Alias | Coordinates | Version | Tags |")
         appendLine("|-------|------------|---------|------|")
         for (lib in libs) {
-            appendLine("| ${lib.alias} | ${lib.group}:${lib.artifact} | ${lib.version ?: "N/A"} | ${lib.tags} |")
+            val tags = lib.tags.joinToString(", ").ifEmpty { "-" }
+            appendLine("| ${lib.alias} | ${lib.group}:${lib.artifact} | ${lib.version ?: "N/A"} | $tags |")
         }
     }
 
-    // Updates, Vulnerabilities, etc. -- аналогично
+    // Plugins
+    data.plugins?.let { plugins ->
+        appendLine()
+        appendLine("## Plugins (${plugins.size})")
+        appendLine()
+        appendLine("| Alias | Plugin ID | Version |")
+        appendLine("|-------|-----------|---------|")
+        for (p in plugins) {
+            appendLine("| ${p.alias} | ${p.id} | ${p.version ?: "N/A"} |")
+        }
+    }
+
+    // Bundles
+    data.bundles?.let { bundles ->
+        appendLine()
+        appendLine("## Bundles (${bundles.size})")
+        appendLine()
+        for (b in bundles) {
+            appendLine("- **${b.alias}**: ${b.libraries.joinToString(", ")}")
+        }
+    }
+
+    // Deprecated
+    data.deprecated?.let { deprecated ->
+        appendLine()
+        appendLine("## Deprecated Libraries (${deprecated.size})")
+        appendLine()
+        appendLine("| Library | Reason | Replacement |")
+        appendLine("|---------|--------|-------------|")
+        for (d in deprecated) {
+            appendLine("| ${d.alias} | ${d.reason ?: "-"} | ${d.replacement ?: "-"} |")
+        }
+    }
+
+    // Updates
+    data.updates?.let { updates ->
+        appendLine()
+        appendLine("## Available Updates (${updates.size})")
+        appendLine()
+        appendLine("| Library | Current | Available | Type |")
+        appendLine("|---------|---------|-----------|------|")
+        for (u in updates) {
+            appendLine("| ${u.alias} | ${u.currentVersion} | ${u.availableVersion} | ${u.type} |")
+        }
+    }
+
+    // Compatibility Issues
+    data.compatibility?.let { issues ->
+        appendLine()
+        appendLine("## Compatibility Issues (${issues.size})")
+        appendLine()
+        appendLine("| Rule | Severity | Message | Suggestion |")
+        appendLine("|------|----------|---------|------------|")
+        for (issue in issues) {
+            appendLine("| ${issue.ruleId} | ${issue.severity} | ${issue.message} | ${issue.suggestion ?: "-"} |")
+        }
+    }
+
+    // Vulnerabilities
+    data.vulnerabilities?.let { vulns ->
+        appendLine()
+        appendLine("## Vulnerabilities (${vulns.size})")
+        appendLine()
+        appendLine("| Library | CVE | Severity | CVSS | Fixed In | Summary |")
+        appendLine("|---------|-----|----------|------|----------|---------|")
+        for (v in vulns) {
+            val cve = v.cveId ?: v.id
+            val cvss = v.cvssScore?.let { "%.1f".format(it) } ?: "-"
+            appendLine("| ${v.library} | $cve | ${v.severity} | $cvss | ${v.fixedVersion ?: "-"} | ${v.summary} |")
+        }
+    }
+
+    // Licenses
+    data.licenses?.let { licenses ->
+        appendLine()
+        appendLine("## Licenses (${licenses.size})")
+        appendLine()
+        appendLine("| Library | License | Status |")
+        appendLine("|---------|---------|--------|")
+        for (l in licenses) {
+            appendLine("| ${l.library} | ${l.licenseName} | ${l.status} |")
+        }
+    }
+
+    // Transitives
+    data.transitives?.let { transitives ->
+        appendLine()
+        appendLine("## Transitive Dependencies")
+        appendLine()
+        appendLine("- Direct: ${transitives.directCount}")
+        appendLine("- Transitive: ${transitives.transitiveCount}")
+        appendLine("- Conflicts: ${transitives.conflictCount}")
+        if (transitives.conflicts.isNotEmpty()) {
+            appendLine()
+            appendLine("### Version Conflicts")
+            appendLine()
+            appendLine("| Artifact | Versions |")
+            appendLine("|----------|----------|")
+            for (c in transitives.conflicts) {
+                appendLine("| ${c.artifact} | ${c.versions.joinToString(" vs ")} |")
+            }
+        }
+    }
+
+    // Constraints
+    data.constraints?.let { constraints ->
+        appendLine()
+        appendLine("## Constraints (${constraints.size})")
+        appendLine()
+        for (c in constraints) {
+            appendLine("- **${c.type}**: ${c.description}")
+        }
+    }
+
+    // Validation
+    data.validation?.let { validation ->
+        appendLine()
+        appendLine("## Validation")
+        appendLine()
+        if (validation.errors.isNotEmpty()) {
+            appendLine("### Errors (${validation.errors.size})")
+            appendLine()
+            for (e in validation.errors) { appendLine("- ❌ [${e.code}] ${e.message}") }
+        }
+        if (validation.warnings.isNotEmpty()) {
+            appendLine("### Warnings (${validation.warnings.size})")
+            appendLine()
+            for (w in validation.warnings) { appendLine("- ⚠️ [${w.code}] ${w.message}") }
+        }
+        if (validation.errors.isEmpty() && validation.warnings.isEmpty()) {
+            appendLine("All checks passed.")
+        }
+    }
 }
+----
+
+==== HTML рендеринг
+
+Используется библиотека https://github.com/commonmark/commonmark-java[commonmark-java] для конвертации Markdown -> HTML.
+Результат оборачивается в HTML-шаблон с базовым CSS.
+
+[source,kotlin]
+----
+import org.commonmark.parser.Parser
+import org.commonmark.renderer.html.HtmlRenderer
+
+private val mdParser = Parser.builder().build()
+private val htmlRenderer = HtmlRenderer.builder().build()
+
+private fun renderHtml(data: ReportData): String {
+    val markdown = renderMarkdown(data)
+    val document = mdParser.parse(markdown)
+    val body = htmlRenderer.render(document)
+    return htmlTemplate(data.generatedAt, body)
+}
+
+private fun htmlTemplate(generatedAt: String, body: String): String = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dependanger Report</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+         max-width: 960px; margin: 0 auto; padding: 24px; color: #333; line-height: 1.5; }
+  h1 { border-bottom: 2px solid #2196F3; padding-bottom: 8px; }
+  h2 { border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-top: 32px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; }
+  tr:hover { background: #fafafa; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd;
+           font-size: 0.85em; color: #888; }
+</style>
+</head>
+<body>
+$body
+<footer>Generated by Dependanger at $generatedAt</footer>
+</body>
+</html>
+""".trimIndent()
 ----
 
 [[report-sections]]
@@ -317,7 +599,7 @@ private fun renderMarkdown(data: ReportData): String = buildString {
 | Очень большой каталог (1000+) | Генерация продолжается, WARNING при > 500KB | Рекомендуется --summary-only
 | Нет прав на запись | ERROR "Cannot write report" | Fail-fast
 | Файл уже существует | Перезаписать (atomic write через temp) | Идемпотентность
-| Невалидный формат | ERROR "Unsupported format" | Fail-fast
+| Невалидный формат | Невозможно: ReportFormat -- sealed enum | Compile-time safety
 | Timestamp | Всегда UTC: "2026-01-27T10:30:00Z" | Consistency
 | Прерывание (Ctrl+C) | Частичный файл удаляется (atomic write) | Не оставлять мусор
 |===
@@ -360,7 +642,11 @@ metadata.versionConflicts       // VersionConflictsExtensionKey
 | `section filtering works` | sections=[SUMMARY, LIBRARIES] -> только эти секции
 | `summaryOnly mode` | Только summary + metadata полей
 | `JSON format is valid` | Парсинг через kotlinx.serialization
-| `Markdown format renders correctly` | Markdown содержит таблицы и заголовки
+| `YAML format is valid` | Парсинг через kaml Yaml.default.decodeFromString
+| `Markdown format renders all sections` | Markdown содержит все 13 секций с таблицами и заголовками
+| `Markdown summary shows non-zero metrics only` | Нулевые метрики не показываются в summary
+| `HTML format is valid` | Содержит DOCTYPE, head, body, CSS
+| `HTML contains rendered tables` | Markdown таблицы -> HTML <table> через commonmark
 | `null sections when processor not run` | updates=null если withUpdateCheck() не вызывался
 | `atomic write creates file` | Файл создан по указанному пути
 | `file overwrite works` | Перезапись существующего файла
@@ -376,6 +662,8 @@ dependanger-report зависит от:
 - dependanger-core (api)
 - dependanger-effective (api)
 - org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0 (implementation)
+- com.charleskorn.kaml:kaml:0.67.0 (implementation) -- YAML рендеринг (kotlinx-serialization native)
+- org.commonmark:commonmark:0.24.0 (implementation) -- Markdown -> HTML конвертация
 - io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
 ----
 
@@ -386,12 +674,10 @@ dependanger-report зависит от:
 |===
 | Файл | Изменение
 
-| `ReportGenerator.kt` | Реализация `generate()` -- сбор данных + рендеринг
-| `ReportData.kt` | **Создать** -- внутренние @Serializable модели отчёта
-| `JsonReportRenderer.kt` | **Создать** -- JSON рендеринг
-| `MarkdownReportRenderer.kt` | **Создать** -- Markdown рендеринг
-| `YamlReportRenderer.kt` | **Создать** -- YAML рендеринг (конвертация из JSON или ручной)
-| `HtmlReportRenderer.kt` | **Создать** -- HTML рендеринг (обёртка над Markdown)
+| `ReportGenerator.kt` | Реализация `generate()` -- сбор данных, dispatch по формату
+| `ReportData.kt` | **Создать** -- внутренние @Serializable модели: ReportData, ReportSummary, Report*-модели для каждой секции
+| `ReportModels.kt` | **Создать** -- публичные @Serializable модели секций (ReportUpdate, ReportVulnerability, etc.)
+| `ReportRenderer.kt` | **Создать** -- sealed interface ReportRenderer + 4 реализации: JsonRenderer, YamlRenderer (kaml), MarkdownRenderer (buildString), HtmlRenderer (commonmark)
 |===
 
 [[priority]]

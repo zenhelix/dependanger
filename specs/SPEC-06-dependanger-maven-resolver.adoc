@@ -72,10 +72,12 @@ public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHo
    a. Попытаться загрузить из кеша -> если есть и TTL не истёк, использовать
    b. Иначе скачать POM из репозиториев (пробовать по порядку)
    c. Распарсить XML: извлечь <properties>, <dependencyManagement><dependencies>
-   d. Рекурсивно резолвить parent BOM (если есть <parent>)
+   c1. Синтезировать built-in project.* properties из координат POM и parent
+   d. Рекурсивно резолвить parent BOM (если есть <parent>), path-based cycle detection
    e. Рекурсивно обработать <dependency scope="import"> (вложенные BOM)
-   f. Резолвить property placeholders: ${property.name} -> значения из <properties>
-   g. Сохранить BomContent в кеш
+   f. Резолвить property placeholders: ${property.name} -> значения из merged properties
+   f1. При неразрешённом property -> UNRESOLVED_BOM_PROPERTY diagnostic, пропустить dependency
+   g. Сохранить BomContent в кеш (файловый + in-memory resolvedCache)
    h. При сетевой ошибке: если есть кеш (даже устаревший) -> использовать с WARNING
 7. Объединить все BomContent в единую карту group:artifact -> version (первый BOM побеждает)
 8. Для каждой библиотеки в metadata.libraries:
@@ -163,11 +165,14 @@ public class PomXmlParser {
         // Использовать javax.xml.parsers.DocumentBuilderFactory
         val doc = parseXmlDocument(pomXml)
 
-        // 1. Извлечь <properties>
-        val properties = extractProperties(doc)
-
-        // 2. Извлечь <parent> координаты (если есть)
+        // 1. Извлечь <parent> координаты (если есть)
         val parent = extractParent(doc)
+
+        // 2. Извлечь <properties> + синтезировать project.* built-in properties
+        val explicitProperties = extractProperties(doc)
+        val syntheticProperties = buildSyntheticProperties(doc, parent)
+        // synthetic + explicit: explicit overrides synthetic (как в Maven)
+        val properties = syntheticProperties + explicitProperties
 
         // 3. Извлечь <dependencyManagement><dependencies>
         val rawDependencies = extractDependencyManagement(doc)
@@ -175,7 +180,38 @@ public class PomXmlParser {
         return PomParseResult(properties, parent, rawDependencies)
     }
 
-    private fun resolvePropertyPlaceholders(
+    /**
+     * Синтезирует Maven built-in `project.*` properties из координат POM.
+     * Maven делает эти свойства доступными имплицитно, без объявления в `<properties>`.
+     */
+    private fun buildSyntheticProperties(doc: Document, parent: ParentPom?): Map<String, String> {
+        val props = mutableMapOf<String, String>()
+
+        // Координаты текущего проекта
+        extractProjectCoordinates(doc)?.let { (groupId, artifactId, version) ->
+            groupId?.let { props["project.groupId"] = it }
+            artifactId?.let { props["project.artifactId"] = it }
+            version?.let { props["project.version"] = it }
+        }
+
+        // Координаты parent (если есть)
+        parent?.let {
+            props["project.parent.groupId"] = it.group
+            props["project.parent.artifactId"] = it.artifact
+            props["project.parent.version"] = it.version
+            // Если project.groupId/version не заданы явно -- наследуются от parent (стандарт Maven)
+            props.putIfAbsent("project.groupId", it.group)
+            props.putIfAbsent("project.version", it.version)
+        }
+
+        return props
+    }
+
+    /**
+     * Резолвит property placeholders `${name}` в строке.
+     * Выбрасывает [IllegalStateException] если property не найден.
+     */
+    public fun resolveProperty(
         value: String,
         properties: Map<String, String>
     ): String {
@@ -194,9 +230,31 @@ public class PomXmlParser {
 
 ==== Property Resolution Precedence
 
+Приоритет свойств (от высшего к низшему):
+
+1. **Explicit `<properties>`** из текущего (child) POM
+2. **Explicit `<properties>`** из parent POM (рекурсивно)
+3. **Synthetic `project.*` properties** (из координат текущего POM)
+4. **Inherited `project.*` properties** (из parent, если child не определяет groupId/version)
+
 * Child POM properties имеют приоритет над parent POM properties
 * При конфликте -- child побеждает
+* `project.groupId`, `project.version` наследуются от parent, если не заданы явно в child
 * Nested properties (`$\{$\{var\}.version\}`) НЕ поддерживаются в первой итерации
+
+Поддерживаемые built-in (synthetic) properties:
+
+[cols="1,2"]
+|===
+| Property | Источник
+
+| `project.groupId` | `<groupId>` или parent `<groupId>`
+| `project.artifactId` | `<artifactId>`
+| `project.version` | `<version>` или parent `<version>`
+| `project.parent.groupId` | `<parent><groupId>`
+| `project.parent.artifactId` | `<parent><artifactId>`
+| `project.parent.version` | `<parent><version>`
+|===
 
 IMPORTANT: Nested property resolution (например `$\{$\{framework\}.version\}`) -- ограничение первой итерации.
 При обнаружении вложенного placeholder'а -- WARNING в diagnostics, значение оставляется как есть.
@@ -253,9 +311,9 @@ override suspend fun process(
     // Key для получения CredentialsProvider из ProcessingContext:
     // internal val CredentialsProviderKey = ProcessingContextKey<CredentialsProvider>("credentialsProvider")
 
-    // Резолвить все BOM (с обнаружением циклов)
+    // Резолвить все BOM (с path-based обнаружением циклов + кеш уже разрешённых)
     val resolvedBoms = mutableListOf<BomContent>()
-    val visited = mutableSetOf<String>() // group:artifact:version
+    val resolvedCache = mutableMapOf<String, BomContent>() // optimization: не скачивать одно и то же дважды
     var diagnostics = metadata.diagnostics
 
     for (bomImport in bomImports) {
@@ -277,9 +335,10 @@ override suspend fun process(
                 continue
             }
         }
+        val pathStack = mutableSetOf<String>() // per-BOM path для cycle detection
         val result = resolveBomRecursive(
             bomImport.group, bomImport.artifact, resolvedVersion,
-            cache, downloader, parser, visited, diagnostics, depth = 0
+            cache, downloader, parser, pathStack, resolvedCache, diagnostics, depth = 0
         )
         resolvedBoms.add(result.content)
         diagnostics = result.diagnostics
@@ -317,7 +376,7 @@ override suspend fun process(
 }
 ----
 
-==== Обнаружение циклов
+==== Обнаружение циклов (path-based)
 
 [source,kotlin]
 ----
@@ -327,76 +386,117 @@ internal data class BomResolveResult(
 )
 ----
 
+Детекция циклов использует **path-based** подход: `pathStack` содержит только узлы на текущем пути рекурсии.
+Узел добавляется при входе и **удаляется при выходе** (`try/finally`).
+Это корректно обрабатывает diamond-зависимости (BOM-A и BOM-B оба импортируют jackson-bom) без ложных CIRCULAR_BOM.
+
+Дополнительно, `resolvedCache` хранит уже разрешённые BOM для оптимизации -- не скачивать и не парсить одно и то же дважды.
+
 [source,kotlin]
 ----
 private suspend fun resolveBomRecursive(
     group: String, artifact: String, version: String,
     cache: BomCache, downloader: MavenPomDownloader, parser: PomXmlParser,
-    visited: MutableSet<String>, diagnostics: Diagnostics, depth: Int
+    pathStack: MutableSet<String>,          // cycle detection: текущий путь рекурсии
+    resolvedCache: MutableMap<String, BomContent>, // optimization: уже разрешённые BOM
+    diagnostics: Diagnostics, depth: Int
 ): BomResolveResult {
     val key = "$group:$artifact:$version"
-    if (key in visited) {
-        return BomResolveResult(BomContent(), diagnostics + Diagnostics.error("CIRCULAR_BOM", "Circular BOM dependency detected: $key", "bom-import"))
+
+    // Цикл: этот BOM уже на текущем пути рекурсии
+    if (key in pathStack) {
+        return BomResolveResult(BomContent(), diagnostics + Diagnostics.error(
+            "CIRCULAR_BOM", "Circular BOM dependency detected: $key", "bom-import"))
     }
     if (depth > 10) {
-        return BomResolveResult(BomContent(), diagnostics + Diagnostics.warning("BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > 10 levels for $key", "bom-import"))
+        return BomResolveResult(BomContent(), diagnostics + Diagnostics.warning(
+            "BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > 10 levels for $key", "bom-import"))
     }
-    visited.add(key)
 
-    // Попробовать кеш
-    val cached = cache.get(group, artifact, version)
-    if (cached != null) return BomResolveResult(cached, diagnostics)
+    // Оптимизация: уже разрешено ранее (diamond dependency)
+    resolvedCache[key]?.let { return BomResolveResult(it, diagnostics) }
 
-    // Скачать POM
-    val pomXml = downloader.downloadPom(group, artifact, version)
-    if (pomXml == null) {
-        // Попробовать стейл кеш
-        val stale = cache.getStale(group, artifact, version)
-        if (stale != null) {
-            return BomResolveResult(stale, diagnostics + Diagnostics.warning("BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import"))
+    pathStack.add(key)
+    try {
+        // Попробовать файловый кеш
+        val cached = cache.get(group, artifact, version)
+        if (cached != null) {
+            resolvedCache[key] = cached
+            return BomResolveResult(cached, diagnostics)
         }
-        return BomResolveResult(BomContent(), diagnostics + Diagnostics.error("BOM_FETCH_FAILED", "Cannot fetch BOM: $key", "bom-import"))
-    }
 
-    // Парсинг
-    val parseResult = parser.parseBomContent(pomXml)
+        // Скачать POM
+        val pomXml = downloader.downloadPom(group, artifact, version)
+        if (pomXml == null) {
+            val stale = cache.getStale(group, artifact, version)
+            if (stale != null) {
+                resolvedCache[key] = stale
+                return BomResolveResult(stale, diagnostics + Diagnostics.warning(
+                    "BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import"))
+            }
+            return BomResolveResult(BomContent(), diagnostics + Diagnostics.error(
+                "BOM_FETCH_FAILED", "Cannot fetch BOM: $key", "bom-import"))
+        }
 
-    // Резолвить parent
-    var mergedProperties = parseResult.properties
-    var mergedDependencies = mutableListOf<BomDependency>()
+        // Парсинг (включает синтетические project.* properties)
+        val parseResult = parser.parseBomContent(pomXml)
 
-    parseResult.parent?.let { parent ->
-        val parentResult = resolveBomRecursive(
-            parent.group, parent.artifact, parent.version,
-            cache, downloader, parser, visited, diagnostics, depth + 1
-        )
-        mergedProperties = parentResult.content.properties + mergedProperties // child overrides
-        mergedDependencies.addAll(parentResult.content.dependencies)
-    }
+        // Резолвить parent
+        var mergedProperties = parseResult.properties
+        var mergedDependencies = mutableListOf<BomDependency>()
+        var currentDiagnostics = diagnostics
 
-    // Резолвить property placeholders и добавить зависимости
-    for (rawDep in parseResult.dependencies) {
-        if (rawDep.scope == "import" && rawDep.type == "pom") {
-            // Рекурсивный BOM import
-            val importResult = resolveBomRecursive(
-                rawDep.group, rawDep.artifact,
-                parser.resolveProperty(rawDep.version, mergedProperties),
-                cache, downloader, parser, visited, diagnostics, depth + 1
+        parseResult.parent?.let { parent ->
+            val parentResult = resolveBomRecursive(
+                parent.group, parent.artifact, parent.version,
+                cache, downloader, parser, pathStack, resolvedCache, currentDiagnostics, depth + 1
             )
-            mergedDependencies.addAll(importResult.content.dependencies)
-        } else {
-            mergedDependencies.add(BomDependency(
-                group = parser.resolveProperty(rawDep.group, mergedProperties),
-                artifact = parser.resolveProperty(rawDep.artifact, mergedProperties),
-                version = parser.resolveProperty(rawDep.version, mergedProperties),
-            ))
+            mergedProperties = parentResult.content.properties + mergedProperties // child overrides
+            mergedDependencies.addAll(parentResult.content.dependencies)
+            currentDiagnostics = parentResult.diagnostics
         }
+
+        // Резолвить property placeholders и добавить зависимости
+        for (rawDep in parseResult.dependencies) {
+            if (rawDep.scope == "import" && rawDep.type == "pom") {
+                // Рекурсивный BOM import -- resolveProperty с обработкой ошибок
+                val resolvedVersion = try {
+                    parser.resolveProperty(rawDep.version, mergedProperties)
+                } catch (e: IllegalStateException) {
+                    currentDiagnostics = currentDiagnostics + Diagnostics.error(
+                        "UNRESOLVED_BOM_PROPERTY", "${e.message} in import ${rawDep.group}:${rawDep.artifact}", "bom-import")
+                    continue // пропустить этот BOM import
+                }
+                val importResult = resolveBomRecursive(
+                    rawDep.group, rawDep.artifact, resolvedVersion,
+                    cache, downloader, parser, pathStack, resolvedCache, currentDiagnostics, depth + 1
+                )
+                mergedDependencies.addAll(importResult.content.dependencies)
+                currentDiagnostics = importResult.diagnostics
+            } else {
+                // Обычная dependency -- resolveProperty с обработкой ошибок
+                try {
+                    mergedDependencies.add(BomDependency(
+                        group = parser.resolveProperty(rawDep.group, mergedProperties),
+                        artifact = parser.resolveProperty(rawDep.artifact, mergedProperties),
+                        version = parser.resolveProperty(rawDep.version, mergedProperties),
+                    ))
+                } catch (e: IllegalStateException) {
+                    currentDiagnostics = currentDiagnostics + Diagnostics.error(
+                        "UNRESOLVED_BOM_PROPERTY", "${e.message} in ${rawDep.group}:${rawDep.artifact}:${rawDep.version}", "bom-import")
+                    // пропустить эту dependency
+                }
+            }
+        }
+
+        val content = BomContent(mergedDependencies, mergedProperties)
+        try { cache.put(group, artifact, version, content) } catch (_: Exception) { /* WARNING */ }
+        resolvedCache[key] = content
+
+        return BomResolveResult(content, currentDiagnostics)
+    } finally {
+        pathStack.remove(key) // path-based: убрать узел при выходе из рекурсии
     }
-
-    val content = BomContent(mergedDependencies, mergedProperties)
-    try { cache.put(group, artifact, version, content) } catch (_: Exception) { /* WARNING */ }
-
-    return BomResolveResult(content, diagnostics)
 }
 ----
 
@@ -628,15 +728,16 @@ https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-bom/2.1.20/kotl
 [source,text]
 ----
 1. Распарсить XML через DocumentBuilderFactory (stdlib javax.xml)
-2. Найти /project/properties -> Map<String, String>
-3. Найти /project/parent -> ParentPom? (groupId, artifactId, version)
-4. Найти /project/dependencyManagement/dependencies/dependency[]
-5. Для каждой dependency:
+2. Найти /project/parent -> ParentPom? (groupId, artifactId, version)
+3. Синтезировать project.* properties из /project/groupId, /project/artifactId, /project/version и parent
+4. Найти /project/properties -> Map<String, String>, объединить с synthetic (explicit overrides)
+5. Найти /project/dependencyManagement/dependencies/dependency[]
+6. Для каждой dependency:
    a. Извлечь groupId, artifactId, version, scope, type
    b. Если scope="import" && type="pom" -> отметить как вложенный BOM
    c. Иначе -> обычная BOM dependency
-6. Property resolution: заменить ${name} на значение из properties
-7. Parent resolution: рекурсивно загрузить parent, объединить properties и dependencies
+7. Property resolution: заменить ${name} на значение из merged properties (includes project.*)
+8. Parent resolution: рекурсивно загрузить parent, объединить properties и dependencies
 ----
 
 [[edge-cases]]
@@ -650,8 +751,10 @@ https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-bom/2.1.20/kotl
 | Невалидный XML | ERROR, pipeline останавливается | `INVALID_BOM_XML`
 | BOM без dependencyManagement | WARNING, BOM игнорируется | `BOM_NO_DEPS`
 | Неразрешённый property | ERROR с именем property | `UNRESOLVED_BOM_PROPERTY`
-| Циклическая зависимость BOM | ERROR, обнаружение через visited set | `CIRCULAR_BOM`
+| Циклическая зависимость BOM | ERROR, обнаружение через path-based stack | `CIRCULAR_BOM`
+| Diamond BOM dependency (shared parent/import) | OK, resolvedCache возвращает ранее вычисленный результат | --
 | Глубокая parent иерархия (>10) | WARNING, остановка рекурсии | `BOM_DEPTH_EXCEEDED`
+| `${project.version}` и другие built-in | Синтезируются из координат POM в parseBomContent() | --
 | Сеть недоступна, кеш есть | WARNING, использовать стейл кеш | `BOM_STALE_CACHE`
 | Сеть недоступна, кеша нет | ERROR, pipeline останавливается | `BOM_FETCH_FAILED`
 | Snapshot BOM | TTL = ttlSnapshotHours (1h default), WARNING | --
@@ -704,7 +807,11 @@ BomImportProcessor не использует ExtensionKey напрямую -- р
 | `BOM with property placeholders` | `${spring.version}` -> резолвится из `<properties>`
 | `parent BOM inheritance` | BOM наследует dependencies от parent
 | `nested BOM import (scope=import)` | BOM импортирует другой BOM
-| `circular BOM detection` | BOM-A -> BOM-B -> BOM-A -> ERROR
+| `circular BOM detection` | BOM-A -> BOM-B -> BOM-A -> CIRCULAR_BOM ERROR
+| `diamond BOM is not circular` | BOM-A и BOM-B оба импортируют BOM-C -> OK, не CIRCULAR_BOM
+| `shared parent is not circular` | BOM-A и BOM-B оба имеют parent P -> OK, не CIRCULAR_BOM
+| `unresolved property produces diagnostic` | `${unknown}` в dependency -> UNRESOLVED_BOM_PROPERTY ERROR, dependency пропускается
+| `project.version resolves` | BOM с `${project.version}` -> резолвится из координат POM
 | `network failure with stale cache` | Сеть недоступна, есть кеш -> WARNING + кеш
 | `network failure without cache` | Сеть недоступна, кеша нет -> ERROR
 | `strict mode unresolved version` | Библиотека без версии, strict -> ERROR
@@ -732,13 +839,18 @@ BomImportProcessor не использует ExtensionKey напрямую -- р
 |===
 | Тест | Описание
 
-| `parse valid BOM POM` | Корректный BOM -> BomContent
+| `parse valid BOM POM` | Корректный BOM -> PomParseResult
 | `parse properties` | `<properties>` -> Map
-| `resolve property placeholders` | `${spring.version}` -> "6.2.1"
-| `unresolved property throws` | `${unknown}` -> IllegalStateException
+| `resolveProperty with placeholders` | `${spring.version}` -> "6.2.1"
+| `resolveProperty unresolved throws` | `${unknown}` -> IllegalStateException
+| `resolveProperty no placeholders` | Строка без `${}` -> возвращается как есть
 | `parse parent POM` | `<parent>` -> ParentPom
 | `nested import scope` | `scope=import type=pom` -> отмечается как вложенный BOM
 | `invalid XML throws` | Невалидный XML -> парсинг-ошибка
+| `synthetic project.version` | POM с `<version>3.4.0</version>` -> properties содержит `project.version=3.4.0`
+| `synthetic project.groupId from parent` | POM без `<groupId>` с parent -> `project.groupId` = parent groupId
+| `synthetic project.parent.*` | POM с parent -> `project.parent.groupId`, `project.parent.version` заполнены
+| `explicit property overrides synthetic` | `<properties><project.version>custom</...>` -> `project.version=custom`
 |===
 
 [[dependencies]]

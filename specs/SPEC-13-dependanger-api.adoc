@@ -41,6 +41,14 @@ public fun fromJson(json: String): DependangerBuilder = TODO()
 
 // DependangerBuilder.kt
 public fun build(): Dependanger = TODO()
+
+// DependangerResultExtensions.kt (НОВЫЙ ФАЙЛ)
+public fun DependangerResult.extractUpdateData(): List<UpdateAvailableInfo> = TODO()
+public fun DependangerResult.extractSecurityData(): List<VulnerabilityInfo> = TODO()
+public fun DependangerResult.extractLicenseData(): List<LicenseViolation> = TODO()
+public fun DependangerResult.extractTransitiveData(): List<TransitiveTree> = TODO()
+public fun DependangerResult.extractCompatibilityIssues(): List<CompatibilityIssue> = TODO()
+public fun DependangerResult.extractVersionConflicts(): List<VersionConflict> = TODO()
 ----
 
 [[spec-build]]
@@ -422,6 +430,78 @@ public fun fromJson(json: String): DependangerBuilder {
 | Валидный JSON, но не DependangerMetadata | `DependangerConfigurationException` | Структура не соответствует
 |===
 
+[[spec-extraction-methods]]
+== SPEC-13.5: Extraction-методы DependangerResult
+
+[[purpose-extraction]]
+=== Назначение
+
+Extension-функции на `DependangerResult` для type-safe извлечения данных из feature-процессоров.
+Определены в отдельном файле `DependangerResultExtensions.kt`, аналогично `DependangerResultToml.kt` и `DependangerResultBom.kt`.
+
+Это позволяет CLI и Gradle plugin работать с результатами feature-процессоров через API фасад, **не зависев напрямую от feature-модулей**.
+API module видит feature-модули (они `implementation` зависимости), а CLI/plugin видит только API.
+
+[[implementation-extraction]]
+=== Детальная реализация
+
+[source,kotlin]
+----
+// DependangerResultExtensions.kt
+package io.github.zenhelix.dependanger.api
+
+import io.github.zenhelix.dependanger.effective.model.getExtension
+import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
+import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
+import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
+import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
+import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
+import io.github.zenhelix.dependanger.features.analysis.model.CompatibilityIssue
+import io.github.zenhelix.dependanger.features.analysis.model.CompatibilityIssuesExtensionKey
+import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
+import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
+
+public fun DependangerResult.extractUpdateData(): List<UpdateAvailableInfo> =
+    effective?.getExtension(UpdatesExtensionKey) ?: emptyList()
+
+public fun DependangerResult.extractSecurityData(): List<VulnerabilityInfo> =
+    effective?.getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
+
+public fun DependangerResult.extractLicenseData(): List<LicenseViolation> =
+    effective?.getExtension(LicenseViolationsExtensionKey) ?: emptyList()
+
+public fun DependangerResult.extractTransitiveData(): List<TransitiveTree> =
+    effective?.getExtension(TransitivesExtensionKey) ?: emptyList()
+
+public fun DependangerResult.extractCompatibilityIssues(): List<CompatibilityIssue> =
+    effective?.getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
+
+public fun DependangerResult.extractVersionConflicts(): List<VersionConflict> =
+    effective?.getExtension(VersionConflictsExtensionKey) ?: emptyList()
+----
+
+=== Обоснование `effective?.` вместо `effective!!`
+
+Методы используют safe-call `?.` вместо `!!`:
+
+* Если `effective == null` (processing failed), возвращается `emptyList()` -- безопасный default
+* Вызывающий код уже проверяет `result.isSuccess` перед extraction, но double-safety лучше crash
+* Консистентно с подходом `isSuccess` -- результат всегда доступен, даже если пустой
+
+=== Edge cases
+
+[cols="1,2,2"]
+|===
+| Ситуация | Поведение | Обоснование
+
+| effective = null (processing failed) | Возвращает `emptyList()` | Безопасный fallback
+| Extension не заполнен процессором | Возвращает `emptyList()` | `getExtension()` возвращает null
+| Процессор не был включён в pipeline | Возвращает `emptyList()` | Extension просто отсутствует
+|===
+
 [[thread-safety]]
 == Потокобезопасность
 
@@ -534,6 +614,22 @@ DependangerException (base)
 | `fromJson round-trip` | fromJson(serialize(metadata)).build().metadata == metadata
 |===
 
+=== Юнит-тесты для extraction-методов DependangerResult
+
+[cols="1,3"]
+|===
+| Тест | Описание
+
+| `extractUpdateData with data` | Возвращает List<UpdateAvailableInfo> из extensions
+| `extractUpdateData no extension` | Возвращает emptyList()
+| `extractUpdateData null effective` | Возвращает emptyList()
+| `extractSecurityData with data` | Возвращает List<VulnerabilityInfo> из extensions
+| `extractLicenseData with data` | Возвращает List<LicenseViolation> из extensions
+| `extractTransitiveData with data` | Возвращает List<TransitiveTree> из extensions
+| `extractCompatibilityIssues with data` | Возвращает List<CompatibilityIssue> из extensions
+| `all extract methods safe on failed result` | DependangerResult(null, diagnostics) -> все возвращают emptyList()
+|===
+
 === Интеграционные тесты
 
 [cols="1,3"]
@@ -584,6 +680,7 @@ dependanger-api зависит от:
 
 | `Dependanger.kt` | Расширить конструктор (additionalProcessors, disabledProcessorIds, pipelineCustomizer). Реализовать `process()`, `validate()`, `fromJson()`. Добавить приватный метод `buildPipeline()`.
 | `DependangerBuilder.kt` | Реализовать `build()`. Добавить приватный метод `resolveMetadata()`.
+| `DependangerResultExtensions.kt` | **НОВЫЙ ФАЙЛ**. Extraction extension-функции: `extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()`, `extractCompatibilityIssues()`, `extractVersionConflicts()`.
 |===
 
 === Файлы НЕ требующие изменений
@@ -611,3 +708,4 @@ dependanger-api зависит от:
 2. `Dependanger.fromJson()` -- прост в реализации, нужен для CLI
 3. `Dependanger.process()` -- основной метод обработки
 4. `Dependanger.validate()` -- делегирует process() с MINIMAL preset
+5. `DependangerResultExtensions.kt` -- extraction-методы, нужны для CLI и Gradle analysis-тасков

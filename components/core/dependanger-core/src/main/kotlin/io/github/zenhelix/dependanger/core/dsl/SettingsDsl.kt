@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.model.BomCacheSettings
 import io.github.zenhelix.dependanger.core.model.BomSettings
 import io.github.zenhelix.dependanger.core.model.CompatibilityAnalysisSettings
 import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.core.model.DualLicensePolicy
 import io.github.zenhelix.dependanger.core.model.LicenseCheckSettings
 import io.github.zenhelix.dependanger.core.model.ReportFormat
 import io.github.zenhelix.dependanger.core.model.ReportSection
@@ -218,6 +219,7 @@ public class LicenseCheckSettingsDsl {
     public var enabled: Boolean = false
     public var allowedLicenses: List<String> = emptyList()
     public var deniedLicenses: List<String> = emptyList()
+    public var dualLicensePolicy: DualLicensePolicy = DualLicensePolicy.OR
     public var failOnDenied: Boolean = false
     public var failOnUnknown: Boolean = false
     public var failOnCopyleft: Boolean = false
@@ -230,6 +232,7 @@ public class LicenseCheckSettingsDsl {
         enabled = enabled,
         allowedLicenses = allowedLicenses,
         deniedLicenses = deniedLicenses,
+        dualLicensePolicy = dualLicensePolicy,
         failOnDenied = failOnDenied,
         failOnUnknown = failOnUnknown,
         failOnCopyleft = failOnCopyleft,
@@ -245,6 +248,7 @@ public class TransitiveResolutionSettingsDsl {
     public var enabled: Boolean = false
     public var repositories: List<Repository> = emptyList()
     public var maxDepth: Int? = null
+    public var maxTransitives: Int? = null
     public var conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST
     public var includeOptional: Boolean = false
     public var scopes: List<String> = listOf("compile", "runtime")
@@ -253,6 +257,7 @@ public class TransitiveResolutionSettingsDsl {
         enabled = enabled,
         repositories = repositories,
         maxDepth = maxDepth,
+        maxTransitives = maxTransitives,
         conflictResolution = conflictResolution,
         includeOptional = includeOptional,
         scopes = scopes,

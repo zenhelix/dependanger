@@ -51,7 +51,7 @@ public class LicenseResolver {
 [[purpose-license]]
 === Назначение
 
-Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензии (одну или несколько — dual-license) из нескольких источников по приоритету (DECLARED > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам с учётом dual-license OR-семантики и сохранить нарушения в extensions.
+Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензии (одну или несколько — dual-license) из нескольких источников по приоритету (DECLARED > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам с учётом dual-license семантики (настраиваемой через `dualLicensePolicy: OR | AND`) и сохранить нарушения в extensions.
 
 [[algorithm-license]]
 === Алгоритм
@@ -68,13 +68,21 @@ public class LicenseResolver {
    a. Проверить user-defined лицензию в context (если есть -> LicenseSource.DECLARED)
    b. Если нет -> вызвать licenseResolver.resolve(group, artifact, version)
    c. Результат: List<LicenseResult> -- одна или несколько лицензий (dual-license)
-5. Для каждого List<LicenseResult> проверить политики (OR-семантика для dual-license):
+5. Для каждого List<LicenseResult> проверить политики (семантика зависит от dualLicensePolicy):
+   ЕСЛИ dualLicensePolicy == OR (дефолт, dual-license = выбор одной из альтернатив):
    a. Если deniedLicenses не пуст:
       - Violation ТОЛЬКО если ВСЕ лицензии из списка в denied (нет допустимой альтернативы)
       - Если хотя бы одна НЕ в denied -> OK
    b. Если allowedLicenses не пуст:
       - OK если ХОТЯ БЫ ОДНА лицензия в allowed
       - Violation если НИ ОДНА не в allowed
+   ЕСЛИ dualLicensePolicy == AND (dual-license = обязательства по всем лицензиям):
+   a. Если deniedLicenses не пуст:
+      - Violation если ЛЮБАЯ лицензия в denied
+   b. Если allowedLicenses не пуст:
+      - OK только если ВСЕ лицензии в allowed
+      - Violation если хотя бы одна НЕ в allowed
+   ОБЩЕЕ (не зависит от policy):
    c. Если warnOnCopyleft и ЛЮБАЯ category in (WEAK_COPYLEFT, STRONG_COPYLEFT) -> WARNING
    d. Если warnOnUnknown и ВСЕ category == UNKNOWN -> WARNING
 6. Собрать все LicenseViolation
@@ -168,7 +176,7 @@ public class LicenseCheckProcessor(
             }.awaitAll()
         }
 
-        // Проверить политики (с dual-license OR-семантикой)
+        // Проверить политики (семантика определяется settings.dualLicensePolicy)
         val violations = mutableListOf<LicenseViolation>()
         val diagnostics = mutableListOf<Diagnostics>()
 
@@ -534,17 +542,50 @@ public class SpdxLicenseMapper {
 [[policy-check]]
 == Проверка политик
 
-=== Алгоритм проверки (единый, с dual-license OR-семантикой)
+=== DualLicensePolicy
+
+Определяет семантику проверки для библиотек с несколькими лицензиями (dual-license).
+
+[source,kotlin]
+----
+/**
+ * Политика проверки dual-license библиотек.
+ * Определяет, как интерпретировать наличие нескольких лицензий у одной библиотеки.
+ */
+@Serializable
+public enum class DualLicensePolicy {
+    /**
+     * OR-семантика (дефолт): пользователь может выбрать любую из предложенных лицензий.
+     * Типичный сценарий: "MIT OR Apache-2.0" — достаточно соблюдать одну.
+     * - Denied: violation только если ВСЕ лицензии в denied (нет допустимой альтернативы)
+     * - Allowed: OK если хотя бы одна лицензия в allowed
+     */
+    OR,
+
+    /**
+     * AND-семантика: все лицензии применяются одновременно (обязательства по каждой).
+     * Типичный сценарий: "GPL-2.0 WITH Classpath-exception-2.0" или проект,
+     * требующий соблюдения всех лицензий одновременно.
+     * - Denied: violation если ЛЮБАЯ лицензия в denied
+     * - Allowed: OK только если ВСЕ лицензии в allowed
+     */
+    AND,
+}
+----
+
+NOTE: `DualLicensePolicy` определяется в `dependanger-core` (пакет `io.github.zenhelix.dependanger.core.model`) и используется в `LicenseCheckSettings`.
+
+=== Алгоритм проверки (с конфигурируемой dual-license семантикой)
 
 [source,kotlin]
 ----
 /**
  * Проверяет список лицензий библиотеки против политик.
- * Для dual-license (несколько LicenseResult) применяется OR-семантика:
- * - Denied: violation ТОЛЬКО если ВСЕ лицензии в denied (нет допустимой альтернативы)
- * - Allowed: OK если ХОТЯ БЫ ОДНА лицензия в allowed
- * - Copyleft: warning если ЛЮБАЯ лицензия copyleft
- * - Unknown: warning если ВСЕ лицензии unknown
+ * Для dual-license (несколько LicenseResult) семантика определяется dualLicensePolicy:
+ * - OR: пользователь выбирает одну из альтернатив (дефолт)
+ * - AND: обязательства по всем лицензиям одновременно
+ * - Copyleft: warning если ЛЮБАЯ лицензия copyleft (не зависит от policy)
+ * - Unknown: warning если ВСЕ лицензии unknown (не зависит от policy)
  */
 private fun checkPolicies(
     lib: EffectiveLibrary,
@@ -554,39 +595,54 @@ private fun checkPolicies(
     diagnostics: MutableList<Diagnostics>,
 ) {
     val spdxIds = licenses.mapNotNull { it.spdxId }
-    val licenseExpression = spdxIds.joinToString(" OR ").ifEmpty { "UNKNOWN" }
+    val separator = if (settings.dualLicensePolicy == DualLicensePolicy.AND) " AND " else " OR "
+    val licenseExpression = spdxIds.joinToString(separator).ifEmpty { "UNKNOWN" }
 
-    // 1. Denied list check (OR-семантика: violation если ВСЕ denied)
+    // 1. Denied list check (семантика зависит от policy)
     if (settings.deniedLicenses.isNotEmpty() && spdxIds.isNotEmpty()) {
-        val allDenied = spdxIds.all { it in settings.deniedLicenses }
-        if (allDenied) {
+        val hasDeniedViolation = when (settings.dualLicensePolicy) {
+            DualLicensePolicy.OR -> spdxIds.all { it in settings.deniedLicenses }   // ВСЕ denied -> нет альтернативы
+            DualLicensePolicy.AND -> spdxIds.any { it in settings.deniedLicenses }  // ЛЮБАЯ denied -> обязательства
+        }
+        if (hasDeniedViolation) {
+            val message = when (settings.dualLicensePolicy) {
+                DualLicensePolicy.OR -> "All licenses are in denied list (no permitted alternative): $licenseExpression"
+                DualLicensePolicy.AND -> "License in denied list (AND-policy, all apply): $licenseExpression"
+            }
             violations.add(LicenseViolation(
                 alias = lib.alias,
                 group = lib.group,
                 artifact = lib.artifact,
                 detectedLicense = licenseExpression,
                 category = licenses.first().category,
-                message = "All licenses are in denied list: $licenseExpression",
+                message = message,
             ))
         }
     }
 
-    // 2. Allowed list check (OR-семантика: OK если хотя бы одна в allowed)
+    // 2. Allowed list check (семантика зависит от policy)
     if (settings.allowedLicenses.isNotEmpty() && spdxIds.isNotEmpty()) {
-        val anyAllowed = spdxIds.any { it in settings.allowedLicenses }
-        if (!anyAllowed) {
+        val isAllowed = when (settings.dualLicensePolicy) {
+            DualLicensePolicy.OR -> spdxIds.any { it in settings.allowedLicenses }   // хотя бы одна в allowed
+            DualLicensePolicy.AND -> spdxIds.all { it in settings.allowedLicenses }  // ВСЕ должны быть в allowed
+        }
+        if (!isAllowed) {
+            val message = when (settings.dualLicensePolicy) {
+                DualLicensePolicy.OR -> "None of the licenses are in allowed list: $licenseExpression"
+                DualLicensePolicy.AND -> "Not all licenses are in allowed list (AND-policy): $licenseExpression"
+            }
             violations.add(LicenseViolation(
                 alias = lib.alias,
                 group = lib.group,
                 artifact = lib.artifact,
                 detectedLicense = licenseExpression,
                 category = licenses.first().category,
-                message = "None of the licenses are in allowed list: $licenseExpression",
+                message = message,
             ))
         }
     }
 
-    // 3. Copyleft warning (любая из лицензий copyleft)
+    // 3. Copyleft warning (любая из лицензий copyleft — не зависит от policy)
     val copyleftLicenses = licenses.filter {
         it.category in listOf(LicenseCategory.WEAK_COPYLEFT, LicenseCategory.STRONG_COPYLEFT)
     }
@@ -598,7 +654,7 @@ private fun checkPolicies(
         ))
     }
 
-    // 4. Unknown warning (все лицензии unknown)
+    // 4. Unknown warning (все лицензии unknown — не зависит от policy)
     if (settings.warnOnUnknown && licenses.all { it.category == LicenseCategory.UNKNOWN }) {
         diagnostics.add(Diagnostics.warning(
             "LICENSE_UNKNOWN",
@@ -685,9 +741,13 @@ internal class LicenseCache(
 | Оба источника недоступны, кеш пуст | category=UNKNOWN, WARNING/ERROR | `LICENSE_ALL_SOURCES_FAILED`
 | Кеш есть, сеть недоступна | Используется стейл кеш + WARNING | `LICENSE_STALE_CACHE`
 | Лицензия не в SPDX | spdxId=null, category=PROPRIETARY | `LICENSE_NON_SPDX`
-| Dual-license (MIT OR Apache-2.0) | resolve() возвращает 2 LicenseResult, checkPolicies проверяет обе с OR-семантикой | --
-| Dual-license с denied | GPL-3.0 OR MIT, denied=[GPL-3.0] -> OK (MIT альтернатива не denied) | --
-| Все лицензии denied | GPL-3.0 OR AGPL-3.0, обе denied -> violation "All licenses are in denied list" | `LICENSE_ALL_DENIED`
+| Dual-license (MIT OR Apache-2.0) | resolve() возвращает 2 LicenseResult, checkPolicies проверяет по dualLicensePolicy | --
+| Dual-license OR + denied | GPL-3.0 OR MIT, denied=[GPL-3.0], policy=OR -> OK (MIT альтернатива не denied) | --
+| Dual-license OR + все denied | GPL-3.0 OR AGPL-3.0, обе denied, policy=OR -> violation "All licenses are in denied list" | `LICENSE_ALL_DENIED`
+| Dual-license AND + denied | GPL-3.0 AND MIT, denied=[GPL-3.0], policy=AND -> violation (GPL-3.0 denied, обязательства по всем) | --
+| Dual-license AND + allowed | GPL-3.0 AND MIT, allowed=[MIT], policy=AND -> violation (не все в allowed) | --
+| Dual-license AND + all allowed | GPL-3.0 AND MIT, allowed=[MIT, GPL-3.0], policy=AND -> OK | --
+| dualLicensePolicy не задан | Дефолт OR — обратная совместимость | --
 | Пустой whitelist | Whitelist отключён, все разрешены кроме denied | --
 | Whitelist + denied конфликт | Denied имеет приоритет -> violation | --
 | User-defined override | DSL license("MIT") приоритет над POM | --
@@ -758,10 +818,15 @@ metadata.licenseViolations // -> List<LicenseViolation>
 | `category classification` | Apache-2.0 -> PERMISSIVE, GPL-3.0 -> STRONG_COPYLEFT
 | `denied license violation` | GPL-3.0 в deniedLicenses -> LicenseViolation
 | `allowed license not in list` | BSD-3-Clause не в allowedLicenses -> LicenseViolation
-| `dual-license denied with alternative` | GPL-3.0 OR MIT, denied=[GPL-3.0] -> OK (MIT not denied)
-| `dual-license all denied` | GPL-3.0 OR AGPL-3.0, denied=[GPL-3.0, AGPL-3.0] -> violation
-| `dual-license allowed one match` | GPL-3.0 OR MIT, allowed=[MIT] -> OK
-| `dual-license allowed none match` | GPL-3.0 OR AGPL-3.0, allowed=[MIT] -> violation
+| `OR policy denied with alternative` | policy=OR, GPL-3.0 OR MIT, denied=[GPL-3.0] -> OK (MIT not denied)
+| `OR policy all denied` | policy=OR, GPL-3.0 OR AGPL-3.0, denied=[GPL-3.0, AGPL-3.0] -> violation
+| `OR policy allowed one match` | policy=OR, GPL-3.0 OR MIT, allowed=[MIT] -> OK
+| `OR policy allowed none match` | policy=OR, GPL-3.0 OR AGPL-3.0, allowed=[MIT] -> violation
+| `AND policy any denied` | policy=AND, GPL-3.0 AND MIT, denied=[GPL-3.0] -> violation
+| `AND policy none denied` | policy=AND, GPL-3.0 AND MIT, denied=[AGPL-3.0] -> OK
+| `AND policy all allowed` | policy=AND, GPL-3.0 AND MIT, allowed=[MIT, GPL-3.0] -> OK
+| `AND policy not all allowed` | policy=AND, GPL-3.0 AND MIT, allowed=[MIT] -> violation
+| `default policy is OR` | dualLicensePolicy не задан -> OR-семантика по умолчанию
 | `SPDX OR parsing` | "MIT OR Apache-2.0" -> ["MIT", "Apache-2.0"]
 | `SPDX AND not split` | "MIT AND Apache-2.0" -> ["MIT AND Apache-2.0"] (single entry)
 | `copyleft warning` | LGPL-2.1 + warnOnCopyleft -> WARNING
@@ -804,7 +869,10 @@ dependanger-license зависит от:
 |===
 | Файл | Изменение
 
-| `LicenseCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, резолвинг лицензий, проверка политик
+| `Enums.kt` (dependanger-core) | Добавлен `DualLicensePolicy` enum (OR, AND) -- уже реализовано
+| `Settings.kt` (dependanger-core) | Добавлено `dualLicensePolicy: DualLicensePolicy = DualLicensePolicy.OR` в `LicenseCheckSettings` -- уже реализовано
+| `SettingsDsl.kt` (dependanger-core) | Добавлено `dualLicensePolicy` в `LicenseCheckSettingsDsl` -- уже реализовано
+| `LicenseCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, резолвинг лицензий, проверка политик с учётом `dualLicensePolicy`
 | `LicenseResolver.kt` | Реализация `resolve()` -> `List<LicenseResult>` -- мульти-источниковый резолвинг (DECLARED > MAVEN_POM > CLEARLY_DEFINED) с поддержкой dual-license
 | `SpdxLicenseMapper.kt` | **Создать** -- нормализация названий лицензий в SPDX ID + категоризация
 | `ClearlyDefinedClient.kt` | **Создать** -- HTTP клиент для ClearlyDefined API

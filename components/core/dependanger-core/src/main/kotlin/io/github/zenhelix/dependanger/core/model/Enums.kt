@@ -23,6 +23,11 @@ public enum class KmpTarget {
 }
 
 @Serializable
+public enum class DualLicensePolicy {
+    OR, AND
+}
+
+@Serializable
 public enum class ConflictResolutionStrategy {
     HIGHEST, FIRST, FAIL, CONSTRAINT
 }

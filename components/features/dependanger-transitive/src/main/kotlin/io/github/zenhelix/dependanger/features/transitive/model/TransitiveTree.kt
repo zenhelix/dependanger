@@ -9,5 +9,6 @@ public data class TransitiveTree(
     val version: String? = null,
     val children: List<TransitiveTree> = emptyList(),
     val isDuplicate: Boolean = false,
+    val isCycle: Boolean = false,
     val scope: String? = null,
 )

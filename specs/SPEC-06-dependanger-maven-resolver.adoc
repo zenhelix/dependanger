@@ -233,9 +233,12 @@ public class PomXmlParser {
 Приоритет свойств (от высшего к низшему):
 
 1. **Explicit `<properties>`** из текущего (child) POM
-2. **Explicit `<properties>`** из parent POM (рекурсивно)
-3. **Synthetic `project.*` properties** (из координат текущего POM)
-4. **Inherited `project.*` properties** (из parent, если child не определяет groupId/version)
+2. **Synthetic `project.*` properties** из текущего (child) POM (из координат)
+3. **Все properties из parent POM** (рекурсивно, explicit + synthetic)
+
+NOTE: Это упрощённая двухуровневая модель: child ALL > parent ALL.
+В Maven приоритет формально четырёхуровневый (child explicit > parent explicit > child synthetic > parent synthetic), но на практике разница проявляется только если parent явно переопределяет `project.*` свойства через `<properties>`, что является антипаттерном.
+Реализация через `parentProperties + childProperties` (Kotlin Map `+`, правая сторона побеждает) корректна для всех реальных сценариев.
 
 * Child POM properties имеют приоритет над parent POM properties
 * При конфликте -- child побеждает

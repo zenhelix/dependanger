@@ -20,7 +20,7 @@
 |===
 | Компонент | Статус
 
-| `TransitiveTree.kt` | Полностью: @Serializable data class (group, artifact, version, children, isDuplicate, scope)
+| `TransitiveTree.kt` | Полностью: @Serializable data class (group, artifact, version, children, isDuplicate, isCycle, scope)
 | `FlatDependency.kt` | Полностью: @Serializable data class (group, artifact, version, isDirectDependency, isOptional)
 | `VersionConflict.kt` | Полностью: @Serializable data class (group, artifact, requestedVersions, resolvedVersion, resolution)
 |===
@@ -57,34 +57,44 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 4. Собрать прямые зависимости:
    a. Все библиотеки из metadata.libraries с version != null
    b. Все библиотеки из metadata.plugins с version != null (если includePlugins=true)
-5. Для каждой прямой зависимости (параллельно, PARALLEL_IO):
-   a. Проверить кеш для group:artifact:version
-   b. Если нет в кеше:
+5. Создать session-global счётчики:
+   a. sessionSeen: ConcurrentSet<String> — для маркировки дубликатов (shared между ветками)
+   b. nodeCounter: AtomicInteger(0) — для подсчёта общего количества узлов (preemptive лимит)
+   c. maxTransitives = settings.maxTransitives ?: 10_000 (настраиваемый лимит)
+6. Для каждой прямой зависимости (параллельно, PARALLEL_IO):
+   a. Проверить nodeCounter >= maxTransitives -> early return (лимит достигнут)
+   b. Проверить кеш для group:artifact:version
+   c. Если нет в кеше:
       i.   Скачать POM из repository через MavenPomDownloader
       ii.  Распарсить <dependencies> секцию (исключить test, provided scope по умолчанию)
       iii. Для каждой зависимости в POM рекурсивно резолвить (до maxDepth, default=10)
-      iv.  Обнаружить циклические зависимости (visited: Set<"group:artifact"> — path-specific, иммутабельный)
-      v.   Пометить дубликаты (isDuplicate=true) через sessionSeen: ConcurrentSet (session-global, shared между ветками)
-   c. Построить TransitiveTree для библиотеки
-   d. Сохранить в кеш
-6. Обнаружить конфликты версий:
+      iv.  Обнаружить циклические зависимости (visited: Set<"group:artifact"> — path-specific, иммутабельный) -> isCycle=true
+      v.   Пометить дубликаты (isDuplicate=true) через sessionSeen (session-global, shared между ветками)
+      vi.  Инкрементировать nodeCounter
+   d. Построить TransitiveTree для библиотеки
+   e. Сохранить в кеш
+7. Post-processing (после построения деревьев):
+   a. Обойти деревья, собрать все узлы с isCycle=true -> эмитить TRANSITIVE_CYCLE_DETECTED для каждого
+   b. Если totalNodes > 5000 -> WARNING TRANSITIVE_LARGE_TREE
+   c. Если nodeCounter >= maxTransitives -> ERROR TRANSITIVE_MAX_EXCEEDED
+8. Обнаружить конфликты версий:
    a. Собрать все артефакты с разными версиями
    b. Для каждого конфликта:
       i.   Применить стратегию HIGHEST (наивысшая версия)
       ii.  Если есть constraint -> использовать версию из constraint
       iii. Создать VersionConflict(requestedVersions, resolvedVersion, resolution)
-7. Применить constraints (sealed class Constraint):
+9. Применить constraints (sealed class Constraint):
    a. VersionConstraintDef -> заменить resolved version в дереве и flat list
    b. Exclude -> удалить из дерева и flat list
    c. Substitute -> заменить артефакт (координаты) в дереве и flat list
-8. Построить flat list (FlatDependency для каждого уникального артефакта):
-   a. Deduplicate по group:artifact
-   b. Записать isDirectDependency, isOptional
-9. Записать в metadata:
-   a. withExtension(TransitivesExtensionKey, trees: List<TransitiveTree>)
-   b. withExtension(FlatDependenciesExtensionKey, flat: List<FlatDependency>)
-   c. withExtension(VersionConflictsExtensionKey, conflicts: List<VersionConflict>)
-10. Добавить diagnostics:
+10. Построить flat list (FlatDependency для каждого уникального артефакта):
+    a. Deduplicate по group:artifact
+    b. Записать isDirectDependency, isOptional
+11. Записать в metadata:
+    a. withExtension(TransitivesExtensionKey, trees: List<TransitiveTree>)
+    b. withExtension(FlatDependenciesExtensionKey, flat: List<FlatDependency>)
+    c. withExtension(VersionConflictsExtensionKey, conflicts: List<VersionConflict>)
+12. Добавить diagnostics:
     a. INFO: "Resolved X direct, Y transitive dependencies, Z conflicts"
     b. Для каждого конфликта -> WARNING с деталями
     c. Если constraint на несуществующую -> WARNING
@@ -129,8 +139,10 @@ public class TransitiveResolverProcessor(
             )
         }
 
-        // Session-global set для isDuplicate (shared между всеми ветками)
+        // Session-global state (shared между всеми ветками)
         val sessionSeen: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        val nodeCounter = AtomicInteger(0)
+        val effectiveMaxTransitives = settings.maxTransitives ?: 10_000
 
         // Параллельный резолвинг
         val trees = coroutineScope {
@@ -146,9 +158,45 @@ public class TransitiveResolverProcessor(
                         scopes = scopes,
                         visited = setOf("${lib.group}:${lib.artifact}"),
                         sessionSeen = sessionSeen,
+                        nodeCounter = nodeCounter,
+                        maxTransitives = effectiveMaxTransitives,
                     )
                 }
             }.awaitAll()
+        }
+
+        // Post-processing: собрать diagnostics для циклов и лимитов
+        val totalNodes = nodeCounter.get()
+        var updatedMetadata = metadata
+
+        // Cycle diagnostics (обход деревьев)
+        val cycles = collectCycles(trees)
+        for (cycle in cycles) {
+            updatedMetadata = updatedMetadata.withDiagnostic(
+                Diagnostics.warning(
+                    "TRANSITIVE_CYCLE_DETECTED",
+                    "Cyclic dependency detected: ${cycle.group}:${cycle.artifact}:${cycle.version}"
+                )
+            )
+        }
+
+        // Limit diagnostics
+        if (totalNodes > 5000 && totalNodes < effectiveMaxTransitives) {
+            updatedMetadata = updatedMetadata.withDiagnostic(
+                Diagnostics.warning(
+                    "TRANSITIVE_LARGE_TREE",
+                    "Large dependency tree: $totalNodes transitive nodes (consider reviewing dependencies)"
+                )
+            )
+        }
+
+        if (totalNodes >= effectiveMaxTransitives) {
+            updatedMetadata = updatedMetadata.withDiagnostic(
+                Diagnostics.error(
+                    "TRANSITIVE_MAX_EXCEEDED",
+                    "Transitive dependency limit exceeded: $totalNodes >= $effectiveMaxTransitives, resolution was truncated"
+                )
+            )
         }
 
         // Обнаружить конфликты
@@ -162,7 +210,7 @@ public class TransitiveResolverProcessor(
         val flatList = buildFlatList(constrainedTrees, libraries)
 
         // Записать результаты
-        var updatedMetadata = metadata
+        updatedMetadata = updatedMetadata
             .withExtension(TransitivesExtensionKey, constrainedTrees)
             .withExtension(FlatDependenciesExtensionKey, flatList)
             .withExtension(VersionConflictsExtensionKey, conflicts)
@@ -185,6 +233,19 @@ public class TransitiveResolverProcessor(
 
         return updatedMetadata
     }
+
+    /**
+     * Обход деревьев для сбора циклических узлов (isCycle=true).
+     */
+    private fun collectCycles(trees: List<TransitiveTree>): List<TransitiveTree> {
+        val result = mutableListOf<TransitiveTree>()
+        fun traverse(tree: TransitiveTree) {
+            if (tree.isCycle) result.add(tree)
+            tree.children.forEach { traverse(it) }
+        }
+        trees.forEach { traverse(it) }
+        return result
+    }
 }
 ----
 
@@ -195,13 +256,15 @@ public class TransitiveResolverProcessor(
 /**
  * Рекурсивный резолвинг дерева зависимостей.
  *
- * Два раздельных механизма отслеживания:
+ * Три механизма отслеживания:
  * - `visited: Set<String>` — path-specific (иммутабельный), для обнаружения ЦИКЛОВ.
  *   Содержит координаты предков текущего узла. Каждый child получает копию + свою координату.
- *   Если coordinate in visited → цикл, ветка прерывается.
+ *   Если coordinate in visited → цикл (isCycle=true), ветка прерывается.
  * - `sessionSeen: MutableSet<String>` — session-global (ConcurrentHashMap.newKeySet()),
  *   для маркировки ДУБЛИКАТОВ. Shared между всеми параллельными ветками.
  *   Если coordinate уже в sessionSeen → isDuplicate=true (зависимость уже резолвлена в другой ветке).
+ * - `nodeCounter: AtomicInteger` — session-global, preemptive лимит количества узлов.
+ *   Если nodeCounter >= maxTransitives → early return (предотвращение OOM).
  */
 private suspend fun resolveTree(
     group: String,
@@ -213,8 +276,15 @@ private suspend fun resolveTree(
     scopes: List<String>,
     visited: Set<String>,
     sessionSeen: MutableSet<String>,
+    nodeCounter: AtomicInteger,
+    maxTransitives: Int,
 ): TransitiveTree {
     val coordinate = "$group:$artifact"
+
+    // Проверить preemptive лимит (предотвращение OOM)
+    if (nodeCounter.get() >= maxTransitives) {
+        return TransitiveTree(group, artifact, version, children = emptyList())
+    }
 
     // Проверить максимальную глубину
     if (depth >= maxDepth) {
@@ -230,6 +300,9 @@ private suspend fun resolveTree(
         return cached?.copy(isDuplicate = true, children = emptyList())
             ?: TransitiveTree(group, artifact, version, isDuplicate = true, children = emptyList())
     }
+
+    // Инкрементировать счётчик узлов
+    nodeCounter.incrementAndGet()
 
     // Проверить кеш (не дубликат, но может быть в кеше от предыдущей сессии)
     cache.get(group, artifact, version)?.let { cached ->
@@ -257,8 +330,8 @@ private suspend fun resolveTree(
             async {
                 val childCoordinate = "${dep.group}:${dep.artifact}"
                 if (childCoordinate in visited) {
-                    // Цикл: зависимость уже в предках текущего пути
-                    TransitiveTree(dep.group, dep.artifact, dep.version, isDuplicate = true, scope = dep.scope, children = emptyList())
+                    // Цикл: зависимость уже в предках текущего пути → isCycle=true (НЕ isDuplicate)
+                    TransitiveTree(dep.group, dep.artifact, dep.version, isCycle = true, scope = dep.scope, children = emptyList())
                 } else {
                     resolveTree(
                         group = dep.group,
@@ -270,6 +343,8 @@ private suspend fun resolveTree(
                         scopes = scopes,
                         visited = visited + childCoordinate,
                         sessionSeen = sessionSeen,
+                        nodeCounter = nodeCounter,
+                        maxTransitives = maxTransitives,
                     ).copy(scope = dep.scope)
                 }
             }
@@ -610,11 +685,12 @@ internal class TransitiveCache(
 
 | POM не найден (404) | WARNING, пустое дерево для библиотеки | `TRANSITIVE_POM_NOT_FOUND`
 | Repository недоступен | Retry с exponential backoff, затем WARNING | `TRANSITIVE_REPO_UNAVAILABLE`
-| Циклическая зависимость (A -> B -> C -> A) | Цикл обнаруживается через path-specific `visited` set, ветка прерывается, isDuplicate=true | `TRANSITIVE_CYCLE_DETECTED`
-| Дубликат (A->B->D, A->C->D) | D обнаруживается через session-global `sessionSeen` set, isDuplicate=true, children из кеша | --
+| Циклическая зависимость (A -> B -> C -> A) | Цикл обнаруживается через path-specific `visited` set, ветка прерывается, `isCycle=true`. Post-processing: WARNING TRANSITIVE_CYCLE_DETECTED | `TRANSITIVE_CYCLE_DETECTED`
+| Дубликат (A->B->D, A->C->D) | D обнаруживается через session-global `sessionSeen` set, `isDuplicate=true`, children из кеша. Семантически отличается от цикла | --
+| Цикл vs дубликат | Цикл: `isCycle=true` (координата в предках текущего пути). Дубликат: `isDuplicate=true` (координата уже резолвлена в другой ветке). Разные флаги для различения | --
 | Глубина > maxDepth (default=10) | Резолвинг останавливается, ветка обрезается, WARNING. Настраивается через `settings.transitiveResolution.maxDepth` | `TRANSITIVE_MAX_DEPTH`
-| > 5000 транзитивных | WARNING при >5000 транзитивных зависимостей | `TRANSITIVE_LARGE_TREE`
-| > 10000 транзитивных (maxTransitives) | ERROR и остановка резолвинга. Ограничение по умолчанию `maxTransitives = 10000`, настраивается через `settings.transitiveResolution.maxTransitives` | `TRANSITIVE_MAX_EXCEEDED`
+| > 5000 транзитивных | Post-processing: WARNING при >5000 узлов (nodeCounter) | `TRANSITIVE_LARGE_TREE`
+| > 10000 транзитивных (maxTransitives) | Preemptive: nodeCounter проверяется в начале `resolveTree()`, early return при превышении. Post-processing: ERROR. Настраивается через `settings.transitiveResolution.maxTransitives` (default=10000) | `TRANSITIVE_MAX_EXCEEDED`
 | Constraint на несуществующую библиотеку | WARNING "Constraint does not match" | `TRANSITIVE_UNUSED_CONSTRAINT`
 | Конфликтующие constraints | ERROR "Conflicting constraints" | `TRANSITIVE_CONFLICTING_CONSTRAINTS`
 | SNAPSHOT версии | Резолвятся как обычные, WARNING о нестабильности | `TRANSITIVE_SNAPSHOT`
@@ -624,7 +700,7 @@ internal class TransitiveCache(
 | BOM в dependencyManagement | BOM резолвится, managed versions применяются | --
 | Пустой каталог | 0 транзитивных, INFO | `TRANSITIVE_NO_LIBS`
 | Таймаут при скачивании POM | Retry 3 раза, затем WARNING, пустое дерево | `TRANSITIVE_TIMEOUT`
-| Дубликаты в дереве | Помечаются isDuplicate=true через sessionSeen, children=emptyList() для дубликатов, в flat list -- одна запись | --
+| Дубликаты в дереве | Помечаются `isDuplicate=true` через sessionSeen, children=emptyList() для дубликатов, в flat list -- одна запись. Циклы помечаются `isCycle=true` (отдельный флаг) | --
 | Параллельный доступ к sessionSeen | ConcurrentHashMap.newKeySet() -- thread-safe | --
 | Кеш устарел (TTL) | Перезапрос из repository | --
 | Сеть недоступна, кеш есть | Используется стейл кеш + WARNING | `TRANSITIVE_STALE_CACHE`
@@ -682,9 +758,13 @@ metadata.versionConflicts  // -> List<VersionConflict>
 | `single library resolved` | spring-web:6.2.0 -> дерево с spring-beans, spring-core
 | `recursive resolution` | A -> B -> C -> дерево глубины 3
 | `max depth stops recursion` | maxDepth=2, дерево глубже -> обрезка
-| `cycle detection` | A -> B -> A -> isDuplicate=true via visited (path-specific), WARNING
-| `duplicate detection via sessionSeen` | A->B->D, A->C->D -> D isDuplicate=true для второго вхождения via sessionSeen
+| `cycle detection sets isCycle` | A -> B -> A -> isCycle=true via visited (path-specific), isDuplicate=false
+| `cycle emits diagnostic` | Post-processing обнаруживает isCycle=true -> WARNING TRANSITIVE_CYCLE_DETECTED
+| `duplicate detection via sessionSeen` | A->B->D, A->C->D -> D isDuplicate=true для второго вхождения via sessionSeen, isCycle=false
 | `duplicate children empty` | Дубликат получает children=emptyList() (не резолвится повторно)
+| `cycle vs duplicate distinction` | Цикл: isCycle=true, isDuplicate=false. Дубликат: isDuplicate=true, isCycle=false
+| `max transitives preemptive stop` | maxTransitives=100, >100 зависимостей -> resolveTree early return, ERROR TRANSITIVE_MAX_EXCEEDED
+| `large tree warning` | >5000 но <10000 узлов -> WARNING TRANSITIVE_LARGE_TREE
 | `version conflict HIGHEST` | guava 31.0 vs 33.0 -> resolved=33.0 (HIGHEST)
 | `version conflict with constraint` | constraint=2.17.0 -> resolved=2.17.0 (CONSTRAINT)
 | `VERSION constraint applied` | constraint на log4j:2.17.0 -> версия заменена в дереве

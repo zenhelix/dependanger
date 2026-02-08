@@ -295,10 +295,12 @@ private fun buildExtensionsMap(): Map<String, JsonElement> {
 ----
 1. Найти preset по name в presetsDsl.presets
 2. Если не найден → throw IllegalArgumentException("Preset '$name' not found")
-3. Применить preset.bundles → добавить в bundlesDsl
-4. Применить preset.distributions → добавить в distributionsDsl
-5. Применить preset.settings → merge с текущими settingsDsl (preset значения перезаписывают текущие)
+3. Применить preset.settings → merge с текущими settingsDsl (preset значения перезаписывают текущие)
 ----
+
+NOTE: Поля `preset.bundles` и `preset.distributions` — декларативные метаданные пресета.
+Они НЕ применяются в DSL, а используются потребителями (CLI, Gradle Plugin) для определения, какие бандлы и дистрибуции актуальны при генерации артефактов.
+Например, CLI может итерировать `metadata.presets[name].distributions` и вызывать `process(distribution=...)` для каждой.
 
 [[implementation-apply-preset]]
 === Детальная реализация
@@ -311,18 +313,11 @@ public fun applyPreset(name: String) {
             "Preset '$name' not found. Available presets: ${presetsDsl.availableNames()}"
         )
 
-    // Применяем бандлы из пресета
-    preset.bundles.forEach { bundleName ->
-        // Бандлы из пресета уже должны быть определены в bundlesDsl
-        // applyPreset не создаёт новые бандлы, а отмечает их для включения
-    }
+    // bundles и distributions — декларативные поля пресета.
+    // Используются потребителями (CLI/Gradle Plugin) для выбора
+    // активных бандлов и дистрибуций. DSL их не применяет.
 
-    // Применяем дистрибуции из пресета
-    preset.distributions.forEach { distName ->
-        // Аналогично — дистрибуции должны быть определены
-    }
-
-    // Мержим настройки: значения пресета перезаписывают текущие
+    // Мержим только настройки: значения пресета перезаписывают текущие
     preset.settings?.let { presetSettings ->
         settingsDsl.mergeFrom(presetSettings)
     }
@@ -332,9 +327,8 @@ public fun applyPreset(name: String) {
 *Edge cases:*
 
 - Preset не найден → `IllegalArgumentException` с перечислением доступных
-- Preset ссылается на несуществующий бандл → обработается позже в ValidationProcessor
 - Множественный applyPreset → каждый последующий мержит свои настройки поверх предыдущих
-- Пустой пресет (без bundles/distributions/settings) → no-op
+- Пустой пресет (без settings) → no-op
 
 [[dsl-build-contract]]
 == Контракт доступа к данным DSL
@@ -771,8 +765,8 @@ public interface CustomRuleHandler {
 
 Используется в:
 
-* xref:SPEC-08-dependanger-analysis.adoc[SPEC-08] -- `CompatibilityCheckProcessor` для обработки `CustomRule`
-* xref:SPEC-03-dependanger-effective.adoc[SPEC-03] -- `CompatRulesProcessor` для обработки `CustomRule`
+* xref:SPEC-08-dependanger-analysis.adoc[SPEC-08] -- `CompatibilityCheckProcessor` для обработки `CustomRule` через SPI
+* xref:SPEC-03-dependanger-effective.adoc[SPEC-03] -- `CompatRulesProcessor` пропускает `CustomRule` с INFO `COMPAT_CUSTOM_RULE_DEFERRED` и делегирует обработку в `CompatibilityCheckProcessor` (order=110)
 
 [[priority]]
 == Приоритет

@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.effective.model
+package io.github.zenhelix.dependanger.features.license.model
 
 import kotlinx.serialization.Serializable
 
@@ -9,8 +9,3 @@ public data class LicenseResult(
     val source: LicenseSource = LicenseSource.UNKNOWN,
     val category: LicenseCategory = LicenseCategory.UNKNOWN,
 )
-
-@Serializable
-public enum class LicenseSource {
-    MAVEN_POM, CLEARLY_DEFINED, DECLARED, UNKNOWN
-}

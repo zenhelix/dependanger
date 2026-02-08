@@ -172,7 +172,7 @@ public suspend fun process(
         val pipeline = buildPipeline()
         val context = ProcessingContext(
             originalMetadata = metadata,
-            settings = metadata.settings ?: Settings(),
+            settings = metadata.settings,
             environment = environment,
             activeDistribution = distribution,
             callback = callback,
@@ -322,7 +322,7 @@ public suspend fun validate(): DependangerResult {
         val pipeline = builder.build()
         val context = ProcessingContext(
             originalMetadata = metadata,
-            settings = metadata.settings ?: Settings(),
+            settings = metadata.settings,
             environment = environment,
             activeDistribution = null,
             callback = null,
@@ -340,7 +340,7 @@ public suspend fun validate(): DependangerResult {
                 DiagnosticMessage(
                     code = "VALIDATION_FAILED",
                     message = "Validation failed: ${e.message}",
-                    severity = DiagnosticSeverity.ERROR,
+                    severity = Severity.ERROR,
                 )
             )
         )

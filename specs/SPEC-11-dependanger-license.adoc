@@ -198,6 +198,14 @@ public class LicenseCheckProcessor(
             )
         }
 
+        if (settings.failOnCopyleft && results.any {
+                it.second.category in listOf(LicenseCategory.WEAK_COPYLEFT, LicenseCategory.STRONG_COPYLEFT)
+            }) {
+            updatedMetadata = updatedMetadata.withDiagnostic(
+                Diagnostics.error("LICENSE_COPYLEFT_FOUND", "Copyleft licenses found")
+            )
+        }
+
         return updatedMetadata
     }
 }

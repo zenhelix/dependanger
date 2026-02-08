@@ -17,6 +17,10 @@ public class PresetsDsl {
             )
         )
     }
+
+    public fun findByName(name: String): Preset? = TODO()
+
+    public fun availableNames(): List<String> = TODO()
 }
 
 @DependangerDslMarker

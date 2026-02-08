@@ -20,7 +20,8 @@
 |===
 | Компонент | Статус
 
-| `MavenRepository.kt` | Полностью: data class с полями url, name, username, password
+| `Repository.kt` (core) | Полностью: sealed interface Repository, data class MavenRepository (url, name) -- перенесён из maven-resolver в core
+| `Credentials.kt` (core) | Полностью: data class Credentials (username, password), fun interface CredentialsProvider
 | `BomContent.kt` | Полностью: @Serializable data class с dependencies и properties
 | `BomDependency.kt` | Полностью: @Serializable data class с group, artifact, version
 |===
@@ -39,7 +40,8 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
 // BomCache.kt
 public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHours: Long = 1) {
-    public fun get(group: String, artifact: String, version: String): BomContent = TODO()
+    public fun get(group: String, artifact: String, version: String): BomContent? = TODO()
+    public fun getStale(group: String, artifact: String, version: String): BomContent? = TODO()
     public fun put(group: String, artifact: String, version: String, content: BomContent): Unit = TODO()
     public fun invalidate(group: String, artifact: String, version: String): Unit = TODO()
     public fun clear(): Unit = TODO()
@@ -94,6 +96,7 @@ public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHo
 public class MavenPomDownloader(
     private val repositories: List<MavenRepository>,
     private val httpClient: HttpClient,
+    private val credentialsProvider: CredentialsProvider? = null,
     private val connectTimeoutMs: Long = 30_000,
     private val readTimeoutMs: Long = 60_000,
 ) {
@@ -102,9 +105,6 @@ public class MavenPomDownloader(
         artifact: String,
         version: String
     ): String? {
-        // Конвертировать координаты в URL:
-        // group "org.springframework.boot" -> "org/springframework/boot"
-        // URL: {repoUrl}/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom
         val groupPath = group.replace('.', '/')
         val pomFileName = "$artifact-$version.pom"
 
@@ -112,8 +112,8 @@ public class MavenPomDownloader(
             val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/$version/$pomFileName"
             try {
                 val response = httpClient.get(url) {
-                    if (repo.username != null && repo.password != null) {
-                        basicAuth(repo.username, repo.password)
+                    credentialsProvider?.getCredentials(repo.url)?.let { creds ->
+                        basicAuth(creds.username, creds.password)
                     }
                     timeout {
                         connectTimeoutMillis = connectTimeoutMs
@@ -123,7 +123,6 @@ public class MavenPomDownloader(
                 if (response.status == HttpStatusCode.OK) {
                     return response.bodyAsText()
                 }
-                // 404 -> пробуем следующий репозиторий
             } catch (e: Exception) {
                 logger.warn { "Failed to download POM from ${repo.url}: ${e.message}" }
             }
@@ -238,15 +237,21 @@ override suspend fun process(
 
     val settings = context.settings
     val cache = BomCache(
-        cacheDirectory = settings.bomCache?.directory ?: "~/.dependanger/cache/bom",
-        ttlHours = settings.bomCache?.ttlHours ?: 24,
-        ttlSnapshotHours = settings.bomCache?.ttlSnapshotHours ?: 1,
+        cacheDirectory = settings.bomCache.directory.ifEmpty {
+            System.getProperty("user.home") + "/.dependanger/cache/bom"
+        },
+        ttlHours = settings.bomCache.ttlHours,
+        ttlSnapshotHours = settings.bomCache.ttlSnapshotHours,
     )
     val repositories = context.settings.repositories.ifEmpty {
         listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
     }
-    val downloader = MavenPomDownloader(repositories, createHttpClient())
+    val credentialsProvider = context[CredentialsProviderKey]
+    val downloader = MavenPomDownloader(repositories, createHttpClient(), credentialsProvider)
     val parser = PomXmlParser()
+
+    // Key для получения CredentialsProvider из ProcessingContext:
+    // internal val CredentialsProviderKey = ProcessingContextKey<CredentialsProvider>("credentialsProvider")
 
     // Резолвить все BOM (с обнаружением циклов)
     val resolvedBoms = mutableListOf<BomContent>()
@@ -305,14 +310,6 @@ override suspend fun process(
         )
     }
 
-    val updatedVersions = metadata.versions.toMutableMap()
-    // Добавить BOM-резолвнутые версии в map
-    for ((_, lib) in updatedLibraries) {
-        if (lib.version?.source == VersionSource.BOM_IMPORT && lib.version != null) {
-            // Обновить соответствующую version entry если нужно
-        }
-    }
-
     return metadata.copy(
         libraries = updatedLibraries,
         diagnostics = diagnostics,
@@ -321,6 +318,14 @@ override suspend fun process(
 ----
 
 ==== Обнаружение циклов
+
+[source,kotlin]
+----
+internal data class BomResolveResult(
+    val content: BomContent,
+    val diagnostics: Diagnostics,
+)
+----
 
 [source,kotlin]
 ----
@@ -339,14 +344,14 @@ private suspend fun resolveBomRecursive(
     visited.add(key)
 
     // Попробовать кеш
-    val cached = try { cache.get(group, artifact, version) } catch (_: Exception) { null }
+    val cached = cache.get(group, artifact, version)
     if (cached != null) return BomResolveResult(cached, diagnostics)
 
     // Скачать POM
     val pomXml = downloader.downloadPom(group, artifact, version)
     if (pomXml == null) {
         // Попробовать стейл кеш
-        val stale = try { cache.getStale(group, artifact, version) } catch (_: Exception) { null }
+        val stale = cache.getStale(group, artifact, version)
         if (stale != null) {
             return BomResolveResult(stale, diagnostics + Diagnostics.warning("BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import"))
         }
@@ -411,7 +416,7 @@ private suspend fun resolveBomRecursive(
 
 [source,text]
 ----
-~/.dependanger/cache/bom/
+{user.home}/.dependanger/cache/bom/   <-- System.getProperty("user.home")
   org/
     springframework/
       boot/
@@ -426,34 +431,46 @@ private suspend fun resolveBomRecursive(
 [source,text]
 ----
 1. Построить путь к файлу: {cacheDir}/{groupPath}/{artifact}/{version}/bom-content.json
-2. Проверить существование файла
+2. Проверить существование файла -> если нет, вернуть null
 3. Прочитать metadata.json -> fetchedAt, isSnapshot
 4. Рассчитать TTL: если isSnapshot -> ttlSnapshotHours, иначе ttlHours
-5. Если (now - fetchedAt) > ttl -> throw CacheExpiredException
+5. Если (now - fetchedAt) > ttl -> вернуть null (expired)
 6. Десериализовать bom-content.json в BomContent
-7. Вернуть BomContent
+7. Вернуть BomContent?
 ----
 
 [source,kotlin]
 ----
-public fun get(group: String, artifact: String, version: String): BomContent {
+public fun get(group: String, artifact: String, version: String): BomContent? {
     val dir = resolveCacheDir(group, artifact, version)
     val contentFile = dir.resolve("bom-content.json")
     val metaFile = dir.resolve("metadata.json")
 
-    if (!contentFile.exists() || !metaFile.exists()) {
-        throw CacheNotFoundException("BOM not in cache: $group:$artifact:$version")
-    }
+    if (!contentFile.exists() || !metaFile.exists()) return null
 
     val meta = Json.decodeFromString<CacheMetadata>(metaFile.readText())
     val ttl = if (version.endsWith("-SNAPSHOT")) ttlSnapshotHours else ttlHours
-    val ageHours = Duration.between(meta.fetchedAt, Instant.now()).toHours()
+    val ageHours = (Clock.System.now() - meta.fetchedAt).inWholeHours
 
-    if (ageHours > ttl) {
-        throw CacheExpiredException("BOM cache expired: $group:$artifact:$version")
-    }
+    if (ageHours > ttl) return null
 
     return Json.decodeFromString<BomContent>(contentFile.readText())
+}
+----
+
+==== BomCache.getStale()
+
+[source,kotlin]
+----
+public fun getStale(group: String, artifact: String, version: String): BomContent? {
+    val dir = resolveCacheDir(group, artifact, version)
+    val contentFile = dir.resolve("bom-content.json")
+    if (!contentFile.exists()) return null
+    return try {
+        Json.decodeFromString<BomContent>(contentFile.readText())
+    } catch (_: Exception) {
+        null
+    }
 }
 ----
 
@@ -474,7 +491,7 @@ public fun put(group: String, artifact: String, version: String, content: BomCon
     tempContent.renameTo(contentFile)
 
     val meta = CacheMetadata(
-        fetchedAt = Instant.now(),
+        fetchedAt = Clock.System.now(),
         isSnapshot = version.endsWith("-SNAPSHOT"),
     )
     val tempMeta = File.createTempFile("meta-", ".tmp", dir)
@@ -508,13 +525,10 @@ public fun clear() {
 [source,kotlin]
 ----
 @Serializable
-private data class CacheMetadata(
-    val fetchedAt: Instant,
+internal data class CacheMetadata(
+    val fetchedAt: kotlinx.datetime.Instant,
     val isSnapshot: Boolean,
 )
-
-public class CacheNotFoundException(message: String) : RuntimeException(message)
-public class CacheExpiredException(message: String) : RuntimeException(message)
 ----
 
 [[http-download]]
@@ -704,7 +718,7 @@ BomImportProcessor не использует ExtensionKey напрямую -- р
 | Тест | Описание
 
 | `put and get returns content` | Запись и чтение из кеша
-| `expired TTL throws CacheExpiredException` | TTL истёк -> исключение
+| `expired TTL returns null` | TTL истёк -> null, getStale() возвращает контент
 | `snapshot has shorter TTL` | SNAPSHOT версия -> ttlSnapshotHours
 | `invalidate removes entry` | Удаление конкретной записи
 | `clear removes all entries` | Полная очистка
@@ -741,6 +755,7 @@ dependanger-maven-resolver зависит от:
 - io.ktor:ktor-serialization-kotlinx-json:3.1.1 (implementation)
 - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1 (implementation)
 - io.github.oshai:kotlin-logging-jvm:7.0.3 (implementation)
+- org.jetbrains.kotlinx:kotlinx-datetime:0.6.2 (implementation)
 
 Тесты:
 - io.ktor:ktor-client-mock:3.1.1

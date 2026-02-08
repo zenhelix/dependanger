@@ -5,4 +5,5 @@ public data class TomlConfig(
     val includeComments: Boolean = true,
     val sortSections: Boolean = true,
     val useInlineVersions: Boolean = false,
+    val includeDeprecationComments: Boolean = true,
 )

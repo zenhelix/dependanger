@@ -295,8 +295,8 @@ Core-процессоры: 1-99.
 | `BomImportProcessor`
 | xref:SPEC-06-dependanger-maven-resolver.adoc[SPEC-06]
 | 15
-| PARALLEL_IO
-| Между extracted-versions(12) и version-fallback(25) -- нужен до version resolution
+| SEQUENTIAL
+| Между extracted-versions(12) и version-fallback(25) -- нужен до version resolution. SEQUENTIAL т.к. модифицирует libraries (внутренняя параллельность через coroutines)
 
 | `UpdateCheckProcessor`
 | xref:SPEC-07-dependanger-updates.adoc[SPEC-07]

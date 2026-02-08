@@ -74,7 +74,7 @@ NOTE: Базовая проверка правил совместимости (`
            - SAME_MAJOR_MINOR: все major.minor совпадают
       iii. При несовпадении -> CompatibilityIssue
    d. CustomRule:
-      i.   Найти handler по ruleId через `CustomRuleHandler` SPI из xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01]. ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.core.spi.CustomRuleHandler`
+      i.   Найти handler по ruleId через `CustomRuleHandler` SPI из xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01]. ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`
       ii.  Вызвать `handler.evaluate(rule, libraries, context)` в try-catch
       iii. Обработать результат -> CompatibilityIssue
 6. Собрать все CompatibilityIssue
@@ -121,15 +121,15 @@ private fun checkVersionConstraint(
     val parsed = versions.map { VersionComparator.parse(it) ?: return null }
 
     val compatible = when (rule.constraint) {
-        ConstraintType.SAME_VERSION -> parsed.distinct().size == 1
-        ConstraintType.SAME_MAJOR -> parsed.map { it.major }.distinct().size == 1
-        ConstraintType.SAME_MAJOR_MINOR ->
+        VersionConstraintType.SAME_VERSION -> parsed.distinct().size == 1
+        VersionConstraintType.SAME_MAJOR -> parsed.map { it.major }.distinct().size == 1
+        VersionConstraintType.SAME_MAJOR_MINOR ->
             parsed.map { it.major to it.minor }.distinct().size == 1
     }
 
     return if (!compatible) {
         CompatibilityIssue(
-            ruleId = rule.id,
+            ruleId = rule.name,
             message = rule.message ?: "Version constraint violated: ${rule.constraint}",
             severity = rule.severity,
             affectedLibraries = involvedLibs.map { it.alias },
@@ -149,7 +149,7 @@ private fun checkJdkRequirement(
     targetJdk: Int?
 ): CompatibilityIssue? {
     if (targetJdk == null) {
-        logger.warn { "targetJdk not specified, skipping jdkRequirement rule '${rule.id}'" }
+        logger.warn { "targetJdk not specified, skipping jdkRequirement rule '${rule.name}'" }
         return null
     }
 
@@ -167,7 +167,7 @@ private fun checkJdkRequirement(
 
     return if (violated) {
         CompatibilityIssue(
-            ruleId = rule.id,
+            ruleId = rule.name,
             message = rule.message ?: "Requires JDK ${rule.minJdk}+, but target is $targetJdk",
             severity = rule.severity,
             affectedLibraries = matchingLibs.map { it.alias },
@@ -188,7 +188,7 @@ private fun checkMutualExclusion(
     val present = rule.libraries.filter { it in libraries }
     return if (present.size >= 2) {
         CompatibilityIssue(
-            ruleId = rule.id,
+            ruleId = rule.name,
             message = rule.message ?: "Mutually exclusive libraries found: ${present.joinToString()}",
             severity = rule.severity,
             affectedLibraries = present,

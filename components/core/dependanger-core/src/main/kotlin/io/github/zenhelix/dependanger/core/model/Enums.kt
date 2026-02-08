@@ -24,7 +24,7 @@ public enum class KmpTarget {
 
 @Serializable
 public enum class ConflictResolutionStrategy {
-    HIGHEST, FIRST, FAIL
+    HIGHEST, FIRST, FAIL, CONSTRAINT
 }
 
 @Serializable

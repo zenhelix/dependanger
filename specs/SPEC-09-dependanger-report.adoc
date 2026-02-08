@@ -32,6 +32,7 @@ public class ReportGenerator {
     public fun generate(
         effective: EffectiveMetadata,
         settings: ReportSettings = ReportSettings(),
+        originalMetadata: DependangerMetadata? = null,
     ): DependangerReport = TODO()
 }
 ----
@@ -106,7 +107,7 @@ public data class ReportBundle(
    h. deprecated -> отфильтровать библиотеки с isDeprecated=true
    i. licenses -> из extensions (LicenseResult для каждой библиотеки)
    j. transitives -> из metadata.transitives (extension)
-   k. constraints -> из originalMetadata.constraints
+   k. constraints -> из originalMetadata?.constraints (если передан)
    l. validation -> из metadata.diagnostics (errors + warnings)
 2. Отфильтровать секции по списку `sections`
 3. Построить summary:
@@ -177,6 +178,7 @@ internal data class ReportSummary(
 public fun generate(
     effective: EffectiveMetadata,
     settings: ReportSettings = ReportSettings(),
+    originalMetadata: DependangerMetadata? = null,
 ): DependangerReport {
     val format = settings.format
     val sections = settings.sections
@@ -286,7 +288,7 @@ private fun renderMarkdown(data: ReportData): String = buildString {
 | `deprecated` | `metadata.libraries.filter { isDeprecated }` | ReportSection.DEPRECATED in sections
 | `licenses` | Extension из LicenseCheckProcessor | ReportSection.LICENSES in sections + данные есть
 | `transitives` | `metadata.transitives` | ReportSection.TRANSITIVES in sections + данные есть
-| `constraints` | `context.originalMetadata.constraints` | ReportSection.CONSTRAINTS in sections
+| `constraints` | `originalMetadata?.constraints` | ReportSection.CONSTRAINTS in sections + originalMetadata != null
 | `validation` | `metadata.diagnostics` | ReportSection.VALIDATION in sections
 |===
 

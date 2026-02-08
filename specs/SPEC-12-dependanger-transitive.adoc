@@ -73,10 +73,10 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
       i.   Применить стратегию HIGHEST (наивысшая версия)
       ii.  Если есть constraint -> использовать версию из constraint
       iii. Создать VersionConflict(requestedVersions, resolvedVersion, resolution)
-7. Применить constraints:
-   a. VERSION -> заменить resolved version в дереве и flat list
-   b. EXCLUDE -> удалить из дерева и flat list
-   c. SUBSTITUTE -> заменить артефакт (координаты) в дереве и flat list
+7. Применить constraints (sealed class Constraint):
+   a. VersionConstraintDef -> заменить resolved version в дереве и flat list
+   b. Exclude -> удалить из дерева и flat list
+   c. Substitute -> заменить артефакт (координаты) в дереве и flat list
 8. Построить flat list (FlatDependency для каждого уникального артефакта):
    a. Deduplicate по group:artifact
    b. Записать isDirectDependency, isOptional
@@ -118,7 +118,7 @@ public class TransitiveResolverProcessor(
         }
         val constraints = context.originalMetadata.constraints ?: emptyList()
         val effectiveMaxDepth = settings.maxDepth ?: maxDepth
-        val scopes = settings.scopes ?: listOf("compile", "runtime")
+        val scopes = settings.scopes
 
         val libraries = metadata.libraries.values
             .filter { it.version != null }
@@ -342,19 +342,17 @@ private fun detectConflicts(
             val distinctVersions = versions.distinct()
 
             // Проверить constraint
-            val constraint = constraints.firstOrNull {
-                it.type == ConstraintType.VERSION &&
-                    it.coordinates.group == group &&
-                    it.coordinates.artifact == artifact
-            }
+            val versionConstraint = constraints.filterIsInstance<Constraint.VersionConstraintDef>()
+                .firstOrNull { it.coordinates == coordinate }
 
-            val resolvedVersion = if (constraint != null) {
-                constraint.coordinates.version
+            val resolvedVersion = if (versionConstraint != null) {
+                (versionConstraint.version as? VersionReference.Literal)?.value
+                    ?: selectHighest(distinctVersions)
             } else {
                 selectHighest(distinctVersions)
             }
 
-            val resolution = if (constraint != null) {
+            val resolution = if (versionConstraint != null) {
                 ConflictResolutionStrategy.CONSTRAINT
             } else {
                 ConflictResolutionStrategy.HIGHEST
@@ -390,10 +388,10 @@ private fun applyConstraints(
     var result = trees
 
     for (constraint in constraints) {
-        result = when (constraint.type) {
-            ConstraintType.VERSION -> applyVersionConstraint(result, constraint)
-            ConstraintType.EXCLUDE -> applyExcludeConstraint(result, constraint)
-            ConstraintType.SUBSTITUTE -> applySubstituteConstraint(result, constraint)
+        result = when (constraint) {
+            is Constraint.VersionConstraintDef -> applyVersionConstraint(result, constraint)
+            is Constraint.Exclude -> applyExcludeConstraint(result, constraint)
+            is Constraint.Substitute -> applySubstituteConstraint(result, constraint)
         }
     }
 
@@ -402,12 +400,13 @@ private fun applyConstraints(
 
 private fun applyVersionConstraint(
     trees: List<TransitiveTree>,
-    constraint: Constraint,
+    constraint: Constraint.VersionConstraintDef,
 ): List<TransitiveTree> {
+    val (group, artifact) = constraint.coordinates.split(":", limit = 2)
+    val version = (constraint.version as? VersionReference.Literal)?.value ?: return trees
     return trees.map { tree ->
-        if (tree.group == constraint.coordinates.group &&
-            tree.artifact == constraint.coordinates.artifact) {
-            tree.copy(version = constraint.coordinates.version)
+        if (tree.group == group && tree.artifact == artifact) {
+            tree.copy(version = version)
         } else {
             tree.copy(children = applyVersionConstraint(tree.children, constraint))
         }
@@ -416,10 +415,10 @@ private fun applyVersionConstraint(
 
 private fun applyExcludeConstraint(
     trees: List<TransitiveTree>,
-    constraint: Constraint,
+    constraint: Constraint.Exclude,
 ): List<TransitiveTree> {
     return trees
-        .filter { !(it.group == constraint.coordinates.group && it.artifact == constraint.coordinates.artifact) }
+        .filter { !(it.group == constraint.group && it.artifact == constraint.artifact) }
         .map { tree ->
             tree.copy(children = applyExcludeConstraint(tree.children, constraint))
         }
@@ -427,15 +426,19 @@ private fun applyExcludeConstraint(
 
 private fun applySubstituteConstraint(
     trees: List<TransitiveTree>,
-    constraint: Constraint,
+    constraint: Constraint.Substitute,
 ): List<TransitiveTree> {
-    val from = constraint.substituteFrom ?: return trees
+    val (fromGroup, fromArtifact) = constraint.from.split(":", limit = 2)
+    val toParts = constraint.to.split(":", limit = 3)
+    val toGroup = toParts[0]
+    val toArtifact = toParts[1]
+    val toVersion = toParts.getOrNull(2)
     return trees.map { tree ->
-        if (tree.group == from.group && tree.artifact == from.artifact) {
+        if (tree.group == fromGroup && tree.artifact == fromArtifact) {
             tree.copy(
-                group = constraint.coordinates.group,
-                artifact = constraint.coordinates.artifact,
-                version = constraint.coordinates.version,
+                group = toGroup,
+                artifact = toArtifact,
+                version = toVersion ?: tree.version,
             )
         } else {
             tree.copy(children = applySubstituteConstraint(tree.children, constraint))

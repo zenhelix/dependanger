@@ -47,7 +47,7 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
 ----
 1. Получить настройки updateCheck из context.settings
 2. Получить список repositories: `settings.repositories` -> `context.settings.repositories` -> Maven Central (см. xref:index.adoc#repository-convention[конвенция репозиториев])
-3. Получить фильтры: excludePatterns, includePrerelease, minUpdateType
+3. Получить фильтры: excludePatterns, includePrerelease
 4. Отфильтровать библиотеки:
    a. Исключить библиотеки с ignoreUpdates = true
    b. Исключить библиотеки matching excludePatterns
@@ -64,9 +64,8 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
    g. Если есть обновление -> создать UpdateAvailableInfo
    h. Сохранить в кеш
 7. Собрать все UpdateAvailableInfo в список
-8. Отфильтровать по minUpdateType
-9. Записать в metadata через withExtension(UpdatesExtensionKey, updates)
-10. Добавить INFO в diagnostics: "X updates available"
+8. Записать в metadata через withExtension(UpdatesExtensionKey, updates)
+9. Добавить INFO в diagnostics: "X updates available"
 ----
 
 [[implementation-update-check]]
@@ -80,6 +79,7 @@ public class MavenMetadataFetcher(
     private val repositories: List<MavenRepository>,
     private val httpClient: HttpClient,
     private val timeout: Long = 30_000,
+    private val credentialsProvider: CredentialsProvider? = null,
 ) {
     /**
      * Запрашивает maven-metadata.xml для артефакта.
@@ -95,8 +95,8 @@ public class MavenMetadataFetcher(
             try {
                 val response = httpClient.get(url) {
                     timeout { requestTimeoutMillis = this@MavenMetadataFetcher.timeout }
-                    if (repo.username != null && repo.password != null) {
-                        basicAuth(repo.username, repo.password)
+                    credentialsProvider?.getCredentials(repo.url)?.let { creds ->
+                        basicAuth(creds.username, creds.password)
                     }
                 }
                 if (response.status == HttpStatusCode.OK) {
@@ -154,7 +154,7 @@ override suspend fun process(
     val fetcher = MavenMetadataFetcher(repos, createHttpClient(), settings.timeout)
     val cache = VersionCache(settings.cacheDirectory, settings.cacheTtlHours)
     val includePrerelease = settings.includePrerelease
-    val parallelism = settings.parallelism ?: 10
+    val parallelism = settings.parallelism
 
     // Отфильтровать библиотеки
     val librariesToCheck = metadata.libraries.values
@@ -174,19 +174,14 @@ override suspend fun process(
         }.awaitAll().filterNotNull()
     }
 
-    // Фильтр по minUpdateType
-    val filtered = settings.minUpdateType?.let { min ->
-        updates.filter { it.updateType.ordinal <= min.ordinal }
-    } ?: updates
-
     return metadata
-        .withExtension(UpdatesExtensionKey, filtered)
+        .withExtension(UpdatesExtensionKey, updates)
         .let { m ->
-            if (filtered.isNotEmpty()) {
-                val summary = "Updates available: ${filtered.size} " +
-                    "(${filtered.count { it.updateType == UpdateType.MAJOR }} major, " +
-                    "${filtered.count { it.updateType == UpdateType.MINOR }} minor, " +
-                    "${filtered.count { it.updateType == UpdateType.PATCH }} patch)"
+            if (updates.isNotEmpty()) {
+                val summary = "Updates available: ${updates.size} " +
+                    "(${updates.count { it.updateType == UpdateType.MAJOR }} major, " +
+                    "${updates.count { it.updateType == UpdateType.MINOR }} minor, " +
+                    "${updates.count { it.updateType == UpdateType.PATCH }} patch)"
                 m.withDiagnostic(
                     Diagnostics.info("UPDATES_AVAILABLE", summary, "update-check")
                 )

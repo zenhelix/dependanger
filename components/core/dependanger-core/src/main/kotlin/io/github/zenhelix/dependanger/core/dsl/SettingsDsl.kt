@@ -85,6 +85,8 @@ public class SettingsDsl {
         reportSettings = dsl.toSettings()
     }
 
+    public fun mergeFrom(settings: Settings): Unit = TODO()
+
     public fun toSettings(): Settings = Settings(
         defaultDistribution = defaultDistribution,
         strictVersionResolution = strictVersionResolution,
@@ -168,12 +170,20 @@ public class UpdateCheckSettingsDsl {
     public var excludePatterns: List<String> = emptyList()
     public var includePrerelease: Boolean = false
     public var repositories: List<Repository> = emptyList()
+    public var timeout: Long = 30_000
+    public var parallelism: Int = 10
+    public var cacheDirectory: String = ""
+    public var cacheTtlHours: Long = 1
 
     public fun toSettings(): UpdateCheckSettings = UpdateCheckSettings(
         enabled = enabled,
         excludePatterns = excludePatterns,
         includePrerelease = includePrerelease,
         repositories = repositories,
+        timeout = timeout,
+        parallelism = parallelism,
+        cacheDirectory = cacheDirectory,
+        cacheTtlHours = cacheTtlHours,
     )
 }
 
@@ -208,13 +218,25 @@ public class LicenseCheckSettingsDsl {
     public var enabled: Boolean = false
     public var allowedLicenses: List<String> = emptyList()
     public var deniedLicenses: List<String> = emptyList()
+    public var failOnDenied: Boolean = false
     public var failOnUnknown: Boolean = false
+    public var failOnCopyleft: Boolean = false
+    public var warnOnCopyleft: Boolean = true
+    public var warnOnUnknown: Boolean = true
+    public var ignoreLibraries: List<String> = emptyList()
+    public var includeTransitives: Boolean = false
 
     public fun toSettings(): LicenseCheckSettings = LicenseCheckSettings(
         enabled = enabled,
         allowedLicenses = allowedLicenses,
         deniedLicenses = deniedLicenses,
+        failOnDenied = failOnDenied,
         failOnUnknown = failOnUnknown,
+        failOnCopyleft = failOnCopyleft,
+        warnOnCopyleft = warnOnCopyleft,
+        warnOnUnknown = warnOnUnknown,
+        ignoreLibraries = ignoreLibraries,
+        includeTransitives = includeTransitives,
     )
 }
 
@@ -222,16 +244,18 @@ public class LicenseCheckSettingsDsl {
 public class TransitiveResolutionSettingsDsl {
     public var enabled: Boolean = false
     public var repositories: List<Repository> = emptyList()
-    public var depth: Int? = null
+    public var maxDepth: Int? = null
     public var conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST
     public var includeOptional: Boolean = false
+    public var scopes: List<String> = listOf("compile", "runtime")
 
     public fun toSettings(): TransitiveResolutionSettings = TransitiveResolutionSettings(
         enabled = enabled,
         repositories = repositories,
-        depth = depth,
+        maxDepth = maxDepth,
         conflictResolution = conflictResolution,
         includeOptional = includeOptional,
+        scopes = scopes,
     )
 }
 

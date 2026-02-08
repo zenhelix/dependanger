@@ -742,11 +742,13 @@ public object VersionComparator {
 === CustomRuleHandler SPI
 
 Интерфейс для обработки пользовательских правил совместимости (`CompatibilityRule.CustomRule`).
-Регистрация через ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.core.spi.CustomRuleHandler`.
+Регистрация через ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`.
+
+NOTE: Интерфейс находится в модуле `dependanger-effective` (пакет `effective.spi`), т.к. зависит от типов `EffectiveLibrary`, `ProcessingContext` и `CompatibilityIssue`.
 
 [source,kotlin]
 ----
-package io.github.zenhelix.dependanger.core.spi
+package io.github.zenhelix.dependanger.effective.spi
 
 /**
  * SPI для обработки пользовательских правил совместимости.

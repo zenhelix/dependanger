@@ -48,8 +48,6 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
 1. Получить настройки securityCheck из context.settings
 2. Собрать библиотеки для проверки:
    a. Все библиотеки из metadata.libraries с version != null
-   b. Исключить библиотеки из ignoreLibraries
-   c. Если includeTransitives=true -> добавить транзитивные из extensions
 3. Проверить кеш: для каждой библиотеки проверить ~/.dependanger/cache/security/
 4. Библиотеки без кеша -> batch-запрос в OSV API:
    a. Разбить на batches по 1000 (лимит OSV API)
@@ -61,14 +59,12 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
    c. Определить severity (CRITICAL/HIGH/MEDIUM/LOW) по CVSS score
    d. Извлечь fixedVersion из affected[].ranges
    e. Создать VulnerabilityInfo
-6. Отфильтровать по minSeverity и minCvssScore
-7. Отфильтровать ignoreCves
-8. Записать в кеш
-9. Записать в metadata: withExtension(VulnerabilitiesExtensionKey, vulns)
-10. Добавить diagnostics:
-    a. INFO: "Scanned X libraries, found Y vulnerabilities"
-    b. Если failOnCritical && есть CRITICAL -> ERROR
-    c. Если failOnHigh && есть HIGH -> ERROR
+6. Отфильтровать ignoreVulnerabilities
+7. Записать в кеш
+8. Записать в metadata: withExtension(VulnerabilitiesExtensionKey, vulns)
+9. Добавить diagnostics:
+   a. INFO: "Scanned X libraries, found Y vulnerabilities"
+   b. Если severity найденных уязвимостей >= failOnVulnerability -> ERROR
 ----
 
 [[spec-osv-client]]
@@ -395,7 +391,7 @@ internal data class OsvReference(val type: String? = null, val url: String? = nu
 | Множественные уязвимости | Отдельный VulnerabilityInfo для каждой | --
 | Пустой каталог | 0 уязвимостей, INFO | `SECURITY_NO_VULNS`
 | Невалидный CVSS | WARNING, severity по текстовому полю | `SECURITY_INVALID_CVSS`
-| Игнорируемая CRITICAL + failOnCritical | Pipeline продолжается (игнорируется) | --
+| Игнорируемая уязвимость + failOnVulnerability | Уязвимость из ignoreVulnerabilities не учитывается при проверке failOnVulnerability, pipeline продолжается | --
 | > 1000 библиотек | Batch splitting по 1000 | --
 | CVSS v2 only | Конвертация -> approximate v3 + WARNING | `SECURITY_CVSS_V2`
 |===
@@ -409,8 +405,7 @@ internal data class OsvReference(val type: String? = null, val url: String? = nu
 
 | `SECURITY_SCAN_COMPLETE` | Сканирование завершено с результатами | INFO
 | `SECURITY_NO_VULNS` | Уязвимости не найдены | INFO
-| `SECURITY_CRITICAL_FOUND` | Найдены CRITICAL уязвимости | ERROR (если failOnCritical)
-| `SECURITY_HIGH_FOUND` | Найдены HIGH уязвимости | ERROR (если failOnHigh)
+| `SECURITY_VULNERABILITY_FOUND` | Найдены уязвимости с severity >= failOnVulnerability | ERROR (если severity >= failOnVulnerability)
 | `SECURITY_API_UNREACHABLE` | OSV API недоступен | WARNING
 | `SECURITY_STALE_CACHE` | Используется устаревший кеш | WARNING
 | `SECURITY_TIMEOUT` | Таймаут запроса к OSV | WARNING
@@ -446,9 +441,8 @@ metadata.vulnerabilities // -> List<VulnerabilityInfo>
 | `severity classification` | 10.0->CRITICAL, 7.5->HIGH, 5.0->MEDIUM, 2.0->LOW
 | `fixedVersion extracted` | affected[].ranges[].events[].fixed -> fixedVersion
 | `CVE alias extracted` | aliases содержит CVE-xxx
-| `ignoreCves filter works` | CVE в ignore list -> не включается
-| `ignoreLibraries filter works` | Библиотека в ignore -> не сканируется
-| `failOnCritical adds ERROR` | CRITICAL + failOnCritical -> ERROR в diagnostics
+| `ignoreVulnerabilities filter works` | Уязвимость в ignore list -> не включается
+| `failOnVulnerability adds ERROR` | severity >= failOnVulnerability -> ERROR в diagnostics
 | `cache prevents duplicate requests` | Повторный запуск -> из кеша
 | `API failure with cache fallback` | 500 error + cache -> WARNING + кеш
 | `API failure without cache` | 500 error + no cache -> WARNING, пропуск

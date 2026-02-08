@@ -59,6 +59,10 @@ public data class UpdateCheckSettings(
     val excludePatterns: List<String> = emptyList(),
     val includePrerelease: Boolean = false,
     val repositories: List<Repository> = emptyList(),
+    val timeout: Long = 30_000,
+    val parallelism: Int = 10,
+    val cacheDirectory: String = "",
+    val cacheTtlHours: Long = 1,
 )
 
 @Serializable
@@ -82,17 +86,21 @@ public data class LicenseCheckSettings(
     val deniedLicenses: List<String> = emptyList(),
     val failOnDenied: Boolean = false,
     val failOnUnknown: Boolean = false,
+    val failOnCopyleft: Boolean = false,
     val warnOnCopyleft: Boolean = true,
     val warnOnUnknown: Boolean = true,
+    val ignoreLibraries: List<String> = emptyList(),
+    val includeTransitives: Boolean = false,
 )
 
 @Serializable
 public data class TransitiveResolutionSettings(
     val enabled: Boolean = false,
     val repositories: List<Repository> = emptyList(),
-    val depth: Int? = null,
+    val maxDepth: Int? = null,
     val conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST,
     val includeOptional: Boolean = false,
+    val scopes: List<String> = listOf("compile", "runtime"),
 )
 
 @Serializable

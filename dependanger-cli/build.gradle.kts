@@ -32,6 +32,9 @@ dependencies {
     // JSON serialization for output
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
+    // YAML serialization for config loading
+    implementation("com.charleskorn.kaml:kaml:0.67.0")
+
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.4")
     runtimeOnly("ch.qos.logback:logback-classic:1.5.16")

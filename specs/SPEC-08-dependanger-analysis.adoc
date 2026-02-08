@@ -115,7 +115,7 @@ private fun checkVersionConstraint(
     val involvedLibs = rule.libraries.mapNotNull { alias -> libraries[alias] }
     if (involvedLibs.size < 2) return null
 
-    val versions = involvedLibs.mapNotNull { it.resolvedVersion }
+    val versions = involvedLibs.mapNotNull { it.version?.value }
     if (versions.size < 2) return null
 
     val parsed = versions.map { VersionComparator.parse(it) ?: return null }
@@ -133,7 +133,7 @@ private fun checkVersionConstraint(
             message = rule.message ?: "Version constraint violated: ${rule.constraint}",
             severity = rule.severity,
             affectedLibraries = involvedLibs.map { it.alias },
-            suggestion = "Align versions of: ${involvedLibs.joinToString { "${it.alias}:${it.resolvedVersion}" }}"
+            suggestion = "Align versions of: ${involvedLibs.joinToString { "${it.alias}:${it.version?.value}" }}"
         )
     } else null
 }

@@ -295,7 +295,7 @@ private fun discoverBuiltinProcessors(): List<EffectiveMetadataProcessor> {
 
 [source,text]
 ----
-1. Вызвать process() с preset = MINIMAL (только базовые процессоры + валидация)
+1. Создать pipeline с preset = MINIMAL + явно включить ValidationProcessor
 2. Вернуть DependangerResult с диагностикой
 ----
 
@@ -314,8 +314,10 @@ public suspend fun validate(): DependangerResult {
         val builtinProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
         builder.addProcessors(builtinProcessors.toList())
 
-        // MINIMAL preset -- отключаем всё кроме конвертации, версий и валидации
+        // MINIMAL preset -- только базовые процессоры
         ProcessingPreset.MINIMAL.configure(builder)
+        // Явно включаем валидацию (MINIMAL её отключает)
+        builder.enableOptional("validation")
 
         val pipeline = builder.build()
         val context = ProcessingContext(

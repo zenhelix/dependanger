@@ -60,7 +60,7 @@ public class LicenseResolver {
 ----
 1. Получить настройки licenseCheck из context.settings
 2. Собрать библиотеки для проверки:
-   a. Все библиотеки из metadata.libraries с resolvedVersion != null
+   a. Все библиотеки из metadata.libraries с version != null
    b. Исключить библиотеки из ignoreLibraries
    c. Если includeTransitives=true -> добавить транзитивные из extensions (FLAT_DEPENDENCIES)
 3. Создать LicenseResolver с настроенными источниками и кешем
@@ -144,7 +144,7 @@ public class LicenseCheckProcessor(
 
         if (libraries.isEmpty()) {
             return metadata.withDiagnostic(
-                DiagnosticEntry.info("LICENSE_NO_LIBS", "No libraries to check")
+                Diagnostics.info("LICENSE_NO_LIBS", "No libraries to check")
             )
         }
 
@@ -156,7 +156,7 @@ public class LicenseCheckProcessor(
                     val result = if (declared != null) {
                         resolveDeclared(declared)
                     } else {
-                        licenseResolver.resolve(lib.group, lib.artifact, lib.resolvedVersion!!)
+                        licenseResolver.resolve(lib.group, lib.artifact, lib.version!!.value)
                     }
                     lib to result
                 }
@@ -165,7 +165,7 @@ public class LicenseCheckProcessor(
 
         // Проверить политики
         val violations = mutableListOf<LicenseViolation>()
-        val diagnostics = mutableListOf<DiagnosticEntry>()
+        val diagnostics = mutableListOf<Diagnostics>()
 
         for ((lib, result) in results) {
             checkPolicies(lib, result, settings, violations, diagnostics)
@@ -180,7 +180,7 @@ public class LicenseCheckProcessor(
         }
 
         updatedMetadata = updatedMetadata.withDiagnostic(
-            DiagnosticEntry.info(
+            Diagnostics.info(
                 "LICENSE_CHECK_COMPLETE",
                 "License check completed: ${results.size} libraries, ${violations.size} violations"
             )
@@ -188,13 +188,13 @@ public class LicenseCheckProcessor(
 
         if (settings.failOnDenied && violations.any { it.message.contains("denied") }) {
             updatedMetadata = updatedMetadata.withDiagnostic(
-                DiagnosticEntry.error("LICENSE_DENIED_FOUND", "Denied licenses found in ${violations.size} libraries")
+                Diagnostics.error("LICENSE_DENIED_FOUND", "Denied licenses found in ${violations.size} libraries")
             )
         }
 
         if (settings.failOnUnknown && results.any { it.second.category == LicenseCategory.UNKNOWN }) {
             updatedMetadata = updatedMetadata.withDiagnostic(
-                DiagnosticEntry.error("LICENSE_UNKNOWN_FOUND", "Unknown licenses found")
+                Diagnostics.error("LICENSE_UNKNOWN_FOUND", "Unknown licenses found")
             )
         }
 
@@ -505,7 +505,7 @@ private fun checkPolicies(
     result: LicenseResult,
     settings: LicenseCheckSettings,
     violations: MutableList<LicenseViolation>,
-    diagnostics: MutableList<DiagnosticEntry>,
+    diagnostics: MutableList<Diagnostics>,
 ) {
     val spdxId = result.spdxId
 
@@ -542,7 +542,7 @@ private fun checkPolicies(
             LicenseCategory.WEAK_COPYLEFT,
             LicenseCategory.STRONG_COPYLEFT
         )) {
-        diagnostics.add(DiagnosticEntry.warning(
+        diagnostics.add(Diagnostics.warning(
             "LICENSE_COPYLEFT",
             "Library '${lib.alias}' uses copyleft license '$spdxId' (${result.category})"
         ))
@@ -550,9 +550,9 @@ private fun checkPolicies(
 
     // 4. Unknown warning
     if (settings.warnOnUnknown && result.category == LicenseCategory.UNKNOWN) {
-        diagnostics.add(DiagnosticEntry.warning(
+        diagnostics.add(Diagnostics.warning(
             "LICENSE_UNKNOWN",
-            "License for library '${lib.alias}' (${lib.group}:${lib.artifact}:${lib.resolvedVersion}) is unknown"
+            "License for library '${lib.alias}' (${lib.group}:${lib.artifact}:${lib.version?.value}) is unknown"
         ))
     }
 }

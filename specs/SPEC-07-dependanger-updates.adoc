@@ -46,12 +46,12 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
 [source,text]
 ----
 1. Получить настройки updateCheck из context.settings
-2. Получить список repositories из `context.settings.repositories` (см. xref:index.adoc#repository-convention[конвенция репозиториев]). Default: Maven Central
+2. Получить список repositories: `settings.repositories` -> `context.settings.repositories` -> Maven Central (см. xref:index.adoc#repository-convention[конвенция репозиториев])
 3. Получить фильтры: excludePatterns, includePrerelease, minUpdateType
 4. Отфильтровать библиотеки:
    a. Исключить библиотеки с ignoreUpdates = true
    b. Исключить библиотеки matching excludePatterns
-   c. Исключить библиотеки без resolvedVersion
+   c. Исключить библиотеки без version (version == null)
 5. Создать VersionCache (файловый кеш, TTL 1h)
 6. Параллельно (Semaphore с concurrency = parallelism, default 10):
    Для каждой отфильтрованной библиотеки:
@@ -146,8 +146,10 @@ override suspend fun process(
     context: ProcessingContext
 ): EffectiveMetadata {
     val settings = context.settings.updateCheck ?: return metadata
-    val repos = context.settings.repositories.ifEmpty {
-        listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
+    val repos = settings.repositories.ifEmpty {
+        context.settings.repositories.ifEmpty {
+            listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
+        }
     }
     val fetcher = MavenMetadataFetcher(repos, createHttpClient(), settings.timeout)
     val cache = VersionCache(settings.cacheDirectory, settings.cacheTtlHours)
@@ -156,7 +158,7 @@ override suspend fun process(
 
     // Отфильтровать библиотеки
     val librariesToCheck = metadata.libraries.values
-        .filter { it.resolvedVersion != null }
+        .filter { it.version != null }
         .filter { lib -> settings.excludePatterns.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) } }
 
     // GlobMatcher из dependanger-core (см. xref:SPEC-01-dependanger-core.adoc#core-utilities[SPEC-01])
@@ -185,9 +187,9 @@ override suspend fun process(
                     "(${filtered.count { it.updateType == UpdateType.MAJOR }} major, " +
                     "${filtered.count { it.updateType == UpdateType.MINOR }} minor, " +
                     "${filtered.count { it.updateType == UpdateType.PATCH }} patch)"
-                m.copy(diagnostics = m.diagnostics.addInfo(
-                    DiagnosticMessage("UPDATES_AVAILABLE", summary, "update-check")
-                ))
+                m.withDiagnostic(
+                    Diagnostics.info("UPDATES_AVAILABLE", summary, "update-check")
+                )
             } else m
         }
 }
@@ -198,7 +200,7 @@ private suspend fun checkUpdate(
     cache: VersionCache,
     includePrerelease: Boolean,
 ): UpdateAvailableInfo? {
-    val currentVersion = lib.resolvedVersion ?: return null
+    val currentVersion = lib.version?.value ?: return null
     val currentParsed = VersionComparator.parse(currentVersion) ?: return null
 
     // Кеш

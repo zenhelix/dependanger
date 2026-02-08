@@ -47,7 +47,7 @@ public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
 ----
 1. Получить настройки securityCheck из context.settings
 2. Собрать библиотеки для проверки:
-   a. Все библиотеки из metadata.libraries с resolvedVersion != null
+   a. Все библиотеки из metadata.libraries с version != null
    b. Исключить библиотеки из ignoreLibraries
    c. Если includeTransitives=true -> добавить транзитивные из extensions
 3. Проверить кеш: для каждой библиотеки проверить ~/.dependanger/cache/security/

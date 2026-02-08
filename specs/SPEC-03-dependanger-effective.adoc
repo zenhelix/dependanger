@@ -59,7 +59,8 @@ EffectiveMetadata (versions, libraries, plugins, bundles, diagnostics)
 === Режимы выполнения
 
 Все 12 core-процессоров работают в режиме `ExecutionMode.SEQUENTIAL`.
-Параллельные фазы (`PARALLEL_IO`) используются только опциональными feature-процессорами (BOM_IMPORT, UPDATE_CHECK, SECURITY_CHECK, LICENSE_CHECK, TRANSITIVE_RESOLVER).
+Параллельные фазы (`PARALLEL_IO`) используются опциональными feature-процессорами (UPDATE_CHECK, SECURITY_CHECK, LICENSE_CHECK, TRANSITIVE_RESOLVER).
+BOM_IMPORT работает в `SEQUENTIAL` режиме, т.к. модифицирует `libraries` (внутренняя параллельность через coroutines).
 
 При параллельном выполнении процессоры могут модифицировать только `diagnostics` и `extensions`.
 Модификация `versions`, `libraries`, `plugins`, `bundles` в параллельном режиме вызывает `IllegalStateException`.

@@ -1314,23 +1314,23 @@ override fun run() = runBlocking {
 // cli/util/EffectiveMetadataExtensions.kt
 package io.github.zenhelix.dependanger.cli.util
 
-import io.github.zenhelix.dependanger.effective.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.EffectiveMetadataKeys
-import io.github.zenhelix.dependanger.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.license.model.LicenseInfo
-import io.github.zenhelix.dependanger.transitive.model.TransitiveDependencyInfo
+import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveMetadataKeys
+import io.github.zenhelix.dependanger.effective.model.getExtension
+import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
+import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
 
 internal fun EffectiveMetadata.extractUpdateData(): List<UpdateAvailableInfo> =
     getExtension(EffectiveMetadataKeys.UPDATES) ?: emptyList()
 
 internal fun EffectiveMetadata.extractSecurityData(): List<VulnerabilityInfo> =
-    getExtension(EffectiveMetadataKeys.SECURITY) ?: emptyList()
+    getExtension(EffectiveMetadataKeys.VULNERABILITIES) ?: emptyList()
 
-internal fun EffectiveMetadata.extractLicenseData(): List<LicenseInfo> =
-    getExtension(EffectiveMetadataKeys.LICENSES) ?: emptyList()
+internal fun EffectiveMetadata.extractLicenseData(): List<LicenseViolation> =
+    getExtension(EffectiveMetadataKeys.LICENSE_VIOLATIONS) ?: emptyList()
 
-internal fun EffectiveMetadata.extractTransitiveData(): List<TransitiveDependencyInfo> =
+internal fun EffectiveMetadata.extractTransitiveData(): List<TransitiveTree> =
     getExtension(EffectiveMetadataKeys.TRANSITIVES) ?: emptyList()
 ----
 

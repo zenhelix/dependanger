@@ -19,7 +19,7 @@ public open class ProcessingPhase(
         public val PROFILE: ProcessingPhase = ProcessingPhase("PROFILE", 5)
         public val METADATA_CONVERSION: ProcessingPhase = ProcessingPhase("METADATA_CONVERSION", 10)
         public val EXTRACTED_VERSIONS: ProcessingPhase = ProcessingPhase("EXTRACTED_VERSIONS", 12)
-        public val BOM_IMPORT: ProcessingPhase = ProcessingPhase("BOM_IMPORT", 15, ExecutionMode.PARALLEL_IO)
+        public val BOM_IMPORT: ProcessingPhase = ProcessingPhase("BOM_IMPORT", 15)
         public val LIBRARY_FILTER: ProcessingPhase = ProcessingPhase("LIBRARY_FILTER", 20)
         public val VERSION_FALLBACK: ProcessingPhase = ProcessingPhase("VERSION_FALLBACK", 25)
         public val VERSION_RESOLVER: ProcessingPhase = ProcessingPhase("VERSION_RESOLVER", 30)

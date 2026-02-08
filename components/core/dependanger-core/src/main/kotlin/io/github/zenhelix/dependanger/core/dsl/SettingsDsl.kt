@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.core.model.LicenseCheckSettings
 import io.github.zenhelix.dependanger.core.model.ReportFormat
 import io.github.zenhelix.dependanger.core.model.ReportSection
 import io.github.zenhelix.dependanger.core.model.ReportSettings
+import io.github.zenhelix.dependanger.core.model.Repository
 import io.github.zenhelix.dependanger.core.model.SecurityCheckSettings
 import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.Severity
@@ -21,6 +22,7 @@ import io.github.zenhelix.dependanger.core.model.ValidationSettings
 public class SettingsDsl {
     public var defaultDistribution: String? = null
     public var strictVersionResolution: Boolean = false
+    public var repositories: List<Repository> = emptyList()
 
     public var validationSettings: ValidationSettings = ValidationSettings()
     public var tomlSettings: TomlSettings = TomlSettings()
@@ -86,6 +88,7 @@ public class SettingsDsl {
     public fun toSettings(): Settings = Settings(
         defaultDistribution = defaultDistribution,
         strictVersionResolution = strictVersionResolution,
+        repositories = repositories,
         validation = validationSettings,
         toml = tomlSettings,
         bom = bomSettings,
@@ -164,7 +167,7 @@ public class UpdateCheckSettingsDsl {
     public var enabled: Boolean = false
     public var excludePatterns: List<String> = emptyList()
     public var includePrerelease: Boolean = false
-    public var repositories: List<String> = emptyList()
+    public var repositories: List<Repository> = emptyList()
 
     public fun toSettings(): UpdateCheckSettings = UpdateCheckSettings(
         enabled = enabled,
@@ -218,12 +221,14 @@ public class LicenseCheckSettingsDsl {
 @DependangerDslMarker
 public class TransitiveResolutionSettingsDsl {
     public var enabled: Boolean = false
+    public var repositories: List<Repository> = emptyList()
     public var depth: Int? = null
     public var conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST
     public var includeOptional: Boolean = false
 
     public fun toSettings(): TransitiveResolutionSettings = TransitiveResolutionSettings(
         enabled = enabled,
+        repositories = repositories,
         depth = depth,
         conflictResolution = conflictResolution,
         includeOptional = includeOptional,

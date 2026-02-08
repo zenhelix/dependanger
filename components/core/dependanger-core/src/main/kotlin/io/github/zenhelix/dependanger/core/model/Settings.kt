@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonElement
 public data class Settings(
     val defaultDistribution: String? = null,
     val strictVersionResolution: Boolean = false,
+    val repositories: List<Repository> = emptyList(),
     val validation: ValidationSettings = ValidationSettings(),
     val toml: TomlSettings = TomlSettings(),
     val bom: BomSettings = BomSettings(),
@@ -57,7 +58,7 @@ public data class UpdateCheckSettings(
     val enabled: Boolean = false,
     val excludePatterns: List<String> = emptyList(),
     val includePrerelease: Boolean = false,
-    val repositories: List<String> = emptyList(),
+    val repositories: List<Repository> = emptyList(),
 )
 
 @Serializable
@@ -79,12 +80,16 @@ public data class LicenseCheckSettings(
     val enabled: Boolean = false,
     val allowedLicenses: List<String> = emptyList(),
     val deniedLicenses: List<String> = emptyList(),
+    val failOnDenied: Boolean = false,
     val failOnUnknown: Boolean = false,
+    val warnOnCopyleft: Boolean = true,
+    val warnOnUnknown: Boolean = true,
 )
 
 @Serializable
 public data class TransitiveResolutionSettings(
     val enabled: Boolean = false,
+    val repositories: List<Repository> = emptyList(),
     val depth: Int? = null,
     val conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST,
     val includeOptional: Boolean = false,

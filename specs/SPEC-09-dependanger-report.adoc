@@ -31,9 +31,7 @@
 public class ReportGenerator {
     public fun generate(
         effective: EffectiveMetadata,
-        format: ReportFormat = ReportFormat.JSON,
-        sections: Set<ReportSection> = ReportSection.entries.toSet(),
-        outputDir: String = "build/reports/dependanger",
+        settings: ReportSettings = ReportSettings(),
     ): DependangerReport = TODO()
 }
 ----
@@ -179,10 +177,12 @@ internal data class ReportSummary(
 ----
 public fun generate(
     effective: EffectiveMetadata,
-    format: ReportFormat,
-    sections: List<ReportSection>,
-    outputDir: String,
+    settings: ReportSettings = ReportSettings(),
 ): DependangerReport {
+    val format = settings.format
+    val sections = settings.sections
+    val outputDir = settings.outputDir
+
     // 1. Собрать данные
     val reportData = buildReportData(effective, sections)
 
@@ -194,7 +194,7 @@ public fun generate(
         ReportFormat.HTML -> renderHtml(reportData)
     }
 
-    // 3. Записать файл (если outputDir указан)
+    // 3. Записать файл
     val extension = when (format) {
         ReportFormat.JSON -> "json"
         ReportFormat.YAML -> "yaml"
@@ -259,10 +259,10 @@ private fun renderMarkdown(data: ReportData): String = buildString {
         appendLine()
         appendLine("## Libraries")
         appendLine()
-        appendLine("| Alias | Coordinates | Version | Source |")
-        appendLine("|-------|------------|---------|--------|")
+        appendLine("| Alias | Coordinates | Version | Tags |")
+        appendLine("|-------|------------|---------|------|")
         for (lib in libs) {
-            appendLine("| ${lib.alias} | ${lib.group}:${lib.name} | ${lib.version ?: "N/A"} | ${lib.versionSource} |")
+            appendLine("| ${lib.alias} | ${lib.group}:${lib.artifact} | ${lib.version ?: "N/A"} | ${lib.tags} |")
         }
     }
 

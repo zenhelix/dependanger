@@ -17,3 +17,6 @@ public data class EffectiveMetadata(
     @Transient
     val extensions: Map<ExtensionKey<*>, Any> = emptyMap(),
 )
+
+public fun EffectiveMetadata.withDiagnostic(d: Diagnostics): EffectiveMetadata =
+    copy(diagnostics = diagnostics + d)

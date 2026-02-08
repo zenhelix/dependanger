@@ -32,7 +32,7 @@
 // BomImportProcessor.kt
 public class BomImportProcessor : EffectiveMetadataProcessor {
     override val id: String = "bom-import"
-    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT  // order=15, PARALLEL_IO
+    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT  // order=15, SEQUENTIAL
     override val isOptional: Boolean = true
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
 }
@@ -53,7 +53,8 @@ public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHo
 === Назначение
 
 Импортировать версии из внешних Maven BOM (Bill of Materials) для библиотек, у которых нет явно заданной версии.
-Процессор работает в фазе `BOM_IMPORT` (order=15, `PARALLEL_IO`) после `EXTRACTED_VERSIONS` (order=12) и перед `LIBRARY_FILTER` (order=20).
+Процессор работает в фазе `BOM_IMPORT` (order=15, `SEQUENTIAL`) после `EXTRACTED_VERSIONS` (order=12) и перед `LIBRARY_FILTER` (order=20).
+Параллельная загрузка нескольких BOM выполняется внутри процессора через coroutines.
 
 [[algorithm-bom-import]]
 === Алгоритм
@@ -62,7 +63,7 @@ public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHo
 ----
 1. Получить список bomImports из context.originalMetadata.bomImports
 2. Если bomImports пуст -> вернуть metadata без изменений
-3. Получить настройки из context.settings (bomCache, timeouts). Repositories из `context.settings.repositories.ifEmpty { listOf(MavenCentral) }` (см. xref:index.adoc#repository-convention[конвенция репозиториев])
+3. Получить настройки из context.settings (bomCache, timeouts). Repositories: `context.settings.repositories` -> Maven Central (см. xref:index.adoc#repository-convention[конвенция репозиториев])
 4. Создать BomCache на основе настроек
 5. Создать MavenPomDownloader (Ktor HTTP client)
 6. Для каждого BOM (в порядке объявления):
@@ -76,7 +77,7 @@ public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHo
    h. При сетевой ошибке: если есть кеш (даже устаревший) -> использовать с WARNING
 7. Объединить все BomContent в единую карту group:artifact -> version (первый BOM побеждает)
 8. Для каждой библиотеки в metadata.libraries:
-   a. Если resolvedVersion != null (DECLARED) -> пропустить
+   a. Если version != null (DECLARED) -> пропустить
    b. Найти version в объединённой карте по group:artifact
    c. Если найдена -> создать ResolvedVersion(source=BOM_IMPORT, originalRef=bomAlias)
    d. Если не найдена -> оставить как есть (WARNING или ERROR в strict mode)
@@ -241,7 +242,7 @@ override suspend fun process(
         ttlHours = settings.bomCache?.ttlHours ?: 24,
         ttlSnapshotHours = settings.bomCache?.ttlSnapshotHours ?: 1,
     )
-    val repositories = settings.repositories.ifEmpty {
+    val repositories = context.settings.repositories.ifEmpty {
         listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
     }
     val downloader = MavenPomDownloader(repositories, createHttpClient())
@@ -273,19 +274,23 @@ override suspend fun process(
 
     // Обогатить библиотеки
     val updatedLibraries = metadata.libraries.mapValues { (_, lib) ->
-        if (lib.resolvedVersion != null) return@mapValues lib // DECLARED имеет приоритет
+        if (lib.version != null) return@mapValues lib // DECLARED имеет приоритет
         val key = "${lib.group}:${lib.artifact}"
         val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
         lib.copy(
-            resolvedVersion = version,
-            versionSource = VersionSource.BOM_IMPORT,
+            version = ResolvedVersion(
+                alias = lib.alias,
+                value = version,
+                source = VersionSource.BOM_IMPORT,
+                originalRef = bomAlias,
+            ),
         )
     }
 
     val updatedVersions = metadata.versions.toMutableMap()
     // Добавить BOM-резолвнутые версии в map
     for ((_, lib) in updatedLibraries) {
-        if (lib.versionSource == VersionSource.BOM_IMPORT && lib.resolvedVersion != null) {
+        if (lib.version?.source == VersionSource.BOM_IMPORT && lib.version != null) {
             // Обновить соответствующую version entry если нужно
         }
     }
@@ -308,12 +313,10 @@ private suspend fun resolveBomRecursive(
 ): BomResolveResult {
     val key = "$group:$artifact:$version"
     if (key in visited) {
-        val msg = DiagnosticMessage("CIRCULAR_BOM", "Circular BOM dependency detected: $key", "bom-import")
-        return BomResolveResult(BomContent(), diagnostics.addError(msg))
+        return BomResolveResult(BomContent(), diagnostics + Diagnostics.error("CIRCULAR_BOM", "Circular BOM dependency detected: $key", "bom-import"))
     }
     if (depth > 10) {
-        val msg = DiagnosticMessage("BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > 10 levels for $key", "bom-import")
-        return BomResolveResult(BomContent(), diagnostics.addWarning(msg))
+        return BomResolveResult(BomContent(), diagnostics + Diagnostics.warning("BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > 10 levels for $key", "bom-import"))
     }
     visited.add(key)
 
@@ -327,11 +330,9 @@ private suspend fun resolveBomRecursive(
         // Попробовать стейл кеш
         val stale = try { cache.getStale(group, artifact, version) } catch (_: Exception) { null }
         if (stale != null) {
-            val msg = DiagnosticMessage("BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import")
-            return BomResolveResult(stale, diagnostics.addWarning(msg))
+            return BomResolveResult(stale, diagnostics + Diagnostics.warning("BOM_STALE_CACHE", "Using stale cache for BOM $key", "bom-import"))
         }
-        val msg = DiagnosticMessage("BOM_FETCH_FAILED", "Cannot fetch BOM: $key", "bom-import")
-        return BomResolveResult(BomContent(), diagnostics.addError(msg))
+        return BomResolveResult(BomContent(), diagnostics + Diagnostics.error("BOM_FETCH_FAILED", "Cannot fetch BOM: $key", "bom-import"))
     }
 
     // Парсинг
@@ -653,7 +654,7 @@ https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-bom/2.1.20/kotl
 [[extension-keys]]
 == ExtensionKey
 
-BomImportProcessor не использует ExtensionKey напрямую -- результат записывается непосредственно в `EffectiveMetadata.libraries` (поля `resolvedVersion` и `versionSource`).
+BomImportProcessor не использует ExtensionKey напрямую -- результат записывается непосредственно в `EffectiveMetadata.libraries` (поле `version: ResolvedVersion?`).
 
 [[testing]]
 == Тестовые сценарии

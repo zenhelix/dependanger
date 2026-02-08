@@ -55,8 +55,8 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 2. Получить repositories из settings (default: Maven Central)
 3. Получить constraints из context.originalMetadata.constraints
 4. Собрать прямые зависимости:
-   a. Все библиотеки из metadata.libraries с resolvedVersion != null
-   b. Все библиотеки из metadata.plugins с resolvedVersion != null (если includePlugins=true)
+   a. Все библиотеки из metadata.libraries с version != null
+   b. Все библиотеки из metadata.plugins с version != null (если includePlugins=true)
 5. Для каждой прямой зависимости (параллельно, PARALLEL_IO):
    a. Проверить кеш для group:artifact:version
    b. Если нет в кеше:
@@ -112,18 +112,20 @@ public class TransitiveResolverProcessor(
     ): EffectiveMetadata {
         val settings = context.settings.transitiveResolution ?: return metadata
         val repositories = settings.repositories.ifEmpty {
-            listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
+            context.settings.repositories.ifEmpty {
+                listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
+            }
         }
         val constraints = context.originalMetadata.constraints ?: emptyList()
         val effectiveMaxDepth = settings.maxDepth ?: maxDepth
         val scopes = settings.scopes ?: listOf("compile", "runtime")
 
         val libraries = metadata.libraries.values
-            .filter { it.resolvedVersion != null }
+            .filter { it.version != null }
 
         if (libraries.isEmpty()) {
             return metadata.withDiagnostic(
-                DiagnosticEntry.info("TRANSITIVE_NO_LIBS", "No libraries to resolve transitives for")
+                Diagnostics.info("TRANSITIVE_NO_LIBS", "No libraries to resolve transitives for")
             )
         }
 
@@ -134,7 +136,7 @@ public class TransitiveResolverProcessor(
                     resolveTree(
                         group = lib.group,
                         artifact = lib.artifact,
-                        version = lib.resolvedVersion!!,
+                        version = lib.version!!.value,
                         repositories = repositories,
                         depth = 0,
                         maxDepth = effectiveMaxDepth,
@@ -162,7 +164,7 @@ public class TransitiveResolverProcessor(
             .withExtension(EffectiveMetadataKeys.VERSION_CONFLICTS, conflicts)
 
         updatedMetadata = updatedMetadata.withDiagnostic(
-            DiagnosticEntry.info(
+            Diagnostics.info(
                 "TRANSITIVE_RESOLVED",
                 "Resolved ${libraries.size} direct, ${flatList.count { !it.isDirectDependency }} transitive dependencies, ${conflicts.size} conflicts"
             )
@@ -170,7 +172,7 @@ public class TransitiveResolverProcessor(
 
         for (conflict in conflicts) {
             updatedMetadata = updatedMetadata.withDiagnostic(
-                DiagnosticEntry.warning(
+                Diagnostics.warning(
                     "TRANSITIVE_CONFLICT",
                     "Version conflict: ${conflict.group}:${conflict.artifact} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})"
                 )
@@ -266,6 +268,7 @@ private suspend fun resolveTree(
 private fun parsePomDependencies(
     pomXml: String,
     scopes: List<String>,
+    includeOptional: Boolean,
 ): List<PomDependencyEntry> {
     val factory = DocumentBuilderFactory.newInstance()
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)

@@ -13,30 +13,6 @@
 1. `DependangerDsl.toMetadata(): DependangerMetadata`
 2. `DependangerDsl.applyPreset(name: String)`
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| Модели (model/) | Полностью: Library, Plugin, Version, Bundle, BomImport, Distribution, TargetPlatform, CompatibilityRule, Settings, Preset, Constraint, FallbackCondition, Diagnostics, Enums, LibraryTypes, FilterSpec и фильтры
-| DSL (dsl/) | Полностью: 17 DSL-классов (VersionsDsl, LibrariesDsl, PluginsDsl, BundlesDsl, и т.д.)
-| SPI (spi/) | Полностью: SerializationFormat, LibraryFilter, PluginFilter, CustomFilterInterpreter, SchemaMigrator, SchemaMigrationChain
-| Validation | Полностью: ValidationResult (type aliases)
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// DependangerDsl.kt
-public fun applyPreset(name: String): Unit = TODO()
-public fun toMetadata(): DependangerMetadata = TODO()
-----
-
 [[spec-to-metadata]]
 == SPEC-01.1: DependangerDsl.toMetadata()
 
@@ -364,37 +340,116 @@ public fun applyPreset(name: String) {
 
 === Требования к merge настроек
 
-==== DSL-путь: `SettingsDsl.applyTo()` через Trackable delegates
+==== Рефакторинг SettingsDsl: Trackable delegates
 
-Каждое поле в `PresetDsl`-версии settings DSL использует `Trackable<T>` delegate:
+`SettingsDsl` использует `Trackable<T>` delegates для всех полей.
+Класс `Trackable` уже реализован в `Trackable.kt` (пакет `io.github.zenhelix.dependanger.core.dsl`).
+
+Trackable-обёртки прозрачны для обычного использования: `toSettings()` читает значения через делегаты, DSL-блоки устанавливают значения через делегаты (`isSet = true` выставляется автоматически).
+Только `applyTo()` проверяет `isSet`.
 
 [source,kotlin]
 ----
-public class Trackable<T>(default: T) : ReadWriteProperty<Any?, T> {
-    public var isSet: Boolean = false; private set
-    private var value: T = default
+@DependangerDslMarker
+public class SettingsDsl {
+    private val _defaultDistribution = Trackable<String?>(null)
+    public var defaultDistribution: String? by _defaultDistribution
 
-    override fun getValue(thisRef: Any?, property: KProperty<*>): T = value
-    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
-        this.value = value
-        isSet = true
-    }
+    private val _strictVersionResolution = Trackable(false)
+    public var strictVersionResolution: Boolean by _strictVersionResolution
+
+    private val _repositories = Trackable<List<Repository>>(emptyList())
+    public var repositories: List<Repository> by _repositories
+
+    private val _validationSettings = Trackable(ValidationSettings())
+    public var validationSettings: ValidationSettings by _validationSettings
+
+    private val _tomlSettings = Trackable(TomlSettings())
+    public var tomlSettings: TomlSettings by _tomlSettings
+
+    private val _bomSettings = Trackable(BomSettings())
+    public var bomSettings: BomSettings by _bomSettings
+
+    private val _bomCacheSettings = Trackable(BomCacheSettings())
+    public var bomCacheSettings: BomCacheSettings by _bomCacheSettings
+
+    private val _updateCheckSettings = Trackable(UpdateCheckSettings())
+    public var updateCheckSettings: UpdateCheckSettings by _updateCheckSettings
+
+    private val _compatibilityAnalysisSettings = Trackable(CompatibilityAnalysisSettings())
+    public var compatibilityAnalysisSettings: CompatibilityAnalysisSettings by _compatibilityAnalysisSettings
+
+    private val _securityCheckSettings = Trackable(SecurityCheckSettings())
+    public var securityCheckSettings: SecurityCheckSettings by _securityCheckSettings
+
+    private val _licenseCheckSettings = Trackable(LicenseCheckSettings())
+    public var licenseCheckSettings: LicenseCheckSettings by _licenseCheckSettings
+
+    private val _transitiveResolutionSettings = Trackable(TransitiveResolutionSettings())
+    public var transitiveResolutionSettings: TransitiveResolutionSettings by _transitiveResolutionSettings
+
+    private val _reportSettings = Trackable(ReportSettings())
+    public var reportSettings: ReportSettings by _reportSettings
+
+    // DSL-блоки (validation { }, toml { }, etc.) — без изменений,
+    // т.к. `validationSettings = dsl.toSettings()` проходит через delegate setter → isSet = true
+
+    // ... существующие DSL-блоки и toSettings() без изменений ...
 }
 ----
+
+NOTE: DSL-блоки (`validation { }`, `toml { }`, etc.) не требуют изменений — присваивание `validationSettings = dsl.toSettings()` проходит через delegate setter и автоматически выставляет `isSet = true`.
+Метод `toSettings()` также не требует изменений — чтение значений через delegate getter прозрачно.
+
+==== DSL-путь: `SettingsDsl.applyTo(target)`
 
 Метод `applyTo(target: SettingsDsl)` применяет к target только поля с `isSet == true`.
 Вложенные sub-settings (validation, toml, bom, etc.) трекаются целиком: если блок `validation { }` был вызван, весь `ValidationSettings` считается установленным.
 Списки (allowedLicenses, excludePatterns) заменяются целиком, не дополняются.
 
+[source,kotlin]
+----
+public fun applyTo(target: SettingsDsl) {
+    if (_defaultDistribution.isSet) target.defaultDistribution = defaultDistribution
+    if (_strictVersionResolution.isSet) target.strictVersionResolution = strictVersionResolution
+    if (_repositories.isSet) target.repositories = repositories
+    if (_validationSettings.isSet) target.validationSettings = validationSettings
+    if (_tomlSettings.isSet) target.tomlSettings = tomlSettings
+    if (_bomSettings.isSet) target.bomSettings = bomSettings
+    if (_bomCacheSettings.isSet) target.bomCacheSettings = bomCacheSettings
+    if (_updateCheckSettings.isSet) target.updateCheckSettings = updateCheckSettings
+    if (_compatibilityAnalysisSettings.isSet) target.compatibilityAnalysisSettings = compatibilityAnalysisSettings
+    if (_securityCheckSettings.isSet) target.securityCheckSettings = securityCheckSettings
+    if (_licenseCheckSettings.isSet) target.licenseCheckSettings = licenseCheckSettings
+    if (_transitiveResolutionSettings.isSet) target.transitiveResolutionSettings = transitiveResolutionSettings
+    if (_reportSettings.isSet) target.reportSettings = reportSettings
+}
+----
+
 ==== JSON-путь (fallback): `SettingsDsl.mergeFrom(Settings)`
 
 [source,kotlin]
 ----
-public fun mergeFrom(settings: Settings)
+public fun mergeFrom(settings: Settings) {
+    val defaults = Settings()
+    if (settings.defaultDistribution != defaults.defaultDistribution) defaultDistribution = settings.defaultDistribution
+    if (settings.strictVersionResolution != defaults.strictVersionResolution) strictVersionResolution = settings.strictVersionResolution
+    if (settings.repositories != defaults.repositories) repositories = settings.repositories
+    if (settings.validation != defaults.validation) validationSettings = settings.validation
+    if (settings.toml != defaults.toml) tomlSettings = settings.toml
+    if (settings.bom != defaults.bom) bomSettings = settings.bom
+    if (settings.bomCache != defaults.bomCache) bomCacheSettings = settings.bomCache
+    if (settings.updateCheck != defaults.updateCheck) updateCheckSettings = settings.updateCheck
+    if (settings.compatibilityAnalysis != defaults.compatibilityAnalysis) compatibilityAnalysisSettings = settings.compatibilityAnalysis
+    if (settings.securityCheck != defaults.securityCheck) securityCheckSettings = settings.securityCheck
+    if (settings.licenseCheck != defaults.licenseCheck) licenseCheckSettings = settings.licenseCheck
+    if (settings.transitiveResolution != defaults.transitiveResolution) transitiveResolutionSettings = settings.transitiveResolution
+    if (settings.report != defaults.report) reportSettings = settings.report
+}
 ----
 
-1. Сравнивает каждое поле `settings` с `Settings()` (конструктор без аргументов)
-2. Если значение отличается от default → перезаписывает текущее
+1. Создаёт `Settings()` с default-значениями для сравнения
+2. Если значение отличается от default → перезаписывает текущее через delegate setter
 3. Вложенные settings (ValidationSettings, TomlSettings, etc.) сравниваются целиком (`!=`)
 4. Списки заменяются целиком, не дополняются
 

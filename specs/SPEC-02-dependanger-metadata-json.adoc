@@ -23,35 +23,6 @@
 * CLI команд (`init`, `add-library`, `remove-library`, `update-version`)
 * Кеширования для инкрементальной обработки
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `JsonSerializationFormat` класс | Создан, реализует `SerializationFormat<String>`
-| `formatId` | Реализовано: `"json"`
-| `fileExtension` | Реализовано: `".json"`
-| `Json` инстанс | Сконфигурирован: `prettyPrint = true`, `ignoreUnknownKeys = true`, `encodeDefaults = true`
-| SPI интерфейс `SerializationFormat<T>` | Полностью определён в `dependanger-core`
-| Все модели (`DependangerMetadata`, `Library`, `Version`, и т.д.) | Полностью определены с `@Serializable`
-| `SchemaMigrator` и `SchemaMigrationChain` | Полностью реализованы в `dependanger-core`
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// JsonSerializationFormat.kt
-override fun serialize(metadata: DependangerMetadata): String = TODO()
-override fun deserialize(input: String): DependangerMetadata = TODO()
-override fun write(metadata: DependangerMetadata, path: Path): Unit = TODO()
-override fun read(path: Path): DependangerMetadata = TODO()
-----
-
 [[serialization-model-context]]
 == Контекст модели сериализации
 

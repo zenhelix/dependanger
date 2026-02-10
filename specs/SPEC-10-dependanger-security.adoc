@@ -11,27 +11,6 @@
 
 Приоритет: **P3** (желательно).
 
-[[current-state]]
-== Текущее состояние
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// SecurityCheckProcessor.kt
-public class SecurityCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "security-check"
-    override val phase: ProcessingPhase = ProcessingPhase.SECURITY_CHECK  // order=120, PARALLEL_IO
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-
-// OsvApiClient.kt
-public class OsvApiClient(public val apiUrl: String = "https://api.osv.dev") {
-    public suspend fun queryVulnerabilities(group: String, artifact: String, version: String): List<VulnerabilityInfo> = TODO()
-}
-----
-
 [[spec-security-check]]
 == SPEC-10.1: SecurityCheckProcessor.process()
 

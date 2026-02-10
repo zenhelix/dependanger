@@ -12,46 +12,10 @@
 Maven BOM -- стандартный механизм централизованного управления версиями зависимостей в Maven/Gradle экосистеме.
 BOM-файл представляет собой POM с `<packaging>pom</packaging>` и блоком `<dependencyManagement>`, перечисляющим зависимости с зафиксированными версиями.
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `BomGenerator` | Класс создан, реализует `ArtifactGenerator<String>`, `generatorId = "maven-bom"`. Методы `generate()` и `write()` -- TODO-заглушки.
-| `BomConfig` | Data class создан с полями: `groupId`, `artifactId`, `version`, `includeOptionalDependencies`. **Неполный** -- отсутствуют поля `filename`, `prettyPrint`, `includeDeprecationComments`.
-| `build.gradle.kts` | Зависимости настроены: `dependanger-core` (api), `dependanger-effective` (api), `kotlin-logging-jvm` (implementation).
-| API-расширения | `DependangerResult.toBom()` и `DependangerResult.writeBomTo()` в модуле `dependanger-api` -- реализованы, делегируют в `BomGenerator`. Требуют обязательный параметр `BomConfig` (нет дефолтного конфига, т.к. `groupId`, `artifactId`, `version` обязательны).
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// BomGenerator.kt
-override fun generate(effective: EffectiveMetadata): String = TODO()
-override fun write(artifact: String, output: Path): Unit = TODO()
-----
-
 [[config-spec]]
 == Спецификация BomConfig
 
-=== Текущее определение
-
-[source,kotlin]
-----
-public data class BomConfig(
-    val groupId: String,
-    val artifactId: String,
-    val version: String,
-    val includeOptionalDependencies: Boolean = false,
-)
-----
-
-=== Требуемое определение
+=== Определение
 
 [source,kotlin]
 ----

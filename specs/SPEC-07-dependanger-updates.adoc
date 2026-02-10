@@ -11,26 +11,6 @@
 
 Приоритет: **P3** (желательно).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-Нет полностью реализованных компонентов.
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// UpdateCheckProcessor.kt
-public class UpdateCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "update-check"
-    override val phase: ProcessingPhase = ProcessingPhase.UPDATE_CHECK  // order=100, PARALLEL_IO
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-----
-
 [[spec-update-check]]
 == SPEC-07.1: UpdateCheckProcessor.process()
 

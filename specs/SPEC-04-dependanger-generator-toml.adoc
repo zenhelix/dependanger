@@ -11,46 +11,10 @@
 
 Gradle Version Catalog -- стандартный механизм централизованного управления зависимостями в Gradle, описанный в файле `libs.versions.toml`.
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `TomlGenerator` | Класс создан, реализует `ArtifactGenerator<String>`, `generatorId = "toml-version-catalog"`. Методы `generate()` и `write()` -- TODO-заглушки.
-| `TomlConfig` | Data class создан с полями: `filename`, `includeComments`, `sortSections`, `useInlineVersions`. **Неполный** -- отсутствует поле `includeDeprecationComments`.
-| `build.gradle.kts` | Зависимости настроены: `dependanger-core` (api), `dependanger-effective` (api), `kotlin-logging-jvm` (implementation).
-| API-расширения | `DependangerResult.toToml()` и `DependangerResult.writeTomlTo()` в модуле `dependanger-api` -- реализованы, делегируют в `TomlGenerator`.
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// TomlGenerator.kt
-override fun generate(effective: EffectiveMetadata): String = TODO()
-override fun write(artifact: String, output: Path): Unit = TODO()
-----
-
 [[config-spec]]
 == Спецификация TomlConfig
 
-=== Текущее определение
-
-[source,kotlin]
-----
-public data class TomlConfig(
-    val filename: String = "libs.versions.toml",
-    val includeComments: Boolean = true,
-    val sortSections: Boolean = true,
-    val useInlineVersions: Boolean = false,
-)
-----
-
-=== Требуемое определение
+=== Определение
 
 [source,kotlin]
 ----

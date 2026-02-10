@@ -257,6 +257,8 @@ Extension keys и extension properties определены в каждом feat
 [[processing-preset-definitions]]
 === Определения ProcessingPreset
 
+NOTE: `ProcessingPreset.configure(builder: PipelineBuilder)` реализован как extension function в `ProcessingPresetConfigurator.kt` (модуль `dependanger-effective`, пакет `io.github.zenhelix.dependanger.effective.pipeline`).
+
 `ProcessingPreset.DEFAULT`:
 
 * Все 12 core-процессоров (order 5-66) включены

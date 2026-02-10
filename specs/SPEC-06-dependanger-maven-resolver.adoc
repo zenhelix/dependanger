@@ -11,43 +11,6 @@
 
 Приоритет: **P2** (важно).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `Repository.kt` (core) | Полностью: sealed interface Repository, data class MavenRepository (url, name) -- перенесён из maven-resolver в core
-| `Credentials.kt` (core) | Полностью: data class Credentials (username, password), fun interface CredentialsProvider
-| `BomContent.kt` | Полностью: @Serializable data class с dependencies и properties
-| `BomDependency.kt` | Полностью: @Serializable data class с group, artifact, version
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// BomImportProcessor.kt
-public class BomImportProcessor : EffectiveMetadataProcessor {
-    override val id: String = "bom-import"
-    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT  // order=15, SEQUENTIAL
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-
-// BomCache.kt
-public class BomCache(cacheDirectory: String, ttlHours: Long = 24, ttlSnapshotHours: Long = 1) {
-    public fun get(group: String, artifact: String, version: String): BomContent? = TODO()
-    public fun getStale(group: String, artifact: String, version: String): BomContent? = TODO()
-    public fun put(group: String, artifact: String, version: String, content: BomContent): Unit = TODO()
-    public fun invalidate(group: String, artifact: String, version: String): Unit = TODO()
-    public fun clear(): Unit = TODO()
-}
-----
-
 [[spec-bom-import-processor]]
 == SPEC-06.1: BomImportProcessor.process()
 

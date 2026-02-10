@@ -12,39 +12,6 @@
 
 Приоритет: **P3** (желательно).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `LicenseResult.kt` | Полностью: @Serializable data class (spdxId, licenseName, source, category)
-| `LicenseViolation.kt` | Полностью: @Serializable data class (alias, group, artifact, detectedLicense, category, message)
-| `LicenseSource.kt` | Полностью: enum (MAVEN_POM, CLEARLY_DEFINED, DECLARED, UNKNOWN)
-| `LicenseCategory.kt` | Полностью: enum (PERMISSIVE, WEAK_COPYLEFT, STRONG_COPYLEFT, PUBLIC_DOMAIN, PROPRIETARY, UNKNOWN)
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// LicenseCheckProcessor.kt
-public class LicenseCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "license-check"
-    override val phase: ProcessingPhase = ProcessingPhase.LICENSE_CHECK  // order=130, PARALLEL_IO
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-
-// LicenseResolver.kt
-public class LicenseResolver {
-    public suspend fun resolve(group: String, artifact: String, version: String): List<LicenseResult> = TODO()
-}
-----
-
 [[spec-license-check]]
 == SPEC-11.1: LicenseCheckProcessor.process()
 

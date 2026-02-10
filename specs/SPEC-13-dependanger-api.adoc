@@ -11,46 +11,6 @@
 
 Модуль зависит от всех core-модулей (api), генераторов (api) и всех 7 feature-модулей (implementation).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `Dependanger.kt` | Каркас класса: приватный конструктор, companion object с factory-методами `fromDsl`, `fromMetadata`. TODO: `process()`, `validate()`, `fromJson()`
-| `DependangerBuilder.kt` | Полный builder: preset, environment, jdkVersion, kotlinVersion, gradleVersion, addProcessor, disableProcessor, configureProcessing. TODO: `build()`
-| `DependangerResult.kt` | Полностью реализован: `isSuccess`, `generate(generator)`, `writeTo(generator, path)`
-| `DependangerResultToml.kt` | Полностью реализован: extension-функции `toToml()`, `writeTomlTo()`
-| `DependangerResultBom.kt` | Полностью реализован: extension-функции `toBom()`, `writeBomTo()`
-| `DependangerException.kt` | Полностью: 5 типов исключений -- `DependangerException`, `DependangerValidationException`, `DependangerProcessingException`, `DependangerGenerationException`, `DependangerConfigurationException`
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// Dependanger.kt
-public suspend fun process(distribution: String? = null, callback: ProcessingCallback? = null): DependangerResult = TODO()
-public suspend fun validate(): DependangerResult = TODO()
-
-// Dependanger.Companion
-public fun fromJson(json: String): DependangerBuilder = TODO()
-
-// DependangerBuilder.kt
-public fun build(): Dependanger = TODO()
-
-// DependangerResultExtensions.kt (НОВЫЙ ФАЙЛ)
-public val DependangerResult.updates: List<UpdateAvailableInfo>
-public val DependangerResult.vulnerabilities: List<VulnerabilityInfo>
-public val DependangerResult.licenseViolations: List<LicenseViolation>
-public val DependangerResult.transitives: List<TransitiveTree>
-public val DependangerResult.compatibilityIssues: List<CompatibilityIssue>
-public val DependangerResult.versionConflicts: List<VersionConflict>
-----
-
 [[spec-build]]
 == SPEC-13.1: DependangerBuilder.build()
 
@@ -462,8 +422,8 @@ import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
 import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
 import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
-import io.github.zenhelix.dependanger.features.analysis.model.CompatibilityIssue
-import io.github.zenhelix.dependanger.features.analysis.model.CompatibilityIssuesExtensionKey
+import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
+import io.github.zenhelix.dependanger.effective.model.CompatibilityIssuesExtensionKey
 import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
 import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
 

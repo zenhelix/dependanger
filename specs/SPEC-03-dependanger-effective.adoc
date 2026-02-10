@@ -8,18 +8,6 @@
 
 Модуль `dependanger-effective` отвечает за трансформацию `DependangerMetadata` в `EffectiveMetadata` через упорядоченный конвейер процессоров.
 
-=== Текущее состояние
-
-[cols="1,2"]
-|===
-| Компонент | Статус
-
-| Инфраструктура пайплайна | *Реализовано:* ProcessingPipeline, ProcessingPhase, ProcessingContext, PipelineBuilder, ProcessingPresetConfigurator, ProcessingCallback, ProcessingEvent
-| Модели effective | *Реализовано:* EffectiveMetadata, EffectiveLibrary, EffectivePlugin, EffectiveBundle, ResolvedVersion, ProcessingInfo, ExtensionKey, CompatibilityIssue
-| EffectiveMetadataBuilder.build() | *TODO-заглушка*
-| 12 Core Processors | *Все TODO-заглушки*
-|===
-
 === SPI: ExtensionSerializerProvider
 
 Модуль определяет SPI-интерфейс `ExtensionSerializerProvider` в пакете `io.github.zenhelix.dependanger.effective.spi` для ServiceLoader-based регистрации serializer'ов extension-моделей.
@@ -27,7 +15,10 @@
 
 === Архитектура пайплайна
 
-Определения ProcessingPreset (DEFAULT, STRICT, MINIMAL) см. в xref:index.adoc#processing-preset-definitions[cross-cutting секции index.adoc].
+Определения ProcessingPreset (DEFAULT, STRICT, MINIMAL, DISTRIBUTION) см. в xref:index.adoc#processing-preset-definitions[cross-cutting секции index.adoc].
+
+NOTE: Метод `ProcessingPreset.configure(builder)` реализован как extension function в файле `ProcessingPresetConfigurator.kt` (пакет `io.github.zenhelix.dependanger.effective.pipeline`).
+При использовании в `EffectiveMetadataBuilder` и `Dependanger` API требуется импорт: `import io.github.zenhelix.dependanger.effective.pipeline.configure`.
 
 [source,text]
 ----

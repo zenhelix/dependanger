@@ -16,32 +16,6 @@ NOTE: `ReportGenerator` -- это **standalone утилита**, а НЕ `Effect
 
 Приоритет: **P3** (желательно).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `DependangerReport.kt` | Полностью: @Serializable data class (format, content, outputPath)
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// ReportGenerator.kt
-public class ReportGenerator {
-    public fun generate(
-        effective: EffectiveMetadata,
-        settings: ReportSettings = ReportSettings(),
-        originalMetadata: DependangerMetadata? = null,
-    ): DependangerReport = TODO()
-}
-----
-
 [[report-models]]
 == Модели отчёта
 
@@ -126,6 +100,13 @@ public data class ReportLicense(
     val library: String,
     val licenseName: String,
     val status: String, // ALLOWED, DENIED, UNKNOWN
+)
+
+@Serializable
+public data class ReportVersion(
+    val alias: String,
+    val value: String,
+    val hasFallback: Boolean = false,
 )
 
 @Serializable
@@ -221,6 +202,7 @@ internal data class ReportData(
     val libraries: List<ReportLibrary>? = null,
     val plugins: List<ReportPlugin>? = null,
     val bundles: List<ReportBundle>? = null,
+    val versions: List<ReportVersion>? = null,
     val updates: List<ReportUpdate>? = null,
     val compatibility: List<ReportCompatibilityIssue>? = null,
     val vulnerabilities: List<ReportVulnerability>? = null,
@@ -392,6 +374,19 @@ private fun renderMarkdown(data: ReportData): String = buildString {
         appendLine()
         for (b in bundles) {
             appendLine("- **${b.alias}**: ${b.libraries.joinToString(", ")}")
+        }
+    }
+
+    // Versions
+    data.versions?.let { versions ->
+        appendLine()
+        appendLine("## Versions (${versions.size})")
+        appendLine()
+        appendLine("| Alias | Value | Fallback |")
+        appendLine("|-------|-------|----------|")
+        for (v in versions) {
+            val fallback = if (v.hasFallback) "Yes" else "-"
+            appendLine("| ${v.alias} | ${v.value} | $fallback |")
         }
     }
 
@@ -569,6 +564,7 @@ $body
 | `libraries` | `metadata.libraries` | ReportSection.LIBRARIES in sections
 | `plugins` | `metadata.plugins` | ReportSection.PLUGINS in sections
 | `bundles` | `metadata.bundles` | ReportSection.BUNDLES in sections
+| `versions` | `metadata.versions` | ReportSection.VERSIONS in sections
 | `updates` | `metadata.updates` (ExtensionKey) | ReportSection.UPDATES in sections + данные есть
 | `compatibility` | `metadata.compatibilityIssues` | ReportSection.COMPATIBILITY in sections + данные есть
 | `vulnerabilities` | `metadata.vulnerabilities` | ReportSection.VULNERABILITIES in sections + данные есть

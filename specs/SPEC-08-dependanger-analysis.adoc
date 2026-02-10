@@ -21,22 +21,6 @@
 
 Приоритет: **P3** (желательно).
 
-[[current-state]]
-== Текущее состояние
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// CompatibilityCheckProcessor.kt
-public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "compatibility-analysis"
-    override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS  // order=110, SEQUENTIAL
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-----
-
 [[spec-compatibility-check]]
 == SPEC-08.1: CompatibilityCheckProcessor.process()
 

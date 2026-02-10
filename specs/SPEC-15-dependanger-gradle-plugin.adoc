@@ -13,40 +13,6 @@ Plugin ID: `io.github.zenhelix.dependanger`
 
 Зависимость: единственная зависимость -- `dependanger-api` (implementation), которая транзитивно тянет все необходимые модули.
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `DependangerPlugin.kt` | Полностью: apply(), registerTasks() -- регистрирует extension и 14 задач
-| `DependangerExtension.kt` | Полностью: dsl, outputDirectory, failOnError, делегирующие методы (versions, libraries, plugins, bundles, bomImports, targetPlatforms, distributions, compatibility, settings, presets, processing)
-| 13 файлов задач | Каркасы: init с group="dependanger" и description. TODO: `execute()` в каждом файле. ProcessTask удалена (дублировала GenerateEffectiveTask).
-| `build.gradle.kts` | Полностью: java-gradle-plugin, plugin-publish, testing (unit + functionalTest с Gradle TestKit)
-|===
-
-=== TODO-заглушки (полный список)
-
-[source,text]
-----
-GenerateMetadataTask.execute()
-GenerateEffectiveTask.execute()
-GenerateTomlTask.execute()
-GenerateBomTask.execute()
-GenerateAllTask.execute()
-ValidateTask.execute()
-CheckUpdatesTask.execute()
-AnalyzeTask.execute()
-ReportTask.execute()
-ListVersionsTask.execute()
-SecurityCheckTask.execute()
-LicenseCheckTask.execute()
-ResolveTransitivesTask.execute()
-----
-
 [[common-pattern]]
 == Общий паттерн задач
 

@@ -11,33 +11,6 @@
 
 Приоритет: **P4** (будущее).
 
-[[current-state]]
-== Текущее состояние
-
-=== Реализовано
-
-[cols="1,3"]
-|===
-| Компонент | Статус
-
-| `TransitiveTree.kt` | Полностью: @Serializable data class (group, artifact, version, children, isDuplicate, isCycle, scope)
-| `FlatDependency.kt` | Полностью: @Serializable data class (group, artifact, version, isDirectDependency, isOptional)
-| `VersionConflict.kt` | Полностью: @Serializable data class (group, artifact, requestedVersions, resolvedVersion, resolution)
-|===
-
-=== TODO-заглушки
-
-[source,kotlin]
-----
-// TransitiveResolverProcessor.kt
-public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
-    override val id: String = "transitive-resolver"
-    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER  // order=101, SEQUENTIAL
-    override val isOptional: Boolean = true
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
-}
-----
-
 [[spec-transitive-resolver]]
 == SPEC-12.1: TransitiveResolverProcessor.process()
 

@@ -12,8 +12,8 @@ public fun ProcessingPreset.configure(builder: PipelineBuilder) {
 }
 
 private fun configureDefault(builder: PipelineBuilder) {
-    // DEFAULT: all mandatory processors enabled, optional by settings
-    // No special configuration needed - pipeline includes all registered processors by default
+    // DEFAULT: all mandatory processors enabled + bom-import (early feature processor)
+    builder.enableOptional("bom-import")
 }
 
 private fun configureMinimal(builder: PipelineBuilder) {
@@ -38,6 +38,6 @@ private fun configureStrict(builder: PipelineBuilder) {
 }
 
 private fun configureDistribution(builder: PipelineBuilder) {
-    // DISTRIBUTION: DEFAULT + profile filtering (profile processor is mandatory anyway)
-    // No special configuration needed beyond DEFAULT - profile processor runs at order 5
+    // DISTRIBUTION: same as DEFAULT + profile filtering (profile processor is mandatory anyway)
+    builder.enableOptional("bom-import")
 }

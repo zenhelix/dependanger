@@ -128,10 +128,10 @@ public class TransitiveResolverProcessor(
             }
         }
         // NOTE: MavenPomDownloader создаётся здесь, а не в конструкторе,
-        // т.к. требует repositories и httpClient из context (см. SPEC-06)
+        // т.к. требует repositories из context settings (см. SPEC-06)
         val pomDownloader = MavenPomDownloader(
             repositories = repositories,
-            httpClient = context.httpClient,
+            httpClient = createHttpClient(),
         )
         val constraints = context.originalMetadata.constraints ?: emptyList()
         val effectiveMaxDepth = settings.maxDepth ?: maxDepth
@@ -163,6 +163,7 @@ public class TransitiveResolverProcessor(
                         depth = 0,
                         maxDepth = effectiveMaxDepth,
                         scopes = scopes,
+                        includeOptional = settings.includeOptional,
                         visited = setOf("${lib.group}:${lib.artifact}"),
                         sessionSeen = sessionSeen,
                         nodeCounter = nodeCounter,
@@ -281,6 +282,7 @@ private suspend fun resolveTree(
     depth: Int,
     maxDepth: Int,
     scopes: List<String>,
+    includeOptional: Boolean,
     visited: Set<String>,
     sessionSeen: MutableSet<String>,
     nodeCounter: AtomicInteger,
@@ -329,7 +331,7 @@ private suspend fun resolveTree(
     }
 
     // Парсить зависимости из POM
-    val pomDependencies = parsePomDependencies(pomXml, scopes)
+    val pomDependencies = parsePomDependencies(pomXml, scopes, includeOptional)
 
     // Рекурсивно резолвить children
     val children = coroutineScope {
@@ -348,6 +350,7 @@ private suspend fun resolveTree(
                         depth = depth + 1,
                         maxDepth = maxDepth,
                         scopes = scopes,
+                        includeOptional = includeOptional,
                         visited = visited + childCoordinate,
                         sessionSeen = sessionSeen,
                         nodeCounter = nodeCounter,

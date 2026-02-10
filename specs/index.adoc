@@ -260,7 +260,9 @@ Extension keys и extension properties определены в каждом feat
 `ProcessingPreset.DEFAULT`:
 
 * Все 12 core-процессоров (order 5-66) включены
-* Все feature-процессоры отключены (`isOptional = true`, не включаются по умолчанию), включая early feature processor `BomImportProcessor`(15)
+* `BomImportProcessor`(15) включён — early feature processor, необходим для разрешения BOM-версий.
+Единственный feature-процессор, включённый по умолчанию
+* Остальные feature-процессоры (order 100+) отключены (`isOptional = true`, требуют явного включения)
 * ValidationSettings: стандартные дефолты
 
 `ProcessingPreset.STRICT`:
@@ -278,7 +280,8 @@ Extension keys и extension properties определены в каждом feat
 `ProcessingPreset.DISTRIBUTION`:
 
 * Все 12 core-процессоров включены (аналогично DEFAULT)
-* Все feature-процессоры отключены (аналогично DEFAULT), включая BomImportProcessor(15)
+* `BomImportProcessor`(15) включён (аналогично DEFAULT)
+* Остальные feature-процессоры (order 100+) отключены (аналогично DEFAULT)
 * Требует указания `distribution` -- ProfileProcessor применяет фильтрацию библиотек/плагинов по дистрибуции
 * Предназначен для CI/CD сценариев, где каталог собирается под конкретную платформу/профиль
 

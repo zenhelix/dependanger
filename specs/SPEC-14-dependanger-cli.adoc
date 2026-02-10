@@ -310,6 +310,7 @@ findConfigFile():
 
 [source,kotlin]
 ----
+import com.charleskorn.kaml.Yaml
 import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -321,6 +322,8 @@ public class ConfigLoader {
         isLenient = true
     }
 
+    private val yaml = Yaml.default
+
     public fun load(configPath: Path? = null): CliConfig {
         val path = configPath ?: findConfigFile() ?: return CliConfig()
 
@@ -328,7 +331,11 @@ public class ConfigLoader {
 
         return try {
             val content = path.readText()
-            json.decodeFromString<CliConfig>(content)
+            val extension = path.fileName.toString().substringAfterLast('.', "")
+            when (extension) {
+                "yaml", "yml" -> yaml.decodeFromString<CliConfig>(content)
+                else -> json.decodeFromString<CliConfig>(content)
+            }
         } catch (e: Exception) {
             // Если конфиг-файл невалиден, логируем warning и используем дефолты
             System.err.println("Warning: Failed to parse config file $path: ${e.message}")
@@ -1106,8 +1113,8 @@ override fun run() = runBlocking {
         throw ProgramResult(ExitCodes.ERROR)
     }
 
-    // Extraction-методы определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
-    val updates = result.extractUpdateData()
+    // Extension properties определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
+    val updates = result.updates
 
     when (format) {
         "json" -> printJsonUpdates(updates)
@@ -1138,7 +1145,7 @@ override fun run() = runBlocking {
     val dependanger = builder.build()
     val result = dependanger.process()
 
-    val issues = result.extractCompatibilityIssues()
+    val issues = result.compatibilityIssues
 
     when (format) {
         "json" -> printJsonAnalysis(issues)
@@ -1166,7 +1173,7 @@ override fun run() = runBlocking {
 
     val result = dependanger.process()
 
-    val vulnerabilities = result.extractSecurityData()
+    val vulnerabilities = result.vulnerabilities
 
     // Фильтрация по severity и ignore-списку
     val filtered = vulnerabilities
@@ -1200,7 +1207,7 @@ override fun run() = runBlocking {
 
     val result = dependanger.process()
 
-    val licenses = result.extractLicenseData()
+    val licenses = result.licenseViolations
 
     // Применение allow/deny списков из CLI опций
     val allowList = allow?.split(",")?.map { it.trim() }
@@ -1237,7 +1244,7 @@ override fun run() = runBlocking {
 
     val result = dependanger.process()
 
-    val transitives = result.extractTransitiveData()
+    val transitives = result.transitives
 
     when (format) {
         "json" -> printJsonTransitives(transitives)
@@ -1306,20 +1313,22 @@ override fun run() = runBlocking {
 Рекомендуется создать общие утилиты для всех команд в пакете `cli/util/`.
 
 [[helper-extract-extensions]]
-=== Паттерн: extraction-методы через DependangerResult (dependanger-api)
+=== Паттерн: extension properties на DependangerResult (dependanger-api)
 
 [IMPORTANT]
 ====
-Extraction-методы (`extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()`, `extractCompatibilityIssues()`) определены как extension-функции на `DependangerResult` в модуле `dependanger-api` (файл `DependangerResultExtensions.kt`, см.
+Extension properties (`updates`, `vulnerabilities`, `licenseViolations`, `transitives`, `compatibilityIssues`, `versionConflicts`) определены на `DependangerResult` в модуле `dependanger-api` (файл `DependangerResultExtensions.kt`, см.
 SPEC-13).
+
+Именование совпадает с extension properties на `EffectiveMetadata` (`metadata.updates` / `result.updates`), обеспечивая единообразный доступ на обоих уровнях абстракции.
 
 Это позволяет:
 
 * CLI не зависеть напрямую от feature-модулей (соблюдается 4-слойная архитектура: INTERFACES -> API -> FEATURES)
 * API инкапсулирует знание о ExtensionKey (API и так зависит от feature-модулей как `implementation`)
-* Вызов из CLI: `result.extractUpdateData()` вместо `result.effective!!.extractUpdateData()`
+* Вызов из CLI: `result.updates` вместо `result.effective!!.updates`
 
-Файл `EffectiveMetadataExtensions.kt` в CLI **НЕ СОЗДАЁТСЯ** -- вместо него используются методы из dependanger-api.
+Файл `EffectiveMetadataExtensions.kt` в CLI **НЕ СОЗДАЁТСЯ** -- вместо него используются properties из dependanger-api.
 ====
 
 === parseVersionOption

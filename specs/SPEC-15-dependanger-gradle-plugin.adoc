@@ -667,8 +667,8 @@ public fun execute() {
         throw GradleException("Dependanger: Failed to check updates")
     }
 
-    // Extraction-методы определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
-    val updates = result.extractUpdateData()
+    // Extension properties определены в dependanger-api (DependangerResultExtensions.kt, см. SPEC-13)
+    val updates = result.updates
 
     if (updates.isEmpty()) {
         logger.lifecycle("Dependanger: All dependencies are up to date.")
@@ -846,7 +846,7 @@ public fun execute() {
         return
     }
 
-    val vulnerabilities = result.extractSecurityData()
+    val vulnerabilities = result.vulnerabilities
 
     if (vulnerabilities.isEmpty()) {
         logger.lifecycle("Dependanger: No known vulnerabilities found.")
@@ -901,7 +901,7 @@ public fun execute() {
         return
     }
 
-    val licenseViolations = result.extractLicenseData()
+    val licenseViolations = result.licenseViolations
 
     val denied = licenseViolations.filter { it.status == "DENIED" }
     val unknown = licenseViolations.filter { it.status == "UNKNOWN" }
@@ -953,8 +953,8 @@ public fun execute() {
         return
     }
 
-    val trees = result.extractTransitiveData()
-    val conflicts = result.extractVersionConflicts()
+    val trees = result.transitives
+    val conflicts = result.versionConflicts
 
     logger.lifecycle("Dependanger: Resolved transitive dependencies:")
     logger.lifecycle("  Direct dependencies: ${result.effective?.libraries?.size ?: 0}")

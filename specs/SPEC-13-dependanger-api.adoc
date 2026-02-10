@@ -43,12 +43,12 @@ public fun fromJson(json: String): DependangerBuilder = TODO()
 public fun build(): Dependanger = TODO()
 
 // DependangerResultExtensions.kt (НОВЫЙ ФАЙЛ)
-public fun DependangerResult.extractUpdateData(): List<UpdateAvailableInfo> = TODO()
-public fun DependangerResult.extractSecurityData(): List<VulnerabilityInfo> = TODO()
-public fun DependangerResult.extractLicenseData(): List<LicenseViolation> = TODO()
-public fun DependangerResult.extractTransitiveData(): List<TransitiveTree> = TODO()
-public fun DependangerResult.extractCompatibilityIssues(): List<CompatibilityIssue> = TODO()
-public fun DependangerResult.extractVersionConflicts(): List<VersionConflict> = TODO()
+public val DependangerResult.updates: List<UpdateAvailableInfo>
+public val DependangerResult.vulnerabilities: List<VulnerabilityInfo>
+public val DependangerResult.licenseViolations: List<LicenseViolation>
+public val DependangerResult.transitives: List<TransitiveTree>
+public val DependangerResult.compatibilityIssues: List<CompatibilityIssue>
+public val DependangerResult.versionConflicts: List<VersionConflict>
 ----
 
 [[spec-build]]
@@ -436,8 +436,11 @@ public fun fromJson(json: String): DependangerBuilder {
 [[purpose-extraction]]
 === Назначение
 
-Extension-функции на `DependangerResult` для type-safe извлечения данных из feature-процессоров.
+Extension properties на `DependangerResult` для type-safe доступа к данным feature-процессоров.
 Определены в отдельном файле `DependangerResultExtensions.kt`, аналогично `DependangerResultToml.kt` и `DependangerResultBom.kt`.
+
+Именование свойств совпадает с extension properties на `EffectiveMetadata` (`metadata.updates` / `result.updates`), обеспечивая единообразный доступ на обоих уровнях абстракции.
+Отличие: свойства на `DependangerResult` выполняют null-safe доступ к `effective` (`effective?.updates ?: emptyList()`).
 
 Это позволяет CLI и Gradle plugin работать с результатами feature-процессоров через API фасад, **не зависев напрямую от feature-модулей**.
 API module видит feature-модули (они `implementation` зависимости), а CLI/plugin видит только API.
@@ -464,28 +467,28 @@ import io.github.zenhelix.dependanger.features.analysis.model.CompatibilityIssue
 import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
 import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
 
-public fun DependangerResult.extractUpdateData(): List<UpdateAvailableInfo> =
-    effective?.getExtension(UpdatesExtensionKey) ?: emptyList()
+public val DependangerResult.updates: List<UpdateAvailableInfo>
+    get() = effective?.getExtension(UpdatesExtensionKey) ?: emptyList()
 
-public fun DependangerResult.extractSecurityData(): List<VulnerabilityInfo> =
-    effective?.getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
+public val DependangerResult.vulnerabilities: List<VulnerabilityInfo>
+    get() = effective?.getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
 
-public fun DependangerResult.extractLicenseData(): List<LicenseViolation> =
-    effective?.getExtension(LicenseViolationsExtensionKey) ?: emptyList()
+public val DependangerResult.licenseViolations: List<LicenseViolation>
+    get() = effective?.getExtension(LicenseViolationsExtensionKey) ?: emptyList()
 
-public fun DependangerResult.extractTransitiveData(): List<TransitiveTree> =
-    effective?.getExtension(TransitivesExtensionKey) ?: emptyList()
+public val DependangerResult.transitives: List<TransitiveTree>
+    get() = effective?.getExtension(TransitivesExtensionKey) ?: emptyList()
 
-public fun DependangerResult.extractCompatibilityIssues(): List<CompatibilityIssue> =
-    effective?.getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
+public val DependangerResult.compatibilityIssues: List<CompatibilityIssue>
+    get() = effective?.getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
 
-public fun DependangerResult.extractVersionConflicts(): List<VersionConflict> =
-    effective?.getExtension(VersionConflictsExtensionKey) ?: emptyList()
+public val DependangerResult.versionConflicts: List<VersionConflict>
+    get() = effective?.getExtension(VersionConflictsExtensionKey) ?: emptyList()
 ----
 
 === Обоснование `effective?.` вместо `effective!!`
 
-Методы используют safe-call `?.` вместо `!!`:
+Properties используют safe-call `?.` вместо `!!`:
 
 * Если `effective == null` (processing failed), возвращается `emptyList()` -- безопасный default
 * Вызывающий код уже проверяет `result.isSuccess` перед extraction, но double-safety лучше crash
@@ -620,14 +623,14 @@ DependangerException (base)
 |===
 | Тест | Описание
 
-| `extractUpdateData with data` | Возвращает List<UpdateAvailableInfo> из extensions
-| `extractUpdateData no extension` | Возвращает emptyList()
-| `extractUpdateData null effective` | Возвращает emptyList()
-| `extractSecurityData with data` | Возвращает List<VulnerabilityInfo> из extensions
-| `extractLicenseData with data` | Возвращает List<LicenseViolation> из extensions
-| `extractTransitiveData with data` | Возвращает List<TransitiveTree> из extensions
-| `extractCompatibilityIssues with data` | Возвращает List<CompatibilityIssue> из extensions
-| `all extract methods safe on failed result` | DependangerResult(null, diagnostics) -> все возвращают emptyList()
+| `updates with data` | Возвращает List<UpdateAvailableInfo> из extensions
+| `updates no extension` | Возвращает emptyList()
+| `updates null effective` | Возвращает emptyList()
+| `vulnerabilities with data` | Возвращает List<VulnerabilityInfo> из extensions
+| `licenseViolations with data` | Возвращает List<LicenseViolation> из extensions
+| `transitives with data` | Возвращает List<TransitiveTree> из extensions
+| `compatibilityIssues with data` | Возвращает List<CompatibilityIssue> из extensions
+| `all properties safe on failed result` | DependangerResult(null, diagnostics) -> все возвращают emptyList()
 |===
 
 === Интеграционные тесты
@@ -680,7 +683,7 @@ dependanger-api зависит от:
 
 | `Dependanger.kt` | Расширить конструктор (additionalProcessors, disabledProcessorIds, pipelineCustomizer). Реализовать `process()`, `validate()`, `fromJson()`. Добавить приватный метод `buildPipeline()`.
 | `DependangerBuilder.kt` | Реализовать `build()`. Добавить приватный метод `resolveMetadata()`.
-| `DependangerResultExtensions.kt` | **НОВЫЙ ФАЙЛ**. Extraction extension-функции: `extractUpdateData()`, `extractSecurityData()`, `extractLicenseData()`, `extractTransitiveData()`, `extractCompatibilityIssues()`, `extractVersionConflicts()`.
+| `DependangerResultExtensions.kt` | **НОВЫЙ ФАЙЛ**. Extension properties: `updates`, `vulnerabilities`, `licenseViolations`, `transitives`, `compatibilityIssues`, `versionConflicts`.
 |===
 
 === Файлы НЕ требующие изменений

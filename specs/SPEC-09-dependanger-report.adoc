@@ -9,6 +9,11 @@
 Модуль `dependanger-report` генерирует единый отчёт о состоянии зависимостей, объединяя данные из EffectiveMetadata и extensions (updates, vulnerabilities, licenses, compatibility, transitives).
 Поддерживает форматы: JSON, YAML, Markdown, HTML.
 
+NOTE: `ReportGenerator` -- это **standalone утилита**, а НЕ `EffectiveMetadataProcessor`.
+Он не участвует в pipeline и не регистрируется через ServiceLoader.
+Вызывается напрямую из CLI (`report` command), Gradle (`dependangerReport` task) и API после завершения pipeline.
+В `ProcessingPhase` нет фазы REPORT.
+
 Приоритет: **P3** (желательно).
 
 [[current-state]]

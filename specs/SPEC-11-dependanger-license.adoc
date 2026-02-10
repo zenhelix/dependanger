@@ -141,9 +141,7 @@ public class LicenseResolver {
 
 [source,kotlin]
 ----
-public class LicenseCheckProcessor(
-    private val licenseResolver: LicenseResolver = LicenseResolver(),
-) : EffectiveMetadataProcessor {
+public class LicenseCheckProcessor : EffectiveMetadataProcessor {
     override val id: String = "license-check"
     override val phase: ProcessingPhase = ProcessingPhase.LICENSE_CHECK  // order=130, PARALLEL_IO
     override val isOptional: Boolean = true
@@ -153,6 +151,17 @@ public class LicenseCheckProcessor(
         context: ProcessingContext,
     ): EffectiveMetadata {
         val settings = context.settings.licenseCheck ?: return metadata
+
+        // Создание LicenseResolver с зависимостями из context (аналогично SPEC-06, SPEC-12)
+        val repositories = settings.repositories.ifEmpty {
+            context.settings.repositories.ifEmpty {
+                listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
+            }
+        }
+        val licenseResolver = LicenseResolver(
+            pomDownloader = MavenPomDownloader(repositories, createHttpClient()),
+        )
+
         val libraries = collectLibraries(metadata, settings)
 
         if (libraries.isEmpty()) {
@@ -232,7 +241,7 @@ public class LicenseCheckProcessor(
 ----
 public class LicenseResolver(
     private val httpClient: HttpClient = createDefaultClient(),
-    private val pomDownloader: MavenPomDownloader? = null,
+    private val pomDownloader: MavenPomDownloader,
     private val spdxMapper: SpdxLicenseMapper = SpdxLicenseMapper(),
     private val cache: LicenseCache = LicenseCache(),
     private val timeout: Long = 30_000,
@@ -288,7 +297,7 @@ private suspend fun tryResolveMavenPom(
     version: String,
 ): List<LicenseResult> {
     return try {
-        val pomXml = pomDownloader?.download(group, artifact, version) ?: return emptyList()
+        val pomXml = pomDownloader.download(group, artifact, version) ?: return emptyList()
         val pomLicenses = parseLicensesFromPom(pomXml)
 
         if (pomLicenses.isEmpty()) return emptyList()

@@ -648,17 +648,17 @@ ____
 | ✅
 | xref:F010-security-scanning.adoc[F010]
 
+| 101
+| `transitive-resolver`
+| Резолвинг транзитивных зависимостей из Maven repositories
+| ✅
+| xref:F012-transitive-resolution.adoc[F012]
+
 | 130
 | `license-check`
 | Проверка лицензий через Maven POM / ClearlyDefined API
 | ✅
 | xref:F011-license-compliance.adoc[F011]
-
-| 140
-| `transitive-resolver`
-| Резолвинг транзитивных зависимостей из Maven repositories
-| ✅
-| xref:F012-transitive-resolution.adoc[F012]
 |===
 
 NOTE: ✅ Optional = можно включить через `withBomImport()`, `withUpdateCheck()`, `withCompatibilityAnalysis()`, `withSecurityCheck()`, `withLicenseCheck()`, `withTransitiveResolution()`
@@ -804,16 +804,12 @@ Pipeline группирует последовательные процессо�
 | Фаза | Процессоры | Описание
 
 | SEQUENTIAL
-| profile, metadata-conversion, extracted-versions, version-fallback, version-resolver
-| Требуют последовательного выполнения (зависят от результатов предыдущих)
+| profile, metadata-conversion, extracted-versions, bom-import, library-filter, version-fallback, version-resolver, bundle-filter, plugin-filter, plugin, used-versions, validation, compat-rules, transitive-resolver, compatibility-analysis
+| Требуют последовательного выполнения (зависят от результатов предыдущих или модифицируют core-данные)
 
 | PARALLEL_IO
-| bom-import, update-check, security-check, license-check, transitive-resolver
-| I/O-bound операции (сетевые запросы к Maven Central, OSV API, ClearlyDefined API)
-
-| PARALLEL_COMPUTE
-| validation, compat-rules, compatibility-analysis
-| CPU-bound операции (могут выполняться параллельно)
+| update-check, security-check, license-check
+| I/O-bound операции (сетевые запросы к Maven Central, OSV API, ClearlyDefined API). Процессоры с одинаковым режимом, идущие подряд по order, выполняются параллельно
 |===
 
 == Pipeline Presets

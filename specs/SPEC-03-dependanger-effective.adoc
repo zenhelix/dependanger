@@ -966,7 +966,7 @@ private fun passesDeprecatedFilter(lib: EffectiveLibrary, filter: DeprecatedFilt
 
 // Используется GlobMatcher из dependanger-core:
 // import io.github.zenhelix.dependanger.core.util.GlobMatcher
-// GlobMatcher.matchesCoordinate(pattern, "${lib.group}:${lib.artifact}")
+// GlobMatcher.matches(pattern, lib.group, lib.artifact)
 ----
 
 === Input/Output пример

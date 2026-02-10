@@ -665,7 +665,7 @@ Ordinal используется для фильтрации (PATCH < MINOR < MA
 package io.github.zenhelix.dependanger.core.util
 
 @Serializable
-public enum class UpdateType { PATCH, MINOR, MAJOR, PRERELEASE }
+public enum class UpdateType { PRERELEASE, PATCH, MINOR, MAJOR }
 ----
 
 [source,kotlin]

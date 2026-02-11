@@ -22,9 +22,9 @@ public sealed class VersionRange {
 
     @Serializable @SerialName("rich")
     public data class Rich(
-        val require: String? = null,
-        val strictly: String? = null,
-        val prefer: String? = null,
-        val reject: List<String> = emptyList(),
+        val require: String?,
+        val strictly: String?,
+        val prefer: String?,
+        val reject: List<String>,
     ) : VersionRange()
 }

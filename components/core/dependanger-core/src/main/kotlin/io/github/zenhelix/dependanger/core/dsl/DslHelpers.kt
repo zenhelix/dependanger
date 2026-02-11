@@ -13,10 +13,5 @@ public fun richVersion(
     prefer: String? = null,
     reject: List<String> = emptyList(),
 ): VersionReference = VersionReference.Range(
-    VersionRange.Rich(
-        require = require,
-        strictly = strictly,
-        prefer = prefer,
-        reject = reject,
-    )
+    VersionRange.Rich(require = require, strictly = strictly, prefer = prefer, reject = reject)
 )

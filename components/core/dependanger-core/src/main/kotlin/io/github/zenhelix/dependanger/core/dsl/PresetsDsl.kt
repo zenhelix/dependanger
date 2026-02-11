@@ -7,7 +7,7 @@ public class PresetsDsl {
     public val presets: MutableList<Preset> = mutableListOf()
     private val presetDsls: MutableMap<String, PresetDsl> = mutableMapOf()
 
-    public fun preset(name: String, block: PresetDsl.() -> Unit) {
+    public fun preset(name: String, block: PresetDsl.() -> Unit = {}) {
         val dsl = PresetDsl().apply(block)
         presetDsls[name] = dsl
         presets.add(

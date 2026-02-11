@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class BundleFilter(
-    val includes: Set<String> = emptySet(),
-    val excludes: Set<String> = emptySet(),
+    val includes: Set<String>,
+    val excludes: Set<String>,
 )

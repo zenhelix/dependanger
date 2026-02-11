@@ -8,8 +8,8 @@ public sealed class Constraint {
     @Serializable @SerialName("versionConstraintDef")
     public data class VersionConstraintDef(
         val coordinates: String,
-        val version: VersionReference? = null,
-        val because: String? = null,
+        val version: VersionReference?,
+        val because: String?,
     ) : Constraint()
 
     @Serializable @SerialName("exclude")
@@ -22,6 +22,6 @@ public sealed class Constraint {
     public data class Substitute(
         val from: String,
         val to: String,
-        val because: String? = null,
+        val because: String?,
     ) : Constraint()
 }

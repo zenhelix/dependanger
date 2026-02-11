@@ -13,18 +13,18 @@ public sealed class CompatibilityRule {
     public data class JdkRequirement(
         override val name: String,
         val matches: String,
-        val minJdk: Int? = null,
-        val maxJdk: Int? = null,
-        override val severity: Severity = Severity.ERROR,
-        override val message: String? = null,
+        val minJdk: Int?,
+        val maxJdk: Int?,
+        override val severity: Severity,
+        override val message: String?,
     ) : CompatibilityRule()
 
     @Serializable @SerialName("mutualExclusion")
     public data class MutualExclusion(
         override val name: String,
         val libraries: List<String>,
-        override val severity: Severity = Severity.WARNING,
-        override val message: String? = null,
+        override val severity: Severity,
+        override val message: String?,
     ) : CompatibilityRule()
 
     @Serializable @SerialName("versionConstraint")
@@ -32,16 +32,16 @@ public sealed class CompatibilityRule {
         override val name: String,
         val libraries: List<String>,
         val constraint: VersionConstraintType,
-        override val severity: Severity = Severity.ERROR,
-        override val message: String? = null,
+        override val severity: Severity,
+        override val message: String?,
     ) : CompatibilityRule()
 
     @Serializable @SerialName("customRule")
     public data class CustomRule(
         override val name: String,
         val ruleId: String,
-        val parameters: Map<String, String> = emptyMap(),
-        override val severity: Severity = Severity.WARNING,
-        override val message: String? = null,
+        val parameters: Map<String, String>,
+        override val severity: Severity,
+        override val message: String?,
     ) : CompatibilityRule()
 }

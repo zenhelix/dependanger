@@ -4,17 +4,17 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class TagFilter(
-    val includes: List<TagInclude> = emptyList(),
-    val excludes: List<TagExclude> = emptyList(),
+    val includes: List<TagInclude>,
+    val excludes: List<TagExclude>,
 )
 
 @Serializable
 public data class TagInclude(
-    val anyOf: Set<String> = emptySet(),
-    val allOf: Set<String> = emptySet(),
+    val anyOf: Set<String>,
+    val allOf: Set<String>,
 )
 
 @Serializable
 public data class TagExclude(
-    val anyOf: Set<String> = emptySet(),
+    val anyOf: Set<String>,
 )

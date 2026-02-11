@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class TargetPlatform(
     val name: String,
-    val jdkConstraints: JdkConstraints? = null,
-    val androidConstraints: AndroidConstraints? = null,
-    val kotlinConstraints: KotlinConstraints? = null,
-    val supportedTargets: Set<KmpTarget> = emptySet(),
+    val jdkConstraints: JdkConstraints?,
+    val androidConstraints: AndroidConstraints?,
+    val kotlinConstraints: KotlinConstraints?,
+    val supportedTargets: Set<KmpTarget>,
 )

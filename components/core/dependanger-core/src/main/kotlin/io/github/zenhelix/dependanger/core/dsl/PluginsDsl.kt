@@ -9,11 +9,11 @@ public class PluginsDsl {
 
     public fun plugin(alias: String, id: String) {
         val (pluginId, version) = parsePluginId(id)
-        plugins.add(Plugin(alias = alias, id = pluginId, version = version))
+        plugins.add(Plugin(alias = alias, id = pluginId, version = version, tags = emptySet()))
     }
 
     public fun plugin(alias: String, id: String, version: VersionReference) {
-        plugins.add(Plugin(alias = alias, id = id, version = version))
+        plugins.add(Plugin(alias = alias, id = id, version = version, tags = emptySet()))
     }
 
     public fun plugin(alias: String, id: String, block: PluginDsl.() -> Unit) {

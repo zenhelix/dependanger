@@ -6,6 +6,6 @@ import kotlinx.serialization.Serializable
 public data class Plugin(
     val alias: String,
     val id: String,
-    val version: VersionReference? = null,
-    val tags: Set<String> = emptySet(),
+    val version: VersionReference?,
+    val tags: Set<String>,
 )

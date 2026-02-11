@@ -13,12 +13,24 @@ public class LibrariesDsl {
 
     public fun library(alias: String, coordinates: String) {
         val (group, artifact, version) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version))
+        libraries.add(
+            Library(
+                alias = alias, group = group, artifact = artifact, version = version,
+                description = null, tags = emptySet(), requires = null, deprecation = null,
+                license = null, constraints = emptyList(), isPlatform = false,
+            )
+        )
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
         val (group, artifact, _) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version))
+        libraries.add(
+            Library(
+                alias = alias, group = group, artifact = artifact, version = version,
+                description = null, tags = emptySet(), requires = null, deprecation = null,
+                license = null, constraints = emptyList(), isPlatform = false,
+            )
+        )
     }
 
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
@@ -35,7 +47,13 @@ public class LibrariesDsl {
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
         val (group, artifact, _) = parseCoordinates(coordinates)
-        libraries.add(Library(alias = alias, group = group, artifact = artifact, version = version, isPlatform = true))
+        libraries.add(
+            Library(
+                alias = alias, group = group, artifact = artifact, version = version,
+                description = null, tags = emptySet(), requires = null, deprecation = null,
+                license = null, constraints = emptyList(), isPlatform = true,
+            )
+        )
     }
 
     private fun parseCoordinates(coordinates: String): Triple<String, String, VersionReference?> {
@@ -72,7 +90,7 @@ public class LibraryDsl(private var version: VersionReference? = null) {
     }
 
     public fun deprecated(replacedBy: String? = null, message: String? = null) {
-        deprecation = DeprecationInfo(replacedBy = replacedBy, message = message)
+        deprecation = DeprecationInfo(replacedBy = replacedBy, message = message, since = null, removalVersion = null)
     }
 
     public fun license(block: LicenseDsl.() -> Unit) {
@@ -96,5 +114,6 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         deprecation = deprecation,
         license = license,
         constraints = constraints.toList(),
+        isPlatform = false,
     )
 }

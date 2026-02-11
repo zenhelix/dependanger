@@ -9,7 +9,7 @@ public class VersionsDsl {
     public val versions: MutableList<Version> = mutableListOf()
 
     public fun version(alias: String, value: String) {
-        versions.add(Version(name = alias, value = value))
+        versions.add(Version(name = alias, value = value, fallbacks = emptyList()))
     }
 
     public fun version(alias: String, value: String, block: VersionDsl.() -> Unit) {

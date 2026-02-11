@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class Distribution(
     val name: String,
-    val spec: FilterSpec? = null,
+    val spec: FilterSpec?,
 )

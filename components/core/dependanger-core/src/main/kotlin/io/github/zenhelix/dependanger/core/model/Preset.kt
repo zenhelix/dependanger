@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class Preset(
     val name: String,
-    val bundles: List<String> = emptyList(),
-    val distributions: List<String> = emptyList(),
-    val settings: Settings? = null,
+    val bundles: List<String>,
+    val distributions: List<String>,
+    val settings: Settings?,
 )

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 public data class Version(
     val name: String,
     val value: String,
-    val fallbacks: List<VersionFallback> = emptyList(),
+    val fallbacks: List<VersionFallback>,
 )
 
 @Serializable

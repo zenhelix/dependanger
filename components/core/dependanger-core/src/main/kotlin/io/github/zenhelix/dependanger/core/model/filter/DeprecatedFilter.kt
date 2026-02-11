@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class DeprecatedFilter(
-    val include: Boolean = true,
+    val include: Boolean,
 )

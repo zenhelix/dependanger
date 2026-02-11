@@ -17,7 +17,7 @@ public data class SemanticVersion(
     val major: Int,
     val minor: Int,
     val patch: Int,
-    val qualifier: String? = null,
+    val qualifier: String?,
 ) : Comparable<SemanticVersion> {
 
     override fun compareTo(other: SemanticVersion): Int {

@@ -5,10 +5,10 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 public data class FilterSpec(
-    val byTags: TagFilter? = null,
-    val byGroups: GroupFilter? = null,
-    val byAliases: AliasFilter? = null,
-    val byBundles: BundleFilter? = null,
-    val byDeprecated: DeprecatedFilter? = null,
-    val customFilters: Map<String, JsonElement> = emptyMap(),
+    val byTags: TagFilter?,
+    val byGroups: GroupFilter?,
+    val byAliases: AliasFilter?,
+    val byBundles: BundleFilter?,
+    val byDeprecated: DeprecatedFilter?,
+    val customFilters: Map<String, JsonElement>,
 )

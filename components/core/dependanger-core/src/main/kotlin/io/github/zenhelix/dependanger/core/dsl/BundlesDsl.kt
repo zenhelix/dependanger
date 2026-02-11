@@ -6,7 +6,7 @@ import io.github.zenhelix.dependanger.core.model.Bundle
 public class BundlesDsl {
     public val bundles: MutableList<Bundle> = mutableListOf()
 
-    public fun bundle(name: String, block: BundleDsl.() -> Unit) {
+    public fun bundle(name: String, block: BundleDsl.() -> Unit = {}) {
         val dsl = BundleDsl().apply(block)
         bundles.add(Bundle(alias = name, libraries = dsl.libraries.toList(), extends = dsl.extendsList.toList()))
     }

@@ -52,6 +52,7 @@ public class FilterDsl {
         byAliases = aliasFilter,
         byBundles = bundleFilter,
         byDeprecated = deprecatedFilter,
+        customFilters = emptyMap(),
     )
 }
 
@@ -71,6 +72,7 @@ public class TagFilterDsl {
     }
 
     public fun toTagFilter(): TagFilter = TagFilter(includes = includes.toList(), excludes = excludes.toList())
+
 }
 
 @DependangerDslMarker

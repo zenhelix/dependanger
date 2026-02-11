@@ -13,5 +13,5 @@ public sealed interface Repository {
 @SerialName("maven")
 public data class MavenRepository(
     override val url: String,
-    override val name: String = "",
+    override val name: String,
 ) : Repository

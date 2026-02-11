@@ -8,11 +8,11 @@ public class ConstraintsDsl {
     public val constraints: MutableList<Constraint> = mutableListOf()
 
     public fun constraint(coordinates: String, version: VersionReference) {
-        constraints.add(Constraint.VersionConstraintDef(coordinates = coordinates, version = version))
+        constraints.add(Constraint.VersionConstraintDef(coordinates = coordinates, version = version, because = null))
     }
 
     public fun constraint(coordinates: String, version: String) {
-        constraints.add(Constraint.VersionConstraintDef(coordinates = coordinates, version = VersionReference.Literal(version)))
+        constraints.add(Constraint.VersionConstraintDef(coordinates = coordinates, version = VersionReference.Literal(version), because = null))
     }
 
     public fun constraint(coordinates: String, block: ConstraintDefDsl.() -> Unit) {
@@ -37,7 +37,7 @@ public class ConstraintsDsl {
     }
 
     public fun substitute(from: String, to: String) {
-        constraints.add(Constraint.Substitute(from = from, to = to))
+        constraints.add(Constraint.Substitute(from = from, to = to, because = null))
     }
 
     public fun substitute(from: String, to: String, block: SubstituteDsl.() -> Unit) {

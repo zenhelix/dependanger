@@ -1,8 +1,14 @@
 package io.github.zenhelix.dependanger.core.dsl
 
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
-public class DslExtensionKey<T : Any>(public val name: String) {
+public class DslExtensionKey<T : Any>(
+    public val name: String,
+    public val serializer: KSerializer<T>,
+) {
     override fun equals(other: Any?): Boolean = other is DslExtensionKey<*> && name == other.name
     override fun hashCode(): Int = name.hashCode()
     override fun toString(): String = "DslExtensionKey($name)"
@@ -81,9 +87,54 @@ public class DependangerDsl {
 
     public fun allExtensions(): Map<DslExtensionKey<*>, Any> = extensions.toMap()
 
-    public fun applyPreset(name: String): Unit = TODO()
+    public fun applyPreset(name: String) {
+        // bundles и distributions — строковые ссылки на определённые в DSL сущности.
+        // Доступны через metadata.presets для потребителей (API, CLI, Gradle Plugin),
+        // которые используют их для определения scope обработки.
 
-    public fun toMetadata(): DependangerMetadata = TODO()
+        val presetDsl = presetsDsl.findDslByName(name)
+        if (presetDsl != null) {
+            // DSL-путь: точный merge через Trackable — применяются только явно установленные поля
+            presetDsl.settingsDsl?.applyTo(settingsDsl)
+            return
+        }
+
+        // JSON-путь (fallback): preset загружен из файла, DSL-объекта нет
+        val preset = presetsDsl.findByName(name)
+            ?: throw IllegalArgumentException(
+                "Preset '$name' not found. Available presets: ${presetsDsl.availableNames()}"
+            )
+        preset.settings?.let { presetSettings ->
+            settingsDsl.mergeFrom(presetSettings)
+        }
+    }
+
+    public fun toMetadata(): DependangerMetadata = DependangerMetadata(
+        schemaVersion = "1.0",
+        versions = versionsDsl.versions.toList(),
+        libraries = librariesDsl.libraries.toList(),
+        plugins = pluginsDsl.plugins.toList(),
+        bundles = bundlesDsl.bundles.toList(),
+        bomImports = bomImportsDsl.boms.toList(),
+        constraints = constraintsDsl.constraints.toList(),
+        targetPlatforms = targetPlatformsDsl.platforms.toList(),
+        distributions = distributionsDsl.distributions.toList(),
+        compatibility = compatibilityDsl.rules.toList(),
+        settings = settingsDsl.toSettings(),
+        presets = presetsDsl.presets.toList(),
+        extensions = buildExtensionsMap(),
+    )
+
+    @Suppress("UNCHECKED_CAST")
+    private fun buildExtensionsMap(): Map<String, JsonElement> {
+        val json = Json { encodeDefaults = true }
+        val result = mutableMapOf<String, JsonElement>()
+        for ((key, value) in extensions) {
+            val serializer = (key as DslExtensionKey<Any>).serializer
+            result[key.name] = json.encodeToJsonElement(serializer, value)
+        }
+        return result
+    }
 }
 
 public fun <T : Any> DependangerDsl.configure(key: DslExtensionKey<T>, block: T.() -> Unit) {

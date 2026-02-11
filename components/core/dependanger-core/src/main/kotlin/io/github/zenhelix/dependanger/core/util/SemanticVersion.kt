@@ -20,7 +20,18 @@ public data class SemanticVersion(
     val qualifier: String? = null,
 ) : Comparable<SemanticVersion> {
 
-    override fun compareTo(other: SemanticVersion): Int = TODO()
+    override fun compareTo(other: SemanticVersion): Int {
+        if (major != other.major) return major.compareTo(other.major)
+        if (minor != other.minor) return minor.compareTo(other.minor)
+        if (patch != other.patch) return patch.compareTo(other.patch)
+        // stable (qualifier=null) > prerelease (qualifier!=null)
+        return when {
+            qualifier == null && other.qualifier == null -> 0
+            qualifier == null                            -> 1   // this is stable, other is prerelease
+            other.qualifier == null                      -> -1
+            else                                         -> qualifier.compareTo(other.qualifier)
+        }
+    }
 
     override fun toString(): String = buildString {
         append("$major.$minor.$patch")

@@ -21,20 +21,44 @@ import io.github.zenhelix.dependanger.core.model.ValidationSettings
 
 @DependangerDslMarker
 public class SettingsDsl {
-    public var defaultDistribution: String? = null
-    public var strictVersionResolution: Boolean = false
-    public var repositories: List<Repository> = emptyList()
+    private val _defaultDistribution = Trackable<String?>(null)
+    public var defaultDistribution: String? by _defaultDistribution
 
-    public var validationSettings: ValidationSettings = ValidationSettings()
-    public var tomlSettings: TomlSettings = TomlSettings()
-    public var bomSettings: BomSettings = BomSettings()
-    public var bomCacheSettings: BomCacheSettings = BomCacheSettings()
-    public var updateCheckSettings: UpdateCheckSettings = UpdateCheckSettings()
-    public var compatibilityAnalysisSettings: CompatibilityAnalysisSettings = CompatibilityAnalysisSettings()
-    public var securityCheckSettings: SecurityCheckSettings = SecurityCheckSettings()
-    public var licenseCheckSettings: LicenseCheckSettings = LicenseCheckSettings()
-    public var transitiveResolutionSettings: TransitiveResolutionSettings = TransitiveResolutionSettings()
-    public var reportSettings: ReportSettings = ReportSettings()
+    private val _strictVersionResolution = Trackable(false)
+    public var strictVersionResolution: Boolean by _strictVersionResolution
+
+    private val _repositories = Trackable<List<Repository>>(emptyList())
+    public var repositories: List<Repository> by _repositories
+
+    private val _validationSettings = Trackable(ValidationSettings())
+    public var validationSettings: ValidationSettings by _validationSettings
+
+    private val _tomlSettings = Trackable(TomlSettings())
+    public var tomlSettings: TomlSettings by _tomlSettings
+
+    private val _bomSettings = Trackable(BomSettings())
+    public var bomSettings: BomSettings by _bomSettings
+
+    private val _bomCacheSettings = Trackable(BomCacheSettings())
+    public var bomCacheSettings: BomCacheSettings by _bomCacheSettings
+
+    private val _updateCheckSettings = Trackable(UpdateCheckSettings())
+    public var updateCheckSettings: UpdateCheckSettings by _updateCheckSettings
+
+    private val _compatibilityAnalysisSettings = Trackable(CompatibilityAnalysisSettings())
+    public var compatibilityAnalysisSettings: CompatibilityAnalysisSettings by _compatibilityAnalysisSettings
+
+    private val _securityCheckSettings = Trackable(SecurityCheckSettings())
+    public var securityCheckSettings: SecurityCheckSettings by _securityCheckSettings
+
+    private val _licenseCheckSettings = Trackable(LicenseCheckSettings())
+    public var licenseCheckSettings: LicenseCheckSettings by _licenseCheckSettings
+
+    private val _transitiveResolutionSettings = Trackable(TransitiveResolutionSettings())
+    public var transitiveResolutionSettings: TransitiveResolutionSettings by _transitiveResolutionSettings
+
+    private val _reportSettings = Trackable(ReportSettings())
+    public var reportSettings: ReportSettings by _reportSettings
 
     public fun validation(block: ValidationSettingsDsl.() -> Unit) {
         val dsl = ValidationSettingsDsl().apply(block)
@@ -86,7 +110,38 @@ public class SettingsDsl {
         reportSettings = dsl.toSettings()
     }
 
-    public fun mergeFrom(settings: Settings): Unit = TODO()
+    public fun applyTo(target: SettingsDsl) {
+        if (_defaultDistribution.isSet) target.defaultDistribution = defaultDistribution
+        if (_strictVersionResolution.isSet) target.strictVersionResolution = strictVersionResolution
+        if (_repositories.isSet) target.repositories = repositories
+        if (_validationSettings.isSet) target.validationSettings = validationSettings
+        if (_tomlSettings.isSet) target.tomlSettings = tomlSettings
+        if (_bomSettings.isSet) target.bomSettings = bomSettings
+        if (_bomCacheSettings.isSet) target.bomCacheSettings = bomCacheSettings
+        if (_updateCheckSettings.isSet) target.updateCheckSettings = updateCheckSettings
+        if (_compatibilityAnalysisSettings.isSet) target.compatibilityAnalysisSettings = compatibilityAnalysisSettings
+        if (_securityCheckSettings.isSet) target.securityCheckSettings = securityCheckSettings
+        if (_licenseCheckSettings.isSet) target.licenseCheckSettings = licenseCheckSettings
+        if (_transitiveResolutionSettings.isSet) target.transitiveResolutionSettings = transitiveResolutionSettings
+        if (_reportSettings.isSet) target.reportSettings = reportSettings
+    }
+
+    public fun mergeFrom(settings: Settings) {
+        val defaults = Settings()
+        if (settings.defaultDistribution != defaults.defaultDistribution) defaultDistribution = settings.defaultDistribution
+        if (settings.strictVersionResolution != defaults.strictVersionResolution) strictVersionResolution = settings.strictVersionResolution
+        if (settings.repositories != defaults.repositories) repositories = settings.repositories
+        if (settings.validation != defaults.validation) validationSettings = settings.validation
+        if (settings.toml != defaults.toml) tomlSettings = settings.toml
+        if (settings.bom != defaults.bom) bomSettings = settings.bom
+        if (settings.bomCache != defaults.bomCache) bomCacheSettings = settings.bomCache
+        if (settings.updateCheck != defaults.updateCheck) updateCheckSettings = settings.updateCheck
+        if (settings.compatibilityAnalysis != defaults.compatibilityAnalysis) compatibilityAnalysisSettings = settings.compatibilityAnalysis
+        if (settings.securityCheck != defaults.securityCheck) securityCheckSettings = settings.securityCheck
+        if (settings.licenseCheck != defaults.licenseCheck) licenseCheckSettings = settings.licenseCheck
+        if (settings.transitiveResolution != defaults.transitiveResolution) transitiveResolutionSettings = settings.transitiveResolution
+        if (settings.report != defaults.report) reportSettings = settings.report
+    }
 
     public fun toSettings(): Settings = Settings(
         defaultDistribution = defaultDistribution,

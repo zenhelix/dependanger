@@ -11,6 +11,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class PluginProcessor : EffectiveMetadataProcessor {
     override val id: String = "plugin"
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Resolves plugin version references"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,

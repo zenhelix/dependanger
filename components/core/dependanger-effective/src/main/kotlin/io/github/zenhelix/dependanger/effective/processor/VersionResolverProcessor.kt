@@ -11,6 +11,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class VersionResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = "version-resolver"
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_RESOLVER
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Resolves version references to actual version values"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -31,6 +35,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                             code = "VERSION_RESOLVED",
                             message = "Library '$alias': version ref '${originalRef.name}' -> '${resolved.value}'",
                             processorId = id,
+                            context = emptyMap(),
                         )
                         lib.copy(
                             version = ResolvedVersion(

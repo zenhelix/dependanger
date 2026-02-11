@@ -19,6 +19,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class CompatRulesProcessor : EffectiveMetadataProcessor {
     override val id: String = "compat-rules"
     override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Checks compatibility rules between libraries"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -46,6 +50,7 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
                         code = "COMPAT_CUSTOM_RULE_DEFERRED",
                         message = "Custom rule '${rule.ruleId}' deferred to compatibility-analysis processor",
                         processorId = id,
+                        context = emptyMap(),
                     )
                     emptyList()
                 }
@@ -67,18 +72,21 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
                     code = "COMPAT_${issue.ruleId.uppercase()}",
                     message = issue.message,
                     processorId = id,
+                    context = emptyMap(),
                 )
 
                 Severity.WARNING -> Diagnostics.warning(
                     code = "COMPAT_${issue.ruleId.uppercase()}",
                     message = issue.message,
                     processorId = id,
+                    context = emptyMap(),
                 )
 
                 Severity.INFO    -> Diagnostics.info(
                     code = "COMPAT_${issue.ruleId.uppercase()}",
                     message = issue.message,
                     processorId = id,
+                    context = emptyMap(),
                 )
             }
         }

@@ -11,6 +11,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class VersionFallbackProcessor : EffectiveMetadataProcessor {
     override val id: String = "version-fallback"
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_FALLBACK
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Applies version fallback rules based on environment conditions"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -35,6 +39,7 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
                         message = "Version '${version.name}': fallback '${fallback.value}' applied " +
                                 "(was '${current.value}', condition: ${fallback.condition})",
                         processorId = id,
+                        context = emptyMap(),
                     )
                     break
                 }

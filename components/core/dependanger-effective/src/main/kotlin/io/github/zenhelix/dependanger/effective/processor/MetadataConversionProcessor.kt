@@ -15,6 +15,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class MetadataConversionProcessor : EffectiveMetadataProcessor {
     override val id: String = "metadata-conversion"
     override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Converts raw metadata to effective model"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,

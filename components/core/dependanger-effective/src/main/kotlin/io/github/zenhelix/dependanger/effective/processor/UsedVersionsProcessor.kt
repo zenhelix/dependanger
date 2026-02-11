@@ -9,6 +9,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class UsedVersionsProcessor : EffectiveMetadataProcessor {
     override val id: String = "used-versions"
     override val phase: ProcessingPhase = ProcessingPhase.USED_VERSIONS
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Removes unused version entries"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -39,6 +43,7 @@ public class UsedVersionsProcessor : EffectiveMetadataProcessor {
                     code = "UNUSED_VERSION_REMOVED",
                     message = "Version '$name' removed: not referenced by any library or plugin",
                     processorId = id,
+                    context = emptyMap(),
                 )
             }
             used

@@ -10,6 +10,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class PluginFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = "plugin-filter"
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN_FILTER
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Filters plugins based on distribution tag rules"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -32,6 +36,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
                     code = "PLUGIN_FILTERED",
                     message = "Plugin '$alias' filtered out by distribution '$distName'",
                     processorId = id,
+                    context = emptyMap(),
                 )
             }
             passes

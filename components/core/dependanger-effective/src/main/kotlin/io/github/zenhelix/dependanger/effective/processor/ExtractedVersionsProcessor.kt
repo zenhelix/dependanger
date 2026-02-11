@@ -11,6 +11,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
     override val id: String = "extracted-versions"
     override val phase: ProcessingPhase = ProcessingPhase.EXTRACTED_VERSIONS
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Extracts inline versions into named version entries"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -34,6 +38,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
                     code = "EXTRACTED_VERSION_CREATED",
                     message = "Extracted version '$versionName' = '${version.value}' from library '$alias'",
                     processorId = id,
+                    context = emptyMap(),
                 )
                 lib.copy(version = resolved)
             } else {
@@ -56,6 +61,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
                     code = "EXTRACTED_VERSION_CREATED",
                     message = "Extracted version '$versionName' = '${version.value}' from plugin '$alias'",
                     processorId = id,
+                    context = emptyMap(),
                 )
                 plugin.copy(version = resolved)
             } else {

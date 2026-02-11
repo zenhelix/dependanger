@@ -11,7 +11,12 @@ public class DependangerBuilder {
     private var metadata: DependangerMetadata? = null
     private var dslBlock: (DependangerDsl.() -> Unit)? = null
     private var preset: ProcessingPreset = ProcessingPreset.DEFAULT
-    private var environment: ProcessingEnvironment = ProcessingEnvironment()
+    private var environment: ProcessingEnvironment = ProcessingEnvironment(
+        jdkVersion = null,
+        kotlinVersion = null,
+        gradleVersion = null,
+        environmentVariables = emptyMap(),
+    )
     private val additionalProcessors: MutableList<EffectiveMetadataProcessor> = mutableListOf()
     private val disabledProcessorIds: MutableSet<String> = mutableSetOf()
     private var pipelineCustomizer: (PipelineBuilder.() -> Unit)? = null

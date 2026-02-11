@@ -9,6 +9,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class BundleFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = "bundle-filter"
     override val phase: ProcessingPhase = ProcessingPhase.BUNDLE_FILTER
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Filters bundles and removes invalid library references"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -26,6 +30,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
                         code = "BUNDLE_LIBRARY_MISSING",
                         message = "Bundle '$bundleAlias': library '$libAlias' not found (filtered out?)",
                         processorId = id,
+                        context = emptyMap(),
                     )
                 }
                 exists
@@ -55,6 +60,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
                     code = "BUNDLE_EMPTIED",
                     message = "Bundle '$alias' removed: no libraries remaining after filtering",
                     processorId = id,
+                    context = emptyMap(),
                 )
             }
             notEmpty

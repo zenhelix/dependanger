@@ -9,6 +9,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ProfileProcessor : EffectiveMetadataProcessor {
     override val id: String = "profile"
     override val phase: ProcessingPhase = ProcessingPhase.PROFILE
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Applies distribution profile to metadata"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -27,6 +31,7 @@ public class ProfileProcessor : EffectiveMetadataProcessor {
                     code = "PROFILE_APPLIED",
                     message = "Distribution '$distName' applied",
                     processorId = id,
+                    context = emptyMap(),
                 ),
             )
         } else {
@@ -37,6 +42,7 @@ public class ProfileProcessor : EffectiveMetadataProcessor {
                     code = "PROFILE_NOT_FOUND",
                     message = "Distribution '$distName' not found. Available: $available",
                     processorId = id,
+                    context = emptyMap(),
                 ),
             )
         }

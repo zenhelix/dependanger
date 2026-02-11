@@ -23,7 +23,12 @@ import io.github.zenhelix.dependanger.effective.processor.VersionResolverProcess
 public class EffectiveMetadataBuilder {
     public var preset: ProcessingPreset = ProcessingPreset.DEFAULT
     public var distribution: String? = null
-    public var environment: ProcessingEnvironment = ProcessingEnvironment()
+    public var environment: ProcessingEnvironment = ProcessingEnvironment(
+        jdkVersion = null,
+        kotlinVersion = null,
+        gradleVersion = null,
+        environmentVariables = emptyMap(),
+    )
 
     public fun preset(preset: ProcessingPreset): EffectiveMetadataBuilder = apply { this.preset = preset }
     public fun distribution(name: String): EffectiveMetadataBuilder = apply { this.distribution = name }
@@ -60,6 +65,8 @@ public class EffectiveMetadataBuilder {
             settings = metadata.settings,
             environment = environment,
             activeDistribution = activeDistribution,
+            callback = null,
+            properties = emptyMap(),
         )
 
         return pipeline.process(context)

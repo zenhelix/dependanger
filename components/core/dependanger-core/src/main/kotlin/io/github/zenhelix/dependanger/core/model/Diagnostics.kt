@@ -33,21 +33,21 @@ public data class Diagnostics(
             infos = messages.filter { it.severity == Severity.INFO },
         )
 
-        public fun error(code: String, message: String, processorId: String? = null, context: Map<String, String> = emptyMap()): Diagnostics =
+        public fun error(code: String, message: String, processorId: String?, context: Map<String, String>): Diagnostics =
             Diagnostics(
                 errors = listOf(DiagnosticMessage(code, message, Severity.ERROR, processorId, context)),
                 warnings = emptyList(),
                 infos = emptyList(),
             )
 
-        public fun warning(code: String, message: String, processorId: String? = null, context: Map<String, String> = emptyMap()): Diagnostics =
+        public fun warning(code: String, message: String, processorId: String?, context: Map<String, String>): Diagnostics =
             Diagnostics(
                 errors = emptyList(),
                 warnings = listOf(DiagnosticMessage(code, message, Severity.WARNING, processorId, context)),
                 infos = emptyList(),
             )
 
-        public fun info(code: String, message: String, processorId: String? = null, context: Map<String, String> = emptyMap()): Diagnostics =
+        public fun info(code: String, message: String, processorId: String?, context: Map<String, String>): Diagnostics =
             Diagnostics(
                 errors = emptyList(),
                 warnings = emptyList(),

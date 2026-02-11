@@ -59,7 +59,7 @@ public class JsonSerializationFormat : SerializationFormat<String> {
 
     override fun read(path: Path): DependangerMetadata {
         if (!path.exists()) {
-            throw MetadataReadException("Metadata file not found: '$path'")
+            throw MetadataReadException("Metadata file not found: '$path'", null)
         }
 
         val content = try {

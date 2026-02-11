@@ -14,6 +14,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ValidationProcessor : EffectiveMetadataProcessor {
     override val id: String = "validation"
     override val phase: ProcessingPhase = ProcessingPhase.VALIDATION
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Validates metadata consistency and correctness"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,

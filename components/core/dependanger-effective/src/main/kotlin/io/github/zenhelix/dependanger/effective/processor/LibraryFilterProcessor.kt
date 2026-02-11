@@ -17,6 +17,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = "library-filter"
     override val phase: ProcessingPhase = ProcessingPhase.LIBRARY_FILTER
+    override val order: Int = phase.order
+    override val isOptional: Boolean = false
+    override val description: String = "Filters libraries based on distribution specification"
+    override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
         metadata: EffectiveMetadata,
@@ -41,6 +45,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
                     code = "LIBRARY_FILTERED",
                     message = "Library '$alias' filtered out by distribution '$distName'",
                     processorId = id,
+                    context = emptyMap(),
                 )
             }
             passes

@@ -9,9 +9,9 @@ public class ProcessingContext(
     public val originalMetadata: DependangerMetadata,
     public val settings: Settings,
     public val environment: ProcessingEnvironment,
-    public val activeDistribution: String? = null,
-    public val callback: ProcessingCallback? = null,
-    private val properties: Map<ProcessingContextKey<*>, Any> = emptyMap(),
+    public val activeDistribution: String?,
+    public val callback: ProcessingCallback?,
+    private val properties: Map<ProcessingContextKey<*>, Any>,
 ) {
     @Suppress("UNCHECKED_CAST")
     public operator fun <T : Any> get(key: ProcessingContextKey<T>): T? = properties[key] as? T

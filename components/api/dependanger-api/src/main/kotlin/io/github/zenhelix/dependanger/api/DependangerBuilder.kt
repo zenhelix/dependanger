@@ -47,5 +47,27 @@ public class DependangerBuilder {
         this.pipelineCustomizer = block
     }
 
-    public fun build(): Dependanger = TODO()
+    public fun build(): Dependanger {
+        val resolvedMetadata = resolveMetadata()
+        return Dependanger(
+            metadata = resolvedMetadata,
+            preset = preset,
+            environment = environment,
+            additionalProcessors = additionalProcessors.toList(),
+            disabledProcessorIds = disabledProcessorIds.toSet(),
+            pipelineCustomizer = pipelineCustomizer,
+        )
+    }
+
+    private fun resolveMetadata(): DependangerMetadata {
+        metadata?.let { return it }
+
+        dslBlock?.let { block ->
+            val dsl = DependangerDsl()
+            dsl.block()
+            return dsl.toMetadata()
+        }
+
+        throw DependangerConfigurationException("Cannot build Dependanger: neither metadata nor DSL block provided. Use Dependanger.fromMetadata() or Dependanger.fromDsl() to create a builder.")
+    }
 }

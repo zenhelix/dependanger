@@ -6,14 +6,14 @@ import kotlinx.serialization.Transient
 
 @Serializable
 public data class EffectiveMetadata(
-    val schemaVersion: String = "1.0",
-    val distribution: String? = null,
-    val versions: Map<String, ResolvedVersion> = emptyMap(),
-    val libraries: Map<String, EffectiveLibrary> = emptyMap(),
-    val plugins: Map<String, EffectivePlugin> = emptyMap(),
-    val bundles: Map<String, EffectiveBundle> = emptyMap(),
-    val diagnostics: Diagnostics = Diagnostics(),
-    val processingInfo: ProcessingInfo? = null,
+    val schemaVersion: String,
+    val distribution: String?,
+    val versions: Map<String, ResolvedVersion>,
+    val libraries: Map<String, EffectiveLibrary>,
+    val plugins: Map<String, EffectivePlugin>,
+    val bundles: Map<String, EffectiveBundle>,
+    val diagnostics: Diagnostics,
+    val processingInfo: ProcessingInfo?,
     @Transient
     val extensions: Map<ExtensionKey<*>, Any> = emptyMap(),
 )

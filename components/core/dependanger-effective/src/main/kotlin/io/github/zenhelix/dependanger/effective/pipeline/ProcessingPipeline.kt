@@ -14,6 +14,16 @@ public class ProcessingPipeline(
         var result = EffectiveMetadata(
             schemaVersion = context.originalMetadata.schemaVersion,
             distribution = context.activeDistribution,
+            versions = emptyMap(),
+            libraries = emptyMap(),
+            plugins = emptyMap(),
+            bundles = emptyMap(),
+            diagnostics = Diagnostics(
+                errors = emptyList(),
+                warnings = emptyList(),
+                infos = emptyList(),
+            ),
+            processingInfo = null,
         )
 
         val groups = groupByExecutionMode(processors.sortedBy { it.order })

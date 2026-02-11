@@ -7,7 +7,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 public class ReportGenerator {
     public fun generate(
         effective: EffectiveMetadata,
-        settings: ReportSettings = ReportSettings(),
+        settings: ReportSettings,
         originalMetadata: DependangerMetadata? = null,
     ): DependangerReport = TODO()
 }

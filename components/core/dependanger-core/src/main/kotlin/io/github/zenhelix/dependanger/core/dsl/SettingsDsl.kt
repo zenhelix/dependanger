@@ -18,6 +18,7 @@ import io.github.zenhelix.dependanger.core.model.TransitiveResolutionSettings
 import io.github.zenhelix.dependanger.core.model.UpdateCheckSettings
 import io.github.zenhelix.dependanger.core.model.ValidationAction
 import io.github.zenhelix.dependanger.core.model.ValidationSettings
+import kotlinx.serialization.json.JsonElement
 
 @DependangerDslMarker
 public class SettingsDsl {
@@ -30,35 +31,119 @@ public class SettingsDsl {
     private val _repositories = Trackable<List<Repository>>(emptyList())
     public var repositories: List<Repository> by _repositories
 
-    private val _validationSettings = Trackable(ValidationSettings())
+    private val _validationSettings = Trackable(
+        ValidationSettings(
+            onCompatibilityViolation = ValidationAction.FAIL,
+            onDeprecatedLibrary = ValidationAction.WARN,
+            onJdkMismatch = ValidationAction.FAIL,
+            onUnresolvedVersion = ValidationAction.WARN,
+        )
+    )
     public var validationSettings: ValidationSettings by _validationSettings
 
-    private val _tomlSettings = Trackable(TomlSettings())
+    private val _tomlSettings = Trackable(
+        TomlSettings(
+            filename = "libs.versions.toml",
+            includeComments = true,
+            sortSections = true,
+            useInlineVersions = false,
+        )
+    )
     public var tomlSettings: TomlSettings by _tomlSettings
 
-    private val _bomSettings = Trackable(BomSettings())
+    private val _bomSettings = Trackable(
+        BomSettings(
+            groupId = "",
+            artifactId = "",
+            version = "",
+            includeOptionalDependencies = false,
+        )
+    )
     public var bomSettings: BomSettings by _bomSettings
 
-    private val _bomCacheSettings = Trackable(BomCacheSettings())
+    private val _bomCacheSettings = Trackable(
+        BomCacheSettings(
+            enabled = true,
+            directory = "",
+            ttlHours = 24,
+            ttlSnapshotHours = 1,
+        )
+    )
     public var bomCacheSettings: BomCacheSettings by _bomCacheSettings
 
-    private val _updateCheckSettings = Trackable(UpdateCheckSettings())
+    private val _updateCheckSettings = Trackable(
+        UpdateCheckSettings(
+            enabled = false,
+            excludePatterns = emptyList(),
+            includePrerelease = false,
+            repositories = emptyList(),
+            timeout = 30_000,
+            parallelism = 10,
+            cacheDirectory = "",
+            cacheTtlHours = 1,
+        )
+    )
     public var updateCheckSettings: UpdateCheckSettings by _updateCheckSettings
 
-    private val _compatibilityAnalysisSettings = Trackable(CompatibilityAnalysisSettings())
+    private val _compatibilityAnalysisSettings = Trackable(
+        CompatibilityAnalysisSettings(
+            enabled = false,
+            targetJdk = null,
+            failOnErrors = true,
+        )
+    )
     public var compatibilityAnalysisSettings: CompatibilityAnalysisSettings by _compatibilityAnalysisSettings
 
-    private val _securityCheckSettings = Trackable(SecurityCheckSettings())
+    private val _securityCheckSettings = Trackable(
+        SecurityCheckSettings(
+            enabled = false,
+            failOnVulnerability = Severity.ERROR,
+            ignoreVulnerabilities = emptyList(),
+        )
+    )
     public var securityCheckSettings: SecurityCheckSettings by _securityCheckSettings
 
-    private val _licenseCheckSettings = Trackable(LicenseCheckSettings())
+    private val _licenseCheckSettings = Trackable(
+        LicenseCheckSettings(
+            enabled = false,
+            allowedLicenses = emptyList(),
+            deniedLicenses = emptyList(),
+            dualLicensePolicy = DualLicensePolicy.OR,
+            failOnDenied = false,
+            failOnUnknown = false,
+            failOnCopyleft = false,
+            warnOnCopyleft = true,
+            warnOnUnknown = true,
+            ignoreLibraries = emptyList(),
+            includeTransitives = false,
+        )
+    )
     public var licenseCheckSettings: LicenseCheckSettings by _licenseCheckSettings
 
-    private val _transitiveResolutionSettings = Trackable(TransitiveResolutionSettings())
+    private val _transitiveResolutionSettings = Trackable(
+        TransitiveResolutionSettings(
+            enabled = false,
+            repositories = emptyList(),
+            maxDepth = null,
+            maxTransitives = null,
+            conflictResolution = ConflictResolutionStrategy.HIGHEST,
+            includeOptional = false,
+            scopes = listOf("compile", "runtime"),
+        )
+    )
     public var transitiveResolutionSettings: TransitiveResolutionSettings by _transitiveResolutionSettings
 
-    private val _reportSettings = Trackable(ReportSettings())
+    private val _reportSettings = Trackable(
+        ReportSettings(
+            format = ReportFormat.MARKDOWN,
+            outputDir = "build/reports/dependanger",
+            sections = ReportSection.entries,
+        )
+    )
     public var reportSettings: ReportSettings by _reportSettings
+
+    private val _customSettings = Trackable<Map<String, JsonElement>>(emptyMap())
+    public var customSettings: Map<String, JsonElement> by _customSettings
 
     public fun validation(block: ValidationSettingsDsl.() -> Unit) {
         val dsl = ValidationSettingsDsl().apply(block)
@@ -124,10 +209,11 @@ public class SettingsDsl {
         if (_licenseCheckSettings.isSet) target.licenseCheckSettings = licenseCheckSettings
         if (_transitiveResolutionSettings.isSet) target.transitiveResolutionSettings = transitiveResolutionSettings
         if (_reportSettings.isSet) target.reportSettings = reportSettings
+        if (_customSettings.isSet) target.customSettings = customSettings
     }
 
     public fun mergeFrom(settings: Settings) {
-        val defaults = Settings()
+        val defaults = toSettings()
         if (settings.defaultDistribution != defaults.defaultDistribution) defaultDistribution = settings.defaultDistribution
         if (settings.strictVersionResolution != defaults.strictVersionResolution) strictVersionResolution = settings.strictVersionResolution
         if (settings.repositories != defaults.repositories) repositories = settings.repositories
@@ -141,6 +227,7 @@ public class SettingsDsl {
         if (settings.licenseCheck != defaults.licenseCheck) licenseCheckSettings = settings.licenseCheck
         if (settings.transitiveResolution != defaults.transitiveResolution) transitiveResolutionSettings = settings.transitiveResolution
         if (settings.report != defaults.report) reportSettings = settings.report
+        if (settings.customSettings != defaults.customSettings) customSettings = settings.customSettings
     }
 
     public fun toSettings(): Settings = Settings(
@@ -157,6 +244,7 @@ public class SettingsDsl {
         licenseCheck = licenseCheckSettings,
         transitiveResolution = transitiveResolutionSettings,
         report = reportSettings,
+        customSettings = customSettings,
     )
 }
 

@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.processor
 
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -8,5 +9,57 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class BundleFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = "bundle-filter"
     override val phase: ProcessingPhase = ProcessingPhase.BUNDLE_FILTER
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): EffectiveMetadata {
+        val existingLibraryAliases = metadata.libraries.keys
+        var diagnostics = metadata.diagnostics
+
+        // 1. Clean references to non-existing libraries
+        var cleanedBundles = metadata.bundles.mapValues { (bundleAlias, bundle) ->
+            val validLibraries = bundle.libraries.filter { libAlias ->
+                val exists = libAlias in existingLibraryAliases
+                if (!exists) {
+                    diagnostics = diagnostics + Diagnostics.warning(
+                        code = "BUNDLE_LIBRARY_MISSING",
+                        message = "Bundle '$bundleAlias': library '$libAlias' not found (filtered out?)",
+                        processorId = id,
+                    )
+                }
+                exists
+            }
+            bundle.copy(libraries = validLibraries)
+        }
+
+        // 2. Apply BundleFilter from distribution
+        val distName = metadata.distribution
+        if (distName != null) {
+            val distribution = context.originalMetadata.distributions.find { it.name == distName }
+            val bundleFilter = distribution?.spec?.byBundles
+            if (bundleFilter != null) {
+                cleanedBundles = cleanedBundles.filter { (alias, _) ->
+                    val passesIncludes = bundleFilter.includes.isEmpty() || alias in bundleFilter.includes
+                    val passesExcludes = bundleFilter.excludes.isEmpty() || alias !in bundleFilter.excludes
+                    passesIncludes && passesExcludes
+                }
+            }
+        }
+
+        // 3. Remove empty bundles
+        val finalBundles = cleanedBundles.filter { (alias, bundle) ->
+            val notEmpty = bundle.libraries.isNotEmpty()
+            if (!notEmpty) {
+                diagnostics = diagnostics + Diagnostics.warning(
+                    code = "BUNDLE_EMPTIED",
+                    message = "Bundle '$alias' removed: no libraries remaining after filtering",
+                    processorId = id,
+                )
+            }
+            notEmpty
+        }
+
+        return metadata.copy(bundles = finalBundles, diagnostics = diagnostics)
+    }
 }

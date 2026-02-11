@@ -1,11 +1,93 @@
 package io.github.zenhelix.dependanger.effective.serialization
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.ExtensionKey
+import io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import java.nio.file.Path
+import java.util.ServiceLoader
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 public class EffectiveJsonFormat {
-    public fun serialize(metadata: EffectiveMetadata): String = TODO()
-    public fun deserialize(json: String): EffectiveMetadata = TODO()
-    public fun write(metadata: EffectiveMetadata, path: Path): Unit = TODO()
-    public fun read(path: Path): EffectiveMetadata = TODO()
+
+    public val formatId: String = "effective-json"
+    public val fileExtension: String = ".effective.json"
+
+    private val providers: List<ExtensionSerializerProvider> =
+        ServiceLoader.load(ExtensionSerializerProvider::class.java).toList()
+
+    private val knownKeys: Map<String, ExtensionKey<*>> =
+        providers.flatMap { it.knownKeys().entries }.associate { it.key to it.value }
+
+    private val json: Json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    public fun serialize(metadata: EffectiveMetadata): String {
+        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata)
+            .jsonObject.toMutableMap()
+
+        if (metadata.extensions.isNotEmpty()) {
+            val extensionsJson = buildJsonObject {
+                for ((key, value) in metadata.extensions) {
+                    @Suppress("UNCHECKED_CAST")
+                    val serializer = key.serializer as KSerializer<Any>
+                    put(key.name, json.encodeToJsonElement(serializer, value))
+                }
+            }
+            baseJson["extensions"] = extensionsJson
+        }
+
+        return json.encodeToString(JsonElement.serializer(), JsonObject(baseJson))
+    }
+
+    public fun deserialize(input: String): EffectiveMetadata {
+        require(input.isNotBlank()) { "Input JSON string must not be blank" }
+
+        val jsonObject = json.parseToJsonElement(input).jsonObject
+        val base = json.decodeFromJsonElement(EffectiveMetadata.serializer(), jsonObject)
+
+        val extensionsJson = jsonObject["extensions"]?.jsonObject ?: return base
+        val extensions = mutableMapOf<ExtensionKey<*>, Any>()
+
+        for ((keyName, element) in extensionsJson) {
+            val extensionKey = knownKeys[keyName] ?: continue
+            try {
+                val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
+                extensions[extensionKey] = deserialized
+            } catch (_: Exception) {
+                // Skip extensions that fail to deserialize
+            }
+        }
+
+        return base.copy(extensions = extensions)
+    }
+
+    public fun write(metadata: EffectiveMetadata, path: Path) {
+        val jsonString = serialize(metadata)
+        path.parent?.let { parent ->
+            if (!parent.exists()) {
+                parent.createDirectories()
+            }
+        }
+        path.writeText(jsonString, Charsets.UTF_8)
+    }
+
+    public fun read(path: Path): EffectiveMetadata {
+        if (!path.exists()) {
+            throw IllegalArgumentException("Effective metadata file not found: '$path'")
+        }
+        val content = path.readText(Charsets.UTF_8)
+        return deserialize(content)
+    }
 }

@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.processor
 
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -8,5 +9,36 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ProfileProcessor : EffectiveMetadataProcessor {
     override val id: String = "profile"
     override val phase: ProcessingPhase = ProcessingPhase.PROFILE
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): EffectiveMetadata {
+        val distName = context.activeDistribution
+            ?: return metadata
+
+        val distributions = context.originalMetadata.distributions
+        val found = distributions.find { it.name == distName }
+
+        return if (found != null) {
+            metadata.copy(
+                distribution = distName,
+                diagnostics = metadata.diagnostics + Diagnostics.info(
+                    code = "PROFILE_APPLIED",
+                    message = "Distribution '$distName' applied",
+                    processorId = id,
+                ),
+            )
+        } else {
+            val available = distributions.map { it.name }
+            metadata.copy(
+                distribution = distName,
+                diagnostics = metadata.diagnostics + Diagnostics.error(
+                    code = "PROFILE_NOT_FOUND",
+                    message = "Distribution '$distName' not found. Available: $available",
+                    processorId = id,
+                ),
+            )
+        }
+    }
 }

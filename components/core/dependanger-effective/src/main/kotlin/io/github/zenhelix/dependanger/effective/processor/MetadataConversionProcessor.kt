@@ -1,6 +1,13 @@
 package io.github.zenhelix.dependanger.effective.processor
 
+import io.github.zenhelix.dependanger.core.model.Bundle
+import io.github.zenhelix.dependanger.core.model.VersionReference
+import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
+import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
+import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
+import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -8,5 +15,89 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class MetadataConversionProcessor : EffectiveMetadataProcessor {
     override val id: String = "metadata-conversion"
     override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata = TODO()
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): EffectiveMetadata {
+        val original = context.originalMetadata
+
+        val versions = original.versions.associate { version ->
+            version.name to ResolvedVersion(
+                alias = version.name,
+                value = version.value,
+                source = VersionSource.DECLARED,
+            )
+        }
+
+        val libraries = original.libraries.associate { lib ->
+            lib.alias to EffectiveLibrary(
+                alias = lib.alias,
+                group = lib.group,
+                artifact = lib.artifact,
+                version = convertVersionReference(lib.version),
+                description = lib.description,
+                tags = lib.tags,
+                requires = lib.requires,
+                isDeprecated = lib.deprecation != null,
+                deprecation = lib.deprecation,
+                license = lib.license,
+                constraints = lib.constraints,
+                isPlatform = lib.isPlatform,
+            )
+        }
+
+        val plugins = original.plugins.associate { plugin ->
+            plugin.alias to EffectivePlugin(
+                alias = plugin.alias,
+                id = plugin.id,
+                version = convertVersionReference(plugin.version),
+            )
+        }
+
+        val bundleIndex = original.bundles.associateBy { it.alias }
+        val bundles = original.bundles.associate { bundle ->
+            val resolvedLibraries = resolveBundleExtends(bundle, bundleIndex, mutableSetOf())
+            bundle.alias to EffectiveBundle(
+                alias = bundle.alias,
+                libraries = resolvedLibraries,
+            )
+        }
+
+        return metadata.copy(
+            versions = versions,
+            libraries = libraries,
+            plugins = plugins,
+            bundles = bundles,
+        )
+    }
+
+    private fun convertVersionReference(ref: VersionReference?): ResolvedVersion? = when (ref) {
+        is VersionReference.Literal   -> ResolvedVersion(
+            alias = "",
+            value = ref.version,
+            source = VersionSource.DECLARED,
+        )
+
+        is VersionReference.Reference -> null
+        is VersionReference.Range     -> null
+        null                          -> null
+    }
+
+    private fun resolveBundleExtends(
+        bundle: Bundle,
+        index: Map<String, Bundle>,
+        visited: MutableSet<String>,
+    ): List<String> {
+        if (bundle.alias in visited) return emptyList()
+        visited.add(bundle.alias)
+
+        val parentLibraries = bundle.extends.flatMap { parentAlias ->
+            val parent = index[parentAlias]
+            if (parent != null) resolveBundleExtends(parent, index, visited)
+            else emptyList()
+        }
+
+        return (parentLibraries + bundle.libraries).distinct()
+    }
 }

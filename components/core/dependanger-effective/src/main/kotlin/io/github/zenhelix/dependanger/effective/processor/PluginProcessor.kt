@@ -41,7 +41,7 @@ public class PluginProcessor : EffectiveMetadataProcessor {
                             )
                         )
                     } else {
-                        diagnostics = diagnostics + Diagnostics.error(
+                        diagnostics += Diagnostics.error(
                             code = DiagnosticCodes.Plugin.VERSION_UNRESOLVED,
                             message = "Plugin '$alias': version ref '${originalRef.name}' not found",
                             processorId = id,

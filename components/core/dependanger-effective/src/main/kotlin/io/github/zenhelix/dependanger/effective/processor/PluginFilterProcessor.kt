@@ -34,7 +34,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
 
             val passes = passesTagFilter(tags, tagFilter)
             if (!passes) {
-                diagnostics = diagnostics + Diagnostics.info(
+                diagnostics += Diagnostics.info(
                     code = DiagnosticCodes.Plugin.FILTERED,
                     message = "Plugin '$alias' filtered out by distribution '$distName'",
                     processorId = id,

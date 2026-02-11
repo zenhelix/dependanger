@@ -28,7 +28,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
             val validLibraries = bundle.libraries.filter { libAlias ->
                 val exists = libAlias in existingLibraryAliases
                 if (!exists) {
-                    diagnostics = diagnostics + Diagnostics.warning(
+                    diagnostics += Diagnostics.warning(
                         code = DiagnosticCodes.Bundle.LIBRARY_MISSING,
                         message = "Bundle '$bundleAlias': library '$libAlias' not found (filtered out?)",
                         processorId = id,
@@ -58,7 +58,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
         val finalBundles = cleanedBundles.filter { (alias, bundle) ->
             val notEmpty = bundle.libraries.isNotEmpty()
             if (!notEmpty) {
-                diagnostics = diagnostics + Diagnostics.warning(
+                diagnostics += Diagnostics.warning(
                     code = DiagnosticCodes.Bundle.EMPTIED,
                     message = "Bundle '$alias' removed: no libraries remaining after filtering",
                     processorId = id,

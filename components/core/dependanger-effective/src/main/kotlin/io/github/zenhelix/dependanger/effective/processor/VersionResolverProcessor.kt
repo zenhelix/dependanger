@@ -33,7 +33,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                 is VersionReference.Reference -> {
                     val resolved = metadata.versions[originalRef.name]
                     if (resolved != null) {
-                        diagnostics = diagnostics + Diagnostics.info(
+                        diagnostics += Diagnostics.info(
                             code = DiagnosticCodes.Version.RESOLVED,
                             message = "Library '$alias': version ref '${originalRef.name}' -> '${resolved.value}'",
                             processorId = id,
@@ -48,7 +48,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                             )
                         )
                     } else {
-                        diagnostics = diagnostics + Diagnostics.error(
+                        diagnostics += Diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Library '$alias': version ref '${originalRef.name}' not found in versions map",
                             processorId = id,
@@ -78,7 +78,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                             )
                         )
                     } else {
-                        diagnostics = diagnostics + Diagnostics.error(
+                        diagnostics += Diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Plugin '$alias': version ref '${originalRef.name}' not found",
                             processorId = id,

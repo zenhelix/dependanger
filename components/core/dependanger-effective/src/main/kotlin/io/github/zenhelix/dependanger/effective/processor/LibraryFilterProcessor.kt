@@ -43,7 +43,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
                     && passesDeprecatedFilter(lib, spec.byDeprecated)
 
             if (!passes) {
-                diagnostics = diagnostics + Diagnostics.info(
+                diagnostics += Diagnostics.info(
                     code = DiagnosticCodes.Library.FILTERED,
                     message = "Library '$alias' filtered out by distribution '$distName'",
                     processorId = id,

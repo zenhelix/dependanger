@@ -27,6 +27,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
                 alias = version.name,
                 value = version.value,
                 source = VersionSource.DECLARED,
+                originalRef = null,
             )
         }
 
@@ -77,6 +78,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
             alias = "",
             value = ref.version,
             source = VersionSource.DECLARED,
+            originalRef = null,
         )
 
         is VersionReference.Reference -> null

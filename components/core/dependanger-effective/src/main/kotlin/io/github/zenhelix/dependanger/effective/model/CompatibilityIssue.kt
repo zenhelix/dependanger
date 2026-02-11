@@ -8,6 +8,6 @@ public data class CompatibilityIssue(
     val ruleId: String,
     val message: String,
     val severity: Severity,
-    val affectedLibraries: List<String> = emptyList(),
-    val suggestion: String? = null,
+    val affectedLibraries: List<String>,
+    val suggestion: String?,
 )

@@ -27,6 +27,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
                     alias = versionName,
                     value = version.value,
                     source = VersionSource.DECLARED,
+                    originalRef = null,
                 )
                 newVersions[versionName] = resolved
                 diagnostics = diagnostics + Diagnostics.info(
@@ -48,6 +49,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
                     alias = versionName,
                     value = version.value,
                     source = VersionSource.DECLARED,
+                    originalRef = null,
                 )
                 newVersions[versionName] = resolved
                 diagnostics = diagnostics + Diagnostics.info(

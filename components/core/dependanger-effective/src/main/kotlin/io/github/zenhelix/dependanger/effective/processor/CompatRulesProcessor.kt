@@ -93,7 +93,7 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
     ): List<CompatibilityIssue> {
         val jdkVersion = environment.jdkVersion ?: return emptyList()
         val matchingLibs = metadata.libraries.filter { (alias, lib) ->
-            GlobMatcher.matchesGlob(rule.matches, "${lib.group}:${lib.artifact}") || GlobMatcher.matchesGlob(rule.matches, alias)
+            GlobMatcher.matches(rule.matches, lib.group, lib.artifact) || GlobMatcher.matchesGlob(rule.matches, alias)
         }
 
         val issues = mutableListOf<CompatibilityIssue>()

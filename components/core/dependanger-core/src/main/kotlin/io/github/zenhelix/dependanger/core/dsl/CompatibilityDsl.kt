@@ -6,11 +6,12 @@ import io.github.zenhelix.dependanger.core.model.VersionConstraintType
 
 @DependangerDslMarker
 public class CompatibilityDsl {
-    public val rules: MutableList<CompatibilityRule> = mutableListOf()
+    private val _rules: MutableList<CompatibilityRule> = mutableListOf()
+    public val rules: List<CompatibilityRule> get() = _rules.toList()
 
     public fun jdkRequirement(name: String, block: JdkRequirementDsl.() -> Unit) {
         val dsl = JdkRequirementDsl().apply(block)
-        rules.add(
+        _rules.add(
             CompatibilityRule.JdkRequirement(
                 name = name,
                 matches = dsl.matches,
@@ -24,7 +25,7 @@ public class CompatibilityDsl {
 
     public fun mutualExclusion(name: String, block: MutualExclusionDsl.() -> Unit) {
         val dsl = MutualExclusionDsl().apply(block)
-        rules.add(
+        _rules.add(
             CompatibilityRule.MutualExclusion(
                 name = name,
                 libraries = dsl.libraries.toList(),
@@ -36,7 +37,7 @@ public class CompatibilityDsl {
 
     public fun versionConstraint(name: String, block: VersionConstraintDsl.() -> Unit) {
         val dsl = VersionConstraintDsl().apply(block)
-        rules.add(
+        _rules.add(
             CompatibilityRule.VersionConstraint(
                 name = name,
                 libraries = dsl.libraries.toList(),
@@ -49,7 +50,7 @@ public class CompatibilityDsl {
 
     public fun customRule(name: String, block: CustomRuleDsl.() -> Unit) {
         val dsl = CustomRuleDsl().apply(block)
-        rules.add(
+        _rules.add(
             CompatibilityRule.CustomRule(
                 name = name,
                 ruleId = dsl.ruleId,
@@ -72,35 +73,38 @@ public class JdkRequirementDsl {
 
 @DependangerDslMarker
 public class MutualExclusionDsl {
-    public val libraries: MutableList<String> = mutableListOf()
+    private val _libraries: MutableList<String> = mutableListOf()
+    public val libraries: List<String> get() = _libraries.toList()
     public var severity: Severity = Severity.WARNING
     public var message: String? = null
 
     public fun libraries(vararg aliases: String) {
-        libraries.addAll(aliases)
+        _libraries.addAll(aliases)
     }
 }
 
 @DependangerDslMarker
 public class VersionConstraintDsl {
-    public val libraries: MutableList<String> = mutableListOf()
+    private val _libraries: MutableList<String> = mutableListOf()
+    public val libraries: List<String> get() = _libraries.toList()
     public var constraint: VersionConstraintType = VersionConstraintType.SAME_VERSION
     public var severity: Severity = Severity.ERROR
     public var message: String? = null
 
     public fun libraries(vararg aliases: String) {
-        libraries.addAll(aliases)
+        _libraries.addAll(aliases)
     }
 }
 
 @DependangerDslMarker
 public class CustomRuleDsl {
     public var ruleId: String = ""
-    public var parameters: MutableMap<String, String> = mutableMapOf()
+    private val _parameters: MutableMap<String, String> = mutableMapOf()
+    public val parameters: Map<String, String> get() = _parameters.toMap()
     public var severity: Severity = Severity.WARNING
     public var message: String? = null
 
     public fun parameter(key: String, value: String) {
-        parameters[key] = value
+        _parameters[key] = value
     }
 }

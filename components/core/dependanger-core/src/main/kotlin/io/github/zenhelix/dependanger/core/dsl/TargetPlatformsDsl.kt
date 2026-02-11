@@ -8,11 +8,12 @@ import io.github.zenhelix.dependanger.core.model.TargetPlatform
 
 @DependangerDslMarker
 public class TargetPlatformsDsl {
-    public val platforms: MutableList<TargetPlatform> = mutableListOf()
+    private val _platforms: MutableList<TargetPlatform> = mutableListOf()
+    public val platforms: List<TargetPlatform> get() = _platforms.toList()
 
     public fun platform(name: String, block: PlatformDsl.() -> Unit) {
         val dsl = PlatformDsl().apply(block)
-        platforms.add(
+        _platforms.add(
             TargetPlatform(
                 name = name,
                 jdkConstraints = dsl.jdkConstraints,
@@ -29,7 +30,9 @@ public class PlatformDsl {
     public var jdkConstraints: JdkConstraints? = null
     public var androidConstraints: AndroidConstraints? = null
     public var kotlinConstraints: KotlinConstraints? = null
-    public val targets: MutableSet<KmpTarget> = mutableSetOf()
+
+    private val _targets: MutableSet<KmpTarget> = mutableSetOf()
+    public val targets: Set<KmpTarget> get() = _targets.toSet()
 
     public fun jdk(block: JdkConstraintsDsl.() -> Unit) {
         val dsl = JdkConstraintsDsl().apply(block)
@@ -48,7 +51,7 @@ public class PlatformDsl {
 
     public fun targets(block: TargetsDsl.() -> Unit) {
         val dsl = TargetsDsl().apply(block)
-        targets.addAll(dsl.targets)
+        _targets.addAll(dsl.targets)
     }
 }
 
@@ -60,45 +63,46 @@ public class AndroidConstraintsDsl {
 
 @DependangerDslMarker
 public class TargetsDsl {
-    public val targets: MutableSet<KmpTarget> = mutableSetOf()
+    private val _targets: MutableSet<KmpTarget> = mutableSetOf()
+    public val targets: Set<KmpTarget> get() = _targets.toSet()
 
     public fun jvm() {
-        targets.add(KmpTarget.JVM)
+        _targets.add(KmpTarget.JVM)
     }
 
     public fun js() {
-        targets.add(KmpTarget.JS)
+        _targets.add(KmpTarget.JS)
     }
 
     public fun android() {
-        targets.add(KmpTarget.ANDROID)
+        _targets.add(KmpTarget.ANDROID)
     }
 
     public fun ios() {
-        targets.add(KmpTarget.IOS)
+        _targets.add(KmpTarget.IOS)
     }
 
     public fun macos() {
-        targets.add(KmpTarget.MACOS)
+        _targets.add(KmpTarget.MACOS)
     }
 
     public fun linux() {
-        targets.add(KmpTarget.LINUX)
+        _targets.add(KmpTarget.LINUX)
     }
 
     public fun mingw() {
-        targets.add(KmpTarget.MINGW)
+        _targets.add(KmpTarget.MINGW)
     }
 
     public fun native() {
-        targets.add(KmpTarget.NATIVE)
+        _targets.add(KmpTarget.NATIVE)
     }
 
     public fun wasmJs() {
-        targets.add(KmpTarget.WASM_JS)
+        _targets.add(KmpTarget.WASM_JS)
     }
 
     public fun wasmWasi() {
-        targets.add(KmpTarget.WASM_WASI)
+        _targets.add(KmpTarget.WASM_WASI)
     }
 }

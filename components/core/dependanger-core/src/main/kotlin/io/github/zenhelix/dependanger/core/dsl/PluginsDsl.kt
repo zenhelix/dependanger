@@ -5,26 +5,27 @@ import io.github.zenhelix.dependanger.core.model.VersionReference
 
 @DependangerDslMarker
 public class PluginsDsl {
-    public val plugins: MutableList<Plugin> = mutableListOf()
+    private val _plugins: MutableList<Plugin> = mutableListOf()
+    public val plugins: List<Plugin> get() = _plugins.toList()
 
     public fun plugin(alias: String, id: String) {
         val (pluginId, version) = parsePluginId(id)
-        plugins.add(Plugin(alias = alias, id = pluginId, version = version, tags = emptySet()))
+        _plugins.add(Plugin(alias = alias, id = pluginId, version = version, tags = emptySet()))
     }
 
     public fun plugin(alias: String, id: String, version: VersionReference) {
-        plugins.add(Plugin(alias = alias, id = id, version = version, tags = emptySet()))
+        _plugins.add(Plugin(alias = alias, id = id, version = version, tags = emptySet()))
     }
 
     public fun plugin(alias: String, id: String, block: PluginDsl.() -> Unit) {
         val (pluginId, version) = parsePluginId(id)
         val dsl = PluginDsl(version).apply(block)
-        plugins.add(Plugin(alias = alias, id = pluginId, version = dsl.version, tags = dsl.tags.toSet()))
+        _plugins.add(Plugin(alias = alias, id = pluginId, version = dsl.version, tags = dsl.tags))
     }
 
     public fun plugin(alias: String, id: String, version: VersionReference, block: PluginDsl.() -> Unit) {
         val dsl = PluginDsl(version).apply(block)
-        plugins.add(Plugin(alias = alias, id = id, version = dsl.version, tags = dsl.tags.toSet()))
+        _plugins.add(Plugin(alias = alias, id = id, version = dsl.version, tags = dsl.tags))
     }
 
     private fun parsePluginId(id: String): Pair<String, VersionReference?> {
@@ -39,9 +40,10 @@ public class PluginsDsl {
 
 @DependangerDslMarker
 public class PluginDsl(public var version: VersionReference? = null) {
-    public val tags: MutableSet<String> = mutableSetOf()
+    private val _tags: MutableSet<String> = mutableSetOf()
+    public val tags: Set<String> get() = _tags.toSet()
 
     public fun tags(vararg tags: String) {
-        this.tags.addAll(tags)
+        _tags.addAll(tags)
     }
 }

@@ -16,75 +16,88 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
     override val description: String = "Extracts inline versions into named version entries"
     override fun supports(context: ProcessingContext): Boolean = true
 
+    private data class ExtractionAccumulator(
+        val usedNames: Set<String>,
+        val versions: Map<String, ResolvedVersion>,
+        val diagnostics: Diagnostics,
+        val resolvedByAlias: Map<String, ResolvedVersion>,
+    )
+
     override suspend fun process(
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
-        val newVersions = metadata.versions.toMutableMap()
-        var diagnostics = metadata.diagnostics
+        val initialAcc = ExtractionAccumulator(
+            usedNames = metadata.versions.keys,
+            versions = emptyMap(),
+            diagnostics = Diagnostics(errors = emptyList(), warnings = emptyList(), infos = emptyList()),
+            resolvedByAlias = emptyMap(),
+        )
+
+        val afterLibraries = metadata.libraries.entries.fold(initialAcc) { acc, (alias, lib) ->
+            extractVersion(acc, alias, lib.version, "library")
+        }
+
+        val afterAll = metadata.plugins.entries.fold(afterLibraries) { acc, (alias, plugin) ->
+            extractVersion(acc, alias, plugin.version, "plugin")
+        }
 
         val updatedLibraries = metadata.libraries.mapValues { (alias, lib) ->
-            val version = lib.version
-            if (version != null && version.alias.isEmpty() && version.value.isNotEmpty()) {
-                val versionName = generateVersionName(alias, newVersions)
-                val resolved = ResolvedVersion(
-                    alias = versionName,
-                    value = version.value,
-                    source = VersionSource.DECLARED,
-                    originalRef = null,
-                )
-                newVersions[versionName] = resolved
-                diagnostics = diagnostics + Diagnostics.info(
-                    code = "EXTRACTED_VERSION_CREATED",
-                    message = "Extracted version '$versionName' = '${version.value}' from library '$alias'",
-                    processorId = id,
-                    context = emptyMap(),
-                )
-                lib.copy(version = resolved)
-            } else {
-                lib
-            }
+            val resolved = afterAll.resolvedByAlias[alias]
+            if (resolved != null) lib.copy(version = resolved) else lib
         }
 
         val updatedPlugins = metadata.plugins.mapValues { (alias, plugin) ->
-            val version = plugin.version
-            if (version != null && version.alias.isEmpty() && version.value.isNotEmpty()) {
-                val versionName = generateVersionName(alias, newVersions)
-                val resolved = ResolvedVersion(
-                    alias = versionName,
-                    value = version.value,
-                    source = VersionSource.DECLARED,
-                    originalRef = null,
-                )
-                newVersions[versionName] = resolved
-                diagnostics = diagnostics + Diagnostics.info(
-                    code = "EXTRACTED_VERSION_CREATED",
-                    message = "Extracted version '$versionName' = '${version.value}' from plugin '$alias'",
-                    processorId = id,
-                    context = emptyMap(),
-                )
-                plugin.copy(version = resolved)
-            } else {
-                plugin
-            }
+            val resolved = afterAll.resolvedByAlias[alias]
+            if (resolved != null) plugin.copy(version = resolved) else plugin
         }
 
         return metadata.copy(
-            versions = newVersions,
+            versions = metadata.versions + afterAll.versions,
             libraries = updatedLibraries,
             plugins = updatedPlugins,
-            diagnostics = diagnostics,
+            diagnostics = metadata.diagnostics + afterAll.diagnostics,
+        )
+    }
+
+    private fun extractVersion(
+        acc: ExtractionAccumulator,
+        alias: String,
+        version: ResolvedVersion?,
+        sourceType: String,
+    ): ExtractionAccumulator {
+        if (version == null || version.alias.isNotEmpty() || version.value.isEmpty()) return acc
+
+        val versionName = generateVersionName(alias, acc.usedNames)
+        val resolved = ResolvedVersion(
+            alias = versionName,
+            value = version.value,
+            source = VersionSource.DECLARED,
+            originalRef = null,
+        )
+        val diagnostic = Diagnostics.info(
+            code = "EXTRACTED_VERSION_CREATED",
+            message = "Extracted version '$versionName' = '${version.value}' from $sourceType '$alias'",
+            processorId = id,
+            context = emptyMap(),
+        )
+
+        return ExtractionAccumulator(
+            usedNames = acc.usedNames + versionName,
+            versions = acc.versions + (versionName to resolved),
+            diagnostics = acc.diagnostics + diagnostic,
+            resolvedByAlias = acc.resolvedByAlias + (alias to resolved),
         )
     }
 
     private fun generateVersionName(
         alias: String,
-        existing: Map<String, ResolvedVersion>,
+        existingNames: Set<String>,
     ): String {
         val base = "$alias-version"
-        if (base !in existing) return base
+        if (base !in existingNames) return base
         var counter = 2
-        while ("$base-$counter" in existing) counter++
+        while ("$base-$counter" in existingNames) counter++
         return "$base-$counter"
     }
 }

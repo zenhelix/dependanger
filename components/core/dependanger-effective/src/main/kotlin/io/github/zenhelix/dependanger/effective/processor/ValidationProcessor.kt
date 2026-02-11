@@ -46,21 +46,23 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
     }
 
     private fun validateDuplicateAliases(metadata: EffectiveMetadata): Diagnostics {
-        val allAliases = mutableMapOf<String, MutableList<String>>()
-        metadata.libraries.keys.forEach { allAliases.getOrPut(it) { mutableListOf() }.add("library") }
-        metadata.plugins.keys.forEach { allAliases.getOrPut(it) { mutableListOf() }.add("plugin") }
-        metadata.bundles.keys.forEach { allAliases.getOrPut(it) { mutableListOf() }.add("bundle") }
+        val allAliases = buildList {
+            metadata.libraries.keys.forEach { add(it to "library") }
+            metadata.plugins.keys.forEach { add(it to "plugin") }
+            metadata.bundles.keys.forEach { add(it to "bundle") }
+        }.groupBy({ it.first }, { it.second })
 
-        val duplicates = allAliases.filter { it.value.size > 1 }
-        val messages = duplicates.map { (alias, types) ->
-            DiagnosticMessage(
-                code = "VALIDATION_DUPLICATE_ALIAS",
-                message = "Alias '$alias' used in multiple namespaces: ${types.joinToString()}",
-                severity = Severity.ERROR,
-                processorId = "validation",
-                context = emptyMap(),
-            )
-        }
+        val messages = allAliases
+            .filter { it.value.size > 1 }
+            .map { (alias, types) ->
+                DiagnosticMessage(
+                    code = "VALIDATION_DUPLICATE_ALIAS",
+                    message = "Alias '$alias' used in multiple namespaces: ${types.joinToString()}",
+                    severity = Severity.ERROR,
+                    processorId = "validation",
+                    context = emptyMap(),
+                )
+            }
         return Diagnostics(
             errors = messages,
             warnings = emptyList(),
@@ -80,39 +82,37 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         )
 
         val originalLibs = context.originalMetadata.libraries.associateBy { it.alias }
-        val issues = mutableListOf<DiagnosticMessage>()
 
-        for ((alias, lib) in metadata.libraries) {
+        val issues = metadata.libraries.mapNotNull { (alias, lib) ->
             val originalRef = originalLibs[alias]?.version
             if (originalRef is VersionReference.Reference && lib.version == null) {
-                issues.add(
-                    DiagnosticMessage(
-                        code = "VALIDATION_UNRESOLVED_REF",
-                        message = "Library '$alias': version reference '${originalRef.name}' is not resolved",
-                        severity = action.toSeverity(),
-                        processorId = "validation",
-                        context = emptyMap(),
-                    )
+                DiagnosticMessage(
+                    code = "VALIDATION_UNRESOLVED_REF",
+                    message = "Library '$alias': version reference '${originalRef.name}' is not resolved",
+                    severity = action.toSeverity(),
+                    processorId = "validation",
+                    context = emptyMap(),
                 )
+            } else {
+                null
             }
         }
         return Diagnostics.of(*issues.toTypedArray())
     }
 
     private fun validateBundleReferences(metadata: EffectiveMetadata): Diagnostics {
-        val issues = mutableListOf<DiagnosticMessage>()
-        for ((bundleAlias, bundle) in metadata.bundles) {
-            for (libAlias in bundle.libraries) {
+        val issues = metadata.bundles.flatMap { (bundleAlias, bundle) ->
+            bundle.libraries.mapNotNull { libAlias ->
                 if (libAlias !in metadata.libraries) {
-                    issues.add(
-                        DiagnosticMessage(
-                            code = "VALIDATION_BUNDLE_REF_MISSING",
-                            message = "Bundle '$bundleAlias': library '$libAlias' does not exist",
-                            severity = Severity.ERROR,
-                            processorId = "validation",
-                            context = emptyMap(),
-                        )
+                    DiagnosticMessage(
+                        code = "VALIDATION_BUNDLE_REF_MISSING",
+                        message = "Bundle '$bundleAlias': library '$libAlias' does not exist",
+                        severity = Severity.ERROR,
+                        processorId = "validation",
+                        context = emptyMap(),
                     )
+                } else {
+                    null
                 }
             }
         }
@@ -123,22 +123,18 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         val bundleIndex = metadata.bundles.associateBy { it.alias }
         val visited = mutableSetOf<String>()
         val inStack = mutableSetOf<String>()
-        val cycles = mutableListOf<String>()
 
-        fun dfs(alias: String) {
-            if (alias in inStack) {
-                cycles.add(alias); return
-            }
-            if (alias in visited) return
+        fun dfs(alias: String): List<String> {
+            if (alias in inStack) return listOf(alias)
+            if (alias in visited) return emptyList()
             visited.add(alias)
             inStack.add(alias)
-            bundleIndex[alias]?.extends?.forEach { dfs(it) }
+            val result = bundleIndex[alias]?.extends?.flatMap { dfs(it) } ?: emptyList()
             inStack.remove(alias)
+            return result
         }
 
-        bundleIndex.keys.forEach { dfs(it) }
-
-        val messages = cycles.map { alias ->
+        val messages = bundleIndex.keys.flatMap { dfs(it) }.map { alias ->
             DiagnosticMessage(
                 code = "VALIDATION_CIRCULAR_EXTENDS",
                 message = "Bundle '$alias' has circular extends dependency",
@@ -164,49 +160,48 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
             infos = emptyList(),
         )
 
-        val issues = mutableListOf<DiagnosticMessage>()
-        for ((alias, lib) in metadata.libraries) {
-            if (lib.isDeprecated && lib.deprecation?.replacedBy != null) {
-                if (lib.deprecation.replacedBy !in metadata.libraries) {
-                    issues.add(
-                        DiagnosticMessage(
-                            code = "VALIDATION_DEPRECATED_REF",
-                            message = "Library '$alias': replacedBy '${lib.deprecation.replacedBy}' does not exist",
-                            severity = action.toSeverity(),
-                            processorId = "validation",
-                            context = emptyMap(),
-                        )
-                    )
-                }
+        val issues = metadata.libraries.mapNotNull { (alias, lib) ->
+            val replacedBy = lib.deprecation?.replacedBy
+            if (lib.isDeprecated && replacedBy != null && replacedBy !in metadata.libraries) {
+                DiagnosticMessage(
+                    code = "VALIDATION_DEPRECATED_REF",
+                    message = "Library '$alias': replacedBy '$replacedBy' does not exist",
+                    severity = action.toSeverity(),
+                    processorId = "validation",
+                    context = emptyMap(),
+                )
+            } else {
+                null
             }
         }
         return Diagnostics.of(*issues.toTypedArray())
     }
 
     private fun validateCoordinates(metadata: EffectiveMetadata): Diagnostics {
-        val issues = mutableListOf<DiagnosticMessage>()
-        for ((alias, lib) in metadata.libraries) {
-            if (lib.group.isBlank() || lib.artifact.isBlank()) {
-                issues.add(
-                    DiagnosticMessage(
-                        code = "VALIDATION_INVALID_COORDINATES",
-                        message = "Library '$alias': empty group or artifact (group='${lib.group}', artifact='${lib.artifact}')",
-                        severity = Severity.ERROR,
-                        processorId = "validation",
-                        context = emptyMap(),
+        val issues = metadata.libraries.flatMap { (alias, lib) ->
+            buildList {
+                if (lib.group.isBlank() || lib.artifact.isBlank()) {
+                    add(
+                        DiagnosticMessage(
+                            code = "VALIDATION_INVALID_COORDINATES",
+                            message = "Library '$alias': empty group or artifact (group='${lib.group}', artifact='${lib.artifact}')",
+                            severity = Severity.ERROR,
+                            processorId = "validation",
+                            context = emptyMap(),
+                        )
                     )
-                )
-            }
-            if (":" in lib.group || ":" in lib.artifact) {
-                issues.add(
-                    DiagnosticMessage(
-                        code = "VALIDATION_INVALID_COORDINATES",
-                        message = "Library '$alias': group or artifact contains ':' (group='${lib.group}', artifact='${lib.artifact}')",
-                        severity = Severity.ERROR,
-                        processorId = "validation",
-                        context = emptyMap(),
+                }
+                if (":" in lib.group || ":" in lib.artifact) {
+                    add(
+                        DiagnosticMessage(
+                            code = "VALIDATION_INVALID_COORDINATES",
+                            message = "Library '$alias': group or artifact contains ':' (group='${lib.group}', artifact='${lib.artifact}')",
+                            severity = Severity.ERROR,
+                            processorId = "validation",
+                            context = emptyMap(),
+                        )
                     )
-                )
+                }
             }
         }
         return Diagnostics.of(*issues.toTypedArray())

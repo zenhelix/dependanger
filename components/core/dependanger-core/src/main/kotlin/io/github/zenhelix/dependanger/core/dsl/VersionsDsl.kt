@@ -6,25 +6,27 @@ import io.github.zenhelix.dependanger.core.model.VersionFallback
 
 @DependangerDslMarker
 public class VersionsDsl {
-    public val versions: MutableList<Version> = mutableListOf()
+    private val _versions: MutableList<Version> = mutableListOf()
+    public val versions: List<Version> get() = _versions.toList()
 
     public fun version(alias: String, value: String) {
-        versions.add(Version(name = alias, value = value, fallbacks = emptyList()))
+        _versions.add(Version(name = alias, value = value, fallbacks = emptyList()))
     }
 
     public fun version(alias: String, value: String, block: VersionDsl.() -> Unit) {
         val dsl = VersionDsl().apply(block)
-        versions.add(Version(name = alias, value = value, fallbacks = dsl.fallbacks))
+        _versions.add(Version(name = alias, value = value, fallbacks = dsl.fallbacks))
     }
 }
 
 @DependangerDslMarker
 public class VersionDsl {
-    public val fallbacks: MutableList<VersionFallback> = mutableListOf()
+    private val _fallbacks: MutableList<VersionFallback> = mutableListOf()
+    public val fallbacks: List<VersionFallback> get() = _fallbacks.toList()
 
     public fun fallback(value: String, condition: FallbackConditionDsl.() -> FallbackCondition) {
         val cond = FallbackConditionDsl().condition()
-        fallbacks.add(VersionFallback(value = value, condition = cond))
+        _fallbacks.add(VersionFallback(value = value, condition = cond))
     }
 }
 

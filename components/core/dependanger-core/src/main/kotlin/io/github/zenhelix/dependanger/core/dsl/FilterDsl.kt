@@ -58,103 +58,115 @@ public class FilterDsl {
 
 @DependangerDslMarker
 public class TagFilterDsl {
-    public val includes: MutableList<TagInclude> = mutableListOf()
-    public val excludes: MutableList<TagExclude> = mutableListOf()
+    private val _includes: MutableList<TagInclude> = mutableListOf()
+    public val includes: List<TagInclude> get() = _includes.toList()
+    private val _excludes: MutableList<TagExclude> = mutableListOf()
+    public val excludes: List<TagExclude> get() = _excludes.toList()
 
     public fun include(block: TagIncludeDsl.() -> Unit) {
         val dsl = TagIncludeDsl().apply(block)
-        includes.add(TagInclude(anyOf = dsl.anyOfTags.toSet(), allOf = dsl.allOfTags.toSet()))
+        _includes.add(TagInclude(anyOf = dsl.anyOfTags.toSet(), allOf = dsl.allOfTags.toSet()))
     }
 
     public fun exclude(block: TagExcludeDsl.() -> Unit) {
         val dsl = TagExcludeDsl().apply(block)
-        excludes.add(TagExclude(anyOf = dsl.anyOfTags.toSet()))
+        _excludes.add(TagExclude(anyOf = dsl.anyOfTags.toSet()))
     }
 
-    public fun toTagFilter(): TagFilter = TagFilter(includes = includes.toList(), excludes = excludes.toList())
+    public fun toTagFilter(): TagFilter = TagFilter(includes = _includes.toList(), excludes = _excludes.toList())
 
 }
 
 @DependangerDslMarker
 public class TagIncludeDsl {
-    public val anyOfTags: MutableSet<String> = mutableSetOf()
-    public val allOfTags: MutableSet<String> = mutableSetOf()
+    private val _anyOfTags: MutableSet<String> = mutableSetOf()
+    public val anyOfTags: Set<String> get() = _anyOfTags.toSet()
+    private val _allOfTags: MutableSet<String> = mutableSetOf()
+    public val allOfTags: Set<String> get() = _allOfTags.toSet()
 
     public fun anyOf(vararg tags: String) {
-        anyOfTags.addAll(tags)
+        _anyOfTags.addAll(tags)
     }
 
     public fun allOf(vararg tags: String) {
-        allOfTags.addAll(tags)
+        _allOfTags.addAll(tags)
     }
 }
 
 @DependangerDslMarker
 public class TagExcludeDsl {
-    public val anyOfTags: MutableSet<String> = mutableSetOf()
+    private val _anyOfTags: MutableSet<String> = mutableSetOf()
+    public val anyOfTags: Set<String> get() = _anyOfTags.toSet()
 
     public fun anyOf(vararg tags: String) {
-        anyOfTags.addAll(tags)
+        _anyOfTags.addAll(tags)
     }
 }
 
 @DependangerDslMarker
 public class GroupFilterDsl {
-    public val includes: MutableSet<String> = mutableSetOf()
-    public val excludes: MutableSet<String> = mutableSetOf()
+    private val _includes: MutableSet<String> = mutableSetOf()
+    public val includes: Set<String> get() = _includes.toSet()
+    private val _excludes: MutableSet<String> = mutableSetOf()
+    public val excludes: Set<String> get() = _excludes.toSet()
 
     public fun include(block: GroupMatchDsl.() -> Unit) {
         val dsl = GroupMatchDsl().apply(block)
-        includes.addAll(dsl.patterns)
+        _includes.addAll(dsl.patterns)
     }
 
     public fun exclude(block: GroupMatchDsl.() -> Unit) {
         val dsl = GroupMatchDsl().apply(block)
-        excludes.addAll(dsl.patterns)
+        _excludes.addAll(dsl.patterns)
     }
 
-    public fun toGroupFilter(): GroupFilter = GroupFilter(includes = includes.toSet(), excludes = excludes.toSet())
+    public fun toGroupFilter(): GroupFilter = GroupFilter(includes = _includes.toSet(), excludes = _excludes.toSet())
 }
 
 @DependangerDslMarker
 public class GroupMatchDsl {
-    public val patterns: MutableList<String> = mutableListOf()
+    private val _patterns: MutableList<String> = mutableListOf()
+    public val patterns: List<String> get() = _patterns.toList()
 
     public fun matching(vararg patterns: String) {
-        this.patterns.addAll(patterns)
+        _patterns.addAll(patterns)
     }
 }
 
 @DependangerDslMarker
 public class AliasFilterDsl {
-    public val includes: MutableSet<String> = mutableSetOf()
-    public val excludes: MutableSet<String> = mutableSetOf()
+    private val _includes: MutableSet<String> = mutableSetOf()
+    public val includes: Set<String> get() = _includes.toSet()
+    private val _excludes: MutableSet<String> = mutableSetOf()
+    public val excludes: Set<String> get() = _excludes.toSet()
 
     public fun include(vararg aliases: String) {
-        includes.addAll(aliases)
+        _includes.addAll(aliases)
     }
 
     public fun exclude(vararg aliases: String) {
-        excludes.addAll(aliases)
+        _excludes.addAll(aliases)
     }
 
-    public fun toAliasFilter(): AliasFilter = AliasFilter(includes = includes.toSet(), excludes = excludes.toSet())
+    public fun toAliasFilter(): AliasFilter = AliasFilter(includes = _includes.toSet(), excludes = _excludes.toSet())
 }
 
 @DependangerDslMarker
 public class BundleFilterDsl {
-    public val includes: MutableSet<String> = mutableSetOf()
-    public val excludes: MutableSet<String> = mutableSetOf()
+    private val _includes: MutableSet<String> = mutableSetOf()
+    public val includes: Set<String> get() = _includes.toSet()
+    private val _excludes: MutableSet<String> = mutableSetOf()
+    public val excludes: Set<String> get() = _excludes.toSet()
 
     public fun include(vararg bundles: String) {
-        includes.addAll(bundles)
+        _includes.addAll(bundles)
     }
 
     public fun exclude(vararg bundles: String) {
-        excludes.addAll(bundles)
+        _excludes.addAll(bundles)
     }
 
-    public fun toBundleFilter(): BundleFilter = BundleFilter(includes = includes.toSet(), excludes = excludes.toSet())
+    public fun toBundleFilter(): BundleFilter = BundleFilter(includes = _includes.toSet(), excludes = _excludes.toSet())
 }
 
 @DependangerDslMarker

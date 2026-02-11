@@ -31,43 +31,37 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
         val rules = context.originalMetadata.compatibility
         if (rules.isEmpty()) return metadata
 
-        val issues = mutableListOf<CompatibilityIssue>()
-        var diagnostics = metadata.diagnostics
-
-        for (rule in rules) {
-            val ruleIssues = when (rule) {
+        val (issues, rulesDiagnostics) = rules.fold(
+            emptyList<CompatibilityIssue>() to metadata.diagnostics
+        ) { (accIssues, accDiag), rule ->
+            when (rule) {
                 is CompatibilityRule.JdkRequirement    ->
-                    checkJdkRequirement(rule, metadata, context.environment)
+                    (accIssues + checkJdkRequirement(rule, metadata, context.environment)) to accDiag
 
                 is CompatibilityRule.MutualExclusion   ->
-                    checkMutualExclusion(rule, metadata)
+                    (accIssues + checkMutualExclusion(rule, metadata)) to accDiag
 
-                is CompatibilityRule.VersionConstraint ->
-                    checkVersionConstraint(rule, metadata)
+                is CompatibilityRule.VersionConstraint -> (accIssues + checkVersionConstraint(rule, metadata)) to accDiag
 
-                is CompatibilityRule.CustomRule        -> {
-                    diagnostics = diagnostics + Diagnostics.info(
+                is CompatibilityRule.CustomRule        ->
+                    accIssues to (accDiag + Diagnostics.info(
                         code = "COMPAT_CUSTOM_RULE_DEFERRED",
                         message = "Custom rule '${rule.ruleId}' deferred to compatibility-analysis processor",
                         processorId = id,
                         context = emptyMap(),
-                    )
-                    emptyList()
-                }
+                    ))
             }
-            issues.addAll(ruleIssues)
         }
 
-        val existingIssues = metadata.compatibilityIssues
-        val allIssues = existingIssues + issues
+        val allIssues = metadata.compatibilityIssues + issues
 
-        var result = metadata.withExtension(
+        val result = metadata.withExtension(
             CompatibilityIssuesExtensionKey,
             allIssues,
         )
 
-        for (issue in issues) {
-            diagnostics = diagnostics + when (issue.severity) {
+        val issueDiagnostics = issues.fold(rulesDiagnostics) { accDiag, issue ->
+            accDiag + when (issue.severity) {
                 Severity.ERROR   -> Diagnostics.error(
                     code = "COMPAT_${issue.ruleId.uppercase()}",
                     message = issue.message,
@@ -91,7 +85,7 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
             }
         }
 
-        return result.copy(diagnostics = diagnostics)
+        return result.copy(diagnostics = issueDiagnostics)
     }
 
     private fun checkJdkRequirement(
@@ -104,26 +98,24 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
             GlobMatcher.matches(rule.matches, lib.group, lib.artifact) || GlobMatcher.matchesGlob(rule.matches, alias)
         }
 
-        val issues = mutableListOf<CompatibilityIssue>()
         val minJdk = rule.minJdk
         val maxJdk = rule.maxJdk
-        for ((alias, _) in matchingLibs) {
+        return matchingLibs.mapNotNull { (alias, _) ->
             val violatesMin = minJdk != null && jdkVersion < minJdk
             val violatesMax = maxJdk != null && jdkVersion > maxJdk
             if (violatesMin || violatesMax) {
-                issues.add(
-                    CompatibilityIssue(
-                        ruleId = rule.name,
-                        message = rule.message
-                            ?: "Library '$alias' requires JDK ${rule.minJdk ?: "?"}-${rule.maxJdk ?: "?"}, current: $jdkVersion",
-                        severity = rule.severity,
-                        affectedLibraries = listOf(alias),
-                        suggestion = "Upgrade JDK or use a compatible library version",
-                    )
+                CompatibilityIssue(
+                    ruleId = rule.name,
+                    message = rule.message
+                        ?: "Library '$alias' requires JDK ${rule.minJdk ?: "?"}-${rule.maxJdk ?: "?"}, current: $jdkVersion",
+                    severity = rule.severity,
+                    affectedLibraries = listOf(alias),
+                    suggestion = "Upgrade JDK or use a compatible library version",
                 )
+            } else {
+                null
             }
         }
-        return issues
     }
 
     private fun checkMutualExclusion(

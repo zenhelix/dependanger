@@ -25,25 +25,25 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
 
         if (versionsWithFallbacks.isEmpty()) return metadata
 
-        val updatedVersions = metadata.versions.toMutableMap()
-        var diagnostics = metadata.diagnostics
+        val (updatedVersions, diagnostics) = versionsWithFallbacks.fold(
+            metadata.versions to metadata.diagnostics
+        ) { (versions, diags), version ->
+            val current = versions[version.name]
+                ?: return@fold versions to diags
 
-        for (version in versionsWithFallbacks) {
-            val current = updatedVersions[version.name] ?: continue
+            val matchedFallback = version.fallbacks
+                .firstOrNull { evaluateCondition(it.condition, context) }
+                ?: return@fold versions to diags
 
-            for (fallback in version.fallbacks) {
-                if (evaluateCondition(fallback.condition, context)) {
-                    updatedVersions[version.name] = current.copy(value = fallback.value)
-                    diagnostics = diagnostics + Diagnostics.info(
-                        code = "FALLBACK_APPLIED",
-                        message = "Version '${version.name}': fallback '${fallback.value}' applied " +
-                                "(was '${current.value}', condition: ${fallback.condition})",
-                        processorId = id,
-                        context = emptyMap(),
-                    )
-                    break
-                }
-            }
+            val newVersions = versions + (version.name to current.copy(value = matchedFallback.value))
+            val newDiags = diags + Diagnostics.info(
+                code = "FALLBACK_APPLIED",
+                message = "Version '${version.name}': fallback '${matchedFallback.value}' applied " +
+                        "(was '${current.value}', condition: ${matchedFallback.condition})",
+                processorId = id,
+                context = emptyMap(),
+            )
+            newVersions to newDiags
         }
 
         return metadata.copy(versions = updatedVersions, diagnostics = diagnostics)

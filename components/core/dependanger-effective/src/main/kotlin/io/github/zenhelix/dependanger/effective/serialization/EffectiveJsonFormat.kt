@@ -34,10 +34,9 @@ public class EffectiveJsonFormat {
     }
 
     public fun serialize(metadata: EffectiveMetadata): String {
-        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata)
-            .jsonObject.toMutableMap()
+        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata).jsonObject
 
-        if (metadata.extensions.isNotEmpty()) {
+        val resultJson = if (metadata.extensions.isNotEmpty()) {
             val extensionsJson = buildJsonObject {
                 for ((key, value) in metadata.extensions) {
                     @Suppress("UNCHECKED_CAST")
@@ -45,10 +44,12 @@ public class EffectiveJsonFormat {
                     put(key.name, json.encodeToJsonElement(serializer, value))
                 }
             }
-            baseJson["extensions"] = extensionsJson
+            JsonObject(baseJson + ("extensions" to extensionsJson))
+        } else {
+            baseJson
         }
 
-        return json.encodeToString(JsonElement.serializer(), JsonObject(baseJson))
+        return json.encodeToString(JsonElement.serializer(), resultJson)
     }
 
     public fun deserialize(input: String): EffectiveMetadata {
@@ -58,15 +59,16 @@ public class EffectiveJsonFormat {
         val base = json.decodeFromJsonElement(EffectiveMetadata.serializer(), jsonObject)
 
         val extensionsJson = jsonObject["extensions"]?.jsonObject ?: return base
-        val extensions = mutableMapOf<ExtensionKey<*>, Any>()
 
-        for ((keyName, element) in extensionsJson) {
-            val extensionKey = knownKeys[keyName] ?: continue
-            try {
-                val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
-                extensions[extensionKey] = deserialized
-            } catch (_: Exception) {
-                // Skip extensions that fail to deserialize
+        val extensions = buildMap<ExtensionKey<*>, Any> {
+            for ((keyName, element) in extensionsJson) {
+                val extensionKey = knownKeys[keyName] ?: continue
+                try {
+                    val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
+                    put(extensionKey, deserialized)
+                } catch (_: Exception) {
+                    // Skip extensions that fail to deserialize
+                }
             }
         }
 

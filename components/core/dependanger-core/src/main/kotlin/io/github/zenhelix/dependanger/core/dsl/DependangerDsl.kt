@@ -128,12 +128,12 @@ public class DependangerDsl {
     @Suppress("UNCHECKED_CAST")
     private fun buildExtensionsMap(): Map<String, JsonElement> {
         val json = Json { encodeDefaults = true }
-        val result = mutableMapOf<String, JsonElement>()
-        for ((key, value) in extensions) {
-            val serializer = (key as DslExtensionKey<Any>).serializer
-            result[key.name] = json.encodeToJsonElement(serializer, value)
+        return buildMap {
+            for ((key, value) in extensions) {
+                val serializer = (key as DslExtensionKey<Any>).serializer
+                put(key.name, json.encodeToJsonElement(serializer, value))
+            }
         }
-        return result
     }
 }
 

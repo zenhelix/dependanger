@@ -9,11 +9,12 @@ import io.github.zenhelix.dependanger.core.model.VersionReference
 
 @DependangerDslMarker
 public class LibrariesDsl {
-    public val libraries: MutableList<Library> = mutableListOf()
+    private val _libraries: MutableList<Library> = mutableListOf()
+    public val libraries: List<Library> get() = _libraries.toList()
 
     public fun library(alias: String, coordinates: String) {
         val (group, artifact, version) = parseCoordinates(coordinates)
-        libraries.add(
+        _libraries.add(
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
@@ -24,7 +25,7 @@ public class LibrariesDsl {
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
         val (group, artifact, _) = parseCoordinates(coordinates)
-        libraries.add(
+        _libraries.add(
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
@@ -36,18 +37,18 @@ public class LibrariesDsl {
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
         val (group, artifact, version) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        libraries.add(dsl.toLibrary(alias, group, artifact))
+        _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference, block: LibraryDsl.() -> Unit) {
         val (group, artifact, _) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        libraries.add(dsl.toLibrary(alias, group, artifact))
+        _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
         val (group, artifact, _) = parseCoordinates(coordinates)
-        libraries.add(
+        _libraries.add(
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
@@ -69,14 +70,16 @@ public class LibrariesDsl {
 @DependangerDslMarker
 public class LibraryDsl(private var version: VersionReference? = null) {
     public var description: String? = null
-    public var tags: MutableSet<String> = mutableSetOf()
+    private val _tags: MutableSet<String> = mutableSetOf()
+    public val tags: Set<String> get() = _tags.toSet()
     public var requires: Requirements? = null
     public var deprecation: DeprecationInfo? = null
     public var license: LicenseInfo? = null
-    public var constraints: MutableList<Constraint> = mutableListOf()
+    private val _constraints: MutableList<Constraint> = mutableListOf()
+    public val constraints: List<Constraint> get() = _constraints.toList()
 
     public fun tags(vararg tags: String) {
-        this.tags.addAll(tags)
+        _tags.addAll(tags)
     }
 
     public fun requires(block: RequiresDsl.() -> Unit) {
@@ -100,7 +103,7 @@ public class LibraryDsl(private var version: VersionReference? = null) {
 
     public fun constraints(block: ConstraintsDsl.() -> Unit) {
         val dsl = ConstraintsDsl().apply(block)
-        constraints.addAll(dsl.constraints)
+        _constraints.addAll(dsl.constraints)
     }
 
     public fun toLibrary(alias: String, group: String, artifact: String): Library = Library(
@@ -109,11 +112,11 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         artifact = artifact,
         version = version,
         description = description,
-        tags = tags.toSet(),
+        tags = tags,
         requires = requires,
         deprecation = deprecation,
         license = license,
-        constraints = constraints.toList(),
+        constraints = constraints,
         isPlatform = false,
     )
 }

@@ -11,7 +11,7 @@ public class ProcessingPipeline(
     private val processors: List<EffectiveMetadataProcessor>,
 ) {
     public suspend fun process(context: ProcessingContext): EffectiveMetadata {
-        var result = EffectiveMetadata(
+        val initial = EffectiveMetadata(
             schemaVersion = context.originalMetadata.schemaVersion,
             distribution = context.activeDistribution,
             versions = emptyMap(),
@@ -28,30 +28,25 @@ public class ProcessingPipeline(
 
         val groups = groupByExecutionMode(processors.sortedBy { it.order })
 
-        for (group in groups) {
-            result = when (group.executionMode) {
+        return groups.fold(initial) { acc, group ->
+            when (group.executionMode) {
                 ExecutionMode.PARALLEL_IO, ExecutionMode.PARALLEL_COMPUTE ->
-                    executeParallel(result, group.processors, context)
+                    executeParallel(acc, group.processors, context)
 
                 else                                                      ->
-                    executeSequential(result, group.processors, context)
+                    executeSequential(acc, group.processors, context)
             }
         }
-
-        return result
     }
 
     private suspend fun executeSequential(
         metadata: EffectiveMetadata,
         processors: List<EffectiveMetadataProcessor>,
         context: ProcessingContext,
-    ): EffectiveMetadata {
-        var result = metadata
-        for (processor in processors) {
-            result = executeProcessor(processor, result, context)
+    ): EffectiveMetadata =
+        processors.fold(metadata) { acc, processor ->
+            executeProcessor(processor, acc, context)
         }
-        return result
-    }
 
     private suspend fun executeParallel(
         base: EffectiveMetadata,
@@ -97,18 +92,14 @@ public class ProcessingPipeline(
         base: EffectiveMetadata,
         results: List<EffectiveMetadata>,
     ): EffectiveMetadata {
-        for (result in results) {
-            validateParallelResult(base, result)
-        }
+        results.forEach { validateParallelResult(base, it) }
 
-        var merged = base
-        for (result in results) {
-            merged = merged.copy(
+        return results.fold(base) { merged, result ->
+            merged.copy(
                 diagnostics = merged.diagnostics + collectNewDiagnostics(base.diagnostics, result.diagnostics),
                 extensions = merged.extensions + (result.extensions - base.extensions.keys),
             )
         }
-        return merged
     }
 
     private fun validateParallelResult(base: EffectiveMetadata, result: EffectiveMetadata) {
@@ -153,23 +144,16 @@ public class ProcessingPipeline(
         fun groupByExecutionMode(sorted: List<EffectiveMetadataProcessor>): List<ProcessorGroup> {
             if (sorted.isEmpty()) return emptyList()
 
-            val groups = mutableListOf<ProcessorGroup>()
-            var currentMode = sorted.first().phase.executionMode
-            var currentProcessors = mutableListOf(sorted.first())
-
-            for (processor in sorted.drop(1)) {
+            val first = sorted.first()
+            return sorted.drop(1).fold(listOf(ProcessorGroup(first.phase.executionMode, listOf(first)))) { groups, processor ->
                 val mode = processor.phase.executionMode
-                if (mode == currentMode) {
-                    currentProcessors.add(processor)
+                val lastGroup = groups.last()
+                if (mode == lastGroup.executionMode) {
+                    groups.dropLast(1) + lastGroup.copy(processors = lastGroup.processors + processor)
                 } else {
-                    groups.add(ProcessorGroup(currentMode, currentProcessors.toList()))
-                    currentMode = mode
-                    currentProcessors = mutableListOf(processor)
+                    groups + ProcessorGroup(mode, listOf(processor))
                 }
             }
-            groups.add(ProcessorGroup(currentMode, currentProcessors.toList()))
-
-            return groups
         }
     }
 }

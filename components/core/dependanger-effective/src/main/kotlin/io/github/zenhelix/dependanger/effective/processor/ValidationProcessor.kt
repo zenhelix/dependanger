@@ -6,13 +6,15 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.ValidationAction
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class ValidationProcessor : EffectiveMetadataProcessor {
-    override val id: String = "validation"
+    override val id: String = ProcessorIds.VALIDATION
     override val phase: ProcessingPhase = ProcessingPhase.VALIDATION
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -56,10 +58,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
             .filter { it.value.size > 1 }
             .map { (alias, types) ->
                 DiagnosticMessage(
-                    code = "VALIDATION_DUPLICATE_ALIAS",
+                    code = DiagnosticCodes.Validation.DUPLICATE_ALIAS,
                     message = "Alias '$alias' used in multiple namespaces: ${types.joinToString()}",
                     severity = Severity.ERROR,
-                    processorId = "validation",
+                    processorId = id,
                     context = emptyMap(),
                 )
             }
@@ -87,10 +89,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
             val originalRef = originalLibs[alias]?.version
             if (originalRef is VersionReference.Reference && lib.version == null) {
                 DiagnosticMessage(
-                    code = "VALIDATION_UNRESOLVED_REF",
+                    code = DiagnosticCodes.Validation.UNRESOLVED_REF,
                     message = "Library '$alias': version reference '${originalRef.name}' is not resolved",
                     severity = action.toSeverity(),
-                    processorId = "validation",
+                    processorId = id,
                     context = emptyMap(),
                 )
             } else {
@@ -105,10 +107,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
             bundle.libraries.mapNotNull { libAlias ->
                 if (libAlias !in metadata.libraries) {
                     DiagnosticMessage(
-                        code = "VALIDATION_BUNDLE_REF_MISSING",
+                        code = DiagnosticCodes.Validation.BUNDLE_REF_MISSING,
                         message = "Bundle '$bundleAlias': library '$libAlias' does not exist",
                         severity = Severity.ERROR,
-                        processorId = "validation",
+                        processorId = id,
                         context = emptyMap(),
                     )
                 } else {
@@ -136,10 +138,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
 
         val messages = bundleIndex.keys.flatMap { dfs(it) }.map { alias ->
             DiagnosticMessage(
-                code = "VALIDATION_CIRCULAR_EXTENDS",
+                code = DiagnosticCodes.Validation.CIRCULAR_EXTENDS,
                 message = "Bundle '$alias' has circular extends dependency",
                 severity = Severity.ERROR,
-                processorId = "validation",
+                processorId = id,
                 context = emptyMap(),
             )
         }
@@ -164,10 +166,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
             val replacedBy = lib.deprecation?.replacedBy
             if (lib.isDeprecated && replacedBy != null && replacedBy !in metadata.libraries) {
                 DiagnosticMessage(
-                    code = "VALIDATION_DEPRECATED_REF",
+                    code = DiagnosticCodes.Validation.DEPRECATED_REF,
                     message = "Library '$alias': replacedBy '$replacedBy' does not exist",
                     severity = action.toSeverity(),
-                    processorId = "validation",
+                    processorId = id,
                     context = emptyMap(),
                 )
             } else {
@@ -183,10 +185,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
                 if (lib.group.isBlank() || lib.artifact.isBlank()) {
                     add(
                         DiagnosticMessage(
-                            code = "VALIDATION_INVALID_COORDINATES",
+                            code = DiagnosticCodes.Validation.INVALID_COORDINATES,
                             message = "Library '$alias': empty group or artifact (group='${lib.group}', artifact='${lib.artifact}')",
                             severity = Severity.ERROR,
-                            processorId = "validation",
+                            processorId = id,
                             context = emptyMap(),
                         )
                     )
@@ -194,10 +196,10 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
                 if (":" in lib.group || ":" in lib.artifact) {
                     add(
                         DiagnosticMessage(
-                            code = "VALIDATION_INVALID_COORDINATES",
+                            code = DiagnosticCodes.Validation.INVALID_COORDINATES,
                             message = "Library '$alias': group or artifact contains ':' (group='${lib.group}', artifact='${lib.artifact}')",
                             severity = Severity.ERROR,
-                            processorId = "validation",
+                            processorId = id,
                             context = emptyMap(),
                         )
                     )

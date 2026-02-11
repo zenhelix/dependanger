@@ -1,6 +1,8 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -8,7 +10,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class UsedVersionsProcessor : EffectiveMetadataProcessor {
-    override val id: String = "used-versions"
+    override val id: String = ProcessorIds.USED_VERSIONS
     override val phase: ProcessingPhase = ProcessingPhase.USED_VERSIONS
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -41,7 +43,7 @@ public class UsedVersionsProcessor : EffectiveMetadataProcessor {
                 (accVersions + (name to version)) to accDiag
             } else {
                 accVersions to (accDiag + Diagnostics.info(
-                    code = "UNUSED_VERSION_REMOVED",
+                    code = DiagnosticCodes.Version.UNUSED_REMOVED,
                     message = "Version '$name' removed: not referenced by any library or plugin",
                     processorId = id,
                     context = emptyMap(),

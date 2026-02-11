@@ -31,115 +31,34 @@ public class SettingsDsl {
     private val _repositories = Trackable<List<Repository>>(emptyList())
     public var repositories: List<Repository> by _repositories
 
-    private val _validationSettings = Trackable(
-        ValidationSettings(
-            onCompatibilityViolation = ValidationAction.FAIL,
-            onDeprecatedLibrary = ValidationAction.WARN,
-            onJdkMismatch = ValidationAction.FAIL,
-            onUnresolvedVersion = ValidationAction.WARN,
-        )
-    )
+    private val _validationSettings = Trackable(ValidationSettings.DEFAULT)
     public var validationSettings: ValidationSettings by _validationSettings
 
-    private val _tomlSettings = Trackable(
-        TomlSettings(
-            filename = "libs.versions.toml",
-            includeComments = true,
-            sortSections = true,
-            useInlineVersions = false,
-        )
-    )
+    private val _tomlSettings = Trackable(TomlSettings.DEFAULT)
     public var tomlSettings: TomlSettings by _tomlSettings
 
-    private val _bomSettings = Trackable(
-        BomSettings(
-            groupId = "",
-            artifactId = "",
-            version = "",
-            includeOptionalDependencies = false,
-        )
-    )
+    private val _bomSettings = Trackable(BomSettings.DEFAULT)
     public var bomSettings: BomSettings by _bomSettings
 
-    private val _bomCacheSettings = Trackable(
-        BomCacheSettings(
-            enabled = true,
-            directory = "",
-            ttlHours = 24,
-            ttlSnapshotHours = 1,
-        )
-    )
+    private val _bomCacheSettings = Trackable(BomCacheSettings.DEFAULT)
     public var bomCacheSettings: BomCacheSettings by _bomCacheSettings
 
-    private val _updateCheckSettings = Trackable(
-        UpdateCheckSettings(
-            enabled = false,
-            excludePatterns = emptyList(),
-            includePrerelease = false,
-            repositories = emptyList(),
-            timeout = 30_000,
-            parallelism = 10,
-            cacheDirectory = "",
-            cacheTtlHours = 1,
-        )
-    )
+    private val _updateCheckSettings = Trackable(UpdateCheckSettings.DEFAULT)
     public var updateCheckSettings: UpdateCheckSettings by _updateCheckSettings
 
-    private val _compatibilityAnalysisSettings = Trackable(
-        CompatibilityAnalysisSettings(
-            enabled = false,
-            targetJdk = null,
-            failOnErrors = true,
-        )
-    )
+    private val _compatibilityAnalysisSettings = Trackable(CompatibilityAnalysisSettings.DEFAULT)
     public var compatibilityAnalysisSettings: CompatibilityAnalysisSettings by _compatibilityAnalysisSettings
 
-    private val _securityCheckSettings = Trackable(
-        SecurityCheckSettings(
-            enabled = false,
-            failOnVulnerability = Severity.ERROR,
-            ignoreVulnerabilities = emptyList(),
-        )
-    )
+    private val _securityCheckSettings = Trackable(SecurityCheckSettings.DEFAULT)
     public var securityCheckSettings: SecurityCheckSettings by _securityCheckSettings
 
-    private val _licenseCheckSettings = Trackable(
-        LicenseCheckSettings(
-            enabled = false,
-            allowedLicenses = emptyList(),
-            deniedLicenses = emptyList(),
-            dualLicensePolicy = DualLicensePolicy.OR,
-            failOnDenied = false,
-            failOnUnknown = false,
-            failOnCopyleft = false,
-            warnOnCopyleft = true,
-            warnOnUnknown = true,
-            ignoreLibraries = emptyList(),
-            includeTransitives = false,
-        )
-    )
+    private val _licenseCheckSettings = Trackable(LicenseCheckSettings.DEFAULT)
     public var licenseCheckSettings: LicenseCheckSettings by _licenseCheckSettings
 
-    private val _transitiveResolutionSettings = Trackable(
-        TransitiveResolutionSettings(
-            enabled = false,
-            repositories = emptyList(),
-            maxDepth = null,
-            maxTransitives = null,
-            conflictResolution = ConflictResolutionStrategy.HIGHEST,
-            includeOptional = false,
-            scopes = listOf("compile", "runtime"),
-        )
-    )
+    private val _transitiveResolutionSettings = Trackable(TransitiveResolutionSettings.DEFAULT)
     public var transitiveResolutionSettings: TransitiveResolutionSettings by _transitiveResolutionSettings
 
-    private val _reportSettings = Trackable(
-        ReportSettings(
-            format = ReportFormat.MARKDOWN,
-            outputDir = "build/reports/dependanger",
-            sections = ReportSection.entries,
-        )
-    )
+    private val _reportSettings = Trackable(ReportSettings.DEFAULT)
     public var reportSettings: ReportSettings by _reportSettings
 
     private val _customSettings = Trackable<Map<String, JsonElement>>(emptyMap())
@@ -213,7 +132,7 @@ public class SettingsDsl {
     }
 
     public fun mergeFrom(settings: Settings) {
-        val defaults = toSettings()
+        val defaults = Settings.DEFAULT
         if (settings.defaultDistribution != defaults.defaultDistribution) defaultDistribution = settings.defaultDistribution
         if (settings.strictVersionResolution != defaults.strictVersionResolution) strictVersionResolution = settings.strictVersionResolution
         if (settings.repositories != defaults.repositories) repositories = settings.repositories
@@ -250,10 +169,10 @@ public class SettingsDsl {
 
 @DependangerDslMarker
 public class ValidationSettingsDsl {
-    public var onCompatibilityViolation: ValidationAction = ValidationAction.FAIL
-    public var onDeprecatedLibrary: ValidationAction = ValidationAction.WARN
-    public var onJdkMismatch: ValidationAction = ValidationAction.FAIL
-    public var onUnresolvedVersion: ValidationAction = ValidationAction.WARN
+    public var onCompatibilityViolation: ValidationAction = ValidationSettings.DEFAULT.onCompatibilityViolation
+    public var onDeprecatedLibrary: ValidationAction = ValidationSettings.DEFAULT.onDeprecatedLibrary
+    public var onJdkMismatch: ValidationAction = ValidationSettings.DEFAULT.onJdkMismatch
+    public var onUnresolvedVersion: ValidationAction = ValidationSettings.DEFAULT.onUnresolvedVersion
 
     public fun toSettings(): ValidationSettings = ValidationSettings(
         onCompatibilityViolation = onCompatibilityViolation,
@@ -265,10 +184,10 @@ public class ValidationSettingsDsl {
 
 @DependangerDslMarker
 public class TomlSettingsDsl {
-    public var filename: String = "libs.versions.toml"
-    public var includeComments: Boolean = true
-    public var sortSections: Boolean = true
-    public var useInlineVersions: Boolean = false
+    public var filename: String = TomlSettings.DEFAULT.filename
+    public var includeComments: Boolean = TomlSettings.DEFAULT.includeComments
+    public var sortSections: Boolean = TomlSettings.DEFAULT.sortSections
+    public var useInlineVersions: Boolean = TomlSettings.DEFAULT.useInlineVersions
 
     public fun toSettings(): TomlSettings = TomlSettings(
         filename = filename,
@@ -280,10 +199,10 @@ public class TomlSettingsDsl {
 
 @DependangerDslMarker
 public class BomSettingsDsl {
-    public var groupId: String = ""
-    public var artifactId: String = ""
-    public var version: String = ""
-    public var includeOptionalDependencies: Boolean = false
+    public var groupId: String = BomSettings.DEFAULT.groupId
+    public var artifactId: String = BomSettings.DEFAULT.artifactId
+    public var version: String = BomSettings.DEFAULT.version
+    public var includeOptionalDependencies: Boolean = BomSettings.DEFAULT.includeOptionalDependencies
 
     public fun toSettings(): BomSettings = BomSettings(
         groupId = groupId,
@@ -295,10 +214,10 @@ public class BomSettingsDsl {
 
 @DependangerDslMarker
 public class BomCacheSettingsDsl {
-    public var enabled: Boolean = true
-    public var directory: String = ""
-    public var ttlHours: Long = 24
-    public var ttlSnapshotHours: Long = 1
+    public var enabled: Boolean = BomCacheSettings.DEFAULT.enabled
+    public var directory: String = BomCacheSettings.DEFAULT.directory
+    public var ttlHours: Long = BomCacheSettings.DEFAULT.ttlHours
+    public var ttlSnapshotHours: Long = BomCacheSettings.DEFAULT.ttlSnapshotHours
 
     public fun toSettings(): BomCacheSettings = BomCacheSettings(
         enabled = enabled,
@@ -310,14 +229,14 @@ public class BomCacheSettingsDsl {
 
 @DependangerDslMarker
 public class UpdateCheckSettingsDsl {
-    public var enabled: Boolean = false
-    public var excludePatterns: List<String> = emptyList()
-    public var includePrerelease: Boolean = false
-    public var repositories: List<Repository> = emptyList()
-    public var timeout: Long = 30_000
-    public var parallelism: Int = 10
-    public var cacheDirectory: String = ""
-    public var cacheTtlHours: Long = 1
+    public var enabled: Boolean = UpdateCheckSettings.DEFAULT.enabled
+    public var excludePatterns: List<String> = UpdateCheckSettings.DEFAULT.excludePatterns
+    public var includePrerelease: Boolean = UpdateCheckSettings.DEFAULT.includePrerelease
+    public var repositories: List<Repository> = UpdateCheckSettings.DEFAULT.repositories
+    public var timeout: Long = UpdateCheckSettings.DEFAULT.timeout
+    public var parallelism: Int = UpdateCheckSettings.DEFAULT.parallelism
+    public var cacheDirectory: String = UpdateCheckSettings.DEFAULT.cacheDirectory
+    public var cacheTtlHours: Long = UpdateCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): UpdateCheckSettings = UpdateCheckSettings(
         enabled = enabled,
@@ -333,9 +252,9 @@ public class UpdateCheckSettingsDsl {
 
 @DependangerDslMarker
 public class CompatibilityAnalysisSettingsDsl {
-    public var enabled: Boolean = false
-    public var targetJdk: Int? = null
-    public var failOnErrors: Boolean = true
+    public var enabled: Boolean = CompatibilityAnalysisSettings.DEFAULT.enabled
+    public var targetJdk: Int? = CompatibilityAnalysisSettings.DEFAULT.targetJdk
+    public var failOnErrors: Boolean = CompatibilityAnalysisSettings.DEFAULT.failOnErrors
 
     public fun toSettings(): CompatibilityAnalysisSettings = CompatibilityAnalysisSettings(
         enabled = enabled,
@@ -346,9 +265,9 @@ public class CompatibilityAnalysisSettingsDsl {
 
 @DependangerDslMarker
 public class SecurityCheckSettingsDsl {
-    public var enabled: Boolean = false
-    public var failOnVulnerability: Severity = Severity.ERROR
-    public var ignoreVulnerabilities: List<String> = emptyList()
+    public var enabled: Boolean = SecurityCheckSettings.DEFAULT.enabled
+    public var failOnVulnerability: Severity = SecurityCheckSettings.DEFAULT.failOnVulnerability
+    public var ignoreVulnerabilities: List<String> = SecurityCheckSettings.DEFAULT.ignoreVulnerabilities
 
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(
         enabled = enabled,
@@ -359,17 +278,17 @@ public class SecurityCheckSettingsDsl {
 
 @DependangerDslMarker
 public class LicenseCheckSettingsDsl {
-    public var enabled: Boolean = false
-    public var allowedLicenses: List<String> = emptyList()
-    public var deniedLicenses: List<String> = emptyList()
-    public var dualLicensePolicy: DualLicensePolicy = DualLicensePolicy.OR
-    public var failOnDenied: Boolean = false
-    public var failOnUnknown: Boolean = false
-    public var failOnCopyleft: Boolean = false
-    public var warnOnCopyleft: Boolean = true
-    public var warnOnUnknown: Boolean = true
-    public var ignoreLibraries: List<String> = emptyList()
-    public var includeTransitives: Boolean = false
+    public var enabled: Boolean = LicenseCheckSettings.DEFAULT.enabled
+    public var allowedLicenses: List<String> = LicenseCheckSettings.DEFAULT.allowedLicenses
+    public var deniedLicenses: List<String> = LicenseCheckSettings.DEFAULT.deniedLicenses
+    public var dualLicensePolicy: DualLicensePolicy = LicenseCheckSettings.DEFAULT.dualLicensePolicy
+    public var failOnDenied: Boolean = LicenseCheckSettings.DEFAULT.failOnDenied
+    public var failOnUnknown: Boolean = LicenseCheckSettings.DEFAULT.failOnUnknown
+    public var failOnCopyleft: Boolean = LicenseCheckSettings.DEFAULT.failOnCopyleft
+    public var warnOnCopyleft: Boolean = LicenseCheckSettings.DEFAULT.warnOnCopyleft
+    public var warnOnUnknown: Boolean = LicenseCheckSettings.DEFAULT.warnOnUnknown
+    public var ignoreLibraries: List<String> = LicenseCheckSettings.DEFAULT.ignoreLibraries
+    public var includeTransitives: Boolean = LicenseCheckSettings.DEFAULT.includeTransitives
 
     public fun toSettings(): LicenseCheckSettings = LicenseCheckSettings(
         enabled = enabled,
@@ -388,13 +307,13 @@ public class LicenseCheckSettingsDsl {
 
 @DependangerDslMarker
 public class TransitiveResolutionSettingsDsl {
-    public var enabled: Boolean = false
-    public var repositories: List<Repository> = emptyList()
-    public var maxDepth: Int? = null
-    public var maxTransitives: Int? = null
-    public var conflictResolution: ConflictResolutionStrategy = ConflictResolutionStrategy.HIGHEST
-    public var includeOptional: Boolean = false
-    public var scopes: List<String> = listOf("compile", "runtime")
+    public var enabled: Boolean = TransitiveResolutionSettings.DEFAULT.enabled
+    public var repositories: List<Repository> = TransitiveResolutionSettings.DEFAULT.repositories
+    public var maxDepth: Int? = TransitiveResolutionSettings.DEFAULT.maxDepth
+    public var maxTransitives: Int? = TransitiveResolutionSettings.DEFAULT.maxTransitives
+    public var conflictResolution: ConflictResolutionStrategy = TransitiveResolutionSettings.DEFAULT.conflictResolution
+    public var includeOptional: Boolean = TransitiveResolutionSettings.DEFAULT.includeOptional
+    public var scopes: List<String> = TransitiveResolutionSettings.DEFAULT.scopes
 
     public fun toSettings(): TransitiveResolutionSettings = TransitiveResolutionSettings(
         enabled = enabled,
@@ -409,9 +328,9 @@ public class TransitiveResolutionSettingsDsl {
 
 @DependangerDslMarker
 public class ReportSettingsDsl {
-    public var format: ReportFormat = ReportFormat.MARKDOWN
-    public var outputDir: String = "build/reports/dependanger"
-    public var sections: List<ReportSection> = ReportSection.entries
+    public var format: ReportFormat = ReportSettings.DEFAULT.format
+    public var outputDir: String = ReportSettings.DEFAULT.outputDir
+    public var sections: List<ReportSection> = ReportSettings.DEFAULT.sections
 
     public fun toSettings(): ReportSettings = ReportSettings(
         format = format,

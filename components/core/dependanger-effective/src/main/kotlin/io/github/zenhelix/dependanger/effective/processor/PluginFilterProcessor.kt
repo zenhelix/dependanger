@@ -2,13 +2,15 @@ package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.filter.TagFilter
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class PluginFilterProcessor : EffectiveMetadataProcessor {
-    override val id: String = "plugin-filter"
+    override val id: String = ProcessorIds.PLUGIN_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN_FILTER
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -33,7 +35,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
             val passes = passesTagFilter(tags, tagFilter)
             if (!passes) {
                 diagnostics = diagnostics + Diagnostics.info(
-                    code = "PLUGIN_FILTERED",
+                    code = DiagnosticCodes.Plugin.FILTERED,
                     message = "Plugin '$alias' filtered out by distribution '$distName'",
                     processorId = id,
                     context = emptyMap(),

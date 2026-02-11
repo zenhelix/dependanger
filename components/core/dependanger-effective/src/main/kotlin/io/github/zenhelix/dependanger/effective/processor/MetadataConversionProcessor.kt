@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Bundle
 import io.github.zenhelix.dependanger.core.model.VersionReference
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -13,7 +14,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class MetadataConversionProcessor : EffectiveMetadataProcessor {
-    override val id: String = "metadata-conversion"
+    override val id: String = ProcessorIds.METADATA_CONVERSION
     override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
     override val order: Int = phase.order
     override val isOptional: Boolean = false

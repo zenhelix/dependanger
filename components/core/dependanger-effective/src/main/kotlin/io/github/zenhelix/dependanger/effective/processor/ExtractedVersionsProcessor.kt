@@ -1,6 +1,8 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
@@ -9,7 +11,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
-    override val id: String = "extracted-versions"
+    override val id: String = ProcessorIds.EXTRACTED_VERSIONS
     override val phase: ProcessingPhase = ProcessingPhase.EXTRACTED_VERSIONS
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -76,7 +78,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
             originalRef = null,
         )
         val diagnostic = Diagnostics.info(
-            code = "EXTRACTED_VERSION_CREATED",
+            code = DiagnosticCodes.Version.EXTRACTED_CREATED,
             message = "Extracted version '$versionName' = '${version.value}' from $sourceType '$alias'",
             processorId = id,
             context = emptyMap(),

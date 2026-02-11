@@ -6,6 +6,8 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.VersionConstraintType
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.VersionComparator
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssuesExtensionKey
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -17,7 +19,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class CompatRulesProcessor : EffectiveMetadataProcessor {
-    override val id: String = "compat-rules"
+    override val id: String = ProcessorIds.COMPAT_RULES
     override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -45,7 +47,7 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
 
                 is CompatibilityRule.CustomRule        ->
                     accIssues to (accDiag + Diagnostics.info(
-                        code = "COMPAT_CUSTOM_RULE_DEFERRED",
+                        code = DiagnosticCodes.Compatibility.CUSTOM_RULE_DEFERRED,
                         message = "Custom rule '${rule.ruleId}' deferred to compatibility-analysis processor",
                         processorId = id,
                         context = emptyMap(),

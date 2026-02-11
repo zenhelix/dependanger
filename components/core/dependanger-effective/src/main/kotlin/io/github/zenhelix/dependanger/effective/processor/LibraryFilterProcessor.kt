@@ -7,6 +7,8 @@ import io.github.zenhelix.dependanger.core.model.filter.DeprecatedFilter
 import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
 import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -15,7 +17,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
-    override val id: String = "library-filter"
+    override val id: String = ProcessorIds.LIBRARY_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.LIBRARY_FILTER
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -42,7 +44,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
 
             if (!passes) {
                 diagnostics = diagnostics + Diagnostics.info(
-                    code = "LIBRARY_FILTERED",
+                    code = DiagnosticCodes.Library.FILTERED,
                     message = "Library '$alias' filtered out by distribution '$distName'",
                     processorId = id,
                     context = emptyMap(),

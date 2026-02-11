@@ -110,7 +110,7 @@ public class DependangerDsl {
     }
 
     public fun toMetadata(): DependangerMetadata = DependangerMetadata(
-        schemaVersion = "1.0",
+        schemaVersion = DependangerMetadata.SCHEMA_VERSION,
         versions = versionsDsl.versions.toList(),
         libraries = librariesDsl.libraries.toList(),
         plugins = pluginsDsl.plugins.toList(),

@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.effective.pipeline
 
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 
 public fun ProcessingPreset.configure(builder: PipelineBuilder) {
     when (this) {
@@ -13,31 +14,31 @@ public fun ProcessingPreset.configure(builder: PipelineBuilder) {
 
 private fun configureDefault(builder: PipelineBuilder) {
     // DEFAULT: all mandatory processors enabled + bom-import (early feature processor)
-    builder.enableOptional("bom-import")
+    builder.enableOptional(ProcessorIds.BOM_IMPORT)
 }
 
 private fun configureMinimal(builder: PipelineBuilder) {
     // MINIMAL: only conversion + version resolution
-    builder.disable("library-filter")
-    builder.disable("bundle-filter")
-    builder.disable("plugin-filter")
-    builder.disable("plugin")
-    builder.disable("used-versions")
-    builder.disable("validation")
-    builder.disable("compat-rules")
+    builder.disable(ProcessorIds.LIBRARY_FILTER)
+    builder.disable(ProcessorIds.BUNDLE_FILTER)
+    builder.disable(ProcessorIds.PLUGIN_FILTER)
+    builder.disable(ProcessorIds.PLUGIN)
+    builder.disable(ProcessorIds.USED_VERSIONS)
+    builder.disable(ProcessorIds.VALIDATION)
+    builder.disable(ProcessorIds.COMPAT_RULES)
 }
 
 private fun configureStrict(builder: PipelineBuilder) {
     // STRICT: all mandatory + all checks enabled
-    builder.enableOptional("bom-import")
-    builder.enableOptional("update-check")
-    builder.enableOptional("compatibility-analysis")
-    builder.enableOptional("security-check")
-    builder.enableOptional("license-check")
-    builder.enableOptional("transitive-resolver")
+    builder.enableOptional(ProcessorIds.BOM_IMPORT)
+    builder.enableOptional(ProcessorIds.UPDATE_CHECK)
+    builder.enableOptional(ProcessorIds.COMPATIBILITY_ANALYSIS)
+    builder.enableOptional(ProcessorIds.SECURITY_CHECK)
+    builder.enableOptional(ProcessorIds.LICENSE_CHECK)
+    builder.enableOptional(ProcessorIds.TRANSITIVE_RESOLVER)
 }
 
 private fun configureDistribution(builder: PipelineBuilder) {
     // DISTRIBUTION: same as DEFAULT + profile filtering (profile processor is mandatory anyway)
-    builder.enableOptional("bom-import")
+    builder.enableOptional(ProcessorIds.BOM_IMPORT)
 }

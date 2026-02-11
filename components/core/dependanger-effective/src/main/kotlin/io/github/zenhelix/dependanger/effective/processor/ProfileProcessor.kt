@@ -1,13 +1,15 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class ProfileProcessor : EffectiveMetadataProcessor {
-    override val id: String = "profile"
+    override val id: String = ProcessorIds.PROFILE
     override val phase: ProcessingPhase = ProcessingPhase.PROFILE
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -28,7 +30,7 @@ public class ProfileProcessor : EffectiveMetadataProcessor {
             metadata.copy(
                 distribution = distName,
                 diagnostics = metadata.diagnostics + Diagnostics.info(
-                    code = "PROFILE_APPLIED",
+                    code = DiagnosticCodes.Profile.APPLIED,
                     message = "Distribution '$distName' applied",
                     processorId = id,
                     context = emptyMap(),
@@ -39,7 +41,7 @@ public class ProfileProcessor : EffectiveMetadataProcessor {
             metadata.copy(
                 distribution = distName,
                 diagnostics = metadata.diagnostics + Diagnostics.error(
-                    code = "PROFILE_NOT_FOUND",
+                    code = DiagnosticCodes.Profile.NOT_FOUND,
                     message = "Distribution '$distName' not found. Available: $available",
                     processorId = id,
                     context = emptyMap(),

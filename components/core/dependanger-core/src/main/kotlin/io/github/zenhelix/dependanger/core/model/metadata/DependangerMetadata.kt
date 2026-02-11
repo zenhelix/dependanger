@@ -29,4 +29,8 @@ public data class DependangerMetadata(
     val settings: Settings,
     val presets: List<Preset>,
     val extensions: Map<String, JsonElement>,
-)
+) {
+    public companion object {
+        public const val SCHEMA_VERSION: String = "1.0"
+    }
+}

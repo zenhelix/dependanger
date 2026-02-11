@@ -1,13 +1,15 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class BundleFilterProcessor : EffectiveMetadataProcessor {
-    override val id: String = "bundle-filter"
+    override val id: String = ProcessorIds.BUNDLE_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.BUNDLE_FILTER
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -27,7 +29,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
                 val exists = libAlias in existingLibraryAliases
                 if (!exists) {
                     diagnostics = diagnostics + Diagnostics.warning(
-                        code = "BUNDLE_LIBRARY_MISSING",
+                        code = DiagnosticCodes.Bundle.LIBRARY_MISSING,
                         message = "Bundle '$bundleAlias': library '$libAlias' not found (filtered out?)",
                         processorId = id,
                         context = emptyMap(),
@@ -57,7 +59,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
             val notEmpty = bundle.libraries.isNotEmpty()
             if (!notEmpty) {
                 diagnostics = diagnostics + Diagnostics.warning(
-                    code = "BUNDLE_EMPTIED",
+                    code = DiagnosticCodes.Bundle.EMPTIED,
                     message = "Bundle '$alias' removed: no libraries remaining after filtering",
                     processorId = id,
                     context = emptyMap(),

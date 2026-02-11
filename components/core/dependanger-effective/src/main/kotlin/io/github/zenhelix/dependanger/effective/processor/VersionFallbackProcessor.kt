@@ -3,13 +3,15 @@ package io.github.zenhelix.dependanger.effective.processor
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.FallbackCondition
 import io.github.zenhelix.dependanger.core.util.VersionComparator
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionFallbackProcessor : EffectiveMetadataProcessor {
-    override val id: String = "version-fallback"
+    override val id: String = ProcessorIds.VERSION_FALLBACK
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_FALLBACK
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -37,9 +39,8 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
 
             val newVersions = versions + (version.name to current.copy(value = matchedFallback.value))
             val newDiags = diags + Diagnostics.info(
-                code = "FALLBACK_APPLIED",
-                message = "Version '${version.name}': fallback '${matchedFallback.value}' applied " +
-                        "(was '${current.value}', condition: ${matchedFallback.condition})",
+                code = DiagnosticCodes.Version.FALLBACK_APPLIED,
+                message = "Version '${version.name}': fallback '${matchedFallback.value}' applied (was '${current.value}', condition: ${matchedFallback.condition})",
                 processorId = id,
                 context = emptyMap(),
             )

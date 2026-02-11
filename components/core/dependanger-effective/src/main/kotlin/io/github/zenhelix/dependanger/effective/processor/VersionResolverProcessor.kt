@@ -2,6 +2,8 @@ package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.VersionReference
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -9,7 +11,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionResolverProcessor : EffectiveMetadataProcessor {
-    override val id: String = "version-resolver"
+    override val id: String = ProcessorIds.VERSION_RESOLVER
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_RESOLVER
     override val order: Int = phase.order
     override val isOptional: Boolean = false
@@ -32,7 +34,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                     val resolved = metadata.versions[originalRef.name]
                     if (resolved != null) {
                         diagnostics = diagnostics + Diagnostics.info(
-                            code = "VERSION_RESOLVED",
+                            code = DiagnosticCodes.Version.RESOLVED,
                             message = "Library '$alias': version ref '${originalRef.name}' -> '${resolved.value}'",
                             processorId = id,
                             context = emptyMap(),
@@ -47,7 +49,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                         )
                     } else {
                         diagnostics = diagnostics + Diagnostics.error(
-                            code = "UNRESOLVED_VERSION",
+                            code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Library '$alias': version ref '${originalRef.name}' not found in versions map",
                             processorId = id,
                             context = mapOf("alias" to alias, "ref" to originalRef.name),
@@ -77,7 +79,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                         )
                     } else {
                         diagnostics = diagnostics + Diagnostics.error(
-                            code = "UNRESOLVED_VERSION",
+                            code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Plugin '$alias': version ref '${originalRef.name}' not found",
                             processorId = id,
                             context = mapOf("alias" to alias, "ref" to originalRef.name),

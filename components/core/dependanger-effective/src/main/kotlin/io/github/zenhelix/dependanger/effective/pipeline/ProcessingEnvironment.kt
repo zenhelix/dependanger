@@ -13,4 +13,13 @@ public data class ProcessingEnvironment(
         kotlinVersion = kotlinVersion,
         gradleVersion = gradleVersion,
     )
+
+    public companion object {
+        public val DEFAULT: ProcessingEnvironment = ProcessingEnvironment(
+            jdkVersion = null,
+            kotlinVersion = null,
+            gradleVersion = null,
+            environmentVariables = emptyMap(),
+        )
+    }
 }

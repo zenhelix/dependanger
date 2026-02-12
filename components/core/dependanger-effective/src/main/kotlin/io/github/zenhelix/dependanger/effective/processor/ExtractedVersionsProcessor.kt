@@ -32,7 +32,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         val initialAcc = ExtractionAccumulator(
             usedNames = metadata.versions.keys,
             versions = emptyMap(),
-            diagnostics = Diagnostics(errors = emptyList(), warnings = emptyList(), infos = emptyList()),
+            diagnostics = Diagnostics.EMPTY,
             resolvedByAlias = emptyMap(),
         )
 

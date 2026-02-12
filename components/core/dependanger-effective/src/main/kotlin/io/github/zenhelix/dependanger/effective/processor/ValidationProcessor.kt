@@ -77,11 +77,7 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         context: ProcessingContext,
         action: ValidationAction,
     ): Diagnostics {
-        if (action == ValidationAction.IGNORE) return Diagnostics(
-            errors = emptyList(),
-            warnings = emptyList(),
-            infos = emptyList(),
-        )
+        if (action == ValidationAction.IGNORE) return Diagnostics.EMPTY
 
         val originalLibs = context.originalMetadata.libraries.associateBy { it.alias }
 
@@ -156,11 +152,7 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
         action: ValidationAction,
     ): Diagnostics {
-        if (action == ValidationAction.IGNORE) return Diagnostics(
-            errors = emptyList(),
-            warnings = emptyList(),
-            infos = emptyList(),
-        )
+        if (action == ValidationAction.IGNORE) return Diagnostics.EMPTY
 
         val issues = metadata.libraries.mapNotNull { (alias, lib) ->
             val replacedBy = lib.deprecation?.replacedBy

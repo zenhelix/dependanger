@@ -1,11 +1,10 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
-import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.effective.coreProcessors
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
@@ -14,20 +13,26 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
-import io.github.zenhelix.dependanger.effective.processor.BundleFilterProcessor
-import io.github.zenhelix.dependanger.effective.processor.CompatRulesProcessor
-import io.github.zenhelix.dependanger.effective.processor.ExtractedVersionsProcessor
-import io.github.zenhelix.dependanger.effective.processor.LibraryFilterProcessor
-import io.github.zenhelix.dependanger.effective.processor.MetadataConversionProcessor
-import io.github.zenhelix.dependanger.effective.processor.PluginFilterProcessor
-import io.github.zenhelix.dependanger.effective.processor.PluginProcessor
-import io.github.zenhelix.dependanger.effective.processor.ProfileProcessor
-import io.github.zenhelix.dependanger.effective.processor.UsedVersionsProcessor
-import io.github.zenhelix.dependanger.effective.processor.ValidationProcessor
-import io.github.zenhelix.dependanger.effective.processor.VersionFallbackProcessor
-import io.github.zenhelix.dependanger.effective.processor.VersionResolverProcessor
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
 import java.util.ServiceLoader
+
+public fun Dependanger(
+    dslBlock: DependangerDsl.() -> Unit,
+    builderAction: DependangerBuilder.() -> Unit,
+): Dependanger {
+    val builder = DependangerBuilder(dslBlock)
+    builder.builderAction()
+    return builder.build()
+}
+
+public fun Dependanger(
+    metadata: DependangerMetadata,
+    builderAction: DependangerBuilder.() -> Unit,
+): Dependanger {
+    val builder = DependangerBuilder(metadata)
+    builder.builderAction()
+    return builder.build()
+}
 
 public class Dependanger internal constructor(
     private val metadata: DependangerMetadata,
@@ -66,17 +71,13 @@ public class Dependanger internal constructor(
     }
 
     public suspend fun validate(): DependangerResult = try {
-        val builder = PipelineBuilder()
-
-        builder.addProcessors(coreProcessors())
-
-        val featureProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-        builder.addProcessors(featureProcessors.toList())
-
-        ProcessingPreset.MINIMAL.configure(builder)
-        builder.enableOptional("validation")
-
-        val pipeline = builder.build()
+        val pipeline = ProcessingPipeline {
+            addProcessors(coreProcessors())
+            val featureProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
+            addProcessors(featureProcessors.toList())
+            ProcessingPreset.MINIMAL.configure(this)
+            enableOptional("validation")
+        }
         val context = ProcessingContext(
             originalMetadata = metadata,
             settings = metadata.settings,
@@ -93,39 +94,23 @@ public class Dependanger internal constructor(
             diagnostics = effective.diagnostics,
         )
     } catch (e: Exception) {
-        val diagnostics = Diagnostics(
-            errors = listOf(
-                DiagnosticMessage(
-                    code = "VALIDATION_FAILED",
-                    message = "Validation failed: ${e.message}",
-                    severity = Severity.ERROR,
-                    processorId = null,
-                    context = emptyMap(),
-                )
-            ),
-            warnings = emptyList(),
-            infos = emptyList(),
+        val diagnostics = Diagnostics.error(
+            code = "VALIDATION_FAILED",
+            message = "Validation failed: ${e.message}",
+            processorId = null,
+            context = emptyMap(),
         )
         DependangerResult(effective = null, diagnostics = diagnostics)
     }
 
-    private fun buildPipeline(): ProcessingPipeline {
-        val builder = PipelineBuilder()
-
-        builder.addProcessors(coreProcessors())
-
+    private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
+        addProcessors(coreProcessors())
         val featureProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-        builder.addProcessors(featureProcessors.toList())
-
-        builder.addProcessors(additionalProcessors)
-
-        preset.configure(builder)
-
-        disabledProcessorIds.forEach { id -> builder.disable(id) }
-
-        pipelineCustomizer?.invoke(builder)
-
-        return builder.build()
+        addProcessors(featureProcessors.toList())
+        addProcessors(additionalProcessors)
+        preset.configure(this)
+        disabledProcessorIds.forEach { id -> disable(id) }
+        pipelineCustomizer?.invoke(this)
     }
 
     public companion object {
@@ -143,20 +128,5 @@ public class Dependanger internal constructor(
             }
             return DependangerBuilder(metadata)
         }
-
-        private fun coreProcessors(): List<EffectiveMetadataProcessor> = listOf(
-            ProfileProcessor(),
-            MetadataConversionProcessor(),
-            ExtractedVersionsProcessor(),
-            LibraryFilterProcessor(),
-            VersionFallbackProcessor(),
-            VersionResolverProcessor(),
-            BundleFilterProcessor(),
-            PluginFilterProcessor(),
-            PluginProcessor(),
-            UsedVersionsProcessor(),
-            ValidationProcessor(),
-            CompatRulesProcessor(),
-        )
     }
 }

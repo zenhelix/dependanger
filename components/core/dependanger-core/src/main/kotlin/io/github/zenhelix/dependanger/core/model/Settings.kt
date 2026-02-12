@@ -76,16 +76,16 @@ public data class TomlSettings(
 
 @Serializable
 public data class BomSettings(
-    val groupId: String,
-    val artifactId: String,
-    val version: String,
+    val groupId: String?,
+    val artifactId: String?,
+    val version: String?,
     val includeOptionalDependencies: Boolean,
 ) {
     public companion object {
         public val DEFAULT: BomSettings = BomSettings(
-            groupId = "",
-            artifactId = "",
-            version = "",
+            groupId = null,
+            artifactId = null,
+            version = null,
             includeOptionalDependencies = false,
         )
     }
@@ -94,14 +94,14 @@ public data class BomSettings(
 @Serializable
 public data class BomCacheSettings(
     val enabled: Boolean,
-    val directory: String,
+    val directory: String?,
     val ttlHours: Long,
     val ttlSnapshotHours: Long,
 ) {
     public companion object {
         public val DEFAULT: BomCacheSettings = BomCacheSettings(
             enabled = true,
-            directory = "",
+            directory = null,
             ttlHours = 24,
             ttlSnapshotHours = 1,
         )
@@ -116,7 +116,7 @@ public data class UpdateCheckSettings(
     val repositories: List<Repository>,
     val timeout: Long,
     val parallelism: Int,
-    val cacheDirectory: String,
+    val cacheDirectory: String?,
     val cacheTtlHours: Long,
 ) {
     public companion object {
@@ -127,7 +127,7 @@ public data class UpdateCheckSettings(
             repositories = emptyList(),
             timeout = 30_000,
             parallelism = 10,
-            cacheDirectory = "",
+            cacheDirectory = null,
             cacheTtlHours = 1,
         )
     }

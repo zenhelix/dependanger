@@ -18,11 +18,7 @@ public class ProcessingPipeline(
             libraries = emptyMap(),
             plugins = emptyMap(),
             bundles = emptyMap(),
-            diagnostics = Diagnostics(
-                errors = emptyList(),
-                warnings = emptyList(),
-                infos = emptyList(),
-            ),
+            diagnostics = Diagnostics.EMPTY,
             processingInfo = null,
         )
 
@@ -129,6 +125,13 @@ public class ProcessingPipeline(
         }
     }
 
+    /**
+     * Collects diagnostics added by a parallel processor.
+     *
+     * Contract: parallel processors MUST only append diagnostics.
+     * The base lists are guaranteed to be prefixes of result lists
+     * because [validateParallelResult] prevents modification of core fields.
+     */
     private fun collectNewDiagnostics(base: Diagnostics, result: Diagnostics): Diagnostics = Diagnostics(
         errors = result.errors.drop(base.errors.size),
         warnings = result.warnings.drop(base.warnings.size),

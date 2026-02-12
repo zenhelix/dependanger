@@ -11,12 +11,7 @@ public class DependangerBuilder {
     private var metadata: DependangerMetadata? = null
     private var dslBlock: (DependangerDsl.() -> Unit)? = null
     private var preset: ProcessingPreset = ProcessingPreset.DEFAULT
-    private var environment: ProcessingEnvironment = ProcessingEnvironment(
-        jdkVersion = null,
-        kotlinVersion = null,
-        gradleVersion = null,
-        environmentVariables = emptyMap(),
-    )
+    private var environment: ProcessingEnvironment = ProcessingEnvironment.DEFAULT
     private val additionalProcessors: MutableList<EffectiveMetadataProcessor> = mutableListOf()
     private val disabledProcessorIds: MutableSet<String> = mutableSetOf()
     private var pipelineCustomizer: (PipelineBuilder.() -> Unit)? = null
@@ -29,25 +24,39 @@ public class DependangerBuilder {
         this.metadata = metadata
     }
 
-    public fun preset(preset: ProcessingPreset): DependangerBuilder = apply { this.preset = preset }
-    public fun environment(environment: ProcessingEnvironment): DependangerBuilder = apply { this.environment = environment }
-    public fun jdkVersion(version: Int): DependangerBuilder = apply { this.environment = environment.copy(jdkVersion = version) }
-    public fun kotlinVersion(version: String): DependangerBuilder = apply { this.environment = environment.copy(kotlinVersion = version) }
-    public fun gradleVersion(version: String): DependangerBuilder = apply { this.environment = environment.copy(gradleVersion = version) }
+    public fun preset(preset: ProcessingPreset) {
+        this.preset = preset
+    }
 
-    public fun addProcessor(processor: EffectiveMetadataProcessor): DependangerBuilder = apply {
+    public fun environment(environment: ProcessingEnvironment) {
+        this.environment = environment
+    }
+
+    public fun jdkVersion(version: Int) {
+        this.environment = environment.copy(jdkVersion = version)
+    }
+
+    public fun kotlinVersion(version: String) {
+        this.environment = environment.copy(kotlinVersion = version)
+    }
+
+    public fun gradleVersion(version: String) {
+        this.environment = environment.copy(gradleVersion = version)
+    }
+
+    public fun addProcessor(processor: EffectiveMetadataProcessor) {
         additionalProcessors.add(processor)
     }
 
-    public fun disableProcessor(processorId: String): DependangerBuilder = apply {
+    public fun disableProcessor(processorId: String) {
         disabledProcessorIds.add(processorId)
     }
 
-    public fun configureProcessing(block: PipelineBuilder.() -> Unit): DependangerBuilder = apply {
+    public fun configureProcessing(block: PipelineBuilder.() -> Unit) {
         this.pipelineCustomizer = block
     }
 
-    public fun build(): Dependanger {
+    internal fun build(): Dependanger {
         val resolvedMetadata = resolveMetadata()
         return Dependanger(
             metadata = resolvedMetadata,
@@ -68,6 +77,9 @@ public class DependangerBuilder {
             return dsl.toMetadata()
         }
 
-        throw DependangerConfigurationException("Cannot build Dependanger: neither metadata nor DSL block provided. Use Dependanger.fromMetadata() or Dependanger.fromDsl() to create a builder.")
+        throw DependangerConfigurationException(
+            "Cannot build Dependanger: neither metadata nor DSL block provided. Use Dependanger.fromMetadata() or Dependanger.fromDsl() to create a builder.",
+            null
+        )
     }
 }

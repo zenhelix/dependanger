@@ -27,11 +27,20 @@ public data class Diagnostics(
     )
 
     public companion object {
-        public fun of(vararg messages: DiagnosticMessage): Diagnostics = Diagnostics(
-            errors = messages.filter { it.severity == Severity.ERROR },
-            warnings = messages.filter { it.severity == Severity.WARNING },
-            infos = messages.filter { it.severity == Severity.INFO },
+        public val EMPTY: Diagnostics = Diagnostics(
+            errors = emptyList(),
+            warnings = emptyList(),
+            infos = emptyList(),
         )
+
+        public fun of(vararg messages: DiagnosticMessage): Diagnostics {
+            val grouped = messages.groupBy { it.severity }
+            return Diagnostics(
+                errors = grouped[Severity.ERROR].orEmpty(),
+                warnings = grouped[Severity.WARNING].orEmpty(),
+                infos = grouped[Severity.INFO].orEmpty(),
+            )
+        }
 
         public fun error(code: String, message: String, processorId: String?, context: Map<String, String>): Diagnostics =
             Diagnostics(

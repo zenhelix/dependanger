@@ -3,8 +3,10 @@ package io.github.zenhelix.dependanger.effective.pipeline
 import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 
+/** Type-safe key for storing values in [ProcessingContext]. */
 public class ProcessingContextKey<T>(public val name: String)
 
+/** Immutable processing context passed through the pipeline. Use [with] to add typed properties. */
 public class ProcessingContext(
     public val originalMetadata: DependangerMetadata,
     public val settings: Settings,

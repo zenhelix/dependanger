@@ -12,7 +12,7 @@ public data class DependangerResult(
     public val isSuccess: Boolean get() = effective != null && !diagnostics.hasErrors
 
     public fun <T> generate(generator: ArtifactGenerator<T>): T {
-        val metadata = effective ?: throw DependangerProcessingException("Cannot generate: processing failed", null)
+        val metadata = effective ?: throw DependangerProcessingException("Cannot generate: processing failed", null, null)
         return generator.generate(metadata)
     }
 

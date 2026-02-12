@@ -4,10 +4,14 @@ public data class BomConfig(
     val groupId: String,
     val artifactId: String,
     val version: String,
-    val name: String = "",
-    val description: String = "",
-    val filename: String = "bom.pom.xml",
-    val includeOptionalDependencies: Boolean = false,
-    val prettyPrint: Boolean = true,
-    val includeDeprecationComments: Boolean = true,
-)
+    val name: String?,
+    val description: String?,
+    val filename: String,
+    val includeOptionalDependencies: Boolean,
+    val prettyPrint: Boolean,
+    val includeDeprecationComments: Boolean,
+) {
+    public companion object {
+        public const val DEFAULT_FILENAME: String = "bom.pom.xml"
+    }
+}

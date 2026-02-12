@@ -199,9 +199,9 @@ public class TomlSettingsDsl {
 
 @DependangerDslMarker
 public class BomSettingsDsl {
-    public var groupId: String = BomSettings.DEFAULT.groupId
-    public var artifactId: String = BomSettings.DEFAULT.artifactId
-    public var version: String = BomSettings.DEFAULT.version
+    public var groupId: String? = BomSettings.DEFAULT.groupId
+    public var artifactId: String? = BomSettings.DEFAULT.artifactId
+    public var version: String? = BomSettings.DEFAULT.version
     public var includeOptionalDependencies: Boolean = BomSettings.DEFAULT.includeOptionalDependencies
 
     public fun toSettings(): BomSettings = BomSettings(
@@ -215,7 +215,7 @@ public class BomSettingsDsl {
 @DependangerDslMarker
 public class BomCacheSettingsDsl {
     public var enabled: Boolean = BomCacheSettings.DEFAULT.enabled
-    public var directory: String = BomCacheSettings.DEFAULT.directory
+    public var directory: String? = BomCacheSettings.DEFAULT.directory
     public var ttlHours: Long = BomCacheSettings.DEFAULT.ttlHours
     public var ttlSnapshotHours: Long = BomCacheSettings.DEFAULT.ttlSnapshotHours
 
@@ -235,7 +235,7 @@ public class UpdateCheckSettingsDsl {
     public var repositories: List<Repository> = UpdateCheckSettings.DEFAULT.repositories
     public var timeout: Long = UpdateCheckSettings.DEFAULT.timeout
     public var parallelism: Int = UpdateCheckSettings.DEFAULT.parallelism
-    public var cacheDirectory: String = UpdateCheckSettings.DEFAULT.cacheDirectory
+    public var cacheDirectory: String? = UpdateCheckSettings.DEFAULT.cacheDirectory
     public var cacheTtlHours: Long = UpdateCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): UpdateCheckSettings = UpdateCheckSettings(

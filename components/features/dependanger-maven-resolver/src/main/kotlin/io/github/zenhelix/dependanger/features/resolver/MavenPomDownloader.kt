@@ -1,18 +1,13 @@
 package io.github.zenhelix.dependanger.features.resolver
 
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
+import io.github.zenhelix.dependanger.http.client.HttpResult
+import io.github.zenhelix.dependanger.http.client.RetryConfig
+import io.github.zenhelix.dependanger.http.client.getWithRetry
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.basicAuth
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.delay
-
-private val logger = KotlinLogging.logger {}
 
 public class MavenPomDownloader(
     private val repositories: List<MavenRepository>,
@@ -60,66 +55,23 @@ public class MavenPomDownloader(
         }
     }
 
-    private suspend fun downloadWithRetry(url: String, repoUrl: String, maxRetries: Int = 3): DownloadResult {
-        var delayMs = 1000L
-        repeat(maxRetries) { attempt ->
-            try {
-                val response = httpClient.get(url) {
-                    credentialsProvider?.getCredentials(repoUrl)?.let { creds ->
-                        basicAuth(creds.username, creds.password)
-                    }
-                    timeout {
-                        connectTimeoutMillis = connectTimeoutMs
-                        requestTimeoutMillis = readTimeoutMs
-                    }
-                }
-                when {
-                    response.status == HttpStatusCode.OK                                    -> return DownloadResult.Success(response.bodyAsText())
-                    response.status == HttpStatusCode.NotFound                              -> return DownloadResult.NotFound
-                    response.status == HttpStatusCode.Unauthorized ||
-                            response.status == HttpStatusCode.Forbidden -> {
-                        logger.debug { "Authentication required for $url (${response.status})" }
-                        return DownloadResult.AuthRequired(url, response.status.value)
-                    }
-
-                    response.status == HttpStatusCode.TooManyRequests   -> {
-                        val retryAfterMs = response.headers["Retry-After"]?.toLongOrNull()
-                            ?.let { it * 1000 }
-                            ?: delayMs
-                        delay(retryAfterMs)
-                        delayMs *= 2
-                    }
-
-                    response.status.value >= 500                        -> {
-                        if (attempt == maxRetries - 1) {
-                            logger.debug { "Server error for $url after $maxRetries attempts: ${response.status}" }
-                            return DownloadResult.Failed("Server error for $url after $maxRetries attempts: ${response.status}")
-                        }
-                        delay(delayMs)
-                        delayMs *= 2
-                    }
-
-                    else                                                -> {
-                        logger.debug { "Unexpected status ${response.status} for $url" }
-                        return DownloadResult.Failed("Unexpected status ${response.status} for $url")
-                    }
-                }
-            } catch (e: HttpRequestTimeoutException) {
-                if (attempt == maxRetries - 1) {
-                    logger.debug(e) { "Timeout downloading $url after $maxRetries attempts" }
-                    return DownloadResult.Failed("Timeout downloading $url after $maxRetries attempts: ${e.message}")
-                }
-                delay(delayMs)
-                delayMs *= 2
-            } catch (e: Exception) {
-                if (attempt == maxRetries - 1) {
-                    logger.debug(e) { "Failed to download $url after $maxRetries attempts" }
-                    return DownloadResult.Failed("Failed to download $url after $maxRetries attempts: ${e.message}")
-                }
-                delay(delayMs)
-                delayMs *= 2
+    private suspend fun downloadWithRetry(url: String, repoUrl: String): DownloadResult {
+        val httpResult = httpClient.getWithRetry(url, RetryConfig()) {
+            credentialsProvider?.getCredentials(repoUrl)?.let { creds ->
+                basicAuth(creds.username, creds.password)
+            }
+            timeout {
+                connectTimeoutMillis = connectTimeoutMs
+                requestTimeoutMillis = readTimeoutMs
             }
         }
-        return DownloadResult.Failed("Failed to download $url after exhausting retries")
+
+        return when (httpResult) {
+            is HttpResult.Success      -> DownloadResult.Success(httpResult.data)
+            is HttpResult.NotFound     -> DownloadResult.NotFound
+            is HttpResult.AuthRequired -> DownloadResult.AuthRequired(httpResult.url, httpResult.statusCode)
+            is HttpResult.RateLimited  -> DownloadResult.Failed("Rate limited for $url, retry after ${httpResult.retryAfterMs}ms")
+            is HttpResult.Failed       -> DownloadResult.Failed(httpResult.error)
+        }
     }
 }

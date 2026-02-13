@@ -11,13 +11,8 @@ import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.engine.cio.endpoint
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
 
 private val logger = KotlinLogging.logger {}
 
@@ -386,7 +381,11 @@ private class BomResolutionContext(
     ttlSnapshotHours: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = createHttpClient()
+    val httpClient: HttpClient = HttpClientFactory.create {
+        connectTimeoutMs = HTTP_CONNECT_TIMEOUT_MS
+        requestTimeoutMs = HTTP_REQUEST_TIMEOUT_MS
+        keepAliveMs = HTTP_KEEP_ALIVE_MS
+    }
 
     val cache: BomCache = BomCache(
         cacheDirectory = cacheDirectory,
@@ -406,22 +405,5 @@ private class BomResolutionContext(
 
     override fun close() {
         httpClient.close()
-    }
-
-    private fun createHttpClient(): HttpClient = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-        engine {
-            requestTimeout = HTTP_REQUEST_TIMEOUT_MS
-            endpoint {
-                connectTimeout = HTTP_CONNECT_TIMEOUT_MS
-                keepAliveTime = HTTP_KEEP_ALIVE_MS
-            }
-        }
-        install(HttpTimeout) {
-            connectTimeoutMillis = HTTP_CONNECT_TIMEOUT_MS
-            requestTimeoutMillis = HTTP_REQUEST_TIMEOUT_MS
-        }
     }
 }

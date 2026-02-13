@@ -9,18 +9,10 @@ dependencies {
     api(project(":components:core:dependanger-core"))
     api(project(":components:core:dependanger-effective"))
     implementation(project(":components:features:dependanger-maven-resolver"))
-
-    // HTTP client
-    implementation("io.ktor:ktor-client-core:3.1.1")
-    implementation("io.ktor:ktor-client-cio:3.1.1")
-    implementation("io.ktor:ktor-client-content-negotiation:3.1.1")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.1.1")
+    api(project(":components:shared:dependanger-http-client"))
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")

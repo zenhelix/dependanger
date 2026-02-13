@@ -3,8 +3,7 @@ package io.github.zenhelix.dependanger.maven.pom.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-@JvmInline
-public value class PomProperties(
+public data class PomProperties(
     public val entries: Map<String, String> = emptyMap(),
 ) {
     public operator fun get(key: String): String? = entries[key]

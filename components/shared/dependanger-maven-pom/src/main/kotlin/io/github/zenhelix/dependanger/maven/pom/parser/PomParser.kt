@@ -11,7 +11,7 @@ import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
-public class PomParser {
+public object PomParser {
 
     public fun parse(pomXml: String): PomProject {
         try {
@@ -25,10 +25,11 @@ public class PomParser {
     }
 
     private fun parseXmlDocument(xml: String): Document {
-        val factory = DocumentBuilderFactory.newInstance()
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-        factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        }
         val builder = factory.newDocumentBuilder()
         return builder.parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
     }

@@ -8,7 +8,6 @@ import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
-import io.github.zenhelix.dependanger.maven.pom.util.escapeXmlComment
 import io.github.zenhelix.dependanger.maven.pom.writer.PomWriter
 import io.github.zenhelix.dependanger.maven.pom.writer.PomWriterConfig
 import java.nio.charset.StandardCharsets
@@ -89,20 +88,18 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
 
         val writer = PomWriter(writerConfig)
 
-        return if (config.includeDeprecationComments) {
-            writer.write(project) { index, _ ->
-                val lib = dependencies[index]
-                if (lib.isDeprecated) buildDeprecationXmlComment(lib) else null
-            }
+        val dependencyComments = if (config.includeDeprecationComments) {
+            dependencies.withIndex()
+                .filter { (_, lib) -> lib.isDeprecated }
+                .associate { (index, lib) -> index to buildDeprecationComment(lib) }
         } else {
-            writer.write(project)
+            emptyMap()
         }
+
+        return writer.write(project, dependencyComments)
     }
 
-    private fun buildDeprecationXmlComment(lib: EffectiveLibrary): String {
-        val nl = if (config.prettyPrint) "\n" else ""
-        val indent3 = if (config.prettyPrint) INDENT.repeat(3) else ""
-
+    private fun buildDeprecationComment(lib: EffectiveLibrary): String {
         val deprecation = lib.deprecation
         val parts = mutableListOf<String>()
 
@@ -111,8 +108,7 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
         deprecation?.replacedBy?.let { parts.add("Use $it instead") }
         deprecation?.removalVersion?.let { parts.add("Removal: $it") }
 
-        val commentText = parts.joinToString(". ")
-        return "$indent3<!-- ${commentText.escapeXmlComment()} -->$nl"
+        return parts.joinToString(". ")
     }
 
     public companion object {

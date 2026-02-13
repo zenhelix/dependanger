@@ -7,10 +7,8 @@ import io.github.zenhelix.dependanger.maven.pom.util.PropertyResolver
 
 public class PomXmlParser {
 
-    private val pomParser: PomParser = PomParser()
-
     public fun parseBomContent(pomXml: String): PomParseResult {
-        val project = pomParser.parse(pomXml)
+        val project = PomParser.parse(pomXml)
         return toPomParseResult(project)
     }
 

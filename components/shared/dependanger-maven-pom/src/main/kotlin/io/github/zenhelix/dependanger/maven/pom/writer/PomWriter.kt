@@ -3,7 +3,9 @@ package io.github.zenhelix.dependanger.maven.pom.writer
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
 import io.github.zenhelix.dependanger.maven.pom.util.MavenConstants
-import io.github.zenhelix.dependanger.maven.pom.util.escapeXml
+import io.github.zenhelix.dependanger.maven.pom.xml.XmlConfig
+import io.github.zenhelix.dependanger.maven.pom.xml.XmlElement
+import io.github.zenhelix.dependanger.maven.pom.xml.xml
 
 public class PomWriter(
     private val config: PomWriterConfig = PomWriterConfig(),
@@ -11,100 +13,94 @@ public class PomWriter(
 
     public fun write(
         project: PomProject,
-        beforeDependency: ((index: Int, dep: PomDependency) -> String?)? = null,
+        dependencyComments: Map<Int, String> = emptyMap(),
     ): String {
-        val sb = StringBuilder()
-        val nl = if (config.prettyPrint) "\n" else ""
-        val indent = if (config.prettyPrint) config.indent else ""
+        val xmlConfig = XmlConfig(config.prettyPrint, config.indent)
 
-        if (config.includeXmlDeclaration) {
-            sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>$nl")
-        }
-
-        val attrSep = if (config.prettyPrint) "\n${indent.repeat(2)}" else " "
-        sb.append("<project xmlns=\"${MavenConstants.MAVEN_POM_NS}\"")
-        sb.append("${attrSep}xmlns:xsi=\"${MavenConstants.MAVEN_XSI_NS}\"")
-        sb.append("${attrSep}xsi:schemaLocation=\"${MavenConstants.MAVEN_XSD_LOCATION}\">$nl")
-
-        sb.append("$indent<modelVersion>${project.modelVersion.escapeXml()}</modelVersion>$nl")
-        sb.append("$indent<groupId>${project.coordinates.groupId.escapeXml()}</groupId>$nl")
-        sb.append("$indent<artifactId>${project.coordinates.artifactId.escapeXml()}</artifactId>$nl")
-        sb.append("$indent<version>${project.coordinates.version.escapeXml()}</version>$nl")
-        sb.append("$indent<packaging>${project.packaging.escapeXml()}</packaging>$nl")
-
-        project.name?.takeIf { it.isNotBlank() }?.let {
-            sb.append("$indent<name>${it.escapeXml()}</name>$nl")
-        }
-        project.description?.takeIf { it.isNotBlank() }?.let {
-            sb.append("$indent<description>${it.escapeXml()}</description>$nl")
-        }
-
-        project.parent?.let { parent ->
-            sb.append("${nl}$indent<parent>$nl")
-            sb.append("$indent$indent<groupId>${parent.coordinates.groupId.escapeXml()}</groupId>$nl")
-            sb.append("$indent$indent<artifactId>${parent.coordinates.artifactId.escapeXml()}</artifactId>$nl")
-            sb.append("$indent$indent<version>${parent.coordinates.version.escapeXml()}</version>$nl")
-            parent.relativePath?.let {
-                sb.append("$indent$indent<relativePath>${it.escapeXml()}</relativePath>$nl")
+        return xml(xmlConfig) {
+            if (config.includeXmlDeclaration) {
+                xmlDeclaration()
             }
-            sb.append("$indent</parent>$nl")
-        }
 
-        if (project.properties.entries.isNotEmpty()) {
-            sb.append("${nl}$indent<properties>$nl")
-            for ((key, value) in project.properties.entries) {
-                sb.append("$indent$indent<$key>${value.escapeXml()}</$key>$nl")
-            }
-            sb.append("$indent</properties>$nl")
-        }
+            element(
+                "project", attrs = linkedMapOf(
+                    "xmlns" to MavenConstants.MAVEN_POM_NS,
+                    "xmlns:xsi" to MavenConstants.MAVEN_XSI_NS,
+                    "xsi:schemaLocation" to MavenConstants.MAVEN_XSD_LOCATION,
+                )
+            ) {
+                element("modelVersion") { text(project.modelVersion) }
+                element("groupId") { text(project.coordinates.groupId) }
+                element("artifactId") { text(project.coordinates.artifactId) }
+                element("version") { text(project.coordinates.version) }
+                element("packaging") { text(project.packaging) }
 
-        project.dependencyManagement?.let { dm ->
-            if (dm.dependencies.isNotEmpty()) {
-                sb.append("${nl}$indent<dependencyManagement>$nl")
-                sb.append("$indent$indent<dependencies>$nl")
-
-                for ((index, dep) in dm.dependencies.withIndex()) {
-                    beforeDependency?.invoke(index, dep)?.let { sb.append(it) }
-                    sb.append(writeDependency(dep, indent))
+                project.name?.takeIf { it.isNotBlank() }?.let {
+                    element("name") { text(it) }
                 }
 
-                sb.append("$indent$indent</dependencies>$nl")
-                sb.append("$indent</dependencyManagement>$nl")
+                project.description?.takeIf { it.isNotBlank() }?.let {
+                    element("description") { text(it) }
+                }
+
+                project.parent?.let { parent ->
+                    blankLine()
+                    element("parent") {
+                        element("groupId") { text(parent.coordinates.groupId) }
+                        element("artifactId") { text(parent.coordinates.artifactId) }
+                        element("version") { text(parent.coordinates.version) }
+                        parent.relativePath?.let {
+                            element("relativePath") { text(it) }
+                        }
+                    }
+                }
+
+                if (project.properties.entries.isNotEmpty()) {
+                    blankLine()
+                    element("properties") {
+                        for ((key, value) in project.properties.entries) {
+                            element(key) { text(value) }
+                        }
+                    }
+                }
+
+                project.dependencyManagement?.let { dm ->
+                    if (dm.dependencies.isNotEmpty()) {
+                        blankLine()
+                        element("dependencyManagement") {
+                            element("dependencies") {
+                                for ((index, dep) in dm.dependencies.withIndex()) {
+                                    dependencyComments[index]?.let { comment(it) }
+                                    writeDependency(dep)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        sb.append("</project>$nl")
-
-        return sb.toString()
     }
 
-    private fun writeDependency(dep: PomDependency, baseIndent: String): String {
-        val nl = if (config.prettyPrint) "\n" else ""
-        val indent3 = if (config.prettyPrint) baseIndent.repeat(3) else ""
-        val indent4 = if (config.prettyPrint) baseIndent.repeat(4) else ""
+    private fun XmlElement.writeDependency(dep: PomDependency) {
+        element("dependency") {
+            element("groupId") { text(dep.groupId) }
+            element("artifactId") { text(dep.artifactId) }
 
-        val sb = StringBuilder()
-        sb.append("$indent3<dependency>$nl")
-        sb.append("$indent4<groupId>${dep.groupId.escapeXml()}</groupId>$nl")
-        sb.append("$indent4<artifactId>${dep.artifactId.escapeXml()}</artifactId>$nl")
+            dep.version?.let {
+                element("version") { text(it) }
+            }
 
-        dep.version?.let {
-            sb.append("$indent4<version>${it.escapeXml()}</version>$nl")
+            dep.type?.let {
+                element("type") { text(it) }
+            }
+
+            dep.scope?.let {
+                element("scope") { text(it) }
+            }
+
+            if (dep.optional) {
+                element("optional") { text("true") }
+            }
         }
-
-        dep.type?.let {
-            sb.append("$indent4<type>${it.escapeXml()}</type>$nl")
-        }
-
-        dep.scope?.let {
-            sb.append("$indent4<scope>${it.escapeXml()}</scope>$nl")
-        }
-
-        if (dep.optional) {
-            sb.append("$indent4<optional>true</optional>$nl")
-        }
-
-        sb.append("$indent3</dependency>$nl")
-        return sb.toString()
     }
 }

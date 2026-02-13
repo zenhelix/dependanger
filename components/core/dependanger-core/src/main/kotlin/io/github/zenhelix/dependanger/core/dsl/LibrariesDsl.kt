@@ -18,7 +18,7 @@ public class LibrariesDsl {
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
-                license = null, constraints = emptyList(), isPlatform = false,
+                license = null, constraints = emptyList(), isPlatform = false, ignoreUpdates = false,
             )
         )
     }
@@ -29,7 +29,7 @@ public class LibrariesDsl {
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
-                license = null, constraints = emptyList(), isPlatform = false,
+                license = null, constraints = emptyList(), isPlatform = false, ignoreUpdates = false,
             )
         )
     }
@@ -52,7 +52,7 @@ public class LibrariesDsl {
             Library(
                 alias = alias, group = group, artifact = artifact, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
-                license = null, constraints = emptyList(), isPlatform = true,
+                license = null, constraints = emptyList(), isPlatform = true, ignoreUpdates = false,
             )
         )
     }
@@ -75,6 +75,7 @@ public class LibraryDsl(private var version: VersionReference? = null) {
     public var requires: Requirements? = null
     public var deprecation: DeprecationInfo? = null
     public var license: LicenseInfo? = null
+    public var ignoreUpdates: Boolean = false
     private val _constraints: MutableList<Constraint> = mutableListOf()
     public val constraints: List<Constraint> get() = _constraints.toList()
 
@@ -118,5 +119,6 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         license = license,
         constraints = constraints,
         isPlatform = false,
+        ignoreUpdates = ignoreUpdates,
     )
 }

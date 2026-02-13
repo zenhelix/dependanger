@@ -14,6 +14,9 @@ dependencies {
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
 
+    // DateTime
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
 

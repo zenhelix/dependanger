@@ -50,6 +50,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
                 license = lib.license,
                 constraints = lib.constraints,
                 isPlatform = lib.isPlatform,
+                ignoreUpdates = lib.ignoreUpdates,
             )
         }
 

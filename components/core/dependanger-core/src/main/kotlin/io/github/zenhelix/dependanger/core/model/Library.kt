@@ -15,4 +15,5 @@ public data class Library(
     val license: LicenseInfo?,
     val constraints: List<Constraint>,
     val isPlatform: Boolean,
+    val ignoreUpdates: Boolean = false,
 )

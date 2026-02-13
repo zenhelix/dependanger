@@ -41,6 +41,16 @@ public object DiagnosticCodes {
         public const val INVALID_COORDINATES: String = "VALIDATION_INVALID_COORDINATES"
     }
 
+    public object Update {
+        public const val UPDATES_AVAILABLE: String = "UPDATES_AVAILABLE"
+        public const val ALL_UP_TO_DATE: String = "ALL_UP_TO_DATE"
+        public const val REPO_UNREACHABLE: String = "UPDATE_REPO_UNREACHABLE"
+        public const val TIMEOUT: String = "UPDATE_TIMEOUT"
+        public const val LIB_NOT_FOUND: String = "UPDATE_LIB_NOT_FOUND"
+        public const val INVALID_VERSION: String = "UPDATE_INVALID_VERSION"
+        public const val RATE_LIMITED: String = "UPDATE_RATE_LIMITED"
+    }
+
     public object Compatibility {
         public const val CUSTOM_RULE_DEFERRED: String = "COMPAT_CUSTOM_RULE_DEFERRED"
         public const val NO_CUSTOM_RULES: String = "COMPAT_NO_CUSTOM_RULES"

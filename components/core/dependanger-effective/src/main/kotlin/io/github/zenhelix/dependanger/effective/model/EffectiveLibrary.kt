@@ -20,4 +20,5 @@ public data class EffectiveLibrary(
     val license: LicenseInfo?,
     val constraints: List<Constraint>,
     val isPlatform: Boolean,
+    val ignoreUpdates: Boolean = false,
 )

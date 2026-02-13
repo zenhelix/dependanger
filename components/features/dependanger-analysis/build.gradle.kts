@@ -7,7 +7,6 @@ description = "Dependanger Analysis - Compatibility and JDK analysis"
 dependencies {
     api(project(":components:core:dependanger-core"))
     api(project(":components:core:dependanger-effective"))
-    implementation(project(":components:features:dependanger-maven-resolver"))
 
     // ASM for bytecode analysis
     implementation("org.ow2.asm:asm:9.7.1")

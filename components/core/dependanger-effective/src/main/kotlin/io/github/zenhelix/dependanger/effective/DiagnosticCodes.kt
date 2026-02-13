@@ -43,5 +43,9 @@ public object DiagnosticCodes {
 
     public object Compatibility {
         public const val CUSTOM_RULE_DEFERRED: String = "COMPAT_CUSTOM_RULE_DEFERRED"
+        public const val NO_CUSTOM_RULES: String = "COMPAT_NO_CUSTOM_RULES"
+        public const val CUSTOM_RULE: String = "COMPAT_CUSTOM_RULE"
+        public const val CUSTOM_HANDLER_NOT_FOUND: String = "COMPAT_CUSTOM_HANDLER_NOT_FOUND"
+        public const val CUSTOM_RULE_FAILED: String = "COMPAT_CUSTOM_RULE_FAILED"
     }
 }

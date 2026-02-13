@@ -2,7 +2,6 @@ package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.CompatibilityRule
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.VersionConstraintType
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.VersionComparator
@@ -12,6 +11,7 @@ import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssuesExtensionKey
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
+import io.github.zenhelix.dependanger.effective.model.toDiagnostics
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -63,28 +63,12 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
         )
 
         val issueDiagnostics = issues.fold(rulesDiagnostics) { accDiag, issue ->
-            accDiag + when (issue.severity) {
-                Severity.ERROR   -> Diagnostics.error(
-                    code = "COMPAT_${issue.ruleId.uppercase()}",
-                    message = issue.message,
-                    processorId = id,
-                    context = emptyMap(),
-                )
-
-                Severity.WARNING -> Diagnostics.warning(
-                    code = "COMPAT_${issue.ruleId.uppercase()}",
-                    message = issue.message,
-                    processorId = id,
-                    context = emptyMap(),
-                )
-
-                Severity.INFO    -> Diagnostics.info(
-                    code = "COMPAT_${issue.ruleId.uppercase()}",
-                    message = issue.message,
-                    processorId = id,
-                    context = emptyMap(),
-                )
-            }
+            accDiag + issue.toDiagnostics(
+                code = "COMPAT_${issue.ruleId.uppercase()}",
+                processorId = id,
+                message = issue.message,
+                context = emptyMap(),
+            )
         }
 
         return result.copy(diagnostics = issueDiagnostics)

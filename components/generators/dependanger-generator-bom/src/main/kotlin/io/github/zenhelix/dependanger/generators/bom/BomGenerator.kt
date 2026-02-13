@@ -4,6 +4,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
+import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
+import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
+import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
+import io.github.zenhelix.dependanger.maven.pom.model.PomProject
+import io.github.zenhelix.dependanger.maven.pom.util.escapeXmlComment
+import io.github.zenhelix.dependanger.maven.pom.writer.PomWriter
+import io.github.zenhelix.dependanger.maven.pom.writer.PomWriterConfig
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -56,87 +63,45 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     }
 
     private fun buildXml(dependencies: List<EffectiveLibrary>): String {
-        val sb = StringBuilder()
-        val indent = if (config.prettyPrint) INDENT else ""
-        val nl = if (config.prettyPrint) "\n" else ""
-
-        // XML declaration
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>$nl")
-
-        // <project>
-        val attrSep = if (config.prettyPrint) "\n${indent.repeat(2)}" else " "
-        sb.append("<project xmlns=\"$MAVEN_POM_NS\"")
-        sb.append("${attrSep}xmlns:xsi=\"$MAVEN_XSI_NS\"")
-        sb.append("${attrSep}xsi:schemaLocation=\"$MAVEN_XSD_LOCATION\">$nl")
-
-        // Coordinates
-        sb.append("$indent<modelVersion>$MODEL_VERSION</modelVersion>$nl")
-        sb.append("$indent<groupId>${escapeXml(config.groupId)}</groupId>$nl")
-        sb.append("$indent<artifactId>${escapeXml(config.artifactId)}</artifactId>$nl")
-        sb.append("$indent<version>${escapeXml(config.version)}</version>$nl")
-        sb.append("$indent<packaging>pom</packaging>$nl")
-
-        // name and description (if provided and not blank)
-        if (!config.name.isNullOrBlank()) {
-            sb.append("$indent<name>${escapeXml(config.name)}</name>$nl")
-        }
-        if (!config.description.isNullOrBlank()) {
-            sb.append("$indent<description>${escapeXml(config.description)}</description>$nl")
+        val pomDependencies = dependencies.map { lib ->
+            PomDependency(
+                groupId = lib.group,
+                artifactId = lib.artifact,
+                version = lib.version?.value,
+                type = if (lib.isPlatform) "pom" else null,
+                scope = if (lib.isPlatform) "import" else null,
+                optional = config.includeOptionalDependencies,
+            )
         }
 
-        // dependencyManagement
-        if (dependencies.isNotEmpty()) {
-            sb.append("${nl}$indent<dependencyManagement>$nl")
-            sb.append("$indent$indent<dependencies>$nl")
+        val project = PomProject(
+            coordinates = PomCoordinates(config.groupId, config.artifactId, config.version),
+            packaging = "pom",
+            name = config.name,
+            description = config.description,
+            dependencyManagement = if (pomDependencies.isNotEmpty()) PomDependencyManagement(pomDependencies) else null,
+        )
 
-            for (lib in dependencies) {
-                if (lib.isDeprecated && config.includeDeprecationComments) {
-                    sb.append(buildDeprecationXmlComment(lib, indent))
-                }
-                sb.append(buildDependencyElement(lib, indent))
+        val writerConfig = PomWriterConfig(
+            prettyPrint = config.prettyPrint,
+            indent = INDENT,
+        )
+
+        val writer = PomWriter(writerConfig)
+
+        return if (config.includeDeprecationComments) {
+            writer.write(project) { index, _ ->
+                val lib = dependencies[index]
+                if (lib.isDeprecated) buildDeprecationXmlComment(lib) else null
             }
-
-            sb.append("$indent$indent</dependencies>$nl")
-            sb.append("$indent</dependencyManagement>$nl")
+        } else {
+            writer.write(project)
         }
-
-        // </project>
-        sb.append("</project>$nl")
-
-        return sb.toString()
     }
 
-    private fun buildDependencyElement(lib: EffectiveLibrary, baseIndent: String): String {
+    private fun buildDeprecationXmlComment(lib: EffectiveLibrary): String {
         val nl = if (config.prettyPrint) "\n" else ""
-        val indent3 = if (config.prettyPrint) baseIndent.repeat(3) else ""
-        val indent4 = if (config.prettyPrint) baseIndent.repeat(4) else ""
-
-        val sb = StringBuilder()
-        sb.append("$indent3<dependency>$nl")
-        sb.append("$indent4<groupId>${escapeXml(lib.group)}</groupId>$nl")
-        sb.append("$indent4<artifactId>${escapeXml(lib.artifact)}</artifactId>$nl")
-
-        val versionValue = lib.version?.value
-        if (versionValue != null) {
-            sb.append("$indent4<version>${escapeXml(versionValue)}</version>$nl")
-        }
-
-        if (lib.isPlatform) {
-            sb.append("$indent4<type>pom</type>$nl")
-            sb.append("$indent4<scope>import</scope>$nl")
-        }
-
-        if (config.includeOptionalDependencies) {
-            sb.append("$indent4<optional>true</optional>$nl")
-        }
-
-        sb.append("$indent3</dependency>$nl")
-        return sb.toString()
-    }
-
-    private fun buildDeprecationXmlComment(lib: EffectiveLibrary, baseIndent: String): String {
-        val nl = if (config.prettyPrint) "\n" else ""
-        val indent3 = if (config.prettyPrint) baseIndent.repeat(3) else ""
+        val indent3 = if (config.prettyPrint) INDENT.repeat(3) else ""
 
         val deprecation = lib.deprecation
         val parts = mutableListOf<String>()
@@ -147,24 +112,11 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
         deprecation?.removalVersion?.let { parts.add("Removal: $it") }
 
         val commentText = parts.joinToString(". ")
-        val safeComment = commentText.replace("--", "- -")
-        return "$indent3<!-- $safeComment -->$nl"
+        return "$indent3<!-- ${commentText.escapeXmlComment()} -->$nl"
     }
-
-    private fun escapeXml(value: String): String = value
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&apos;")
 
     public companion object {
         private const val GENERATOR_ID: String = "maven-bom"
-        private const val MAVEN_POM_NS: String = "http://maven.apache.org/POM/4.0.0"
-        private const val MAVEN_XSI_NS: String = "http://www.w3.org/2001/XMLSchema-instance"
-        private const val MAVEN_XSD_LOCATION: String =
-            "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-        private const val MODEL_VERSION: String = "4.0.0"
         private const val INDENT: String = "    "
     }
 }

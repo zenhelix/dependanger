@@ -7,6 +7,7 @@ description = "Dependanger Maven Resolver - Maven repository integration"
 dependencies {
     api(project(":components:core:dependanger-core"))
     api(project(":components:core:dependanger-effective"))
+    api(project(":components:shared:dependanger-maven-pom"))
 
     // HTTP client
     implementation("io.ktor:ktor-client-core:3.1.1")

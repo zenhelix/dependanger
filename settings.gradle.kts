@@ -27,6 +27,9 @@ include(":components:core:dependanger-core")
 include(":components:core:dependanger-metadata-json")
 include(":components:core:dependanger-effective")
 
+// Shared modules
+include(":components:shared:dependanger-maven-pom")
+
 // API module (API layer)
 include(":components:api:dependanger-api")
 

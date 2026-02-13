@@ -20,6 +20,9 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
 
+    // DateTime
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+
     // Test
     testImplementation("io.ktor:ktor-client-mock:3.1.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")

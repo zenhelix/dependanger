@@ -10,34 +10,36 @@ import java.nio.file.StandardCopyOption
 
 private val logger = KotlinLogging.logger {}
 
-private val cacheJson = Json {
-    ignoreUnknownKeys = true
-    prettyPrint = false
-}
-
 public class BomCache(
     public val cacheDirectory: String,
-    public val ttlHours: Long = 24,
-    public val ttlSnapshotHours: Long = 1,
+    public val ttlHours: Long,
+    public val ttlSnapshotHours: Long,
 ) {
-    public fun get(group: String, artifact: String, version: String): BomContent? {
+    private val cacheJson: Json = Json {
+        ignoreUnknownKeys = true
+        prettyPrint = false
+    }
+
+    public fun get(group: String, artifact: String, version: String): CacheResult {
+        val key = "$group:$artifact:$version"
         val dir = resolveCacheDir(group, artifact, version)
         val contentFile = dir.resolve("bom-content.json")
         val metaFile = dir.resolve("metadata.json")
 
-        if (!contentFile.exists() || !metaFile.exists()) return null
+        if (!contentFile.exists() || !metaFile.exists()) return CacheResult.Miss
 
         return try {
             val meta = cacheJson.decodeFromString<CacheMetadata>(metaFile.readText())
             val ttl = if (version.endsWith("-SNAPSHOT")) ttlSnapshotHours else ttlHours
             val ageHours = (Clock.System.now() - meta.fetchedAt).inWholeHours
 
-            if (ageHours > ttl) return null
+            if (ageHours > ttl) return CacheResult.Miss
 
-            cacheJson.decodeFromString<BomContent>(contentFile.readText())
+            CacheResult.Hit(cacheJson.decodeFromString<BomContent>(contentFile.readText()))
         } catch (e: Exception) {
-            logger.warn { "Corrupted cache for $group:$artifact:$version: ${e.message}" }
-            null
+            logger.warn { "Corrupted cache for $key: ${e.message}" }
+            dir.deleteRecursively()
+            CacheResult.Corrupted(key = key, error = e.message ?: "Unknown error")
         }
     }
 

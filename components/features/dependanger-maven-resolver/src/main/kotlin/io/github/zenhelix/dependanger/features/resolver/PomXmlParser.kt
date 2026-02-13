@@ -17,10 +17,10 @@ public class PomXmlParser {
         properties: Map<String, String>,
     ): String {
         val resolver = PropertyResolver(properties)
-        try {
-            return resolver.resolve(value)
+        return try {
+            resolver.resolve(value)
         } catch (e: PropertyResolutionException) {
-            throw IllegalStateException(e.message, e)
+            throw IllegalStateException("Unresolved property in BOM: ${e.message}", e)
         }
     }
 
@@ -47,7 +47,11 @@ public class PomXmlParser {
             )
         } ?: emptyList()
 
-        return PomParseResult(properties, parent, rawDependencies)
+        return PomParseResult(
+            properties = properties,
+            parent = parent,
+            dependencies = rawDependencies,
+        )
     }
 
     private fun buildSyntheticProperties(project: PomProject): Map<String, String> {

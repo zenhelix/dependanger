@@ -11,6 +11,13 @@ public data class BomDependency(
 
 @Serializable
 public data class BomContent(
-    val dependencies: List<BomDependency> = emptyList(),
-    val properties: Map<String, String> = emptyMap(),
-)
+    val dependencies: List<BomDependency>,
+    val properties: Map<String, String>,
+) {
+    public companion object {
+        public val EMPTY: BomContent = BomContent(
+            dependencies = emptyList(),
+            properties = emptyMap(),
+        )
+    }
+}

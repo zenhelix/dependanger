@@ -16,6 +16,6 @@ public data class RawBomDependency(
     val group: String,
     val artifact: String,
     val version: String,
-    val scope: String? = null,
-    val type: String? = null,
+    val scope: String?,
+    val type: String?,
 )

@@ -289,6 +289,10 @@ public class LicenseCheckSettingsDsl {
     public var warnOnUnknown: Boolean = LicenseCheckSettings.DEFAULT.warnOnUnknown
     public var ignoreLibraries: List<String> = LicenseCheckSettings.DEFAULT.ignoreLibraries
     public var includeTransitives: Boolean = LicenseCheckSettings.DEFAULT.includeTransitives
+    public var timeout: Long = LicenseCheckSettings.DEFAULT.timeout
+    public var parallelism: Int = LicenseCheckSettings.DEFAULT.parallelism
+    public var cacheDirectory: String? = LicenseCheckSettings.DEFAULT.cacheDirectory
+    public var cacheTtlHours: Long = LicenseCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): LicenseCheckSettings = LicenseCheckSettings(
         enabled = enabled,
@@ -302,6 +306,10 @@ public class LicenseCheckSettingsDsl {
         warnOnUnknown = warnOnUnknown,
         ignoreLibraries = ignoreLibraries,
         includeTransitives = includeTransitives,
+        timeout = timeout,
+        parallelism = parallelism,
+        cacheDirectory = cacheDirectory,
+        cacheTtlHours = cacheTtlHours,
     )
 }
 

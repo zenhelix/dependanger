@@ -3,6 +3,7 @@ package io.github.zenhelix.dependanger.maven.pom.parser
 import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
+import io.github.zenhelix.dependanger.maven.pom.model.PomLicense
 import io.github.zenhelix.dependanger.maven.pom.model.PomParent
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
 import io.github.zenhelix.dependanger.maven.pom.model.PomProperties
@@ -53,6 +54,7 @@ public object PomParser {
         val packaging = root.getDirectChildText("packaging") ?: "jar"
         val name = root.getDirectChildText("name")
         val description = root.getDirectChildText("description")
+        val licenses = extractLicenses(root)
         val properties = extractProperties(root)
         val dependencyManagement = extractDependencyManagement(root)
 
@@ -63,6 +65,7 @@ public object PomParser {
             parent = parent,
             name = name,
             description = description,
+            licenses = licenses,
             properties = properties,
             dependencyManagement = dependencyManagement,
         )
@@ -84,6 +87,31 @@ public object PomParser {
             coordinates = PomCoordinates(groupId, artifactId, version),
             relativePath = relativePath,
         )
+    }
+
+    private fun extractLicenses(root: Element): List<PomLicense> {
+        val licenses = mutableListOf<PomLicense>()
+        val licensesElements = root.getElementsByTagName("licenses")
+
+        for (i in 0 until licensesElements.length) {
+            val licensesEl = licensesElements.item(i) as? Element ?: continue
+            if (licensesEl.parentNode != root) continue
+
+            val licenseElements = licensesEl.getElementsByTagName("license")
+            for (j in 0 until licenseElements.length) {
+                val licenseEl = licenseElements.item(j) as? Element ?: continue
+                if (licenseEl.parentNode != licensesEl) continue
+
+                licenses.add(
+                    PomLicense(
+                        name = licenseEl.getDirectChildText("name"),
+                        url = licenseEl.getDirectChildText("url"),
+                    )
+                )
+            }
+        }
+
+        return licenses
     }
 
     private fun extractProperties(root: Element): PomProperties {

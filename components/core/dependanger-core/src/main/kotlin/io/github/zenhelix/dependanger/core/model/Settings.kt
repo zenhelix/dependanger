@@ -176,6 +176,10 @@ public data class LicenseCheckSettings(
     val warnOnUnknown: Boolean,
     val ignoreLibraries: List<String>,
     val includeTransitives: Boolean,
+    val timeout: Long,
+    val parallelism: Int,
+    val cacheDirectory: String?,
+    val cacheTtlHours: Long,
 ) {
     public companion object {
         public val DEFAULT: LicenseCheckSettings = LicenseCheckSettings(
@@ -190,6 +194,10 @@ public data class LicenseCheckSettings(
             warnOnUnknown = true,
             ignoreLibraries = emptyList(),
             includeTransitives = false,
+            timeout = 30_000,
+            parallelism = 10,
+            cacheDirectory = null,
+            cacheTtlHours = 168,
         )
     }
 }

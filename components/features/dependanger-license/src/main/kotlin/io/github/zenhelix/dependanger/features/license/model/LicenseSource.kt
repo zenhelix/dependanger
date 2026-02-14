@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public enum class LicenseSource {
-    MAVEN_POM, CLEARLY_DEFINED, DECLARED, UNKNOWN
+    MAVEN_POM, CLEARLY_DEFINED, DECLARED, CUSTOM, UNKNOWN
 }

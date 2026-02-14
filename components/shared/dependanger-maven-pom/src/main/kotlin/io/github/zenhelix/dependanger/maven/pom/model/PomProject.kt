@@ -10,6 +10,7 @@ public data class PomProject(
     val parent: PomParent? = null,
     val name: String? = null,
     val description: String? = null,
+    val licenses: List<PomLicense> = emptyList(),
     val properties: PomProperties = PomProperties(),
     val dependencyManagement: PomDependencyManagement? = null,
 )

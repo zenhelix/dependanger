@@ -7,7 +7,7 @@
 [abstract]
 --
 Проверка лицензий библиотек и соответствия политикам (whitelist/blacklist).
-Опциональный процессор в pipeline (order: 85).
+Опциональный процессор в pipeline (order: 130, phase: LICENSE_CHECK).
 --
 
 == Метаданные
@@ -120,7 +120,7 @@ ____
 | AC-002-1
 | Библиотека с `license("MIT")` в DSL, Maven POM содержит Apache-2.0
 | Запускаю license check
-| Используется MIT (user-defined имеет приоритет), `source = USER_DEFINED`
+| Используется MIT (user-defined имеет приоритет), `source = DECLARED`
 
 | AC-002-2
 | Библиотека с `license("Proprietary", url = "https://example.com/license")`
@@ -401,7 +401,7 @@ licenses.forEach { info ->
 
 | `source`
 | LicenseSource
-| Источник информации: USER_DEFINED, MAVEN_POM, CLEARLY_DEFINED, UNKNOWN
+| Источник информации: DECLARED, MAVEN_POM, CLEARLY_DEFINED, UNKNOWN
 |===
 
 == License
@@ -460,15 +460,6 @@ licenses.forEach { info ->
 
     includeTransitives = false         // Проверять транзитивные (default: false)
 
-    // === Источники ===
-
-    // Порядок источников (по умолчанию: USER_DEFINED → MAVEN_POM → CLEARLY_DEFINED)
-    sources = listOf(
-        LicenseSource.USER_DEFINED,
-        LicenseSource.MAVEN_POM,
-        LicenseSource.CLEARLY_DEFINED
-    )
-
     // Таймаут для сетевых запросов
     timeout = 30.seconds
 }
@@ -476,7 +467,7 @@ licenses.forEach { info ->
 
 == SPI: LicenseCheckProcessor
 
-`LicenseCheckProcessor` — опциональный процессор (order: 85, phase: PARALLEL_IO), который:
+`LicenseCheckProcessor` — опциональный процессор (order: 130, phase: LICENSE_CHECK, executionMode: PARALLEL_IO), который:
 
 1. Собирает все библиотеки из EffectiveMetadata
 2. Для каждой библиотеки резолвит лицензию по приоритету источников
@@ -784,13 +775,6 @@ dependanger {
             // Транзитивные зависимости
             includeTransitives = false  // требует F012
 
-            // Источники лицензий (порядок = приоритет)
-            sources = listOf(
-                LicenseSource.USER_DEFINED,
-                LicenseSource.MAVEN_POM,
-                LicenseSource.CLEARLY_DEFINED
-            )
-
             // Кеширование
             cache {
                 enabled = true
@@ -1016,7 +1000,7 @@ dependanger {
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 85)
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 130)
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает licenses info
 * xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — для проверки транзитивных
 * xref:../03-interfaces/cli.adoc[CLI — команда license-check]

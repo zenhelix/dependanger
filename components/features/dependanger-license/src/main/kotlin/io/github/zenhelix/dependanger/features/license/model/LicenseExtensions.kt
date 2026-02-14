@@ -10,3 +10,6 @@ public val LicenseViolationsExtensionKey: ExtensionKey<List<LicenseViolation>> =
 
 public val EffectiveMetadata.licenseViolations: List<LicenseViolation>
     get() = getExtension(LicenseViolationsExtensionKey) ?: emptyList()
+
+public val LicenseCategory.isCopyleft: Boolean
+    get() = this == LicenseCategory.WEAK_COPYLEFT || this == LicenseCategory.STRONG_COPYLEFT

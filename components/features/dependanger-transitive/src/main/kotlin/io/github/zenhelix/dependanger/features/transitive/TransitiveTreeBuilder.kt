@@ -20,6 +20,7 @@ internal class TransitiveTreeBuilder(
     private val scopes: List<String>,
     private val includeOptional: Boolean,
 ) {
+    private val parentPomResolver: ParentPomResolver = ParentPomResolver(ctx.pomDownloader)
     private val sessionSeen: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val nodeCounter: AtomicInteger = AtomicInteger(0)
 
@@ -78,13 +79,14 @@ internal class TransitiveTreeBuilder(
             }
         }
 
-        val pomProject = downloadAndParsePom(group, artifact, version)
-        if (pomProject == null) {
+        val rawPomProject = downloadAndParsePom(group, artifact, version)
+        if (rawPomProject == null) {
             val tree = leaf(group = group, artifact = artifact, version = version, scope = scope)
             ctx.cache.put(group, artifact, version, tree)
             return tree
         }
 
+        val pomProject = parentPomResolver.resolveWithParents(rawPomProject)
         val pomDependencies = PomDependencyExtractor.extract(pomProject, scopes, includeOptional)
 
         val children = coroutineScope {

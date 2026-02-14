@@ -9,6 +9,7 @@ dependencies {
     api(project(":components:core:dependanger-core"))
     api(project(":components:core:dependanger-effective"))
     implementation(project(":components:features:dependanger-maven-resolver"))
+    implementation(project(":components:features:dependanger-transitive"))
     api(project(":components:shared:dependanger-http-client"))
 
     // Serialization

@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
 public data class TransitiveTree(
     val group: String,
     val artifact: String,
-    val version: String? = null,
-    val children: List<TransitiveTree> = emptyList(),
-    val isDuplicate: Boolean = false,
-    val isCycle: Boolean = false,
-    val scope: String? = null,
+    val version: String?,
+    val scope: String?,
+    val children: List<TransitiveTree>,
+    val isDuplicate: Boolean,
+    val isCycle: Boolean,
 )

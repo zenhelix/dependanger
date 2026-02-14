@@ -19,6 +19,8 @@ import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsEx
 import io.github.zenhelix.dependanger.features.license.model.isCopyleft
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
+import io.github.zenhelix.dependanger.features.transitive.model.FlatDependency
+import io.github.zenhelix.dependanger.features.transitive.model.flatDependencies
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -53,21 +55,36 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
 
         var diagnostics = metadata.diagnostics
 
-        if (settings.includeTransitives) {
-            logger.warn { "includeTransitives is enabled but transitive license checking is not yet implemented (requires F012 Transitive Resolution)" }
-            diagnostics = diagnostics + Diagnostics.warning(
-                DiagnosticCodes.License.INCLUDE_TRANSITIVES_NOT_SUPPORTED,
-                "includeTransitives is enabled but not yet supported; only direct dependencies will be checked",
-                id, emptyMap(),
-            )
-        }
-
         val candidates = metadata.libraries.values.filter { lib ->
             lib.version != null
                     && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) }
         }
 
-        if (candidates.isEmpty()) {
+        val transitiveCandidates: List<FlatDependency> = if (settings.includeTransitives) {
+            val flatDeps = metadata.flatDependencies
+            if (flatDeps.isEmpty()) {
+                logger.warn { "includeTransitives is enabled but no transitive dependencies found (enable transitive resolution first)" }
+                diagnostics = diagnostics + Diagnostics.warning(
+                    DiagnosticCodes.License.INCLUDE_TRANSITIVES_NOT_SUPPORTED,
+                    "includeTransitives is enabled but no transitive dependencies available; ensure transitive resolution is enabled and runs before license check",
+                    id, emptyMap(),
+                )
+                emptyList()
+            } else {
+                val directCoordinates = candidates.map { "${it.group}:${it.artifact}" }.toSet()
+                flatDeps.filter { dep ->
+                    !dep.isDirectDependency
+                            && "${dep.group}:${dep.artifact}" !in directCoordinates
+                            && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, dep.group, dep.artifact) }
+                }.also { transitives ->
+                    logger.info { "Including ${transitives.size} transitive dependencies in license check" }
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        if (candidates.isEmpty() && transitiveCandidates.isEmpty()) {
             diagnostics = diagnostics + Diagnostics.info(DiagnosticCodes.License.NO_LIBS, "No libraries to check for licenses", id, emptyMap())
             return metadata.copy(diagnostics = diagnostics)
                 .withExtension(LicenseViolationsExtensionKey, emptyList())
@@ -83,7 +100,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
         ).use { ctx ->
             val semaphore = Semaphore(settings.parallelism)
 
-            val results: List<Pair<EffectiveLibrary, List<LicenseResult>>> = coroutineScope {
+            val directResults: List<Pair<EffectiveLibrary, List<LicenseResult>>> = coroutineScope {
                 candidates.map { lib ->
                     async {
                         semaphore.withPermit {
@@ -99,25 +116,54 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
                 }.awaitAll()
             }
 
+            val transitiveResults: List<Pair<FlatDependency, List<LicenseResult>>> = if (transitiveCandidates.isNotEmpty()) {
+                coroutineScope {
+                    transitiveCandidates.map { dep ->
+                        async {
+                            semaphore.withPermit {
+                                val licenses = ctx.resolver.resolve(
+                                    group = dep.group,
+                                    artifact = dep.artifact,
+                                    version = dep.version,
+                                    declaredLicenseId = null,
+                                )
+                                dep to licenses
+                            }
+                        }
+                    }.awaitAll()
+                }
+            } else {
+                emptyList()
+            }
+
             val allViolations = mutableListOf<LicenseViolation>()
 
-            for ((lib, licenses) in results) {
+            for ((lib, licenses) in directResults) {
                 val policyResult = LicensePolicy.checkCompliance(lib, licenses, settings)
                 allViolations.addAll(policyResult.violations)
                 diagnostics = diagnostics + policyResult.diagnostics
             }
 
+            for ((dep, licenses) in transitiveResults) {
+                val policyResult = LicensePolicy.checkTransitiveCompliance(dep, licenses, settings)
+                allViolations.addAll(policyResult.violations)
+                diagnostics = diagnostics + policyResult.diagnostics
+            }
+
+            val totalChecked = directResults.size + transitiveResults.size
+            val allResults = directResults.map { it.second } + transitiveResults.map { it.second }
+
             diagnostics = diagnostics + if (allViolations.isEmpty()) {
                 Diagnostics.info(
                     DiagnosticCodes.License.ALL_COMPLIANT,
-                    "License check completed: ${results.size} libraries, all compliant",
-                    id, mapOf("count" to results.size.toString()),
+                    "License check completed: $totalChecked libraries (${directResults.size} direct, ${transitiveResults.size} transitive), all compliant",
+                    id, mapOf("count" to totalChecked.toString(), "direct" to directResults.size.toString(), "transitive" to transitiveResults.size.toString()),
                 )
             } else {
                 Diagnostics.info(
                     DiagnosticCodes.License.CHECK_COMPLETE,
-                    "License check completed: ${results.size} libraries, ${allViolations.size} violation(s)",
-                    id, mapOf("count" to results.size.toString(), "violations" to allViolations.size.toString()),
+                    "License check completed: $totalChecked libraries (${directResults.size} direct, ${transitiveResults.size} transitive), ${allViolations.size} violation(s)",
+                    id, mapOf("count" to totalChecked.toString(), "violations" to allViolations.size.toString()),
                 )
             }
 
@@ -133,7 +179,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
             }
 
             if (settings.failOnUnknown) {
-                val unknownCount = results.count { (_, licenses) -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
+                val unknownCount = allResults.count { licenses -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
                 if (unknownCount > 0) {
                     diagnostics = diagnostics + Diagnostics.error(
                         DiagnosticCodes.License.UNKNOWN_FOUND,
@@ -144,7 +190,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
             }
 
             if (settings.failOnCopyleft) {
-                val copyleftCount = results.count { (_, licenses) -> licenses.any { it.category.isCopyleft } }
+                val copyleftCount = allResults.count { licenses -> licenses.any { it.category.isCopyleft } }
                 if (copyleftCount > 0) {
                     diagnostics = diagnostics + Diagnostics.error(
                         DiagnosticCodes.License.COPYLEFT_FOUND,

@@ -9,6 +9,8 @@ dependencies {
     api(project(":components:core:dependanger-core"))
     api(project(":components:core:dependanger-effective"))
     implementation(project(":components:features:dependanger-maven-resolver"))
+    implementation(project(":components:shared:dependanger-maven-pom"))
+    implementation(project(":components:shared:dependanger-http-client"))
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
@@ -16,11 +18,15 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
 
+    // DateTime
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
 
     // Test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+    testImplementation("io.ktor:ktor-client-mock:3.1.1")
 }
 
 publishing {

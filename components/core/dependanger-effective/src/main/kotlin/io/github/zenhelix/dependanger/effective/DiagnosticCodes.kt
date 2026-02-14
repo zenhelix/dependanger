@@ -67,6 +67,23 @@ public object DiagnosticCodes {
         public const val INCLUDE_TRANSITIVES_NOT_SUPPORTED: String = "LICENSE_INCLUDE_TRANSITIVES_NOT_SUPPORTED"
     }
 
+    public object Transitive {
+        public const val RESOLVED: String = "TRANSITIVE_RESOLVED"
+        public const val NO_LIBS: String = "TRANSITIVE_NO_LIBS"
+        public const val CONFLICT: String = "TRANSITIVE_CONFLICT"
+        public const val POM_NOT_FOUND: String = "TRANSITIVE_POM_NOT_FOUND"
+        public const val REPO_UNAVAILABLE: String = "TRANSITIVE_REPO_UNAVAILABLE"
+        public const val CYCLE_DETECTED: String = "TRANSITIVE_CYCLE_DETECTED"
+        public const val MAX_DEPTH: String = "TRANSITIVE_MAX_DEPTH"
+        public const val LARGE_TREE: String = "TRANSITIVE_LARGE_TREE"
+        public const val MAX_EXCEEDED: String = "TRANSITIVE_MAX_EXCEEDED"
+        public const val UNUSED_CONSTRAINT: String = "TRANSITIVE_UNUSED_CONSTRAINT"
+        public const val SNAPSHOT: String = "TRANSITIVE_SNAPSHOT"
+        public const val TIMEOUT: String = "TRANSITIVE_TIMEOUT"
+        public const val STALE_CACHE: String = "TRANSITIVE_STALE_CACHE"
+        public const val POM_PARSE_FAILED: String = "TRANSITIVE_POM_PARSE_FAILED"
+    }
+
     public object Compatibility {
         public const val CUSTOM_RULE_DEFERRED: String = "COMPAT_CUSTOM_RULE_DEFERRED"
         public const val NO_CUSTOM_RULES: String = "COMPAT_NO_CUSTOM_RULES"

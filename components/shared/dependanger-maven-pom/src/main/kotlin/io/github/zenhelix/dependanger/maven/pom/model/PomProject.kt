@@ -12,5 +12,6 @@ public data class PomProject(
     val description: String? = null,
     val licenses: List<PomLicense> = emptyList(),
     val properties: PomProperties = PomProperties(),
+    val dependencies: List<PomDependency> = emptyList(),
     val dependencyManagement: PomDependencyManagement? = null,
 )

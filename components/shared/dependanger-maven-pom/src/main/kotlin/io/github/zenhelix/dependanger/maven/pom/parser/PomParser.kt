@@ -56,6 +56,7 @@ public object PomParser {
         val description = root.getDirectChildText("description")
         val licenses = extractLicenses(root)
         val properties = extractProperties(root)
+        val dependencies = extractDependencies(root)
         val dependencyManagement = extractDependencyManagement(root)
 
         return PomProject(
@@ -67,6 +68,7 @@ public object PomParser {
             description = description,
             licenses = licenses,
             properties = properties,
+            dependencies = dependencies,
             dependencyManagement = dependencyManagement,
         )
     }
@@ -130,6 +132,26 @@ public object PomParser {
         }
 
         return PomProperties(props)
+    }
+
+    private fun extractDependencies(root: Element): List<PomDependency> {
+        val dependencies = mutableListOf<PomDependency>()
+
+        val depsElements = root.getElementsByTagName("dependencies")
+        for (i in 0 until depsElements.length) {
+            val depsEl = depsElements.item(i) as? Element ?: continue
+            if (depsEl.parentNode != root) continue
+
+            val depElements = depsEl.getElementsByTagName("dependency")
+            for (j in 0 until depElements.length) {
+                val depEl = depElements.item(j) as? Element ?: continue
+                if (depEl.parentNode != depsEl) continue
+
+                dependencies.add(extractDependency(depEl))
+            }
+        }
+
+        return dependencies
     }
 
     private fun extractDependencyManagement(root: Element): PomDependencyManagement? {

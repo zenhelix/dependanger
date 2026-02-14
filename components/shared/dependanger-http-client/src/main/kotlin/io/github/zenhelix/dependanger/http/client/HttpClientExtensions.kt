@@ -76,8 +76,7 @@ private suspend fun mapResponse(response: HttpResponse, url: String): RetryDecis
         RetryDecision.Retry(overrideDelayMs = retryAfterMs)
     }
 
-    response.status.value >= 500                                                                  ->
-        RetryDecision.Retry()
+    response.status.value >= 500 -> RetryDecision.Retry()
 
     else                                                                                          -> {
         logger.debug { "Unexpected status ${response.status} for $url" }

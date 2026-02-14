@@ -7,6 +7,7 @@ public data class FlatDependency(
     val group: String,
     val artifact: String,
     val version: String,
-    val isDirectDependency: Boolean = false,
-    val isOptional: Boolean = false,
+    val scope: String?,
+    val isDirectDependency: Boolean,
+    val isOptional: Boolean,
 )

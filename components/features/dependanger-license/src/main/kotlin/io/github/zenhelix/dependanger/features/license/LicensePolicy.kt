@@ -10,6 +10,7 @@ import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
 import io.github.zenhelix.dependanger.features.license.model.isCopyleft
+import io.github.zenhelix.dependanger.features.transitive.model.FlatDependency
 
 /**
  * Result of policy compliance check for a single library.
@@ -27,8 +28,38 @@ internal object LicensePolicy {
 
     private const val PROCESSOR_ID: String = "license-check"
 
+    fun checkCompliance(
+        lib: EffectiveLibrary,
+        licenses: List<LicenseResult>,
+        settings: LicenseCheckSettings,
+    ): PolicyCheckResult = checkComplianceInternal(
+        displayName = lib.alias,
+        group = lib.group,
+        artifact = lib.artifact,
+        versionDisplay = lib.version?.value,
+        licenses = licenses,
+        settings = settings,
+    )
+
+    fun checkTransitiveCompliance(
+        dep: FlatDependency,
+        licenses: List<LicenseResult>,
+        settings: LicenseCheckSettings,
+    ): PolicyCheckResult {
+        val coordinate = "${dep.group}:${dep.artifact}:${dep.version}"
+        return checkComplianceInternal(
+            displayName = coordinate,
+            group = dep.group,
+            artifact = dep.artifact,
+            versionDisplay = dep.version,
+            licenses = licenses,
+            settings = settings,
+            isTransitive = true,
+        )
+    }
+
     /**
-     * Checks all licenses for a library against the configured policies.
+     * Common compliance checking logic for both direct and transitive dependencies.
      *
      * Algorithm:
      * 1. Build the license expression string for display
@@ -41,10 +72,14 @@ internal object LicensePolicy {
      * 4. Copyleft warning: if warnOnCopyleft and ANY license is copyleft
      * 5. Unknown warning: if warnOnUnknown and ALL licenses are UNKNOWN
      */
-    fun checkCompliance(
-        lib: EffectiveLibrary,
+    private fun checkComplianceInternal(
+        displayName: String,
+        group: String,
+        artifact: String,
+        versionDisplay: String?,
         licenses: List<LicenseResult>,
         settings: LicenseCheckSettings,
+        isTransitive: Boolean = false,
     ): PolicyCheckResult {
         val violations = mutableListOf<LicenseViolation>()
         var diagnostics = Diagnostics.EMPTY
@@ -53,6 +88,7 @@ internal object LicensePolicy {
         val separator = if (settings.dualLicensePolicy == DualLicensePolicy.AND) " AND " else " OR "
         val licenseExpression = spdxIds.joinToString(separator).ifEmpty { "UNKNOWN" }
         val worstCategory = worstCategory(licenses)
+        val prefix = if (isTransitive) "Transitive dependency " else ""
 
         // 1. Denied list check
         if (settings.deniedLicenses.isNotEmpty() && spdxIds.isNotEmpty()) {
@@ -62,14 +98,14 @@ internal object LicensePolicy {
             }
             if (hasDeniedViolation) {
                 val message = when (settings.dualLicensePolicy) {
-                    DualLicensePolicy.OR  -> "All licenses are in denied list (no permitted alternative): $licenseExpression"
-                    DualLicensePolicy.AND -> "License in denied list (AND-policy, all apply): $licenseExpression"
+                    DualLicensePolicy.OR  -> "${prefix}All licenses are in denied list (no permitted alternative): $licenseExpression"
+                    DualLicensePolicy.AND -> "${prefix}License in denied list (AND-policy, all apply): $licenseExpression"
                 }
                 violations.add(
                     LicenseViolation(
-                        alias = lib.alias,
-                        group = lib.group,
-                        artifact = lib.artifact,
+                        alias = displayName,
+                        group = group,
+                        artifact = artifact,
                         detectedLicense = licenseExpression,
                         category = worstCategory,
                         violationType = LicenseViolationType.DENIED,
@@ -87,14 +123,14 @@ internal object LicensePolicy {
             }
             if (!isAllowed) {
                 val message = when (settings.dualLicensePolicy) {
-                    DualLicensePolicy.OR  -> "None of the licenses are in allowed list: $licenseExpression"
-                    DualLicensePolicy.AND -> "Not all licenses are in allowed list (AND-policy): $licenseExpression"
+                    DualLicensePolicy.OR  -> "${prefix}None of the licenses are in allowed list: $licenseExpression"
+                    DualLicensePolicy.AND -> "${prefix}Not all licenses are in allowed list (AND-policy): $licenseExpression"
                 }
                 violations.add(
                     LicenseViolation(
-                        alias = lib.alias,
-                        group = lib.group,
-                        artifact = lib.artifact,
+                        alias = displayName,
+                        group = group,
+                        artifact = artifact,
                         detectedLicense = licenseExpression,
                         category = worstCategory,
                         violationType = LicenseViolationType.NOT_ALLOWED,
@@ -110,19 +146,20 @@ internal object LicensePolicy {
             val copyleftIds = copyleftLicenses.mapNotNull { it.spdxId }.joinToString(", ")
             diagnostics = diagnostics + Diagnostics.warning(
                 DiagnosticCodes.License.COPYLEFT_WARNING,
-                "Library '${lib.alias}' has copyleft license(s): $copyleftIds",
+                "${prefix}Library '$displayName' has copyleft license(s): $copyleftIds",
                 PROCESSOR_ID,
-                mapOf("library" to lib.alias, "licenses" to copyleftIds),
+                mapOf("library" to displayName, "licenses" to copyleftIds),
             )
         }
 
         // 4. Unknown warning
         if (settings.warnOnUnknown && licenses.all { it.category == LicenseCategory.UNKNOWN }) {
+            val coordinate = "$group:$artifact:$versionDisplay"
             diagnostics = diagnostics + Diagnostics.warning(
                 DiagnosticCodes.License.UNKNOWN_WARNING,
-                "License for library '${lib.alias}' (${lib.group}:${lib.artifact}:${lib.version?.value}) is unknown",
+                "${prefix}License for library '$displayName' ($coordinate) is unknown",
                 PROCESSOR_ID,
-                mapOf("library" to lib.alias, "coordinate" to "${lib.group}:${lib.artifact}:${lib.version?.value}"),
+                mapOf("library" to displayName, "coordinate" to coordinate),
             )
         }
 

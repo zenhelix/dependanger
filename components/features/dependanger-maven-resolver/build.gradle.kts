@@ -1,4 +1,5 @@
 plugins {
+    kotlin("plugin.serialization")
     `maven-publish`
 }
 
@@ -9,6 +10,7 @@ dependencies {
     api(project(":components:core:dependanger-effective"))
     api(project(":components:shared:dependanger-maven-pom"))
     api(project(":components:shared:dependanger-http-client"))
+    api(project(":components:shared:dependanger-cache"))
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")

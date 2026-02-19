@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.security
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
@@ -62,16 +63,16 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
         for (lib in candidates) {
             val version = lib.version!!.value
             when (val cacheResult = cache.get(lib.group, lib.artifact, version)) {
-                is SecurityCacheResult.Hit       -> {
-                    cachedVulns.addAll(cacheResult.vulnerabilities)
+                is CacheResult.Hit       -> {
+                    cachedVulns.addAll(cacheResult.data)
                 }
 
-                is SecurityCacheResult.Corrupted -> {
+                is CacheResult.Corrupted -> {
                     logger.warn { "Corrupted security cache for ${lib.group}:${lib.artifact}:$version" }
                     uncachedPackages.add(PackageQuery(group = lib.group, artifact = lib.artifact, version = version))
                 }
 
-                is SecurityCacheResult.Miss      -> {
+                is CacheResult.Miss      -> {
                     uncachedPackages.add(PackageQuery(group = lib.group, artifact = lib.artifact, version = version))
                 }
             }

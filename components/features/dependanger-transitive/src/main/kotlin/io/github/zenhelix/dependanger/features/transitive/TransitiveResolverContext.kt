@@ -1,8 +1,10 @@
 package io.github.zenhelix.dependanger.features.transitive
 
+import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
+import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
 
@@ -34,10 +36,12 @@ internal class TransitiveResolverContext(
         readTimeoutMs = readTimeoutMs,
     )
 
-    val cache: TransitiveCache = TransitiveCache(
+    val cache: DirBasedCache<TransitiveTree> = DirBasedCache(
         cacheDirectory = cacheDirectory ?: (System.getProperty("user.home") + "/$DEFAULT_CACHE_DIR"),
         ttlHours = DEFAULT_TTL_HOURS,
         ttlSnapshotHours = DEFAULT_SNAPSHOT_TTL_HOURS,
+        contentSerializer = TransitiveTree.serializer(),
+        contentFileName = "tree-content.json",
     )
 
     override fun close() {

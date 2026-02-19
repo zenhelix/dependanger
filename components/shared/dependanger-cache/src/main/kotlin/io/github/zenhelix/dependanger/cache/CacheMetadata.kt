@@ -1,10 +1,10 @@
-package io.github.zenhelix.dependanger.features.resolver
+package io.github.zenhelix.dependanger.cache
 
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
-internal data class CacheMetadata(
+public data class CacheMetadata(
     val fetchedAt: Instant,
     val isSnapshot: Boolean,
 )

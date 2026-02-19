@@ -1,6 +1,8 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
@@ -12,7 +14,7 @@ import io.github.zenhelix.dependanger.maven.pom.parser.PomParser
 private val logger = KotlinLogging.logger {}
 
 public class LicenseResolver(
-    private val cache: LicenseCache,
+    private val cache: DirBasedCache<List<LicenseResult>>,
     private val pomDownloader: MavenPomDownloader,
     private val clearlyDefinedClient: ClearlyDefinedClient,
     private val customProviders: List<LicenseSourceProvider> = emptyList(),
@@ -27,16 +29,16 @@ public class LicenseResolver(
         val coordinate = "$group:$artifact:$version"
 
         when (val cacheResult = cache.get(group, artifact, version)) {
-            is LicenseCacheResult.Hit       -> {
+            is CacheResult.Hit       -> {
                 logger.debug { "Cache hit for $coordinate" }
-                return cacheResult.licenses
+                return cacheResult.data
             }
 
-            is LicenseCacheResult.Corrupted -> {
+            is CacheResult.Corrupted -> {
                 logger.warn { "Corrupted cache for $coordinate: ${cacheResult.error}" }
             }
 
-            is LicenseCacheResult.Miss      -> {
+            is CacheResult.Miss      -> {
                 logger.debug { "Cache miss for $coordinate" }
             }
         }

@@ -7,5 +7,5 @@ import kotlinx.serialization.Serializable
 public data class DependangerReport(
     val format: ReportFormat,
     val content: String,
-    val outputPath: String? = null,
+    val outputPath: String?,
 )

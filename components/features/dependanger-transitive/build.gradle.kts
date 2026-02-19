@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":components:features:dependanger-maven-resolver"))
     implementation(project(":components:shared:dependanger-maven-pom"))
     implementation(project(":components:shared:dependanger-http-client"))
+    implementation(project(":components:shared:dependanger-cache"))
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")

@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.updates
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
@@ -180,9 +181,9 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
         val coordinate = "$group:$artifact"
 
         when (val cached = ctx.cache.get(group, artifact)) {
-            is VersionCacheResult.Hit       -> return cached.result
-            is VersionCacheResult.Corrupted -> logger.warn { "Corrupted version cache for $coordinate: ${cached.error}" }
-            is VersionCacheResult.Miss      -> { /* proceed to fetch */
+            is CacheResult.Hit       -> return cached.data
+            is CacheResult.Corrupted -> logger.warn { "Corrupted version cache for $coordinate: ${cached.error}" }
+            is CacheResult.Miss      -> { /* proceed to fetch */
             }
         }
 

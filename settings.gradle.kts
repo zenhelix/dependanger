@@ -30,6 +30,7 @@ include(":components:core:dependanger-effective")
 // Shared modules
 include(":components:shared:dependanger-maven-pom")
 include(":components:shared:dependanger-http-client")
+include(":components:shared:dependanger-cache")
 
 // API module (API layer)
 include(":components:api:dependanger-api")

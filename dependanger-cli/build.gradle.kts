@@ -8,17 +8,6 @@ description = "Dependanger CLI - Command-line interface"
 
 dependencies {
     implementation(project(":components:api:dependanger-api"))
-    implementation(project(":components:core:dependanger-core"))
-    implementation(project(":components:core:dependanger-effective"))
-    implementation(project(":components:core:dependanger-metadata-json"))
-    implementation(project(":components:generators:dependanger-generator-toml"))
-    implementation(project(":components:generators:dependanger-generator-bom"))
-    implementation(project(":components:features:dependanger-updates"))
-    implementation(project(":components:features:dependanger-analysis"))
-    implementation(project(":components:features:dependanger-report"))
-    implementation(project(":components:features:dependanger-security"))
-    implementation(project(":components:features:dependanger-license"))
-    implementation(project(":components:features:dependanger-transitive"))
 
     // CLI framework
     implementation("com.github.ajalt.clikt:clikt:5.0.3")

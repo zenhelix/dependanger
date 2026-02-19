@@ -1,6 +1,8 @@
 package io.github.zenhelix.dependanger.features.resolver
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
@@ -204,8 +206,8 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
             when (val cached = ctx.cache.get(group, artifact, version)) {
                 is CacheResult.Hit       -> {
-                    state.resolvedCache[key] = cached.content
-                    return BomResolveResult(content = cached.content, diagnostics = currentDiagnostics)
+                    state.resolvedCache[key] = cached.data
+                    return BomResolveResult(content = cached.data, diagnostics = currentDiagnostics)
                 }
 
                 is CacheResult.Corrupted -> {
@@ -387,10 +389,12 @@ private class BomResolutionContext(
         keepAliveMs = HTTP_KEEP_ALIVE_MS
     }
 
-    val cache: BomCache = BomCache(
+    val cache: DirBasedCache<BomContent> = DirBasedCache(
         cacheDirectory = cacheDirectory,
         ttlHours = ttlHours,
         ttlSnapshotHours = ttlSnapshotHours,
+        contentSerializer = BomContent.serializer(),
+        contentFileName = "bom-content.json",
     )
 
     val downloader: MavenPomDownloader = MavenPomDownloader(

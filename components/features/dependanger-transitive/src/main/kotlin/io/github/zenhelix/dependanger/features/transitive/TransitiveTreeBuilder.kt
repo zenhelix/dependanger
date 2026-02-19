@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.features.resolver.DownloadResult
 import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
@@ -73,9 +74,9 @@ internal class TransitiveTreeBuilder(
         nodeCounter.incrementAndGet()
 
         when (val cacheResult = ctx.cache.get(group, artifact, version)) {
-            is TransitiveCacheResult.Hit       -> return cacheResult.tree.copy(isDuplicate = false, scope = scope)
-            is TransitiveCacheResult.Corrupted -> logger.warn { "Corrupted cache for $coordinate:$version" }
-            is TransitiveCacheResult.Miss      -> { /* proceed with resolution */
+            is CacheResult.Hit       -> return cacheResult.data.copy(isDuplicate = false, scope = scope)
+            is CacheResult.Corrupted -> logger.warn { "Corrupted cache for $coordinate:$version" }
+            is CacheResult.Miss      -> { /* proceed with resolution */
             }
         }
 

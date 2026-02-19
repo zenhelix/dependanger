@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.github.zenhelix.dependanger.http.client.postWithRetry
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -16,18 +17,28 @@ import us.springett.cvss.Cvss
 
 private val logger = KotlinLogging.logger {}
 
-public data class PackageQuery(
+internal data class PackageQuery(
     val group: String,
     val artifact: String,
     val version: String,
 )
 
-public sealed interface OsvBatchResult {
-    public data class Success(val vulnerabilities: List<List<VulnerabilityInfo>>) : OsvBatchResult
-    public data class Failed(val error: String) : OsvBatchResult
+internal sealed interface OsvBatchResult {
+    data class Success(val vulnerabilities: List<List<VulnerabilityInfo>>) : OsvBatchResult
+    data class PartialSuccess(
+        val vulnerabilities: List<List<VulnerabilityInfo>>,
+        val failedPackageCount: Int,
+        val error: String,
+        val isTimeout: Boolean,
+    ) : OsvBatchResult
+
+    data class Timeout(val error: String) : OsvBatchResult
+    data class Failed(val error: String) : OsvBatchResult
 }
 
-public class OsvApiClient(
+private val CVSS_PRIORITY: List<String> = listOf("CVSS_V4", "CVSS_V3", "CVSS_V2")
+
+internal class OsvApiClient(
     private val apiUrl: String,
     private val httpClient: HttpClient,
     private val batchSize: Int,
@@ -38,12 +49,30 @@ public class OsvApiClient(
         ignoreUnknownKeys = true
     }
 
-    public suspend fun queryBatch(packages: List<PackageQuery>): OsvBatchResult {
+    internal suspend fun queryBatch(packages: List<PackageQuery>): OsvBatchResult {
         if (packages.isEmpty()) return OsvBatchResult.Success(vulnerabilities = emptyList())
 
         val allResults = mutableListOf<List<VulnerabilityInfo>>()
+        val batches = packages.chunked(batchSize)
 
-        for (batch in packages.chunked(batchSize)) {
+        for ((batchIndex, batch) in batches.withIndex()) {
+            val failedPackageCount = batches.drop(batchIndex).sumOf { it.size }
+
+            fun failureResult(error: String, isTimeout: Boolean): OsvBatchResult {
+                return if (allResults.isNotEmpty()) {
+                    OsvBatchResult.PartialSuccess(
+                        vulnerabilities = allResults.toList(),
+                        failedPackageCount = failedPackageCount,
+                        error = error,
+                        isTimeout = isTimeout,
+                    )
+                } else if (isTimeout) {
+                    OsvBatchResult.Timeout(error = error)
+                } else {
+                    OsvBatchResult.Failed(error = error)
+                }
+            }
+
             val request = OsvBatchRequest(
                 queries = batch.map { pkg ->
                     OsvQuery(
@@ -72,13 +101,14 @@ public class OsvApiClient(
                         json.decodeFromString<OsvBatchResponse>(httpResult.data)
                     } catch (e: Exception) {
                         logger.warn { "Failed to parse OSV API response: ${e.message}" }
-                        return OsvBatchResult.Failed(error = "Failed to parse OSV API response: ${e.message}")
+                        return failureResult("Failed to parse OSV API response: ${e.message}", isTimeout = false)
                     }
 
                     if (response.results.size != batch.size) {
                         logger.warn { "OSV API returned ${response.results.size} results for ${batch.size} queries" }
-                        return OsvBatchResult.Failed(
-                            error = "OSV API response size mismatch: expected ${batch.size}, got ${response.results.size}"
+                        return failureResult(
+                            "OSV API response size mismatch: expected ${batch.size}, got ${response.results.size}",
+                            isTimeout = false,
                         )
                     }
 
@@ -96,15 +126,19 @@ public class OsvApiClient(
                 }
 
                 is HttpResult.RateLimited  -> {
-                    return OsvBatchResult.Failed(error = "Rate limited by OSV API")
+                    return failureResult("Rate limited by OSV API", isTimeout = false)
                 }
 
                 is HttpResult.AuthRequired -> {
-                    return OsvBatchResult.Failed(error = "Authentication required for OSV API: ${httpResult.url}")
+                    return failureResult("Authentication required for OSV API: ${httpResult.url}", isTimeout = false)
                 }
 
                 is HttpResult.Failed       -> {
-                    return OsvBatchResult.Failed(error = httpResult.error)
+                    return if (httpResult.cause is HttpRequestTimeoutException) {
+                        failureResult(httpResult.error, isTimeout = true)
+                    } else {
+                        failureResult(httpResult.error, isTimeout = false)
+                    }
                 }
             }
         }
@@ -113,11 +147,12 @@ public class OsvApiClient(
     }
 
     private fun mapToVulnerabilityInfo(vuln: OsvVulnerability, pkg: PackageQuery): VulnerabilityInfo {
-        val cvssEntry = vuln.severity?.firstOrNull { it.type == "CVSS_V4" }
-            ?: vuln.severity?.firstOrNull { it.type == "CVSS_V3" }
-            ?: vuln.severity?.firstOrNull { it.type == "CVSS_V2" }
+        val cvssEntry = CVSS_PRIORITY.firstNotNullOfOrNull { type ->
+            vuln.severity?.firstOrNull { it.type == type }
+        }
         val cvssScore = cvssEntry?.let { parseCvssScore(it.score) }
         val severity = cvssScoreToSeverity(cvssScore)
+        val cvssVersion = cvssEntry?.type
         val fixedVersion = vuln.affected
             ?.flatMap { it.ranges ?: emptyList() }
             ?.flatMap { it.events ?: emptyList() }
@@ -130,6 +165,7 @@ public class OsvApiClient(
             summary = vuln.summary ?: "",
             severity = severity,
             cvssScore = cvssScore,
+            cvssVersion = cvssVersion,
             fixedVersion = fixedVersion,
             url = vuln.references?.firstOrNull()?.url,
             affectedGroup = pkg.group,

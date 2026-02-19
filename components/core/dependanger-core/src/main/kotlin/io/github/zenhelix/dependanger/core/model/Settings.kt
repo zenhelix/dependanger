@@ -152,6 +152,7 @@ public data class CompatibilityAnalysisSettings(
 public data class SecurityCheckSettings(
     val enabled: Boolean,
     val failOnVulnerability: Severity,
+    val minSeverity: String,
     val ignoreVulnerabilities: List<String>,
     val timeout: Long,
     val parallelism: Int,
@@ -162,6 +163,7 @@ public data class SecurityCheckSettings(
         public val DEFAULT: SecurityCheckSettings = SecurityCheckSettings(
             enabled = false,
             failOnVulnerability = Severity.ERROR,
+            minSeverity = "HIGH",
             ignoreVulnerabilities = emptyList(),
             timeout = 30_000,
             parallelism = 10,

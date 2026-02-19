@@ -35,6 +35,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
         val settings = context.settings.securityCheck
+        val minSeverity = parseMinSeverity(settings.minSeverity)
 
         val candidates = metadata.libraries.values.filter { it.version != null }
 
@@ -94,29 +95,45 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
                         }
                     }
 
-                    is OsvBatchResult.Failed  -> {
-                        logger.warn { "OSV API query failed: ${result.error}" }
-                        var usedStaleCache = false
-                        for (pkg in uncachedPackages) {
-                            val stale = cache.getStale(pkg.group, pkg.artifact, pkg.version)
-                            if (stale != null) {
-                                fetchedVulns.addAll(stale)
-                                usedStaleCache = true
+                    is OsvBatchResult.PartialSuccess -> {
+                        // Process the successful results
+                        for ((i, vulns) in result.vulnerabilities.withIndex()) {
+                            val pkg = uncachedPackages[i]
+                            fetchedVulns.addAll(vulns)
+                            try {
+                                cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
+                            } catch (e: Exception) {
+                                logger.warn { "Failed to write security cache for ${pkg.group}:${pkg.artifact}:${pkg.version}: ${e.message}" }
                             }
                         }
-                        diagnostics += if (usedStaleCache) {
-                            Diagnostics.warning(
-                                DiagnosticCodes.Security.STALE_CACHE,
-                                "Using stale security cache due to OSV API failure",
-                                id, emptyMap(),
-                            )
-                        } else {
-                            Diagnostics.warning(
-                                DiagnosticCodes.Security.API_UNREACHABLE,
-                                "OSV API unavailable and no cached data: ${result.error}",
-                                id, emptyMap(),
-                            )
-                        }
+                        // Handle the failed portion
+                        val failedPackages = uncachedPackages.drop(result.vulnerabilities.size)
+                        val failureDiagCode = if (result.isTimeout) DiagnosticCodes.Security.TIMEOUT else DiagnosticCodes.Security.API_UNREACHABLE
+                        val failureResult = handleApiFailure(cache, failedPackages, failureDiagCode, "Partial failure: ${result.error}")
+                        diagnostics += failureResult.diagnostics
+                        fetchedVulns.addAll(failureResult.staleVulns)
+                    }
+
+                    is OsvBatchResult.Timeout        -> {
+                        logger.warn { "OSV API request timed out: ${result.error}" }
+                        val failureResult = handleApiFailure(
+                            cache, uncachedPackages,
+                            DiagnosticCodes.Security.TIMEOUT,
+                            "OSV API request timed out after retries: ${result.error}",
+                        )
+                        diagnostics += failureResult.diagnostics
+                        fetchedVulns.addAll(failureResult.staleVulns)
+                    }
+
+                    is OsvBatchResult.Failed  -> {
+                        logger.warn { "OSV API query failed: ${result.error}" }
+                        val failureResult = handleApiFailure(
+                            cache, uncachedPackages,
+                            DiagnosticCodes.Security.API_UNREACHABLE,
+                            "OSV API unavailable and no cached data: ${result.error}",
+                        )
+                        diagnostics += failureResult.diagnostics
+                        fetchedVulns.addAll(failureResult.staleVulns)
                     }
                 }
             }
@@ -127,15 +144,45 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
             vuln.id !in ignoreSet && vuln.aliases.none { it in ignoreSet }
         }
 
-        diagnostics += buildScanDiagnostics(allVulns, candidates.size, settings.failOnVulnerability)
+        diagnostics += buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability)
 
         return metadata.copy(diagnostics = diagnostics)
             .withExtension(VulnerabilitiesExtensionKey, allVulns)
     }
 
+    private data class ApiFailureResult(
+        val diagnostics: Diagnostics,
+        val staleVulns: List<VulnerabilityInfo>,
+    )
+
+    private fun handleApiFailure(
+        cache: SecurityCache,
+        failedPackages: List<PackageQuery>,
+        fallbackDiagnosticCode: String,
+        fallbackMessage: String,
+    ): ApiFailureResult {
+        val staleVulns = failedPackages.flatMap { pkg ->
+            cache.getStale(pkg.group, pkg.artifact, pkg.version) ?: emptyList()
+        }
+        var diagnostics = Diagnostics.warning(
+            fallbackDiagnosticCode,
+            fallbackMessage,
+            id, emptyMap(),
+        )
+        if (staleVulns.isNotEmpty()) {
+            diagnostics += Diagnostics.warning(
+                DiagnosticCodes.Security.STALE_CACHE,
+                "Using stale security cache due to OSV API failure",
+                id, emptyMap(),
+            )
+        }
+        return ApiFailureResult(diagnostics = diagnostics, staleVulns = staleVulns)
+    }
+
     private fun buildScanDiagnostics(
         vulnerabilities: List<VulnerabilityInfo>,
         libraryCount: Int,
+        minSeverity: VulnerabilitySeverity,
         failOnVulnerability: Severity,
     ): Diagnostics {
         if (vulnerabilities.isEmpty()) {
@@ -165,28 +212,36 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
             )
         }
 
-        result += when (failOnVulnerability) {
-            Severity.ERROR   -> Diagnostics.error(
-                DiagnosticCodes.Security.VULNERABILITY_FOUND,
-                "${vulnerabilities.size} vulnerability(ies) found",
-                id, mapOf("count" to vulnerabilities.size.toString()),
+        val hasCvssV2Only = vulnerabilities.any { it.cvssVersion == "CVSS_V2" }
+        if (hasCvssV2Only) {
+            result += Diagnostics.info(
+                DiagnosticCodes.Security.CVSS_V2,
+                "Some vulnerabilities only have CVSS v2 scores (v2 formula used for calculation)",
+                id, emptyMap(),
             )
+        }
 
-            Severity.WARNING -> Diagnostics.warning(
-                DiagnosticCodes.Security.VULNERABILITY_FOUND,
-                "${vulnerabilities.size} vulnerability(ies) found",
-                id, mapOf("count" to vulnerabilities.size.toString()),
-            )
-
-            Severity.INFO    -> Diagnostics.info(
-                DiagnosticCodes.Security.VULNERABILITY_FOUND,
-                "${vulnerabilities.size} vulnerability(ies) found",
-                id, mapOf("count" to vulnerabilities.size.toString()),
-            )
+        val actionableVulns = vulnerabilities.filter { it.severity.meetsThreshold(minSeverity) }
+        if (actionableVulns.isNotEmpty()) {
+            val message = "${actionableVulns.size} vulnerability(ies) with severity >= $minSeverity found"
+            val details = mapOf("count" to actionableVulns.size.toString(), "minSeverity" to minSeverity.name)
+            result += when (failOnVulnerability) {
+                Severity.ERROR   -> Diagnostics.error(DiagnosticCodes.Security.VULNERABILITY_FOUND, message, id, details)
+                Severity.WARNING -> Diagnostics.warning(DiagnosticCodes.Security.VULNERABILITY_FOUND, message, id, details)
+                Severity.INFO    -> Diagnostics.info(DiagnosticCodes.Security.VULNERABILITY_FOUND, message, id, details)
+            }
         }
 
         return result
     }
+
+    private fun parseMinSeverity(value: String): VulnerabilitySeverity =
+        try {
+            VulnerabilitySeverity.fromString(value)
+        } catch (e: IllegalArgumentException) {
+            logger.warn { "Invalid minSeverity value '$value', falling back to HIGH: ${e.message}" }
+            VulnerabilitySeverity.HIGH
+        }
 }
 
 private class SecurityCheckContext(

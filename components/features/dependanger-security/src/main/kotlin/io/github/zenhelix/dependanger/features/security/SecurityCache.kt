@@ -98,7 +98,7 @@ public class SecurityCache(
 }
 
 public sealed interface SecurityCacheResult {
-    public data class Hit(public val vulnerabilities: List<VulnerabilityInfo>) : SecurityCacheResult
+    public data class Hit(val vulnerabilities: List<VulnerabilityInfo>) : SecurityCacheResult
     public data object Miss : SecurityCacheResult
-    public data class Corrupted(public val key: String, public val error: String) : SecurityCacheResult
+    public data class Corrupted(val key: String, val error: String) : SecurityCacheResult
 }

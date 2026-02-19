@@ -267,6 +267,7 @@ public class CompatibilityAnalysisSettingsDsl {
 public class SecurityCheckSettingsDsl {
     public var enabled: Boolean = SecurityCheckSettings.DEFAULT.enabled
     public var failOnVulnerability: Severity = SecurityCheckSettings.DEFAULT.failOnVulnerability
+    public var minSeverity: String = SecurityCheckSettings.DEFAULT.minSeverity
     public var ignoreVulnerabilities: List<String> = SecurityCheckSettings.DEFAULT.ignoreVulnerabilities
     public var timeout: Long = SecurityCheckSettings.DEFAULT.timeout
     public var parallelism: Int = SecurityCheckSettings.DEFAULT.parallelism
@@ -276,6 +277,7 @@ public class SecurityCheckSettingsDsl {
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(
         enabled = enabled,
         failOnVulnerability = failOnVulnerability,
+        minSeverity = minSeverity,
         ignoreVulnerabilities = ignoreVulnerabilities,
         timeout = timeout,
         parallelism = parallelism,

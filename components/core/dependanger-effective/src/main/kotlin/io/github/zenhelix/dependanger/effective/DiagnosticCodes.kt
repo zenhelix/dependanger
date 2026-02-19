@@ -91,4 +91,16 @@ public object DiagnosticCodes {
         public const val CUSTOM_HANDLER_NOT_FOUND: String = "COMPAT_CUSTOM_HANDLER_NOT_FOUND"
         public const val CUSTOM_RULE_FAILED: String = "COMPAT_CUSTOM_RULE_FAILED"
     }
+
+    public object Security {
+        public const val SCAN_COMPLETE: String = "SECURITY_SCAN_COMPLETE"
+        public const val NO_VULNS: String = "SECURITY_NO_VULNS"
+        public const val VULNERABILITY_FOUND: String = "SECURITY_VULNERABILITY_FOUND"
+        public const val API_UNREACHABLE: String = "SECURITY_API_UNREACHABLE"
+        public const val STALE_CACHE: String = "SECURITY_STALE_CACHE"
+        public const val TIMEOUT: String = "SECURITY_TIMEOUT"
+        public const val RATE_LIMITED: String = "SECURITY_RATE_LIMITED"
+        public const val INVALID_CVSS: String = "SECURITY_INVALID_CVSS"
+        public const val CVSS_V2: String = "SECURITY_CVSS_V2"
+    }
 }

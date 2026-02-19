@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -17,12 +18,24 @@ public suspend fun HttpClient.getWithRetry(
     url: String,
     retryConfig: RetryConfig = RetryConfig(),
     requestBuilder: HttpRequestBuilder.() -> Unit = {},
+): HttpResult<String> = requestWithRetry(url, retryConfig) { get(url, requestBuilder) }
+
+public suspend fun HttpClient.postWithRetry(
+    url: String,
+    retryConfig: RetryConfig = RetryConfig(),
+    requestBuilder: HttpRequestBuilder.() -> Unit = {},
+): HttpResult<String> = requestWithRetry(url, retryConfig) { post(url, requestBuilder) }
+
+private suspend fun requestWithRetry(
+    url: String,
+    retryConfig: RetryConfig,
+    httpCall: suspend () -> HttpResponse,
 ): HttpResult<String> {
     var delayMs = retryConfig.initialDelayMs
 
     repeat(retryConfig.maxRetries) { attempt ->
         try {
-            val response = get(url, requestBuilder)
+            val response = httpCall()
             when (val result = mapResponse(response, url)) {
                 is RetryDecision.Return -> return result.httpResult
                 is RetryDecision.Retry  -> {

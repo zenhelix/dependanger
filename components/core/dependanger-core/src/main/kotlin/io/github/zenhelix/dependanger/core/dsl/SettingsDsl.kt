@@ -268,11 +268,19 @@ public class SecurityCheckSettingsDsl {
     public var enabled: Boolean = SecurityCheckSettings.DEFAULT.enabled
     public var failOnVulnerability: Severity = SecurityCheckSettings.DEFAULT.failOnVulnerability
     public var ignoreVulnerabilities: List<String> = SecurityCheckSettings.DEFAULT.ignoreVulnerabilities
+    public var timeout: Long = SecurityCheckSettings.DEFAULT.timeout
+    public var parallelism: Int = SecurityCheckSettings.DEFAULT.parallelism
+    public var cacheDirectory: String? = SecurityCheckSettings.DEFAULT.cacheDirectory
+    public var cacheTtlHours: Long = SecurityCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(
         enabled = enabled,
         failOnVulnerability = failOnVulnerability,
         ignoreVulnerabilities = ignoreVulnerabilities,
+        timeout = timeout,
+        parallelism = parallelism,
+        cacheDirectory = cacheDirectory,
+        cacheTtlHours = cacheTtlHours,
     )
 }
 

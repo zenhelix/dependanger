@@ -153,12 +153,20 @@ public data class SecurityCheckSettings(
     val enabled: Boolean,
     val failOnVulnerability: Severity,
     val ignoreVulnerabilities: List<String>,
+    val timeout: Long,
+    val parallelism: Int,
+    val cacheDirectory: String?,
+    val cacheTtlHours: Long,
 ) {
     public companion object {
         public val DEFAULT: SecurityCheckSettings = SecurityCheckSettings(
             enabled = false,
             failOnVulnerability = Severity.ERROR,
             ignoreVulnerabilities = emptyList(),
+            timeout = 30_000,
+            parallelism = 10,
+            cacheDirectory = null,
+            cacheTtlHours = 24,
         )
     }
 }

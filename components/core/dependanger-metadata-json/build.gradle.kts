@@ -1,19 +1,11 @@
 plugins {
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Metadata JSON - JSON format serialization for metadata"
 
 dependencies {
-    api(project(":components:core:dependanger-core"))
-
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    api(projects.components.core.dependangerCore)
+    implementation(libs.kotlinx.serialization.json)
 }

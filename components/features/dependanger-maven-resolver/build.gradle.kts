@@ -1,32 +1,20 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Maven Resolver - Maven repository integration"
 
 dependencies {
-    api(project(":components:core:dependanger-core"))
-    api(project(":components:core:dependanger-effective"))
-    api(project(":components:shared:dependanger-maven-pom"))
-    api(project(":components:shared:dependanger-http-client"))
-    api(project(":components:shared:dependanger-cache"))
+    api(projects.components.core.dependangerCore)
+    api(projects.components.core.dependangerEffective)
+    api(projects.components.shared.dependangerMavenPom)
+    api(projects.components.shared.dependangerHttpClient)
+    api(projects.components.shared.dependangerCache)
+    implementation(libs.kotlin.logging.jvm)
+    implementation(libs.kotlinx.datetime)
 
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-
-    // DateTime
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-
-    // Test
-    testImplementation("io.ktor:ktor-client-mock:3.1.1")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

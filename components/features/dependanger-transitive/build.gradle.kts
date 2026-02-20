@@ -1,39 +1,23 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Transitive - Transitive dependency resolution and constraints"
 
 dependencies {
-    api(project(":components:core:dependanger-core"))
-    api(project(":components:core:dependanger-effective"))
-    implementation(project(":components:features:dependanger-maven-resolver"))
-    implementation(project(":components:shared:dependanger-maven-pom"))
-    implementation(project(":components:shared:dependanger-http-client"))
-    implementation(project(":components:shared:dependanger-cache"))
+    api(projects.components.core.dependangerCore)
+    api(projects.components.core.dependangerEffective)
+    implementation(projects.components.features.dependangerMavenResolver)
+    implementation(projects.components.shared.dependangerMavenPom)
+    implementation(projects.components.shared.dependangerHttpClient)
+    implementation(projects.components.shared.dependangerCache)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.kotlin.logging.jvm)
 
-    // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-    // DateTime
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
-
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-
-    // Test
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-    testImplementation("io.ktor:ktor-client-mock:3.1.1")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
 }

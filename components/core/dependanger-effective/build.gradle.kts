@@ -1,32 +1,18 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Effective - Filtered and enriched metadata model"
 
 dependencies {
-    api(project(":components:core:dependanger-core"))
+    api(projects.components.core.dependangerCore)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlin.logging.jvm)
 
-    // Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-    // Coroutines for parallel processing
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-
-    // Test dependencies
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.9")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    testImplementation(libs.kotlinx.coroutines.test)
+    testRuntimeOnly(libs.slf4j.simple)
 }

@@ -1,47 +1,30 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger API - High-level facade for external consumers"
 
 dependencies {
-    // Core dependencies
-    api(project(":components:core:dependanger-core"))
-    api(project(":components:core:dependanger-effective"))
-    api(project(":components:core:dependanger-metadata-json"))
+    api(projects.components.core.dependangerCore)
+    api(projects.components.core.dependangerEffective)
+    api(projects.components.core.dependangerMetadataJson)
+    api(projects.components.generators.dependangerGeneratorToml)
+    api(projects.components.generators.dependangerGeneratorBom)
 
-    // Generators
-    api(project(":components:generators:dependanger-generator-toml"))
-    api(project(":components:generators:dependanger-generator-bom"))
+    implementation(projects.components.features.dependangerMavenResolver)
+    implementation(projects.components.features.dependangerUpdates)
+    implementation(projects.components.features.dependangerAnalysis)
+    implementation(projects.components.features.dependangerReport)
+    implementation(projects.components.features.dependangerSecurity)
+    implementation(projects.components.features.dependangerLicense)
+    implementation(projects.components.features.dependangerTransitive)
 
-    // Built-in features (optional processors) - implementation, not exposed to consumers
-    implementation(project(":components:features:dependanger-maven-resolver"))
-    implementation(project(":components:features:dependanger-updates"))
-    implementation(project(":components:features:dependanger-analysis"))
-    implementation(project(":components:features:dependanger-report"))
-    implementation(project(":components:features:dependanger-security"))
-    implementation(project(":components:features:dependanger-license"))
-    implementation(project(":components:features:dependanger-transitive"))
+    api(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlin.logging.jvm)
 
-    // Serialization - needed transitively by consumers
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-    // Coroutines - needed transitively by consumers (e.g., runBlocking in plugin tasks)
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-
-    // Test dependencies
     testImplementation(kotlin("test"))
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.9")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    testRuntimeOnly(libs.slf4j.simple)
 }

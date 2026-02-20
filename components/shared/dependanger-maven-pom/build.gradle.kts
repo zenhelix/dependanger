@@ -1,20 +1,12 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Maven POM - Shared Maven POM parsing and writing"
 
 dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0")
-
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.9")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    api(libs.kotlinx.serialization.core)
+    testRuntimeOnly(libs.slf4j.simple)
 }

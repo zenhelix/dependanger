@@ -1,18 +1,17 @@
 @file:Suppress("UnstableApiUsage")
 
 plugins {
+    id("dependanger.base")
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish")
+    alias(libs.plugins.gradle.plugin.publish)
     `jvm-test-suite`
 }
 
 description = "Dependanger Gradle Plugin - Gradle integration"
 
 dependencies {
-    // Single dependency on dependanger-api facade - provides all core functionality
-    implementation(project(":components:api:dependanger-api"))
-
-    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.20")
+    implementation(projects.components.api.dependangerApi)
+    compileOnly(libs.kotlin.gradle.plugin)
 }
 
 gradlePlugin {
@@ -42,7 +41,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(gradleTestKit())
-                implementation("org.assertj:assertj-core:3.27.3")
+                implementation(libs.assertj.core)
             }
 
             targets {

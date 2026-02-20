@@ -1,22 +1,13 @@
 plugins {
-    kotlin("plugin.serialization")
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.serialization")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger Core - Models, DSL, and validation"
 
 dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.0")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    api(libs.kotlinx.serialization.core)
+    api(libs.kotlinx.serialization.json)
+    implementation(libs.kotlin.logging.jvm)
 }

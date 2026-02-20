@@ -1,24 +1,15 @@
 plugins {
-    `maven-publish`
+    id("dependanger.base")
+    id("dependanger.publishing")
 }
 
 description = "Dependanger BOM - Bill of Materials generator"
 
 dependencies {
-    api(project(":components:core:dependanger-core"))
-    api(project(":components:core:dependanger-effective"))
-    api(project(":components:shared:dependanger-maven-pom"))
+    api(projects.components.core.dependangerCore)
+    api(projects.components.core.dependangerEffective)
+    api(projects.components.shared.dependangerMavenPom)
+    implementation(libs.kotlin.logging.jvm)
 
-    // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-
-    testRuntimeOnly("org.slf4j:slf4j-simple:2.0.9")
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
+    testRuntimeOnly(libs.slf4j.simple)
 }

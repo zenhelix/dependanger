@@ -5,6 +5,24 @@ package io.github.zenhelix.dependanger.effective
  */
 public object DiagnosticCodes {
 
+    public object Bom {
+        public const val SNAPSHOT_WARNING: String = "BOM_SNAPSHOT_WARNING"
+        public const val UNRESOLVED_VERSION: String = "BOM_UNRESOLVED_VERSION"
+        public const val VERSION_RANGE: String = "BOM_VERSION_RANGE"
+        public const val CACHE_CORRUPT: String = "BOM_CACHE_CORRUPT"
+        public const val CIRCULAR: String = "CIRCULAR_BOM"
+        public const val DEPTH_EXCEEDED: String = "BOM_DEPTH_EXCEEDED"
+        public const val VERSION_IMPORTED: String = "BOM_VERSION_IMPORTED"
+        public const val NO_DEPS: String = "BOM_NO_DEPS"
+        public const val STALE_CACHE: String = "BOM_STALE_CACHE"
+        public const val FETCH_FAILED: String = "BOM_FETCH_FAILED"
+        public const val AUTH_REQUIRED: String = "BOM_AUTH_REQUIRED"
+        public const val INVALID_XML: String = "INVALID_BOM_XML"
+        public const val UNRESOLVED_PROPERTY: String = "UNRESOLVED_BOM_PROPERTY"
+        public const val DUPLICATE_ENTRY: String = "BOM_DUPLICATE_ENTRY"
+        public const val CACHE_READONLY: String = "BOM_CACHE_READONLY"
+    }
+
     public object Profile {
         public const val APPLIED: String = "PROFILE_APPLIED"
         public const val NOT_FOUND: String = "PROFILE_NOT_FOUND"

@@ -1,18 +1,12 @@
 package io.github.zenhelix.dependanger.core.dsl
 
+import io.github.zenhelix.dependanger.core.model.TypedKey
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
-public class DslExtensionKey<T : Any>(
-    public val name: String,
-    public val serializer: KSerializer<T>,
-) {
-    override fun equals(other: Any?): Boolean = other is DslExtensionKey<*> && name == other.name
-    override fun hashCode(): Int = name.hashCode()
-    override fun toString(): String = "DslExtensionKey($name)"
-}
+public class DslExtensionKey<T : Any>(name: String, serializer: KSerializer<T>) : TypedKey<T>(name, serializer)
 
 @DependangerDslMarker
 public class DependangerDsl {

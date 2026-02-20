@@ -12,7 +12,7 @@ public class AddBundleCommand : CliktCommand(name = "add-bundle") {
     public val name: String by argument(help = "Bundle name")
     public val libraries: String? by option("--libraries", help = "Library aliases (comma-separated)")
     public val extends: String? by option("--extends", help = "Bundle names to extend (comma-separated)")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run(): Unit = TODO()

@@ -2,9 +2,11 @@ package io.github.zenhelix.dependanger.effective.pipeline
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.ProcessingInfo
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import java.time.Instant
 import kotlin.time.TimeSource
 
 public class ProcessingPipeline(
@@ -24,38 +26,50 @@ public class ProcessingPipeline(
 
         val groups = groupByExecutionMode(processors.sortedBy { it.order })
 
-        return groups.fold(initial) { acc, group ->
+        val executedProcessorIds = mutableListOf<String>()
+
+        val result = groups.fold(initial) { acc, group ->
             when (group.executionMode) {
                 ExecutionMode.PARALLEL_IO, ExecutionMode.PARALLEL_COMPUTE ->
-                    executeParallel(acc, group.processors, context)
+                    executeParallel(acc, group.processors, context, executedProcessorIds)
 
                 else                                                      ->
-                    executeSequential(acc, group.processors, context)
+                    executeSequential(acc, group.processors, context, executedProcessorIds)
             }
         }
+
+        return result.copy(
+            processingInfo = ProcessingInfo(
+                processedAt = Instant.now().toString(),
+                processorIds = executedProcessorIds.toList(),
+                environment = context.environment.toSnapshot(),
+            )
+        )
     }
 
     private suspend fun executeSequential(
         metadata: EffectiveMetadata,
         processors: List<EffectiveMetadataProcessor>,
         context: ProcessingContext,
+        executedProcessorIds: MutableList<String>,
     ): EffectiveMetadata =
         processors.fold(metadata) { acc, processor ->
-            executeProcessor(processor, acc, context)
+            executeProcessor(processor, acc, context, executedProcessorIds)
         }
 
     private suspend fun executeParallel(
         base: EffectiveMetadata,
         processors: List<EffectiveMetadataProcessor>,
         context: ProcessingContext,
+        executedProcessorIds: MutableList<String>,
     ): EffectiveMetadata {
         if (processors.size == 1) {
-            return executeSequential(base, processors, context)
+            return executeSequential(base, processors, context, executedProcessorIds)
         }
 
         val results = coroutineScope {
             processors.map { processor ->
-                async { executeProcessor(processor, base, context) }
+                async { executeProcessor(processor, base, context, executedProcessorIds) }
             }.awaitAll()
         }
 
@@ -66,6 +80,7 @@ public class ProcessingPipeline(
         processor: EffectiveMetadataProcessor,
         metadata: EffectiveMetadata,
         context: ProcessingContext,
+        executedProcessorIds: MutableList<String>,
     ): EffectiveMetadata {
         if (!processor.supports(context)) {
             return metadata
@@ -77,6 +92,7 @@ public class ProcessingPipeline(
         return try {
             val result = processor.process(metadata, context)
             callback?.onEvent(ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
+            executedProcessorIds.add(processor.id)
             result
         } catch (e: Throwable) {
             callback?.onEvent(ProcessingEvent.PhaseError(processor.phase, e))

@@ -12,7 +12,7 @@ public class AddBomCommand : CliktCommand(name = "add-bom") {
     public val coordinates: String by argument(help = "Maven BOM coordinates (group:artifact[:version])")
     public val alias: String? by option("--alias", help = "BOM alias (defaults to artifactId)")
     public val version: String? by option("-v", "--version", help = "BOM version or ref:alias")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run(): Unit = TODO()

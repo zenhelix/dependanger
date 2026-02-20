@@ -2,9 +2,11 @@ package io.github.zenhelix.dependanger.features.security
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -13,6 +15,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.ktor.client.HttpClient
@@ -21,11 +24,9 @@ private val logger = KotlinLogging.logger {}
 
 private const val OSV_API_URL: String = "https://api.osv.dev"
 private const val OSV_BATCH_SIZE: Int = 1000
-private const val HTTP_CONNECT_TIMEOUT_MS: Long = 30_000L
-private const val HTTP_KEEP_ALIVE_MS: Long = 5_000L
 
 public class SecurityCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "security-check"
+    override val id: String = ProcessorIds.SECURITY_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.SECURITY_CHECK
     override val order: Int = phase.order
     override val isOptional: Boolean = true
@@ -51,7 +52,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
         }
 
         val cacheDir = settings.cacheDirectory
-            ?: (System.getProperty("user.home") + "/.dependanger/cache/security")
+            ?: DependangerPaths.resolveInUserHome(DependangerPaths.SECURITY_CACHE_DIR)
         val cache = SecurityCache(
             cacheDirectory = cacheDir,
             ttlHours = settings.cacheTtlHours,
@@ -250,9 +251,9 @@ private class SecurityCheckContext(
 ) : AutoCloseable {
 
     val httpClient: HttpClient = HttpClientFactory.create {
-        connectTimeoutMs = HTTP_CONNECT_TIMEOUT_MS
+        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
         requestTimeoutMs = timeoutMs
-        keepAliveMs = HTTP_KEEP_ALIVE_MS
+        keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
     }
 
     val osvClient: OsvApiClient = OsvApiClient(

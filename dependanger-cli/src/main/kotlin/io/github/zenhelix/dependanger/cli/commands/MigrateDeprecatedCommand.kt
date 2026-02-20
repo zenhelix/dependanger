@@ -13,7 +13,7 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
     public val replace: Boolean by option("--replace", help = "Replace deprecated with replacedBy in bundles").flag(default = true)
     public val remove: Boolean by option("--remove", help = "Remove deprecated libraries from metadata").flag()
     public val removeFromBundles: Boolean by option("--remove-from-bundles", help = "Remove deprecated from bundles instead of replacing").flag()
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
     public val backup: Boolean by option("--backup", help = "Create backup before modifying").flag()
 

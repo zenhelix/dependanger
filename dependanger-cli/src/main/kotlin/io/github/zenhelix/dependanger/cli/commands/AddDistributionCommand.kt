@@ -13,7 +13,7 @@ public class AddDistributionCommand : CliktCommand(name = "add-distribution") {
     public val includeTags: String? by option("--include-tags", help = "Tags to include (comma-separated)")
     public val excludeTags: String? by option("--exclude-tags", help = "Tags to exclude (comma-separated)")
     public val includeBundles: String? by option("--include-bundles", help = "Bundles to include (comma-separated)")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run(): Unit = TODO()

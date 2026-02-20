@@ -12,7 +12,7 @@ public class UpdateVersionCommand : CliktCommand(name = "update-version") {
 
     public val alias: String by argument(help = "Version or library alias")
     public val version: String by argument(help = "New version value")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file")
     public val library: Boolean by option("-l", "--library", help = "Update library version").flag()
 

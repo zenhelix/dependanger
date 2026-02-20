@@ -2,12 +2,14 @@ package io.github.zenhelix.dependanger.features.updates
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.VersionComparator
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withExtension
@@ -17,6 +19,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
 import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.async
@@ -27,12 +30,8 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-private const val HTTP_CONNECT_TIMEOUT_MS = 30_000L
-private const val HTTP_REQUEST_TIMEOUT_MS = 60_000L
-private const val HTTP_KEEP_ALIVE_MS = 5_000L
-
 public class UpdateCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = "update-check"
+    override val id: String = ProcessorIds.UPDATE_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.UPDATE_CHECK
     override val order: Int = phase.order
     override val isOptional: Boolean = true
@@ -67,14 +66,14 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
         }
 
         val cacheDir = settings.cacheDirectory
-            ?: (System.getProperty("user.home") + "/.dependanger/cache/versions")
+            ?: DependangerPaths.resolveInUserHome(DependangerPaths.VERSIONS_CACHE_DIR)
 
         UpdateCheckContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
             cacheDirectory = cacheDir,
             cacheTtlHours = settings.cacheTtlHours,
-            connectTimeoutMs = HTTP_CONNECT_TIMEOUT_MS,
+            connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
             readTimeoutMs = settings.timeout,
         ).use { ctx ->
             val semaphore = Semaphore(settings.parallelism)
@@ -240,7 +239,7 @@ private class UpdateCheckContext(
     val httpClient: HttpClient = HttpClientFactory.create {
         this.connectTimeoutMs = connectTimeoutMs
         this.requestTimeoutMs = readTimeoutMs
-        this.keepAliveMs = HTTP_KEEP_ALIVE_MS
+        this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
     }
 
     val cache: VersionCache = VersionCache(

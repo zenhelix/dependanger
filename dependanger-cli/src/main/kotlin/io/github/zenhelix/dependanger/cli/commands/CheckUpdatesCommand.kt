@@ -10,9 +10,9 @@ import com.github.ajalt.clikt.parameters.options.option
 public class CheckUpdatesCommand : CliktCommand(name = "check-updates") {
     override fun help(context: Context): String = "Check for available library updates"
 
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output report file")
-    public val format: String by option("--format", help = "Output format").default("text")
+    public val format: String by option("--format", help = "Output format").default(CliDefaults.OUTPUT_FORMAT_TEXT)
     public val includePrerelease: Boolean by option("--include-prerelease", help = "Include prerelease").flag()
     public val exclude: List<String> by option("--exclude", help = "Exclude patterns").multiple()
     public val type: String? by option("--type", help = "Update types: PATCH,MINOR,MAJOR")

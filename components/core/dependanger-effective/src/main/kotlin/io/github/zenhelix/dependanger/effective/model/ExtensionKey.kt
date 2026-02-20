@@ -1,15 +1,9 @@
 package io.github.zenhelix.dependanger.effective.model
 
+import io.github.zenhelix.dependanger.core.model.TypedKey
 import kotlinx.serialization.KSerializer
 
-public class ExtensionKey<T : Any>(
-    public val name: String,
-    public val serializer: KSerializer<T>,
-) {
-    override fun equals(other: Any?): Boolean = other is ExtensionKey<*> && name == other.name
-    override fun hashCode(): Int = name.hashCode()
-    override fun toString(): String = "ExtensionKey($name)"
-}
+public class ExtensionKey<T : Any>(name: String, serializer: KSerializer<T>) : TypedKey<T>(name, serializer)
 
 @Suppress("UNCHECKED_CAST")
 public fun <T : Any> EffectiveMetadata.getExtension(key: ExtensionKey<T>): T? =

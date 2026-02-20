@@ -13,7 +13,7 @@ public class UpdateLibraryCommand : CliktCommand(name = "update-library") {
     public val version: String? by option("-v", "--version", help = "New version or ref:alias")
     public val tags: String? by option("-t", "--tags", help = "New tags (comma-separated)")
     public val requiresJdk: String? by option("--requires-jdk", help = "Minimum JDK version")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run(): Unit = TODO()

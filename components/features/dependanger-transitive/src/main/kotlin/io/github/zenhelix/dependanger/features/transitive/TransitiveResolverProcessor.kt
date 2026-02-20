@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withDiagnostic
 import io.github.zenhelix.dependanger.effective.model.withExtension
@@ -23,7 +24,7 @@ private const val DEFAULT_READ_TIMEOUT_MS = 30_000L
 private const val LARGE_TREE_THRESHOLD = 5_000
 
 public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
-    override val id: String = "transitive-resolver"
+    override val id: String = ProcessorIds.TRANSITIVE_RESOLVER
     override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER
     override val order: Int = phase.order
     override val isOptional: Boolean = true

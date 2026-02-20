@@ -3,28 +3,29 @@ package io.github.zenhelix.dependanger.features.resolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
+import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.VersionReference
+import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}
 
 private const val MAX_BOM_DEPTH = 10
-private const val HTTP_REQUEST_TIMEOUT_MS = 60_000L
-private const val HTTP_CONNECT_TIMEOUT_MS = 30_000L
-private const val HTTP_KEEP_ALIVE_MS = 5_000L
 
 public class BomImportProcessor : EffectiveMetadataProcessor {
-    override val id: String = "bom-import"
+    override val id: String = ProcessorIds.BOM_IMPORT
     override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT
     override val order: Int = phase.order
     override val isOptional: Boolean = true
@@ -37,7 +38,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
         val settings = context.settings
         val cacheDir = settings.bomCache.directory
-            ?: (System.getProperty("user.home") + "/.dependanger/cache/bom")
+            ?: DependangerPaths.resolveInUserHome(DependangerPaths.BOM_CACHE_DIR)
         val repositories = settings.repositories
             .filterIsInstance<MavenRepository>()
             .ifEmpty {
@@ -63,7 +64,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
                 if (resolvedVersion.endsWith("-SNAPSHOT")) {
                     diagnostics += Diagnostics.warning(
-                        "BOM_SNAPSHOT_WARNING",
+                        DiagnosticCodes.Bom.SNAPSHOT_WARNING,
                         "BOM '${bomImport.alias}' uses SNAPSHOT version $resolvedVersion which may be unstable",
                         id, emptyMap()
                     )
@@ -105,7 +106,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             val found = context.originalMetadata.versions.find { it.name == v.name }
             if (found == null) {
                 null to Diagnostics.error(
-                    "BOM_UNRESOLVED_VERSION",
+                    DiagnosticCodes.Bom.UNRESOLVED_VERSION,
                     "Version reference '${v.name}' not found for BOM '${bomImport.alias}'",
                     id, emptyMap()
                 )
@@ -116,7 +117,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
         is VersionReference.Range     -> {
             null to Diagnostics.warning(
-                "BOM_VERSION_RANGE",
+                DiagnosticCodes.Bom.VERSION_RANGE,
                 "Version ranges not supported for BOM imports, skipping '${bomImport.alias}'",
                 id, emptyMap()
             )
@@ -154,7 +155,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             val key = "${lib.group}:${lib.artifact}"
             val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
             currentDiagnostics += Diagnostics.info(
-                "BOM_VERSION_IMPORTED",
+                DiagnosticCodes.Bom.VERSION_IMPORTED,
                 "Version $version imported from BOM '$bomAlias' for ${lib.group}:${lib.artifact}",
                 id, emptyMap()
             )
@@ -185,7 +186,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             return BomResolveResult(
                 content = BomContent.EMPTY,
                 diagnostics = diagnostics + Diagnostics.error(
-                    "CIRCULAR_BOM", "Circular BOM dependency detected: $key", id, emptyMap()
+                    DiagnosticCodes.Bom.CIRCULAR, "Circular BOM dependency detected: $key", id, emptyMap()
                 ),
             )
         }
@@ -193,7 +194,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             return BomResolveResult(
                 content = BomContent.EMPTY,
                 diagnostics = diagnostics + Diagnostics.warning(
-                    "BOM_DEPTH_EXCEEDED", "BOM parent hierarchy > $MAX_BOM_DEPTH levels for $key", id, emptyMap()
+                    DiagnosticCodes.Bom.DEPTH_EXCEEDED, "BOM parent hierarchy > $MAX_BOM_DEPTH levels for $key", id, emptyMap()
                 ),
             )
         }
@@ -212,7 +213,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
                 is CacheResult.Corrupted -> {
                     currentDiagnostics += Diagnostics.warning(
-                        "BOM_CACHE_CORRUPT",
+                        DiagnosticCodes.Bom.CACHE_CORRUPT,
                         "Cache corrupted for $key, will re-fetch: ${cached.error}",
                         id, emptyMap()
                     )
@@ -233,7 +234,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                         return BomResolveResult(
                             content = stale,
                             diagnostics = currentDiagnostics + Diagnostics.warning(
-                                "BOM_STALE_CACHE", "Using stale cache for BOM $key", id, emptyMap()
+                                DiagnosticCodes.Bom.STALE_CACHE, "Using stale cache for BOM $key", id, emptyMap()
                             ),
                         )
                     }
@@ -251,7 +252,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                 return BomResolveResult(
                     content = BomContent.EMPTY,
                     diagnostics = currentDiagnostics + Diagnostics.error(
-                        "INVALID_BOM_XML", "Failed to parse BOM XML for $key: ${e.message}", id, emptyMap()
+                        DiagnosticCodes.Bom.INVALID_XML, "Failed to parse BOM XML for $key: ${e.message}", id, emptyMap()
                     ),
                 )
             }
@@ -261,7 +262,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
             if (parseResult.dependencies.isEmpty() && parseResult.parent == null) {
                 currentDiagnostics += Diagnostics.warning(
-                    "BOM_NO_DEPS", "BOM $key contains no dependencyManagement", id, emptyMap()
+                    DiagnosticCodes.Bom.NO_DEPS, "BOM $key contains no dependencyManagement", id, emptyMap()
                 )
             }
 
@@ -304,7 +305,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                         val depKey = "${dep.group}:${dep.artifact}"
                         if (!seen.add(depKey)) {
                             currentDiagnostics += Diagnostics.warning(
-                                "BOM_DUPLICATE_ENTRY",
+                                DiagnosticCodes.Bom.DUPLICATE_ENTRY,
                                 "Duplicate dependency $depKey in BOM $key, last definition wins",
                                 id, emptyMap()
                             )
@@ -320,7 +321,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             } catch (e: Exception) {
                 logger.warn { "Failed to write BOM cache for $key: ${e.message}" }
                 currentDiagnostics += Diagnostics.warning(
-                    "BOM_CACHE_READONLY", "Cannot write cache for $key: ${e.message}", id, emptyMap()
+                    DiagnosticCodes.Bom.CACHE_READONLY, "Cannot write cache for $key: ${e.message}", id, emptyMap()
                 )
             }
             state.resolvedCache[key] = content
@@ -332,13 +333,13 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     }
 
     private fun downloadErrorDiagnostic(result: DownloadResult, key: String): Pair<String, String> = when (result) {
-        is DownloadResult.AuthRequired -> "BOM_AUTH_REQUIRED" to
+        is DownloadResult.AuthRequired -> DiagnosticCodes.Bom.AUTH_REQUIRED to
                 "Authentication required to fetch BOM $key from ${result.url} (HTTP ${result.statusCode})"
 
-        is DownloadResult.NotFound     -> "BOM_FETCH_FAILED" to
+        is DownloadResult.NotFound     -> DiagnosticCodes.Bom.FETCH_FAILED to
                 "BOM not found in any repository: $key"
 
-        is DownloadResult.Failed       -> "BOM_FETCH_FAILED" to
+        is DownloadResult.Failed       -> DiagnosticCodes.Bom.FETCH_FAILED to
                 "Cannot fetch BOM $key: ${result.error}"
 
         is DownloadResult.Success      -> error("Success is not an error")
@@ -362,7 +363,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
         DependencyResolutionResult(
             dependency = null,
             diagnostics = diagnostics + Diagnostics.error(
-                "UNRESOLVED_BOM_PROPERTY",
+                DiagnosticCodes.Bom.UNRESOLVED_PROPERTY,
                 "${e.message} in ${rawDep.group}:${rawDep.artifact}:${rawDep.version}",
                 id, emptyMap()
             ),
@@ -384,9 +385,9 @@ private class BomResolutionContext(
 ) : AutoCloseable {
 
     val httpClient: HttpClient = HttpClientFactory.create {
-        connectTimeoutMs = HTTP_CONNECT_TIMEOUT_MS
-        requestTimeoutMs = HTTP_REQUEST_TIMEOUT_MS
-        keepAliveMs = HTTP_KEEP_ALIVE_MS
+        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
+        requestTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS
+        keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
     }
 
     val cache: DirBasedCache<BomContent> = DirBasedCache(
@@ -401,8 +402,8 @@ private class BomResolutionContext(
         repositories = repositories,
         httpClient = httpClient,
         credentialsProvider = credentialsProvider,
-        connectTimeoutMs = HTTP_CONNECT_TIMEOUT_MS,
-        readTimeoutMs = HTTP_REQUEST_TIMEOUT_MS,
+        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
+        readTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS,
     )
 
     val parser: PomXmlParser = PomXmlParser()

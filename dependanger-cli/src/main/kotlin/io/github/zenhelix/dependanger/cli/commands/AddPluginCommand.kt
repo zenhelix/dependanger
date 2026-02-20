@@ -13,7 +13,7 @@ public class AddPluginCommand : CliktCommand(name = "add-plugin") {
     public val pluginId: String by argument(help = "Gradle plugin ID")
     public val version: String? by option("-v", "--version", help = "Plugin version or ref:alias")
     public val tags: String? by option("-t", "--tags", help = "Tags (comma-separated)")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default("metadata.json")
+    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run(): Unit = TODO()

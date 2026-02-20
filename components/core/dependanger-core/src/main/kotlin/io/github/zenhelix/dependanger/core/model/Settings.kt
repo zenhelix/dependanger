@@ -3,6 +3,16 @@ package io.github.zenhelix.dependanger.core.model
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+public object SettingsDefaults {
+    public const val DEFAULT_TIMEOUT_MS: Long = 30_000
+    public const val DEFAULT_PARALLELISM: Int = 10
+    public const val DEFAULT_CACHE_TTL_HOURS: Long = 24
+    public const val LICENSE_CACHE_TTL_HOURS: Long = 168
+    public const val SNAPSHOT_CACHE_TTL_HOURS: Long = 1
+    public const val UPDATE_CACHE_TTL_HOURS: Long = 1
+    public const val DEFAULT_REPORT_OUTPUT_DIR: String = "build/reports/dependanger"
+}
+
 @Serializable
 public data class Settings(
     val defaultDistribution: String?,
@@ -102,8 +112,8 @@ public data class BomCacheSettings(
         public val DEFAULT: BomCacheSettings = BomCacheSettings(
             enabled = true,
             directory = null,
-            ttlHours = 24,
-            ttlSnapshotHours = 1,
+            ttlHours = SettingsDefaults.DEFAULT_CACHE_TTL_HOURS,
+            ttlSnapshotHours = SettingsDefaults.SNAPSHOT_CACHE_TTL_HOURS,
         )
     }
 }
@@ -125,10 +135,10 @@ public data class UpdateCheckSettings(
             excludePatterns = emptyList(),
             includePrerelease = false,
             repositories = emptyList(),
-            timeout = 30_000,
-            parallelism = 10,
+            timeout = SettingsDefaults.DEFAULT_TIMEOUT_MS,
+            parallelism = SettingsDefaults.DEFAULT_PARALLELISM,
             cacheDirectory = null,
-            cacheTtlHours = 1,
+            cacheTtlHours = SettingsDefaults.UPDATE_CACHE_TTL_HOURS,
         )
     }
 }
@@ -165,10 +175,10 @@ public data class SecurityCheckSettings(
             failOnVulnerability = Severity.ERROR,
             minSeverity = "HIGH",
             ignoreVulnerabilities = emptyList(),
-            timeout = 30_000,
-            parallelism = 10,
+            timeout = SettingsDefaults.DEFAULT_TIMEOUT_MS,
+            parallelism = SettingsDefaults.DEFAULT_PARALLELISM,
             cacheDirectory = null,
-            cacheTtlHours = 24,
+            cacheTtlHours = SettingsDefaults.DEFAULT_CACHE_TTL_HOURS,
         )
     }
 }
@@ -204,10 +214,10 @@ public data class LicenseCheckSettings(
             warnOnUnknown = true,
             ignoreLibraries = emptyList(),
             includeTransitives = false,
-            timeout = 30_000,
-            parallelism = 10,
+            timeout = SettingsDefaults.DEFAULT_TIMEOUT_MS,
+            parallelism = SettingsDefaults.DEFAULT_PARALLELISM,
             cacheDirectory = null,
-            cacheTtlHours = 168,
+            cacheTtlHours = SettingsDefaults.LICENSE_CACHE_TTL_HOURS,
         )
     }
 }
@@ -244,7 +254,7 @@ public data class ReportSettings(
     public companion object {
         public val DEFAULT: ReportSettings = ReportSettings(
             format = ReportFormat.MARKDOWN,
-            outputDir = "build/reports/dependanger",
+            outputDir = SettingsDefaults.DEFAULT_REPORT_OUTPUT_DIR,
             sections = ReportSection.entries,
         )
     }

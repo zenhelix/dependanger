@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.pipeline
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ProcessingInfo
@@ -8,6 +9,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import kotlin.time.TimeSource
+
+private val logger = KotlinLogging.logger {}
 
 public class ProcessingPipeline(
     private val processors: List<EffectiveMetadataProcessor>,
@@ -26,22 +29,24 @@ public class ProcessingPipeline(
 
         val groups = groupByExecutionMode(processors.sortedBy { it.order })
 
-        val executedProcessorIds = mutableListOf<String>()
-
-        val result = groups.fold(initial) { acc, group ->
-            when (group.executionMode) {
+        val groupResult = groups.fold(GroupResult(initial, emptyList())) { acc, group ->
+            val result = when (group.executionMode) {
                 ExecutionMode.PARALLEL_IO, ExecutionMode.PARALLEL_COMPUTE ->
-                    executeParallel(acc, group.processors, context, executedProcessorIds)
+                    executeParallel(acc.metadata, group.processors, context)
 
                 else                                                      ->
-                    executeSequential(acc, group.processors, context, executedProcessorIds)
+                    executeSequential(acc.metadata, group.processors, context)
             }
+            GroupResult(
+                metadata = result.metadata,
+                executedProcessorIds = acc.executedProcessorIds + result.executedProcessorIds,
+            )
         }
 
-        return result.copy(
+        return groupResult.metadata.copy(
             processingInfo = ProcessingInfo(
                 processedAt = Instant.now().toString(),
-                processorIds = executedProcessorIds.toList(),
+                processorIds = groupResult.executedProcessorIds,
                 environment = context.environment.toSnapshot(),
             )
         )
@@ -51,51 +56,55 @@ public class ProcessingPipeline(
         metadata: EffectiveMetadata,
         processors: List<EffectiveMetadataProcessor>,
         context: ProcessingContext,
-        executedProcessorIds: MutableList<String>,
-    ): EffectiveMetadata =
-        processors.fold(metadata) { acc, processor ->
-            executeProcessor(processor, acc, context, executedProcessorIds)
+    ): GroupResult {
+        val executedIds = mutableListOf<String>()
+        val result = processors.fold(metadata) { acc, processor ->
+            val output = executeProcessor(processor, acc, context)
+            if (output.executedId != null) {
+                executedIds.add(output.executedId)
+            }
+            output.metadata
         }
+        return GroupResult(result, executedIds)
+    }
 
     private suspend fun executeParallel(
         base: EffectiveMetadata,
         processors: List<EffectiveMetadataProcessor>,
         context: ProcessingContext,
-        executedProcessorIds: MutableList<String>,
-    ): EffectiveMetadata {
+    ): GroupResult {
         if (processors.size == 1) {
-            return executeSequential(base, processors, context, executedProcessorIds)
+            return executeSequential(base, processors, context)
         }
 
-        val results = coroutineScope {
+        val outputs = coroutineScope {
             processors.map { processor ->
-                async { executeProcessor(processor, base, context, executedProcessorIds) }
+                async { executeProcessor(processor, base, context) }
             }.awaitAll()
         }
 
-        return mergeParallelResults(base, results)
+        val executedIds = outputs.mapNotNull { it.executedId }
+        val merged = mergeParallelResults(base, outputs.map { it.metadata })
+        return GroupResult(merged, executedIds)
     }
 
     private suspend fun executeProcessor(
         processor: EffectiveMetadataProcessor,
         metadata: EffectiveMetadata,
         context: ProcessingContext,
-        executedProcessorIds: MutableList<String>,
-    ): EffectiveMetadata {
+    ): ProcessorOutput {
         if (!processor.supports(context)) {
-            return metadata
+            return ProcessorOutput(metadata, executedId = null)
         }
 
-        val callback = context.callback
-        callback?.onEvent(ProcessingEvent.PhaseStarted(processor.phase))
+        emitEvent(context, ProcessingEvent.PhaseStarted(processor.phase))
         val mark = TimeSource.Monotonic.markNow()
         return try {
             val result = processor.process(metadata, context)
-            callback?.onEvent(ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
-            executedProcessorIds.add(processor.id)
-            result
+            emitEvent(context, ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
+            ProcessorOutput(result, executedId = processor.id)
         } catch (e: Throwable) {
-            callback?.onEvent(ProcessingEvent.PhaseError(processor.phase, e))
+            emitEvent(context, ProcessingEvent.PhaseError(processor.phase, e))
             throw e
         }
     }
@@ -115,27 +124,16 @@ public class ProcessingPipeline(
     }
 
     private fun validateParallelResult(base: EffectiveMetadata, result: EffectiveMetadata) {
-        if (result.versions != base.versions) {
+        assertUnchanged("versions", base.versions, result.versions)
+        assertUnchanged("libraries", base.libraries, result.libraries)
+        assertUnchanged("plugins", base.plugins, result.plugins)
+        assertUnchanged("bundles", base.bundles, result.bundles)
+    }
+
+    private fun assertUnchanged(fieldName: String, base: Any?, result: Any?) {
+        if (result != base) {
             throw IllegalStateException(
-                "Parallel processor modified 'versions' which is not supported. " +
-                        "Only diagnostics and extensions can be modified in parallel execution mode."
-            )
-        }
-        if (result.libraries != base.libraries) {
-            throw IllegalStateException(
-                "Parallel processor modified 'libraries' which is not supported. " +
-                        "Only diagnostics and extensions can be modified in parallel execution mode."
-            )
-        }
-        if (result.plugins != base.plugins) {
-            throw IllegalStateException(
-                "Parallel processor modified 'plugins' which is not supported. " +
-                        "Only diagnostics and extensions can be modified in parallel execution mode."
-            )
-        }
-        if (result.bundles != base.bundles) {
-            throw IllegalStateException(
-                "Parallel processor modified 'bundles' which is not supported. " +
+                "Parallel processor modified '$fieldName' which is not supported. " +
                         "Only diagnostics and extensions can be modified in parallel execution mode."
             )
         }
@@ -154,6 +152,24 @@ public class ProcessingPipeline(
         infos = result.infos.drop(base.infos.size),
     )
 
+    private fun emitEvent(context: ProcessingContext, event: ProcessingEvent) {
+        try {
+            context.callback?.onEvent(event)
+        } catch (e: Exception) {
+            logger.warn(e) { "Processing callback failed on event $event" }
+        }
+    }
+
+    private data class ProcessorOutput(
+        val metadata: EffectiveMetadata,
+        val executedId: String?,
+    )
+
+    private data class GroupResult(
+        val metadata: EffectiveMetadata,
+        val executedProcessorIds: List<String>,
+    )
+
     private data class ProcessorGroup(
         val executionMode: ExecutionMode,
         val processors: List<EffectiveMetadataProcessor>,
@@ -163,16 +179,17 @@ public class ProcessingPipeline(
         fun groupByExecutionMode(sorted: List<EffectiveMetadataProcessor>): List<ProcessorGroup> {
             if (sorted.isEmpty()) return emptyList()
 
-            val first = sorted.first()
-            return sorted.drop(1).fold(listOf(ProcessorGroup(first.phase.executionMode, listOf(first)))) { groups, processor ->
+            val groups = mutableListOf<ProcessorGroup>()
+            for (processor in sorted) {
                 val mode = processor.phase.executionMode
-                val lastGroup = groups.last()
-                if (mode == lastGroup.executionMode) {
-                    groups.dropLast(1) + lastGroup.copy(processors = lastGroup.processors + processor)
+                val last = groups.lastOrNull()
+                if (last != null && last.executionMode == mode) {
+                    groups[groups.lastIndex] = last.copy(processors = last.processors + processor)
                 } else {
-                    groups + ProcessorGroup(mode, listOf(processor))
+                    groups.add(ProcessorGroup(mode, listOf(processor)))
                 }
             }
+            return groups
         }
     }
 }

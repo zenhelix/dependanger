@@ -4,7 +4,7 @@ import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
-import io.github.zenhelix.dependanger.effective.coreProcessors
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
@@ -14,7 +14,8 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
-import java.util.ServiceLoader
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 public fun Dependanger(
     dslBlock: DependangerDsl.() -> Unit,
@@ -38,6 +39,8 @@ public class Dependanger internal constructor(
     private val metadata: DependangerMetadata,
     private val preset: ProcessingPreset,
     private val environment: ProcessingEnvironment,
+    private val coreProcessors: List<EffectiveMetadataProcessor>,
+    private val discoveredProcessors: List<EffectiveMetadataProcessor>,
     private val additionalProcessors: List<EffectiveMetadataProcessor>,
     private val disabledProcessorIds: Set<String>,
     private val pipelineCustomizer: (PipelineBuilder.() -> Unit)?,
@@ -67,16 +70,16 @@ public class Dependanger internal constructor(
     } catch (e: PipelineConfigurationException) {
         throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
     } catch (e: Exception) {
+        currentCoroutineContext().ensureActive()
         throw DependangerProcessingException("Processing failed: ${e.message}", phase = null, cause = e)
     }
 
     public suspend fun validate(): DependangerResult = try {
         val pipeline = ProcessingPipeline {
-            addProcessors(coreProcessors())
-            val featureProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-            addProcessors(featureProcessors.toList())
+            addProcessors(coreProcessors)
+            addProcessors(discoveredProcessors)
             ProcessingPreset.MINIMAL.configure(this)
-            enableOptional("validation")
+            enableOptional(ProcessorIds.VALIDATION)
         }
         val context = ProcessingContext(
             originalMetadata = metadata,
@@ -94,6 +97,7 @@ public class Dependanger internal constructor(
             diagnostics = effective.diagnostics,
         )
     } catch (e: Exception) {
+        currentCoroutineContext().ensureActive()
         val diagnostics = Diagnostics.error(
             code = "VALIDATION_FAILED",
             message = "Validation failed: ${e.message}",
@@ -104,9 +108,8 @@ public class Dependanger internal constructor(
     }
 
     private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
-        addProcessors(coreProcessors())
-        val featureProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-        addProcessors(featureProcessors.toList())
+        addProcessors(coreProcessors)
+        addProcessors(discoveredProcessors)
         addProcessors(additionalProcessors)
         preset.configure(this)
         disabledProcessorIds.forEach { id -> disable(id) }

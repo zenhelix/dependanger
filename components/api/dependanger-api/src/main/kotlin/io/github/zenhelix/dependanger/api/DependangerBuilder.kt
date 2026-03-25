@@ -3,9 +3,11 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.effective.coreProcessors
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
+import java.util.ServiceLoader
 
 public class DependangerBuilder {
     private var metadata: DependangerMetadata? = null
@@ -24,44 +26,50 @@ public class DependangerBuilder {
         this.metadata = metadata
     }
 
-    public fun preset(preset: ProcessingPreset) {
+    public fun preset(preset: ProcessingPreset): DependangerBuilder = apply {
         this.preset = preset
     }
 
-    public fun environment(environment: ProcessingEnvironment) {
+    public fun environment(environment: ProcessingEnvironment): DependangerBuilder = apply {
         this.environment = environment
     }
 
-    public fun jdkVersion(version: Int) {
+    public fun jdkVersion(version: Int): DependangerBuilder = apply {
         this.environment = environment.copy(jdkVersion = version)
     }
 
-    public fun kotlinVersion(version: String) {
+    public fun kotlinVersion(version: String): DependangerBuilder = apply {
         this.environment = environment.copy(kotlinVersion = version)
     }
 
-    public fun gradleVersion(version: String) {
+    public fun gradleVersion(version: String): DependangerBuilder = apply {
         this.environment = environment.copy(gradleVersion = version)
     }
 
-    public fun addProcessor(processor: EffectiveMetadataProcessor) {
+    public fun addProcessor(processor: EffectiveMetadataProcessor): DependangerBuilder = apply {
         additionalProcessors.add(processor)
     }
 
-    public fun disableProcessor(processorId: String) {
+    public fun disableProcessor(processorId: String): DependangerBuilder = apply {
         disabledProcessorIds.add(processorId)
     }
 
-    public fun configureProcessing(block: PipelineBuilder.() -> Unit) {
-        this.pipelineCustomizer = block
+    public fun configureProcessing(block: PipelineBuilder.() -> Unit): DependangerBuilder = apply {
+        val previous = pipelineCustomizer
+        this.pipelineCustomizer = {
+            previous?.invoke(this)
+            block()
+        }
     }
 
-    internal fun build(): Dependanger {
+    public fun build(): Dependanger {
         val resolvedMetadata = resolveMetadata()
         return Dependanger(
             metadata = resolvedMetadata,
             preset = preset,
             environment = environment,
+            coreProcessors = coreProcessors(),
+            discoveredProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList(),
             additionalProcessors = additionalProcessors.toList(),
             disabledProcessorIds = disabledProcessorIds.toSet(),
             pipelineCustomizer = pipelineCustomizer,
@@ -72,9 +80,13 @@ public class DependangerBuilder {
         metadata?.let { return it }
 
         dslBlock?.let { block ->
-            val dsl = DependangerDsl()
-            dsl.block()
-            return dsl.toMetadata()
+            return wrapNonDependangerException({ e ->
+                                                   DependangerConfigurationException("DSL evaluation failed: ${e.message}", e)
+                                               }) {
+                val dsl = DependangerDsl()
+                dsl.block()
+                dsl.toMetadata()
+            }
         }
 
         throw DependangerConfigurationException(

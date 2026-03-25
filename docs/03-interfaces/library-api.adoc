@@ -5,6 +5,7 @@
 :icons: font
 :source-highlighter: highlight.js
 
+[[overview]]
 == Обзор
 
 Library API предоставляет программный доступ к функциональности Dependanger для интеграции с другими инструментами и создания кастомных решений.
@@ -23,6 +24,18 @@ Library API предоставляет программный доступ к ф
 | Разработчики инструментов
 |===
 
+[[design-principles]]
+=== Принципы дизайна
+
+API построен по принципу **тонкого фасада с extension-функциями**:
+
+* `Dependanger` — минимальный фасад: конструирование pipeline и выполнение `process()` / `validate()`.
+* `DependangerResult` — data class для результата с `effective` (nullable) и `diagnostics`.
+* Генераторы (TOML, BOM) и extraction-методы вынесены в **extension-функции** на `DependangerResult`, что позволяет добавлять новые генераторы и extractors без изменения ядра.
+
+Это избегает жёсткой связи фасада с конкретными генераторами и фичами.
+
+[[connection]]
 == Подключение
 
 === Gradle (Kotlin DSL)
@@ -45,21 +58,34 @@ dependencies {
 </dependency>
 ----
 
+[[core-concepts]]
 == Основные концепции
 
+[[concept-dependanger]]
 === Dependanger
 
 Главный фасад для всех операций.
-Создаётся через `Dependanger.create()` или `Dependanger.builder()`.
+Создаётся через factory-функции `Dependanger(dslBlock) \{ ... \}` или `Dependanger(metadata) \{ ... \}`, либо через companion-методы `Dependanger.fromDsl()`, `Dependanger.fromMetadata()`, `Dependanger.fromJson()`.
 
+[[concept-builder]]
 === DependangerBuilder
 
-Builder для настройки Dependanger с кастомными процессорами, фильтрами и конфигурацией.
+Builder для настройки pipeline: preset, environment, кастомные процессоры, отключение процессоров.
+Возвращается из `Dependanger.fromDsl()` / `fromMetadata()` / `fromJson()`.
+Не thread-safe — предназначен для однопоточной конфигурации.
 
+[[concept-result]]
 === DependangerResult
 
-Unified result type для обработки успеха/ошибок с type-safe API.
+Data class с двумя полями:
 
+* `effective: EffectiveMetadata?` — `null` при ошибке обработки (например, `validate()` с невалидным metadata)
+* `diagnostics: Diagnostics` — всегда присутствует (может быть `Diagnostics.EMPTY`)
+
+Не sealed class — единый тип для успеха и ошибки.
+Computed property `isSuccess` = `effective != null && !diagnostics.hasErrors`.
+
+[[concept-thread-safety]]
 === Thread Safety
 
 [cols="1,2",options="header"]
@@ -67,660 +93,993 @@ Unified result type для обработки успеха/ошибок с type-
 | Компонент | Thread Safety
 
 | `Dependanger`
-| **Thread-safe.** Экземпляр можно использовать из нескольких потоков. Все операции stateless — состояние передаётся через параметры.
+| **Thread-safe.** Все поля — immutable. Операции `process()` / `validate()` stateless — состояние передаётся через параметры.
 
 | `DependangerBuilder`
-| **Не thread-safe.** Builder предназначен для однопоточной конфигурации. После вызова `build()` результирующий `Dependanger` thread-safe.
+| **Не thread-safe.** Builder предназначен для однопоточной конфигурации. После `build()` результирующий `Dependanger` thread-safe.
+
+| `DependangerResult`
+| **Immutable.** Data class, безопасен для sharing между потоками.
 
 | `Metadata`, `EffectiveMetadata`
-| **Immutable.** Все data-классы неизменяемы и безопасны для sharing между потоками.
+| **Immutable.** Все data-классы неизменяемы.
 
 | Processors
-| **Stateless.** Кастомные процессоры должны быть stateless для корректной работы в многопоточном окружении.
+| **Stateless.** Кастомные процессоры должны быть stateless.
 |===
 
 [NOTE]
 ====
-Для параллельной обработки нескольких дистрибуций используйте `buildAllEffective()` — метод выполняет обработку последовательно, но результат можно безопасно использовать в параллельных потоках.
+Для параллельной обработки нескольких дистрибуций вызывайте `process()` с разными `distribution` из coroutine scope.
+Каждый вызов `process()` создаёт свой `ProcessingContext` — вызовы не делят mutable-состояние.
 ====
 
+[[quick-start]]
 == Быстрый старт
 
-=== Базовое использование
+=== Базовое использование (factory-функции)
 
 [source,kotlin]
 ----
 import io.github.zenhelix.dependanger.api.Dependanger
-import java.io.File
+import io.github.zenhelix.dependanger.api.toToml
+import io.github.zenhelix.dependanger.api.writeTomlTo
+import io.github.zenhelix.dependanger.api.writeBomTo
+import io.github.zenhelix.dependanger.generators.bom.BomConfig
+import java.nio.file.Path
+import kotlinx.coroutines.runBlocking
 
-fun main() {
-    // Создание с дефолтными настройками
-    val dependanger = Dependanger.create()
-    
-    // Загрузка metadata из файла
-    val metadata = dependanger.loadMetadata(File("dependanger-metadata.json"))
-    
-    // Build effective metadata для default дистрибуции
-    val effective = dependanger.buildEffective(metadata)
-    
-    // Генерация TOML
-    dependanger.generateToml(effective, File("libs.versions.toml"))
-    
-    // Генерация BOM
-    dependanger.generateBom(
-        effective, 
-        File("bom.xml"),
+fun main() = runBlocking {
+    val dependanger = Dependanger(
+        dslBlock = {
+            versions {
+                version("kotlin", "2.1.20")
+            }
+            libraries {
+                library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+                    version = versionRef("kotlin")
+                }
+            }
+        },
+        builderAction = {
+            jdkVersion(17)
+        }
+    )
+
+    // Обработка (default distribution)
+    val result = dependanger.process()
+
+    // Генерация TOML (extension function)
+    val tomlContent: String = result.toToml()
+
+    // Запись TOML в файл
+    result.writeTomlTo(Path.of("gradle/libs.versions.toml"))
+
+    // Генерация BOM (extension function, требует config)
+    val bomConfig = BomConfig(
         groupId = "com.example",
         artifactId = "my-bom",
-        version = "1.0.0"
+        version = "1.0.0",
+        name = null,
+        description = null,
+        filename = BomConfig.DEFAULT_FILENAME,
+        includeOptionalDependencies = false,
+        prettyPrint = true,
+        includeDeprecationComments = true,
     )
+    result.writeBomTo(Path.of("build/bom.pom.xml"), bomConfig)
 }
 ----
 
-=== Использование DSL
+=== Использование DSL через companion-методы
 
 [source,kotlin]
 ----
-val dependanger = Dependanger.create()
+import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 
-val metadata = dependanger.fromDsl {
+// Companion-метод возвращает DependangerBuilder
+val dependanger = Dependanger.fromDsl {
     versions {
         version("kotlin", "2.1.20")
         version("spring-boot", "3.4.1")
     }
-    
+
     libraries {
         library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
             version = versionRef("kotlin")
+            tags("core", "kotlin")
         }
         library("spring-boot-starter", "org.springframework.boot:spring-boot-starter") {
             version = versionRef("spring-boot")
             tags("spring", "core")
         }
     }
-    
+
     bundles {
         bundle("kotlin-core") {
-            libraries("kotlin-stdlib", "kotlin-reflect")
+            libraries("kotlin-stdlib")
         }
     }
 }
-
-val effective = dependanger.buildEffective(metadata)
-----
-
-== DependangerBuilder
-
-=== Конфигурация через Builder
-
-[source,kotlin]
-----
-val dependanger = Dependanger.builder()
-    // Feature processors
-    .withUpdateChecking(enabled = true, failOnMajorUpdates = true)
-    .withCompatibilityAnalysis(enabled = true, targetJdk = 17)
-    .withBomImport(enabled = true)
-    .withReporting(enabled = true)
-    
-    // Custom processors
-    .withProcessor(MyCustomProcessor())
-    
-    // Custom filters
-    .withLibraryFilter(MyLibraryFilter())
-    .withBundleProcessor(MyBundleProcessor())
-    
-    // JSON format
-    .withPrettyJson(encodeDefaults = false)
-    
-    // Callbacks
-    .withCallback(object : ProcessingCallback {
-        override fun onProcessorStart(name: String) {
-            println("Starting: $name")
-        }
-        override fun onProcessorComplete(name: String) {
-            println("Completed: $name")
-        }
-    })
-    
+    .preset(ProcessingPreset.STRICT)
+    .jdkVersion(17)
     .build()
 ----
 
-=== Отключение features
-
-[source,kotlin]
-----
-// Отключить конкретные features
-val dependanger = Dependanger.builder()
-    .withoutUpdateChecking()
-    .withoutCompatibilityAnalysis()
-    .withoutBomImport()
-    .build()
-
-// Отключить все features (минимальная конфигурация)
-val minimal = Dependanger.builder()
-    .withoutAllFeatures()
-    .build()
-----
-
-=== DSL-style конфигурация
-
-[source,kotlin]
-----
-val dependanger = Dependanger.builder()
-    .updateChecking {
-        enabled = true
-        failOnMajorUpdates = true
-        config = UpdateConfig(
-            checkInterval = Duration.ofHours(24)
-        )
-    }
-    .compatibilityAnalysis {
-        enabled = true
-        targetJdk = 17
-        failOnErrors = false
-    }
-    .bomImport {
-        enabled = true
-        failOnError = false
-    }
-    .reporting {
-        enabled = true
-        defaultConfig {
-            includeUpdates = true
-            includeCompatibility = true
-        }
-    }
-    .build()
-----
-
-== Работа с дистрибуциями
-
-=== DistributionSelection
-
-[source,kotlin]
-----
-import io.github.zenhelix.dependanger.effective.builder.DistributionSelection
-
-// Default: если settings.defaultDistribution не задан — все библиотеки без фильтрации
-val effective1 = dependanger.buildEffective(metadata, DistributionSelection.Default)
-
-// Конкретная дистрибуция по имени
-val effective2 = dependanger.buildEffective(metadata, DistributionSelection.Named("android"))
-
-// Все дистрибуции
-val allEffective: Map<String, EffectiveMetadata> = dependanger.buildAllEffective(metadata)
-----
-
-=== Прямая конвертация (без пайплайна)
-
-[source,kotlin]
-----
-// Конвертация без pipeline processors (без фильтрации и обогащения)
-val direct = dependanger.convertDirect(metadata, DistributionSelection.Named("core"))
-
-// Конвертация всех дистрибуций напрямую
-val allDirect = dependanger.convertAllDirect(metadata)
-----
-
-== Result API
-
-=== DependangerResult
-
-Type-safe обработка результатов:
-
-[source,kotlin]
-----
-import io.github.zenhelix.dependanger.result.DependangerResult
-
-val result: DependangerResult<EffectiveMetadata> = 
-    dependanger.buildEffectiveAsResult(metadata, DistributionSelection.Named("android"))
-
-// Pattern matching style
-when (result) {
-    is DependangerResult.Success -> {
-        val effective = result.value
-        println("Built ${effective.libraries.size} libraries")
-    }
-    is DependangerResult.Failure -> {
-        result.errors.forEach { error ->
-            println("Error: ${error.message}")
-        }
-    }
-}
-
-// Callback style
-result
-    .onSuccess { effective ->
-        println("Success: ${effective.libraries.size} libraries")
-    }
-    .onFailure { errors ->
-        errors.forEach { println("Error: ${it.message}") }
-    }
-
-// Get or throw
-val effective = result.getOrThrow()
-
-// Get or default
-val effectiveOrEmpty = result.getOrElse { EffectiveMetadata.EMPTY }
-----
-
-=== Валидация с Result
-
-[source,kotlin]
-----
-// Валидация metadata
-dependanger.validateAsResult(metadata)
-    .onSuccess { validated ->
-        println("Metadata is valid")
-    }
-    .onFailure { errors ->
-        errors.forEach { println("Validation error: ${it.message}") }
-    }
-
-// Валидация effective metadata
-dependanger.validateAsResult(effective)
-    .onSuccess { validated ->
-        // Proceed with generation
-    }
-    .onFailure { errors ->
-        // Handle errors
-    }
-----
-
-== Генераторы артефактов
-
-=== Прямой доступ к генераторам
-
-[source,kotlin]
-----
-// TOML генератор
-val tomlContent: String = dependanger.toml.generate(effective)
-
-// BOM генератор
-val bomContent: String = dependanger.bom.generate(effective, BomConfig(
-    groupId = "com.example",
-    artifactId = "my-bom",
-    version = "1.0.0"
-))
-
-// Список всех генераторов
-dependanger.generators.forEach { generator ->
-    println("Generator: ${generator.formatName}")
-}
-----
-
-=== Удобные методы
-
-[source,kotlin]
-----
-// Генерация в файл
-dependanger.generateToml(effective, File("libs.versions.toml"))
-
-dependanger.generateBom(
-    effective,
-    File("bom.xml"),
-    groupId = "com.example",
-    artifactId = "my-bom",
-    version = "1.0.0"
-)
-
-// Convenience: load + build + generate в одном вызове
-val result = dependanger.processToToml(
-    metadataFile = File("metadata.json"),
-    outputFile = File("libs.versions.toml"),
-    distribution = DistributionSelection.Named("core")
-)
-
-val bomResult = dependanger.processToBom(
-    metadataFile = File("metadata.json"),
-    outputFile = File("bom.xml"),
-    groupId = "com.example",
-    artifactId = "my-bom",
-    version = "1.0.0",
-    distribution = DistributionSelection.Default
-)
-----
-
-== Reporting Service
-
-=== Генерация отчётов
-
-[source,kotlin]
-----
-// Проверка доступности
-if (dependanger.isReportingEnabled) {
-    val reportService = dependanger.reporting!!
-    
-    val report = reportService.generateReport(
-        metadata = metadata,
-        effective = effective,
-        config = ReportConfig(
-            includeUpdates = true,
-            includeCompatibility = true,
-            targetJdk = 17
-        )
-    )
-    
-    // Сохранение отчёта
-    reportService.saveReport(report, File("dependanger-report.json"))
-}
-
-// Или с throw при отключенном reporting
-val reportService = dependanger.reportingOrThrow()
-----
-
-== Filter Preview
-
-Предпросмотр результатов фильтрации:
-
-[source,kotlin]
-----
-val preview = dependanger.previewFilter(
-    metadata = metadata,
-    distribution = DistributionSelection.Named("android")
-)
-
-println("Included libraries: ${preview.includedLibraries.map { it.alias }}")
-println("Excluded libraries: ${preview.excludedLibraries.map { it.alias }}")
-println("Included bundles: ${preview.includedBundles.map { it.name }}")
-----
-
-== Custom Processors
-
-=== Создание кастомного процессора
-
-[source,kotlin]
-----
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
-import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
-
-class MyCustomProcessor : EffectiveMetadataProcessor {
-    override val name: String = "my-custom-processor"
-    override val order: Int = 80  // После compatibility analysis (75)
-    
-    override suspend fun process(
-        metadata: EffectiveMetadata,
-        context: ProcessingContext
-    ): EffectiveMetadata {
-        // Кастомная логика обработки
-        val enrichedLibraries = metadata.libraries.map { library ->
-            library.copy(
-                metadata = library.metadata + ("customField" to "customValue")
-            )
-        }
-        
-        return metadata.copy(libraries = enrichedLibraries)
-    }
-}
-----
-
-=== Регистрация процессора
-
-[source,kotlin]
-----
-val dependanger = Dependanger.builder()
-    .withProcessor(MyCustomProcessor())
-    .build()
-----
-
-== Custom Filters
-
-=== LibraryFilter
-
-[source,kotlin]
-----
-import io.github.zenhelix.dependanger.filter.LibraryFilter
-import io.github.zenhelix.dependanger.metadata.Library
-import io.github.zenhelix.dependanger.metadata.FilterSpec
-
-class SecurityLibraryFilter : LibraryFilter {
-    override fun filter(
-        libraries: List<Library>,
-        filterSpec: FilterSpec?
-    ): List<Library> {
-        return libraries.filter { library ->
-            // Исключаем библиотеки с известными уязвимостями
-            !isVulnerable(library)
-        }
-    }
-    
-    private fun isVulnerable(library: Library): Boolean {
-        // Логика проверки уязвимостей
-        return false
-    }
-}
-
-val dependanger = Dependanger.builder()
-    .withLibraryFilter(SecurityLibraryFilter())
-    .build()
-----
-
-== Сериализация
-
-=== Кастомные форматы
-
-[source,kotlin]
-----
-// Compact JSON (без pretty printing)
-val dependanger = Dependanger.builder()
-    .withCompactJson()
-    .build()
-
-// Pretty JSON с defaults
-val dependanger2 = Dependanger.builder()
-    .withPrettyJson(encodeDefaults = true)
-    .build()
-
-// Кастомный формат
-val dependanger3 = Dependanger.builder()
-    .withMetadataFormat(MyCustomFormat())
-    .withEffectiveMetadataFormat(MyCustomEffectiveFormat())
-    .build()
-----
-
-=== Прямой доступ к converter
-
-[source,kotlin]
-----
-// Конвертер для прямого преобразования без пайплайна
-val converter = dependanger.converter
-
-val effective = converter.convert(metadata, DistributionSelection.Named("android"))
-val all = converter.convertAll(metadata)
-----
-
-== Обработка ошибок
-
-=== BuildResult с диагностикой
-
-[source,kotlin]
-----
-val result = dependanger.buildEffectiveWithDiagnostics(metadata, DistributionSelection.Default)
-
-println("Success: ${result.isSuccess}")
-println("Has errors: ${result.hasErrors}")
-println("Has warnings: ${result.hasWarnings}")
-
-result.errors.forEach { error ->
-    println("ERROR [${error.processor}]: ${error.message}")
-}
-
-result.warnings.forEach { warning ->
-    println("WARNING [${warning.processor}]: ${warning.message}")
-}
-
-// Доступ к metadata (даже при наличии ошибок)
-val effective = result.metadata
-----
-
-== Полный пример
+=== Загрузка из JSON
 
 [source,kotlin]
 ----
 import io.github.zenhelix.dependanger.api.Dependanger
-import io.github.zenhelix.dependanger.effective.builder.DistributionSelection
-import java.io.File
 
-fun main() {
-    // 1. Создание Dependanger с кастомной конфигурацией
-    val dependanger = Dependanger.builder()
-        .withUpdateChecking(enabled = true, failOnMajorUpdates = false)
-        .withCompatibilityAnalysis(enabled = true, targetJdk = 17)
-        .withBomImport(enabled = true)
-        .withReporting(enabled = true)
-        .withPrettyJson()
-        .build()
-    
-    // 2. Создание metadata через DSL
-    val metadata = dependanger.fromDsl {
-        versions {
-            version("kotlin", "2.1.20")
-            version("spring-boot", "3.4.1")
-        }
-        
-        libraries {
-            library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
-                version = versionRef("kotlin")
-                tags("core", "kotlin")
-            }
-            library("spring-boot-starter", "org.springframework.boot:spring-boot-starter") {
-                version = versionRef("spring-boot")
-                tags("spring", "core")
-            }
-        }
-        
-        platforms {
-            platform("spring-boot-bom", "org.springframework.boot:spring-boot-dependencies") {
-                version = versionRef("spring-boot")
-            }
-        }
-        
-        distributions {
-            distribution("core") {
-                filter {
-                    includeTags("core")
-                }
-            }
-        }
-        
-        compatibility {
-            jdkRequirement("spring-boot-3x") {
-                libraries("spring-boot-starter")
-                minJdk = 17
-            }
-        }
-    }
-    
-    // 3. Валидация
-    dependanger.validateAsResult(metadata)
-        .onFailure { errors ->
-            errors.forEach { println("Validation error: ${it.message}") }
-            return
-        }
-    
-    // 4. Build effective metadata с диагностикой
-    val result = dependanger.buildEffectiveAsResult(
-        metadata, 
-        DistributionSelection.Named("core")
-    )
-    
-    result
-        .onSuccess { effective ->
-            println("Built ${effective.libraries.size} libraries")
-            
-            // 5. Генерация артефактов
-            dependanger.generateToml(effective, File("build/libs.versions.toml"))
-            dependanger.generateBom(
-                effective,
-                File("build/bom.xml"),
-                groupId = "com.example",
-                artifactId = "my-bom",
-                version = "1.0.0"
-            )
-            
-            // 6. Генерация отчёта
-            if (dependanger.isReportingEnabled) {
-                val report = dependanger.reporting!!.generateReport(metadata, effective)
-                dependanger.reporting!!.saveReport(report, File("build/report.json"))
-            }
-            
-            println("Generation completed!")
-        }
-        .onFailure { errors ->
-            errors.forEach { println("Build error: ${it.message}") }
-        }
-}
+val json = File("dependanger-metadata.json").readText()
+
+val dependanger = Dependanger.fromJson(json)
+    .jdkVersion(17)
+    .kotlinVersion("2.1.20")
+    .build()
+
+val result = dependanger.process(distribution = "production")
 ----
 
-== Extraction API
+[[dependanger-class]]
+== Dependanger
 
-Extension-функции для извлечения feature-специфичных данных из `DependangerResult`.
-Полезны для custom reporting, CI-интеграций и программного анализа зависимостей.
+[[dependanger-creation]]
+=== Создание
+
+Три способа создания `Dependanger`:
+
+==== Factory-функции (рекомендуется для inline-использования)
 
 [source,kotlin]
 ----
-import io.github.zenhelix.dependanger.api.extractUpdateData
-import io.github.zenhelix.dependanger.api.extractSecurityData
-import io.github.zenhelix.dependanger.api.extractLicenseData
-import io.github.zenhelix.dependanger.api.extractTransitiveData
-import io.github.zenhelix.dependanger.api.extractCompatibilityIssues
-import io.github.zenhelix.dependanger.api.extractVersionConflicts
+// Из DSL-блока
+val d1 = Dependanger(
+    dslBlock = {
+        versions { version("kotlin", "2.1.20") }
+        libraries { /* ... */ }
+    },
+    builderAction = {
+        preset(ProcessingPreset.DEFAULT)
+        jdkVersion(17)
+    }
+)
 
-val result: DependangerResult = dependanger.process(metadata)
+// Из готового DependangerMetadata
+val d2 = Dependanger(
+    metadata = existingMetadata,
+    builderAction = {
+        disableProcessor("update-check")
+    }
+)
+----
 
-// Данные об обновлениях
-val updates: List<UpdateAvailableInfo> = result.extractUpdateData()
-updates.forEach { println("${it.alias}: ${it.currentVersion} -> ${it.latestVersion}") }
+==== Companion-методы (рекомендуется для поэтапной конфигурации)
 
-// Уязвимости (CVE)
-val vulnerabilities: List<VulnerabilityInfo> = result.extractSecurityData()
-vulnerabilities.forEach { println("${it.cveId} (CVSS: ${it.cvssScore}): ${it.summary}") }
+[source,kotlin]
+----
+// fromDsl — возвращает DependangerBuilder
+val builder1 = Dependanger.fromDsl { /* DSL */ }
 
-// Нарушения лицензий
-val licenseIssues: List<LicenseViolation> = result.extractLicenseData()
+// fromMetadata — из готового объекта
+val builder2 = Dependanger.fromMetadata(metadata)
 
-// Дерево транзитивных зависимостей
-val transitives: List<TransitiveTree> = result.extractTransitiveData()
+// fromJson — парсит JSON, оборачивает в builder
+val builder3 = Dependanger.fromJson(jsonString)
 
-// Проблемы совместимости
-val compatIssues: List<CompatibilityIssue> = result.extractCompatibilityIssues()
+// Все три → DependangerBuilder → .build() → Dependanger
+val dependanger = builder1.jdkVersion(17).build()
+----
 
-// Конфликты версий транзитивных зависимостей
-val conflicts: List<VersionConflict> = result.extractVersionConflicts()
+[NOTE]
+====
+`fromJson()` бросает `DependangerConfigurationException`, если JSON невалиден.
+Builder без metadata и без DSL-блока бросит `DependangerConfigurationException` при `build()`.
+====
+
+[[dependanger-operations]]
+=== Операции
+
+Оба метода — `suspend`:
+
+[source,kotlin]
+----
+// Полная обработка через pipeline
+public suspend fun process(
+    distribution: String? = null,     // null → settings.defaultDistribution
+    callback: ProcessingCallback? = null,
+): DependangerResult
+
+// Валидация (MINIMAL preset + validation processor)
+public suspend fun validate(): DependangerResult
+----
+
+[[dependanger-process-behavior]]
+==== process()
+
+1. Собирает pipeline: core-процессоры + discovered-процессоры (закэшированы при `build()`) + additionalProcessors.
+2. Применяет preset и disabledProcessorIds.
+3. Применяет `pipelineCustomizer` (если задан).
+4. Создаёт `ProcessingContext` с `distribution`, `settings`, `environment`.
+5. Запускает pipeline.
+Процессоры группируются по `ExecutionMode`: sequential выполняются последовательно (fold), parallel — через `coroutineScope { async }`.
+Каждый процессор возвращает immutable `ProcessorOutput` (metadata + executedId); shared mutable state отсутствует.
+6. Возвращает `DependangerResult(effective, diagnostics)`.
+
+**Обработка ошибок:**
+
+* `CancellationException` — **перебрасывается** (через `coroutineContext.ensureActive()`), не оборачивается.
+Structured concurrency сохраняется.
+* `DependangerException` — пробрасывается as-is.
+* `PipelineConfigurationException` — оборачивается в `DependangerConfigurationException`.
+* Любой другой `Exception` — оборачивается в `DependangerProcessingException`.
+
+[IMPORTANT]
+====
+`process()` **бросает исключение** при фатальной ошибке pipeline.
+Если pipeline отработал, но с ошибками в diagnostics — вернётся `DependangerResult` с `effective != null` и `diagnostics.hasErrors == true`.
+Проверяйте `result.isSuccess` перед генерацией, либо используйте `result.diagnostics.errors` для деталей.
+====
+
+[[dependanger-validate-behavior]]
+==== validate()
+
+1. Использует `ProcessingPreset.MINIMAL` с включённым `validation` процессором.
+2. `CancellationException` — **перебрасывается** (через `coroutineContext.ensureActive()`), structured concurrency сохраняется.
+3. При любом другом исключении — **не бросает**, а возвращает `DependangerResult(effective = null, diagnostics = error(...))`.
+
+Это позволяет вызывающему коду безопасно проверить `result.isSuccess` без try/catch (кроме отмены корутины).
+
+[NOTE]
+====
+`validate()` — lightweight quick-check.
+Он **намеренно игнорирует** настройки builder'а (`preset`, `additionalProcessors`, `disabledProcessorIds`, `pipelineCustomizer`).
+Всегда использует `ProcessingPreset.MINIMAL` + `validation` processor для быстрой и предсказуемой проверки.
+
+Для полной валидации с учётом всех настроек — используйте `process()` и проверяйте `result.diagnostics`.
+====
+
+[[dependanger-builder]]
+== DependangerBuilder
+
+=== Конфигурация
+
+[source,kotlin]
+----
+public class DependangerBuilder {
+    // Все методы возвращают this (fluent API)
+
+    // Processing preset (DEFAULT, MINIMAL, STRICT, DISTRIBUTION)
+    public fun preset(preset: ProcessingPreset): DependangerBuilder
+
+    // Environment
+    public fun environment(environment: ProcessingEnvironment): DependangerBuilder
+    public fun jdkVersion(version: Int): DependangerBuilder
+    public fun kotlinVersion(version: String): DependangerBuilder
+    public fun gradleVersion(version: String): DependangerBuilder
+
+    // Custom processors
+    public fun addProcessor(processor: EffectiveMetadataProcessor): DependangerBuilder
+    public fun disableProcessor(processorId: String): DependangerBuilder
+
+    // Pipeline customization
+    public fun configureProcessing(block: PipelineBuilder.() -> Unit): DependangerBuilder
+
+    // Build
+    public fun build(): Dependanger
+}
 ----
 
 [cols="1,2,1",options="header"]
 |===
-| Метод | Описание | Возвращаемый тип
+| Метод | Описание | Default
 
-| `extractUpdateData()`
+| `preset()`
+| Processing preset, определяющий набор активных процессоров
+| `ProcessingPreset.DEFAULT`
+
+| `environment()`
+| Полная замена `ProcessingEnvironment` (JDK, Kotlin, Gradle версии + env variables)
+| `ProcessingEnvironment.DEFAULT` (version fields = null, environmentVariables = emptyMap)
+
+| `jdkVersion()`
+| Устанавливает JDK-версию в environment (через `copy()`)
+| `null`
+
+| `kotlinVersion()`
+| Устанавливает Kotlin-версию в environment (через `copy()`)
+| `null`
+
+| `gradleVersion()`
+| Устанавливает Gradle-версию в environment (через `copy()`)
+| `null`
+
+| `addProcessor()`
+| Добавляет кастомный процессор в pipeline
+| —
+
+| `disableProcessor()`
+| Отключает процессор по его `id`
+| —
+
+| `configureProcessing()`
+| Низкоуровневая настройка `PipelineBuilder`. Аккумулируется: несколько вызовов выполняются последовательно в порядке добавления.
+| —
+|===
+
+[NOTE]
+====
+Все методы возвращают `this` — поддержка fluent-цепочек.
+
+`jdkVersion()`, `kotlinVersion()`, `gradleVersion()` — convenience-обёртки над `environment.copy()`.
+Вызов `environment()` после них перезапишет все ранее установленные значения:
+
+[source,kotlin]
+----
+// НЕПРАВИЛЬНО: jdkVersion потеряна
+builder.jdkVersion(17).environment(ProcessingEnvironment.DEFAULT)
+
+// ПРАВИЛЬНО: environment первым, потом точечные
+builder.environment(baseEnv).jdkVersion(17).kotlinVersion("2.1.20")
+----
+
+Используйте либо `environment()`, либо точечные методы — не смешивайте.
+====
+
+=== Пример: строгий режим с кастомными процессорами
+
+[source,kotlin]
+----
+val dependanger = Dependanger.fromDsl {
+    versions { version("kotlin", "2.1.20") }
+    libraries { /* ... */ }
+}
+    .preset(ProcessingPreset.STRICT)
+    .jdkVersion(17)
+    .kotlinVersion("2.1.20")
+    .addProcessor(MyAuditProcessor())
+    .disableProcessor("license-check")  // отключить конкретный feature
+    .configureProcessing {
+        // низкоуровневая настройка PipelineBuilder
+        enableOptional("validation")
+    }
+.build()
+----
+
+[[result-api]]
+== DependangerResult
+
+=== Структура
+
+[source,kotlin]
+----
+public data class DependangerResult(
+    val effective: EffectiveMetadata?,
+    val diagnostics: Diagnostics,
+) {
+    public val isSuccess: Boolean
+        get() = effective != null && !diagnostics.hasErrors
+
+    // Safe — бросает если !isSuccess
+    public fun <T> generate(generator: ArtifactGenerator<T>): T
+    public fun <T> writeTo(generator: ArtifactGenerator<T>, path: Path): Path
+
+    // Unsafe — бросает только если effective == null, игнорирует diagnostics.hasErrors
+    public fun <T> generateUnsafe(generator: ArtifactGenerator<T>): T
+    public fun <T> writeToUnsafe(generator: ArtifactGenerator<T>, path: Path): Path
+}
+----
+
+=== Использование
+
+[source,kotlin]
+----
+val result = dependanger.process(distribution = "production")
+
+// Проверка успеха
+if (result.isSuccess) {
+    val toml = result.toToml()  // extension function (делегирует в generate())
+    println(toml)
+}
+
+// Проверка диагностики
+result.diagnostics.errors.forEach { error ->
+    println("ERROR [${error.processorId}] ${error.code}: ${error.message}")
+}
+result.diagnostics.warnings.forEach { warning ->
+    println("WARNING [${warning.processorId}] ${warning.code}: ${warning.message}")
+}
+----
+
+=== generate() / writeTo() — safe vs unsafe
+
+[source,kotlin]
+----
+// generate() — safe: бросает если !isSuccess (effective == null ИЛИ diagnostics.hasErrors)
+val tomlContent = result.generate(TomlGenerator(TomlConfig.DEFAULT))
+
+// generateUnsafe() — бросает только если effective == null
+// Используйте для best-effort генерации при наличии ошибок в diagnostics
+val bestEffort = result.generateUnsafe(TomlGenerator(TomlConfig.DEFAULT))
+
+// writeTo() / writeToUnsafe() — аналогично, но с записью в файл
+val outputPath = result.writeTo(TomlGenerator(TomlConfig.DEFAULT), Path.of("libs.versions.toml"))
+----
+
+[IMPORTANT]
+====
+* `generate()` / `writeTo()` — **бросают `DependangerProcessingException`** если `!isSuccess` (pipeline не отработал или есть ошибки в diagnostics).
+Это safe-path по умолчанию.
+* `generateUnsafe()` / `writeToUnsafe()` — бросают только если `effective == null`.
+Позволяют генерировать best-effort результат несмотря на ошибки в diagnostics.
+Используйте осознанно.
+====
+
+=== Edge Cases
+
+[cols="1,2",options="header"]
+|===
+| Сценарий | Поведение
+
+| `effective != null`, `diagnostics.hasErrors == false`
+| `isSuccess = true`. `generate()` и `generateUnsafe()` работают одинаково.
+
+| `effective != null`, `diagnostics.hasErrors == true`
+| `isSuccess = false`. `generate()` **бросает**, `generateUnsafe()` **работает** (best-effort результат).
+
+| `effective == null`, `diagnostics.hasErrors == true`
+| `isSuccess = false`. И `generate()`, и `generateUnsafe()` **бросают**.
+
+| `effective == null`, `diagnostics.hasErrors == false`
+| Теоретически невозможно при текущей реализации, но оба метода **бросают** по null-check.
+
+| Вызов `generate()` при `effective == null`
+| Бросает `DependangerProcessingException("Cannot generate: processing failed")`.
+|===
+
+[[generator-extensions]]
+== Extension-функции для генераторов
+
+Convenience-обёртки над `generate()` / `writeTo()` — вынесены в отдельные файлы, не создают связи фасада с генераторами.
+
+=== TOML
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.toToml
+import io.github.zenhelix.dependanger.api.writeTomlTo
+
+// Генерация строки (default config)
+val toml: String = result.toToml()
+
+// С кастомным конфигом
+val toml2 = result.toToml(TomlConfig(
+    filename = "libs.versions.toml",
+    includeComments = true,
+    sortSections = true,
+    useInlineVersions = false,
+    includeDeprecationComments = true,
+))
+
+// Запись в файл
+val path: Path = result.writeTomlTo(Path.of("gradle/libs.versions.toml"))
+val path2 = result.writeTomlTo(Path.of("output"), TomlConfig.DEFAULT)
+----
+
+=== BOM
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.toBom
+import io.github.zenhelix.dependanger.api.writeBomTo
+
+val config = BomConfig(
+    groupId = "com.example",
+    artifactId = "my-bom",
+    version = "1.0.0",
+    name = "My BOM",
+    description = "Centralized dependency versions",
+    filename = BomConfig.DEFAULT_FILENAME,
+    includeOptionalDependencies = false,
+    prettyPrint = true,
+    includeDeprecationComments = true,
+)
+
+// Генерация строки
+val bom: String = result.toBom(config)
+
+// Запись в файл
+result.writeBomTo(Path.of("build/bom.pom.xml"), config)
+----
+
+[NOTE]
+====
+`toToml()` имеет default-параметр `TomlConfig.DEFAULT`.
+`toBom()` **не имеет** default — `BomConfig` требует обязательные `groupId`, `artifactId`, `version`.
+====
+
+=== Универсальный generate()
+
+Для кастомных генераторов (реализующих `ArtifactGenerator<T>`):
+
+[source,kotlin]
+----
+// Любой ArtifactGenerator<T>
+val artifact = result.generate(myCustomGenerator)
+result.writeTo(myCustomGenerator, Path.of("output"))
+----
+
+[[extraction-api]]
+== Extraction API
+
+Extension-свойства на `DependangerResult` для извлечения feature-специфичных данных из `EffectiveMetadata.extensions`.
+Определены в `DependangerResultExtensions.kt`.
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.updates
+import io.github.zenhelix.dependanger.api.vulnerabilities
+import io.github.zenhelix.dependanger.api.licenseViolations
+import io.github.zenhelix.dependanger.api.transitives
+import io.github.zenhelix.dependanger.api.compatibilityIssues
+import io.github.zenhelix.dependanger.api.versionConflicts
+
+val result = dependanger.process(distribution = "production")
+
+// Доступные обновления (из UpdateCheckProcessor)
+val updates: List<UpdateAvailableInfo> = result.updates
+updates.forEach { println("${it.alias}: ${it.currentVersion} -> ${it.latestVersion}") }
+
+// Уязвимости (из SecurityCheckProcessor)
+val vulnerabilities: List<VulnerabilityInfo> = result.vulnerabilities
+vulnerabilities.forEach { println("${it.cveId} (CVSS: ${it.cvssScore}): ${it.summary}") }
+
+// Нарушения лицензий (из LicenseCheckProcessor)
+val licenseIssues: List<LicenseViolation> = result.licenseViolations
+
+// Транзитивные зависимости (из TransitiveResolverProcessor)
+val trees: List<TransitiveTree> = result.transitives
+
+// Проблемы совместимости (из CompatibilityCheckProcessor)
+val issues: List<CompatibilityIssue> = result.compatibilityIssues
+
+// Конфликты версий (из TransitiveResolverProcessor)
+val conflicts: List<VersionConflict> = result.versionConflicts
+----
+
+[cols="1,2,1",options="header"]
+|===
+| Extension-свойство | Описание | Возвращаемый тип
+
+| `updates`
 | Доступные обновления версий
 | `List<UpdateAvailableInfo>`
 
-| `extractSecurityData()`
+| `vulnerabilities`
 | Найденные уязвимости (CVE)
 | `List<VulnerabilityInfo>`
 
-| `extractLicenseData()`
+| `licenseViolations`
 | Нарушения лицензионных политик
 | `List<LicenseViolation>`
 
-| `extractTransitiveData()`
+| `transitives`
 | Деревья транзитивных зависимостей
 | `List<TransitiveTree>`
 
-| `extractCompatibilityIssues()`
+| `compatibilityIssues`
 | Проблемы совместимости
 | `List<CompatibilityIssue>`
 
-| `extractVersionConflicts()`
+| `versionConflicts`
 | Конфликты версий транзитивных зависимостей
 | `List<VersionConflict>`
 |===
 
-NOTE: Все extraction-методы безопасны — при отсутствии данных или failed result возвращают пустой список.
+[NOTE]
+====
+Все extraction-свойства безопасны: при `effective == null` или отсутствии данных возвращают пустой список.
+Данные доступны только если соответствующий процессор был включён (через preset или `addProcessor()`).
+Если процессор отключён или не в classpath — свойство вернёт пустой список без ошибок.
 
+**Как отличить "процессор не нашёл данных" от "процессор не запускался":**
+используйте `ProcessingInfo.processorIds` — список ID процессоров, которые фактически выполнились:
+
+[source,kotlin]
+----
+val processorRan = result.effective
+    ?.processingInfo
+    ?.processorIds
+    ?.contains("update-check") == true
+
+if (!processorRan) {
+    println("Update check was not executed (disabled or not in classpath)")
+} else if (result.updates.isEmpty()) {
+    println("All libraries are up to date")
+}
+----
+====
+
+[[distributions]]
+== Работа с дистрибуциями
+
+=== Одна дистрибуция
+
+[source,kotlin]
+----
+// Default distribution (из settings.defaultDistribution или null → все библиотеки)
+val result1 = dependanger.process()
+
+// Конкретная дистрибуция
+val result2 = dependanger.process(distribution = "android")
+----
+
+=== Несколько дистрибуций
+
+[source,kotlin]
+----
+// Последовательная обработка
+val distributions = listOf("android", "ios", "backend")
+val results = distributions.map { dist ->
+    dist to dependanger.process(distribution = dist)
+}
+
+// Параллельная обработка (Dependanger thread-safe)
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+suspend fun processAll(
+    dependanger: Dependanger,
+    distributions: List<String>
+): Map<String, DependangerResult> = coroutineScope {
+    distributions.associateWith { dist ->
+        async { dependanger.process(distribution = dist) }
+    }.mapValues { (_, deferred) -> deferred.await() }
+}
+----
+
+[IMPORTANT]
+====
+`distribution = null` не означает "все дистрибуции".
+Это означает "использовать `settings.defaultDistribution`".
+Если `defaultDistribution` не задан — pipeline работает без фильтрации (все библиотеки включены).
+Для обработки всех дистрибуций — итерируйте явно.
+
+Несуществующая дистрибуция (не объявленная в `distributions {}`) обрабатывается `ProfileProcessor` в pipeline — добавляет ошибку в diagnostics.
+====
+
+[[processing-callback]]
+== Processing Callback
+
+Для отслеживания прогресса pipeline:
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEvent
+
+val result = dependanger.process(
+    distribution = "production",
+    callback = ProcessingCallback { event ->
+        when (event) {
+            is ProcessingEvent.PhaseStarted ->
+                println("Starting: ${event.phase}")
+            is ProcessingEvent.PhaseCompleted ->
+                println("Completed: ${event.phase} in ${event.duration}")
+            is ProcessingEvent.PhaseError ->
+                println("Error in ${event.phase}: ${event.error.message}")
+            is ProcessingEvent.DiagnosticAdded ->
+                println("Diagnostic: [${event.message.severity}] ${event.message.message}")
+            is ProcessingEvent.Progress ->
+                println("Progress [${event.phase}]: ${event.current}/${event.total}")
+        }
+    }
+)
+----
+
+`ProcessingCallback` — `fun interface` с единственным методом `onEvent(event: ProcessingEvent)`.
+Можно передать лямбду.
+
+[NOTE]
+====
+Callback — наблюдатель.
+Исключения из callback'а **не влияют на pipeline**: они перехватываются, логируются через `kotlin-logging` на уровне `WARN` и подавляются.
+Callback не должен бросать исключения — но если бросит, pipeline продолжит работу корректно.
+====
+
+[[custom-processors]]
+== Custom Processors
+
+=== Создание
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
+
+class MyAuditProcessor : EffectiveMetadataProcessor {
+    override val id: String = "my-audit"
+    override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS
+    override val order: Int = 115  // после стандартного compatibility (110)
+    override val isOptional: Boolean = true
+    override val description: String = "Custom audit checks"
+
+    override fun supports(context: ProcessingContext): Boolean = true
+
+    override suspend fun process(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): EffectiveMetadata {
+        // Возвращаем НОВЫЙ объект — immutability contract
+        return metadata.copy(
+            diagnostics = metadata.diagnostics + myDiagnostics,
+        )
+    }
+}
+----
+
+=== Регистрация
+
+[source,kotlin]
+----
+// Через builder
+val dependanger = Dependanger.fromDsl { /* ... */ }
+    .addProcessor(MyAuditProcessor())
+    .build()
+
+// Через ServiceLoader (META-INF/services)
+// Файл: META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+// Содержимое: com.example.MyAuditProcessor
+----
+
+[[error-handling]]
+== Обработка ошибок
+
+=== Иерархия исключений
+
+[source,kotlin]
+----
+DependangerException(message, cause)           // базовый
+├── DependangerConfigurationException          // ошибки конфигурации (build, JSON parse, unknown distribution)
+├── DependangerValidationException(errors)     // ошибки валидации (список строк)
+├── DependangerProcessingException(phase?)     // ошибки pipeline (phase: String?, null для generic errors)
+└── DependangerGenerationException(generatorId) // ошибки генерации
+----
+
+=== Когда что бросается
+
+[cols="1,2",options="header"]
+|===
+| Ситуация | Поведение
+
+| Невалидный JSON в `fromJson()`
+| `DependangerConfigurationException`
+
+| Исключение в DSL-блоке при `build()`
+| `DependangerConfigurationException` (оборачивает оригинальное исключение в `cause`)
+
+| Builder без metadata и DSL
+| `DependangerConfigurationException` при `build()`
+
+| Pipeline configuration error
+| `DependangerConfigurationException` (обёрнутый `PipelineConfigurationException`)
+
+| Ошибка в процессоре при `process()`
+| `DependangerProcessingException` с `phase`
+
+| `generate()` при `!isSuccess`
+| `DependangerProcessingException` (safe-check перед генерацией)
+
+| `generateUnsafe()` при `effective == null`
+| `DependangerProcessingException`
+
+| Ошибка в генераторе (`generate()` / `generateUnsafe()`)
+| `DependangerGenerationException` с `generatorId` (оборачивает исключение генератора)
+
+| Ошибка записи файла (`writeTo()` / `writeToUnsafe()`)
+| `DependangerGenerationException` с `generatorId` (оборачивает IO/другие исключения)
+
+| Ошибка при `validate()`
+| **Не бросает** — возвращает `DependangerResult(effective = null, diagnostics = error(...))`
+
+| Отмена корутины (`CancellationException`)
+| **Перебрасывается** в обоих методах (`process()` и `validate()`) через `coroutineContext.ensureActive()`
+|===
+
+[IMPORTANT]
+====
+**Асимметрия `process()` vs `validate()`:**
+
+* `process()` бросает исключения при фатальных ошибках.
+* `validate()` **не бросает** бизнес-ошибки — возвращает через `diagnostics`.
+* Оба метода **перебрасывают `CancellationException`** — structured concurrency сохраняется.
+====
+
+=== Паттерн обработки
+
+[source,kotlin]
+----
+// process() — нужен try/catch для фатальных ошибок
+try {
+    val result = dependanger.process(distribution = "production")
+
+    if (result.isSuccess) {
+        result.writeTomlTo(Path.of("libs.versions.toml"))
+    } else {
+        result.diagnostics.errors.forEach { e ->
+            System.err.println("[${e.code}] ${e.message}")
+        }
+    }
+} catch (e: DependangerConfigurationException) {
+    System.err.println("Configuration error: ${e.message}")
+} catch (e: DependangerProcessingException) {
+    System.err.println("Processing failed at phase ${e.phase}: ${e.message}")
+}
+
+// validate() — try/catch не нужен
+val validationResult = dependanger.validate()
+if (!validationResult.isSuccess) {
+    validationResult.diagnostics.errors.forEach { e ->
+        System.err.println("Validation: [${e.code}] ${e.message}")
+    }
+}
+----
+
+[[diagnostics]]
+== Диагностика
+
+`Diagnostics` — immutable контейнер для сообщений трёх уровней:
+
+[source,kotlin]
+----
+public data class Diagnostics(
+    val errors: List<DiagnosticMessage>,
+    val warnings: List<DiagnosticMessage>,
+    val infos: List<DiagnosticMessage>,
+) {
+    val hasErrors: Boolean     // errors.isNotEmpty()
+    val isValid: Boolean       // errors.isEmpty()
+    operator fun plus(other: Diagnostics): Diagnostics
+}
+
+public data class DiagnosticMessage(
+    val code: String,          // e.g. "UNRESOLVED_VERSION"
+    val message: String,       // человекочитаемое описание
+    val severity: Severity,    // ERROR, WARNING, INFO
+    val processorId: String?,  // какой процессор выдал (null для system-level)
+    val context: Map<String, String>,  // доп. контекст (alias, version и т.д.)
+)
+----
+
+Стандартные коды диагностики определены в xref:../02-features/F003-processing-pipeline.adoc[F003 Processing Pipeline].
+
+[[full-example]]
+== Полный пример
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.*
+import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.generators.bom.BomConfig
+import kotlinx.coroutines.runBlocking
+import java.nio.file.Path
+
+fun main() = runBlocking {
+    // 1. Создание Dependanger через DSL
+    val dependanger = Dependanger(
+        dslBlock = {
+            versions {
+                version("kotlin", "2.1.20")
+                version("spring-boot", "3.4.1")
+            }
+
+            libraries {
+                library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib") {
+                    version = versionRef("kotlin")
+                    tags("core", "kotlin")
+                }
+                library("spring-boot-starter", "org.springframework.boot:spring-boot-starter") {
+                    version = versionRef("spring-boot")
+                    tags("spring", "core")
+                }
+            }
+
+            distributions {
+                distribution("core") {
+                    spec {
+                        filter {
+                            byTags {
+                                include { anyOf("core") }
+                            }
+                        }
+                    }
+                }
+            }
+
+            compatibility {
+                jdkRequirement("spring-boot-3x") {
+                    matches = "spring-*"
+                    minJdk = 17
+                }
+            }
+        },
+        builderAction = {
+            preset(ProcessingPreset.STRICT)
+            jdkVersion(17)
+            kotlinVersion("2.1.20")
+        }
+    )
+
+    // 2. Валидация (безопасно, без исключений)
+    val validation = dependanger.validate()
+    if (!validation.isSuccess) {
+        validation.diagnostics.errors.forEach { e ->
+            println("Validation error: [${e.code}] ${e.message}")
+        }
+        return@runBlocking
+    }
+
+    // 3. Обработка с callback
+    val result = dependanger.process(
+        distribution = "core",
+        callback = { event ->
+            println("Event: $event")
+        }
+    )
+
+    if (!result.isSuccess) {
+        result.diagnostics.errors.forEach { e ->
+            println("Error: [${e.code}] ${e.message}")
+        }
+        return@runBlocking
+    }
+
+    // 4. Предупреждения (не блокируют, но стоит показать)
+    result.diagnostics.warnings.forEach { w ->
+        println("Warning: [${w.code}] ${w.message}")
+    }
+
+    // 5. Генерация TOML
+    result.writeTomlTo(Path.of("build/libs.versions.toml"))
+
+    // 6. Генерация BOM
+    result.writeBomTo(
+        Path.of("build/bom.pom.xml"),
+        BomConfig(
+            groupId = "com.example",
+            artifactId = "my-bom",
+            version = "1.0.0",
+            name = "My BOM",
+            description = null,
+            filename = BomConfig.DEFAULT_FILENAME,
+            includeOptionalDependencies = false,
+            prettyPrint = true,
+            includeDeprecationComments = true,
+        )
+    )
+
+    // 7. Анализ feature-данных (через extraction extensions)
+    val updates = result.updates
+    if (updates.isNotEmpty()) {
+        println("\nAvailable updates:")
+        updates.forEach { println("  ${it.alias}: ${it.currentVersion} -> ${it.latestVersion}") }
+    }
+
+    val vulns = result.vulnerabilities
+    if (vulns.isNotEmpty()) {
+        println("\nVulnerabilities found:")
+        vulns.forEach { println("  ${it.cveId} [${it.severity}]: ${it.summary}") }
+    }
+
+    println("\nGeneration completed!")
+}
+----
+
+[[related-sections]]
 == Связи с другими разделами
 
 * xref:../02-features/F001-registry-dsl.adoc[F001 Registry DSL] — описание DSL синтаксиса

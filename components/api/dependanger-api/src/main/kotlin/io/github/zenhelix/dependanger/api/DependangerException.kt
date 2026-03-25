@@ -27,3 +27,14 @@ public class DependangerConfigurationException(
     message: String,
     cause: Throwable?,
 ) : DependangerException(message, cause)
+
+internal inline fun <T> wrapNonDependangerException(
+    wrap: (Exception) -> DependangerException,
+    block: () -> T,
+): T = try {
+    block()
+} catch (e: DependangerException) {
+    throw e
+} catch (e: Exception) {
+    throw wrap(e)
+}

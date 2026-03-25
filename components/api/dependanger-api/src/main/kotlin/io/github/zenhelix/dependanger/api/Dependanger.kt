@@ -14,8 +14,16 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+
+private val PREVIEW_EXCLUDED_PROCESSORS: Set<String> = setOf(
+    ProcessorIds.VALIDATION,
+    ProcessorIds.COMPAT_RULES,
+    ProcessorIds.USED_VERSIONS,
+)
 
 public fun Dependanger(
     dslBlock: DependangerDsl.() -> Unit,
@@ -50,13 +58,9 @@ public class Dependanger internal constructor(
         callback: ProcessingCallback? = null,
     ): DependangerResult = try {
         val pipeline = buildPipeline()
-        val context = ProcessingContext(
-            originalMetadata = metadata,
-            settings = metadata.settings,
-            environment = environment,
-            activeDistribution = distribution ?: metadata.settings.defaultDistribution,
+        val context = baseContext(
+            distribution = distribution ?: metadata.settings.defaultDistribution,
             callback = callback,
-            properties = emptyMap(),
         )
 
         val effective = pipeline.process(context)
@@ -81,16 +85,8 @@ public class Dependanger internal constructor(
             ProcessingPreset.MINIMAL.configure(this)
             enableOptional(ProcessorIds.VALIDATION)
         }
-        val context = ProcessingContext(
-            originalMetadata = metadata,
-            settings = metadata.settings,
-            environment = environment,
-            activeDistribution = null,
-            callback = null,
-            properties = emptyMap(),
-        )
 
-        val effective = pipeline.process(context)
+        val effective = pipeline.process(baseContext())
 
         DependangerResult(
             effective = effective,
@@ -106,6 +102,44 @@ public class Dependanger internal constructor(
         )
         DependangerResult(effective = null, diagnostics = diagnostics)
     }
+
+    public suspend fun previewFilter(distribution: String): FilterPreview {
+        val pipeline = ProcessingPipeline {
+            addProcessors(coreProcessors.filter { it.id !in PREVIEW_EXCLUDED_PROCESSORS })
+        }
+
+        val (unfiltered, filtered) = coroutineScope {
+            val u = async { pipeline.process(baseContext()) }
+            val f = async { pipeline.process(baseContext(distribution = distribution)) }
+            u.await() to f.await()
+        }
+
+        return FilterPreview(
+            distribution = distribution,
+            included = FilteredItems(
+                libraries = filtered.libraries,
+                plugins = filtered.plugins,
+                bundles = filtered.bundles,
+            ),
+            excluded = FilteredItems(
+                libraries = unfiltered.libraries - filtered.libraries.keys,
+                plugins = unfiltered.plugins - filtered.plugins.keys,
+                bundles = unfiltered.bundles - filtered.bundles.keys,
+            ),
+        )
+    }
+
+    private fun baseContext(
+        distribution: String? = null,
+        callback: ProcessingCallback? = null,
+    ): ProcessingContext = ProcessingContext(
+        originalMetadata = metadata,
+        settings = metadata.settings,
+        environment = environment,
+        activeDistribution = distribution,
+        callback = callback,
+        properties = emptyMap(),
+    )
 
     private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
         addProcessors(coreProcessors)

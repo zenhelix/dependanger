@@ -190,15 +190,12 @@ dependanger {
 
 [source,kotlin]
 ----
-val preview = dependanger.previewFilter(
-    metadata = metadata,
-    distribution = DistributionSelection.Named("android")
-)
+val preview = dependanger.previewFilter(distribution = "android")
 
-println("Included: ${preview.includedLibraries.map { it.alias }}")
+println("Included: $\{preview.included.libraries.keys\}")
 // [kotlin-stdlib, compose-ui]
 
-println("Excluded: ${preview.excludedLibraries.map { it.alias }}")
+println("Excluded: $\{preview.excluded.libraries.keys\}")
 // [spring-boot]
 ----
 

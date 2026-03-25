@@ -750,6 +750,52 @@ suspend fun processAll(
 Несуществующая дистрибуция (не объявленная в `distributions {}`) обрабатывается `ProfileProcessor` в pipeline — добавляет ошибку в diagnostics.
 ====
 
+[[preview-filter]]
+== Preview Filter
+
+Предварительный просмотр результата фильтрации дистрибуции **без запуска полного pipeline**.
+Показывает, какие библиотеки, плагины и бандлы попадут в дистрибуцию, а какие будут отфильтрованы.
+
+[source,kotlin]
+----
+public suspend fun previewFilter(distribution: String): FilterPreview
+----
+
+=== Результат
+
+[source,kotlin]
+----
+public data class FilterPreview(
+    val distribution: String,
+    val included: FilteredItems,
+    val excluded: FilteredItems,
+)
+
+public data class FilteredItems(
+    val libraries: Map<String, EffectiveLibrary>,
+    val plugins: Map<String, EffectivePlugin>,
+    val bundles: Map<String, EffectiveBundle>,
+)
+----
+
+=== Пример использования
+
+[source,kotlin]
+----
+val preview = dependanger.previewFilter(distribution = "android")
+
+println("Included libraries: $\{preview.included.libraries.keys\}")
+println("Excluded libraries: $\{preview.excluded.libraries.keys\}")
+println("Included plugins: $\{preview.included.plugins.keys\}")
+println("Included bundles: $\{preview.included.bundles.keys\}")
+----
+
+[NOTE]
+====
+`previewFilter()` прогоняет мини-pipeline (конвертация + версионный резолв + фильтрация) без валидации, compatibility-проверок и feature-процессоров.
+Это быстрый dry-run — используйте для отладки фильтров дистрибуций.
+====
+
 [[processing-callback]]
 == Processing Callback
 
@@ -845,7 +891,6 @@ val dependanger = Dependanger.fromDsl { /* ... */ }
 ----
 DependangerException(message, cause)           // базовый
 ├── DependangerConfigurationException          // ошибки конфигурации (build, JSON parse, unknown distribution)
-├── DependangerValidationException(errors)     // ошибки валидации (список строк)
 ├── DependangerProcessingException(phase?)     // ошибки pipeline (phase: String?, null для generic errors)
 └── DependangerGenerationException(generatorId) // ошибки генерации
 ----

@@ -494,8 +494,6 @@ DependangerException (base)
 ├── DependangerProcessingException     -- ошибки в pipeline
 │   ├── Processor failed (с phase)
 │   └── Unknown processing error
-├── DependangerValidationException     -- ошибки валидации
-│   └── Validation errors list
 └── DependangerGenerationException     -- ошибки генерации артефактов
     └── Generator failed (с generatorId)
 ----

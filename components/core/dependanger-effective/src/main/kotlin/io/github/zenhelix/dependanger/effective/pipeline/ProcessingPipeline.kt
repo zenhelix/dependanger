@@ -58,11 +58,12 @@ public class ProcessingPipeline(
         context: ProcessingContext,
     ): GroupResult {
         val executedIds = mutableListOf<String>()
-        val result = processors.fold(metadata) { acc, processor ->
+        val result = processors.foldIndexed(metadata) { index, acc, processor ->
             val output = executeProcessor(processor, acc, context)
             if (output.executedId != null) {
                 executedIds.add(output.executedId)
             }
+            emitEvent(context, ProcessingEvent.Progress(processor.phase, index + 1, processors.size))
             output.metadata
         }
         return GroupResult(result, executedIds)
@@ -101,6 +102,7 @@ public class ProcessingPipeline(
         val mark = TimeSource.Monotonic.markNow()
         return try {
             val result = processor.process(metadata, context)
+            emitNewDiagnostics(context, metadata.diagnostics, result.diagnostics)
             emitEvent(context, ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
             ProcessorOutput(result, executedId = processor.id)
         } catch (e: Throwable) {
@@ -151,6 +153,19 @@ public class ProcessingPipeline(
         warnings = result.warnings.drop(base.warnings.size),
         infos = result.infos.drop(base.infos.size),
     )
+
+    private fun emitNewDiagnostics(context: ProcessingContext, before: Diagnostics, after: Diagnostics) {
+        if (context.callback == null) return
+        if (before.errors.size == after.errors.size
+            && before.warnings.size == after.warnings.size
+            && before.infos.size == after.infos.size
+        ) return
+
+        val newMessages = collectNewDiagnostics(before, after)
+        for (message in newMessages.errors + newMessages.warnings + newMessages.infos) {
+            emitEvent(context, ProcessingEvent.DiagnosticAdded(message))
+        }
+    }
 
     private fun emitEvent(context: ProcessingContext, event: ProcessingEvent) {
         try {

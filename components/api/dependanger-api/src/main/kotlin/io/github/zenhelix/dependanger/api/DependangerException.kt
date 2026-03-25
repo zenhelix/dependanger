@@ -5,12 +5,6 @@ public open class DependangerException(
     cause: Throwable?,
 ) : RuntimeException(message, cause)
 
-public class DependangerValidationException(
-    message: String,
-    public val errors: List<String>,
-    cause: Throwable?,
-) : DependangerException(message, cause)
-
 public class DependangerProcessingException(
     message: String,
     public val phase: String?,

@@ -121,9 +121,12 @@ fun process(metadata: DependangerMetadata): EffectiveMetadata {
 [source,kotlin]
 ----
 interface EffectiveMetadataProcessor {
-    val name: String
+    val id: String
+    val phase: ProcessingPhase
     val order: Int
-    
+    val isOptional: Boolean
+    val description: String
+    fun supports(context: ProcessingContext): Boolean
     suspend fun process(
         metadata: EffectiveMetadata,
         context: ProcessingContext

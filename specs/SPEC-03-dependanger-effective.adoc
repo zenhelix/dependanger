@@ -116,77 +116,37 @@ NOTE: `BomImportProcessor` (order=15) -- **early feature processor**.
 Точка входа для трансформации `DependangerMetadata` -> `EffectiveMetadata`.
 Создает пайплайн на основе preset-конфигурации и запускает обработку.
 
-=== Текущий код (TODO)
+=== Статус: РЕАЛИЗОВАНО
 
-[source,kotlin]
-----
-// EffectiveMetadataBuilder.kt
-public suspend fun build(metadata: DependangerMetadata): EffectiveMetadata = TODO()
-----
+Метод полностью реализован.
+Использует `ProcessingPipeline` DSL и `coreProcessors()` фабричную функцию вместо явного перечисления процессоров.
 
-=== Алгоритм
-
-[source,text]
-----
-1. Создать PipelineBuilder
-2. Зарегистрировать все 12 core-процессоров
-3. Применить preset-конфигурацию через ProcessingPreset.configure(builder)
-4. Собрать pipeline через builder.build()
-5. Создать ProcessingContext из параметров:
-   - originalMetadata = metadata
-   - settings = metadata.settings
-   - environment = this.environment
-   - activeDistribution = this.distribution ?: metadata.settings.defaultDistribution
-6. Вызвать pipeline.process(context)
-7. Вернуть результат
-----
-
-=== Детальная реализация
+=== Текущая реализация
 
 [source,kotlin]
 ----
 public suspend fun build(metadata: DependangerMetadata): EffectiveMetadata {
-    val builder = PipelineBuilder()
+    val pipeline = ProcessingPipeline {
+        addProcessors(coreProcessors())
+        this@EffectiveMetadataBuilder.preset.configure(this)
+    }
 
-    // Регистрация всех core-процессоров
-    builder.addProcessors(
-        listOf(
-            ProfileProcessor(),
-            MetadataConversionProcessor(),
-            ExtractedVersionsProcessor(),
-            LibraryFilterProcessor(),
-            VersionFallbackProcessor(),
-            VersionResolverProcessor(),
-            BundleFilterProcessor(),
-            PluginFilterProcessor(),
-            PluginProcessor(),
-            UsedVersionsProcessor(),
-            ValidationProcessor(),
-            CompatRulesProcessor(),
-        )
-    )
-
-    // Применяем конфигурацию preset
-    preset.configure(builder)
-
-    // Собираем pipeline
-    val pipeline = builder.build()
-
-    // Определяем активную дистрибуцию
     val activeDistribution = distribution ?: metadata.settings.defaultDistribution
 
-    // Создаем контекст
     val context = ProcessingContext(
         originalMetadata = metadata,
         settings = metadata.settings,
         environment = environment,
         activeDistribution = activeDistribution,
+        callback = null,
+        properties = emptyMap(),
     )
 
-    // Запускаем обработку
     return pipeline.process(context)
 }
 ----
+
+NOTE: Также определена convenience-функция `EffectiveMetadata(metadata, builderAction)` для DSL-стиля создания.
 
 === Edge cases
 

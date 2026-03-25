@@ -202,8 +202,8 @@ flowchart TB
     facade -->|"uses"| pipeline
     facade -->|"returns"| result
     pipeline -->|"runs"| processors
-    result -->|"toToml()"| toml["TOML"]
-    result -->|"toBom()"| bom["BOM"]
+    result -->|"toToml() (ext)"| toml["TOML"]
+    result -->|"toBom() (ext)"| bom["BOM"]
 ----
 
 == Структура модулей
@@ -315,12 +315,12 @@ API и effective модули не имеют compile-time зависимост�
 | FEATURES
 
 | `dependanger-updates`
-| Update check процессор (order: 70)
+| Update check процессор (order: 100)
 | core
 | FEATURES
 
 | `dependanger-analysis`
-| Compatibility analysis процессор (order: 75)
+| Compatibility analysis процессор (order: 110)
 | core
 | FEATURES
 
@@ -709,7 +709,8 @@ val result = Dependanger.fromDsl {
     }
 }.build()
 
-// Генерация артефактов — convenience-методы для built-in генераторов
+// Генерация артефактов — extension functions на DependangerResult
+// (определены в DependangerResultToml.kt и DependangerResultBom.kt)
 val toml = result.toToml()
 val bom = result.toBom()
 

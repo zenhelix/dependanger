@@ -7,7 +7,7 @@
 [abstract]
 --
 Проверка доступных обновлений для библиотек в Maven репозиториях.
-Опциональный процессор в pipeline (order: 70).
+Опциональный процессор в pipeline (order: 100).
 --
 
 == Метаданные
@@ -232,7 +232,7 @@ dependanger {
 
 == SPI: UpdateCheckProcessor
 
-`UpdateCheckProcessor` — опциональный процессор (order: 70, phase: PARALLEL_IO), который:
+`UpdateCheckProcessor` — опциональный процессор (order: 100, phase: PARALLEL_IO), который:
 
 1. Для каждой библиотеки в effective metadata
 2. Параллельно запрашивает доступные версии из Maven repositories
@@ -632,11 +632,11 @@ dependanger {
 
 * **Входные данные:** `EffectiveMetadata` с разрешёнными версиями
 * **Выходные данные:** `UpdateAvailableInfo` в diagnostics
-* **Позиция в pipeline:** order 70 (после Validation)
+* **Позиция в pipeline:** order: 100 (после Validation)
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 70)
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 100)
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает update info
 * xref:../03-interfaces/cli.adoc[CLI — команда check-updates]
 * xref:../03-interfaces/gradle-plugin.adoc[Gradle Plugin — задача dependangerCheckUpdates]

@@ -7,7 +7,7 @@
 [abstract]
 --
 Проверка библиотек на известные уязвимости (CVE) через OSV API.
-Опциональный процессор в pipeline (order: 80).
+Опциональный процессор в pipeline (order: 120).
 --
 
 == Метаданные
@@ -87,14 +87,9 @@ ____
 | Показываются 3 уязвимости (CRITICAL + HIGH)
 
 | AC-002-2
-| 5 уязвимостей с разными CVSS scores
-| Запускаю с `minCvssScore = 7.0`
-| Показываются только уязвимости с CVSS >= 7.0
-
-| AC-002-3
-| Уязвимость без CVSS score (только severity)
-| Запускаю с `minCvssScore = 7.0`
-| Уязвимость включается если severity >= HIGH (fallback)
+| 5 уязвимостей с разными severity
+| Запускаю с `minSeverity = "CRITICAL"`
+| Показываются только CRITICAL уязвимости
 |===
 
 === US-003: Игнорирование уязвимостей
@@ -112,13 +107,8 @@ ____
 
 | AC-003-1
 | Уязвимость CVE-2023-OLD в библиотеке `lib-a`
-| Запускаю с `ignoreCves = ["CVE-2023-OLD"]`
+| Запускаю с `ignoreVulnerabilities = ["CVE-2023-OLD"]`
 | Уязвимость не показывается в результатах
-
-| AC-003-2
-| Библиотека `test-lib` с уязвимостью
-| Запускаю с `ignoreLibraries = ["test-lib"]`
-| Библиотека пропускается при сканировании
 
 | AC-003-3
 | Игнорируемая уязвимость
@@ -140,19 +130,14 @@ ____
 | ID | Given | When | Then
 
 | AC-004-1
-| CRITICAL уязвимость, `failOnCritical = false` (default)
+| CRITICAL уязвимость, `failOnVulnerability = Severity.WARNING` (default)
 | Запускаю pipeline
-| WARNING в логе, pipeline продолжается
+| WARNING в diagnostics, pipeline продолжается
 
 | AC-004-2
-| CRITICAL уязвимость, `failOnCritical = true`
+| CRITICAL уязвимость, `failOnVulnerability = Severity.ERROR`
 | Запускаю pipeline
-| Pipeline завершается с ERROR
-
-| AC-004-3
-| HIGH уязвимость, `failOnCritical = true`, `failOnHigh = true`
-| Запускаю pipeline
-| Pipeline завершается с ERROR
+| Pipeline завершается с ERROR в diagnostics
 
 | AC-004-4
 | Gradle task `dependangerSecurityCheck`, CRITICAL уязвимость
@@ -236,11 +221,9 @@ val dependanger = Dependanger.fromDsl {
     // ... DSL config
     settings {
         securityCheck {
-            minSeverity = Severity.HIGH
-            failOnCritical = true
-            failOnHigh = false
-            ignoreCves = listOf("CVE-2023-ACCEPTED")
-            ignoreLibraries = listOf("internal-test-lib")
+            minSeverity = "HIGH"  // "CRITICAL", "HIGH", "MEDIUM", "LOW"
+            failOnVulnerability = Severity.ERROR
+            ignoreVulnerabilities = listOf("CVE-2023-ACCEPTED")
         }
     }
 }
@@ -408,16 +391,13 @@ Dependanger группирует библиотеки в batches для эффе
 settings {
     securityCheck {
         // Фильтрация
-        minSeverity = Severity.HIGH        // Минимальный severity (default: HIGH)
-        minCvssScore = 7.0                 // Минимальный CVSS score (default: 7.0)
+        minSeverity = "HIGH"               // "CRITICAL", "HIGH", "MEDIUM", "LOW" (default: "HIGH")
 
-        // Fail условия (по умолчанию только warn)
-        failOnCritical = false             // Fail при CRITICAL (default: false)
-        failOnHigh = false                 // Fail при HIGH (default: false)
+        // Fail условия
+        failOnVulnerability = Severity.ERROR // ERROR, WARNING, INFO (default: ERROR)
 
         // Игнорирование
-        ignoreCves = listOf("CVE-2023-OLD")      // Игнорировать конкретные CVE
-        ignoreLibraries = listOf("test-lib")     // Игнорировать библиотеки
+        ignoreVulnerabilities = listOf("CVE-2023-OLD")  // Игнорировать конкретные CVE
 
         // Транзитивные зависимости (требует F012)
         includeTransitives = false         // Проверять транзитивные (default: false)
@@ -431,13 +411,13 @@ settings {
 
 == SPI: SecurityCheckProcessor
 
-`SecurityCheckProcessor` — опциональный процессор (order: 80, phase: PARALLEL_IO), который:
+`SecurityCheckProcessor` — опциональный процессор (order: 120, phase: SECURITY_CHECK, executionMode: PARALLEL_IO), который:
 
 1. Собирает все библиотеки из EffectiveMetadata
 2. Batch-запросом отправляет в OSV API
 3. Парсит ответ и создаёт `VulnerabilityInfo` для каждой уязвимости
 4. Добавляет результаты в `Diagnostics`
-5. При `failOnCritical/failOnHigh` добавляет ERROR в diagnostics
+5. При `failOnVulnerability = ERROR` добавляет ERROR в diagnostics
 
 Включается через `withSecurityCheck()` в builder API.
 
@@ -560,9 +540,8 @@ ERROR: Critical vulnerabilities found. Fix before deploying.
 **Опции:**
 
 * `minSeverity` — минимальный severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`)
-* `minCvssScore` — минимальный CVSS score
-* `failOnCritical`, `failOnHigh` — fail при уязвимостях
-* `ignoreCves`, `ignoreLibraries` — списки для игнорирования
+* `failOnVulnerability` — уровень severity для fail (ERROR, WARNING, INFO)
+* `ignoreVulnerabilities` — список CVE для игнорирования
 * `includeTransitives` — проверять транзитивные зависимости
 
 [source,bash]
@@ -570,11 +549,8 @@ ERROR: Critical vulnerabilities found. Fix before deploying.
 # Базовая проверка
 ./gradlew dependangerSecurityCheck
 
-# Fail при CRITICAL
-./gradlew dependangerSecurityCheck -PfailOnCritical=true
-
-# Только CRITICAL и HIGH
-./gradlew dependangerSecurityCheck -PminSeverity=HIGH
+# Только CRITICAL
+./gradlew dependangerSecurityCheck -PminSeverity=CRITICAL
 ----
 
 == Settings DSL
@@ -590,19 +566,16 @@ dependanger {
             enabled = true  // или через processing { checkSecurity = true }
 
             // Фильтрация
-            minSeverity = HIGH  // CRITICAL, HIGH, MEDIUM, LOW
-            minCvssScore = 7.0  // 0.0 - 10.0
+            minSeverity = "HIGH"  // "CRITICAL", "HIGH", "MEDIUM", "LOW"
 
             // Fail условия
-            failOnCritical = false  // default
-            failOnHigh = false  // default
+            failOnVulnerability = Severity.ERROR  // ERROR, WARNING, INFO
 
             // Игнорирование
-            ignoreCves = listOf(
+            ignoreVulnerabilities = listOf(
                 "CVE-2023-ACCEPTED",
                 "CVE-2023-KNOWN-RISK"
             )
-            ignoreLibraries = listOf("internal-test-lib")
 
             // Транзитивные зависимости
             includeTransitives = false  // требует F012
@@ -665,7 +638,7 @@ dependanger {
     {
       "cveId": "CVE-2023-ACCEPTED",
       "library": "some-lib",
-      "reason": "Configured in ignoreCves"
+      "reason": "Configured in ignoreVulnerabilities"
     }
   ]
 }
@@ -715,7 +688,7 @@ dependanger {
 
 | FR-010
 | SHOULD
-| Система ДОЛЖНА поддерживать настраиваемый fail pipeline при уязвимостях (`failOnCritical`, `failOnHigh`). По умолчанию только WARNING
+| Система ДОЛЖНА поддерживать настраиваемый fail pipeline при уязвимостях через `failOnVulnerability: Severity` (ERROR/WARNING/INFO). По умолчанию ERROR
 
 | FR-011
 | SHOULD
@@ -797,7 +770,7 @@ dependanger {
 | INFO: "No vulnerabilities found", пустой список
 
 | Игнорируемая CRITICAL уязвимость
-| CVE в `ignoreCves`, `failOnCritical = true`
+| CVE в `ignoreVulnerabilities`, `failOnVulnerability = ERROR`
 | Pipeline продолжается, уязвимость в `ignoredVulnerabilities`
 
 | Большой каталог
@@ -825,11 +798,11 @@ dependanger {
 
 * **Входные данные:** `EffectiveMetadata` с разрешёнными версиями
 * **Выходные данные:** `VulnerabilityInfo` в diagnostics
-* **Позиция в pipeline:** order 80 (после Compatibility Analysis)
+* **Позиция в pipeline:** order: 120 (после Compatibility Analysis)
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 80)
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 120)
 * xref:F007-update-check.adoc[F007: Update Check] — дополняет информацией о версиях
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает vulnerabilities info
 * xref:F012-transitive-resolution.adoc[F012: Transitive Resolution] — для проверки транзитивных

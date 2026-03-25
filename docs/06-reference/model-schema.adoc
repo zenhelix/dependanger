@@ -489,8 +489,8 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | Включить проверку уязвимостей
 
 | `minSeverity`
-| VulnerabilitySeverity?
-| Минимальный уровень серьёзности для срабатывания
+| String
+| Минимальный уровень серьёзности для срабатывания (значения: "CRITICAL", "HIGH", "MEDIUM", "LOW"; по умолчанию "HIGH")
 |===
 
 [[license-check-settings]]

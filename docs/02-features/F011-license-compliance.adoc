@@ -1003,7 +1003,7 @@ dependanger {
 
 * **Входные данные:** `EffectiveMetadata` с разрешёнными версиями
 * **Выходные данные:** `LicenseInfo` в diagnostics
-* **Позиция в pipeline:** order 85 (после Security Check)
+* **Позиция в pipeline:** order: 130, phase: LICENSE_CHECK (после Security Check)
 
 == Связанные документы
 

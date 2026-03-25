@@ -526,10 +526,10 @@ flowchart TB
     GM --> GE
     GE --> GT
     GE --> GB
-    GM --> V
-    GE --> CU
-    GE --> A
 ----
+
+NOTE: Аналитические задачи (`validate`, `checkUpdates`, `analyze` и др.) являются **standalone** — они самостоятельно создают Metadata из DSL и запускают свой pipeline, не зависят от generative задач.
+На диаграмме показаны только generative задачи и их зависимости.
 
 == Интеграция с Version Catalogs
 

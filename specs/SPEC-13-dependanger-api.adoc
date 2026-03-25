@@ -1,4 +1,4 @@
-= SPEC-13: dependanger-api -- Реализация TODO-заглушек
+= SPEC-13: dependanger-api -- Архитектура и реализация
 :toc: left
 :toclevels: 3
 :sectnums:
@@ -38,7 +38,9 @@ NOTE: Дополнительные поля builder'а (`additionalProcessors`, 
 Для этого нужно расширить приватный конструктор Dependanger.
 
 [[implementation-build]]
-=== Детальная реализация
+=== Статус: РЕАЛИЗОВАНО
+
+=== Текущая реализация
 
 [source,kotlin]
 ----
@@ -48,6 +50,8 @@ public fun build(): Dependanger {
         metadata = resolvedMetadata,
         preset = preset,
         environment = environment,
+        coreProcessors = coreProcessors(),
+        discoveredProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList(),
         additionalProcessors = additionalProcessors.toList(),
         disabledProcessorIds = disabledProcessorIds.toSet(),
         pipelineCustomizer = pipelineCustomizer,
@@ -55,39 +59,47 @@ public fun build(): Dependanger {
 }
 
 private fun resolveMetadata(): DependangerMetadata {
-    // Приоритет: explicit metadata > DSL block
     metadata?.let { return it }
 
     dslBlock?.let { block ->
-        val dsl = DependangerDsl()
-        dsl.block()
-        return dsl.toMetadata()
+        return wrapNonDependangerException({ e ->
+            DependangerConfigurationException("DSL evaluation failed: ${e.message}", e)
+        }) {
+            val dsl = DependangerDsl()
+            dsl.block()
+            dsl.toMetadata()
+        }
     }
 
     throw DependangerConfigurationException(
         "Cannot build Dependanger: neither metadata nor DSL block provided. " +
-        "Use Dependanger.fromMetadata() or Dependanger.fromDsl() to create a builder."
+        "Use Dependanger.fromMetadata() or Dependanger.fromDsl() to create a builder.",
+        null
     )
 }
 ----
 
-=== Изменения в Dependanger
+=== Конструктор Dependanger
 
-Приватный конструктор необходимо расширить для хранения pipeline-конфигурации:
+Конструктор `internal` (не `private`), разделяет процессоры на три категории:
 
 [source,kotlin]
 ----
-public class Dependanger private constructor(
+public class Dependanger internal constructor(
     private val metadata: DependangerMetadata,
     private val preset: ProcessingPreset,
     private val environment: ProcessingEnvironment,
-    private val additionalProcessors: List<EffectiveMetadataProcessor> = emptyList(),
-    private val disabledProcessorIds: Set<String> = emptySet(),
-    private val pipelineCustomizer: (PipelineBuilder.() -> Unit)? = null,
-) {
-    // ...
-}
+    private val coreProcessors: List<EffectiveMetadataProcessor>,
+    private val discoveredProcessors: List<EffectiveMetadataProcessor>,
+    private val additionalProcessors: List<EffectiveMetadataProcessor>,
+    private val disabledProcessorIds: Set<String>,
+    private val pipelineCustomizer: (PipelineBuilder.() -> Unit)?,
+)
 ----
+
+NOTE: `coreProcessors` — 12 встроенных процессоров из `coreProcessors()`.
+`discoveredProcessors` — feature-процессоры, обнаруженные через `ServiceLoader`.
+`additionalProcessors` — пользовательские процессоры, добавленные через builder.
 
 === Edge cases
 
@@ -114,81 +126,75 @@ public class Dependanger private constructor(
 
 [source,text]
 ----
-1. Создать PipelineBuilder
-2. Зарегистрировать все встроенные процессоры через ServiceLoader или явный список
-3. Добавить additionalProcessors
-4. Применить preset-конфигурацию (preset.configure(builder))
-5. Для каждого disabledProcessorId -> builder.disable(id)
-6. Применить pipelineCustomizer, если задан
-7. Построить pipeline (builder.build())
-8. Создать ProcessingContext(originalMetadata, settings, environment, distribution, callback)
-9. Выполнить pipeline.process(context) -> EffectiveMetadata
-10. Обернуть в DependangerResult(effective, effective.diagnostics)
-11. При исключении -> обернуть в DependangerResult(null, diagnosticsWithError)
+1. Построить pipeline через buildPipeline():
+   a. Добавить coreProcessors, discoveredProcessors, additionalProcessors
+   b. Применить preset.configure()
+   c. Отключить disabledProcessorIds
+   d. Применить pipelineCustomizer
+2. Создать ProcessingContext через baseContext(distribution, callback)
+3. Выполнить pipeline.process(context) -> EffectiveMetadata
+4. Обернуть в DependangerResult(effective, effective.diagnostics)
+5. При DependangerException -> пробросить как есть
+6. При PipelineConfigurationException -> обернуть в DependangerConfigurationException
+7. При других исключениях -> ensureActive(), обернуть в DependangerProcessingException
 ----
 
 [[implementation-process]]
-=== Детальная реализация
+=== Статус: РЕАЛИЗОВАНО
+
+=== Текущая реализация
 
 [source,kotlin]
 ----
 public suspend fun process(
     distribution: String? = null,
     callback: ProcessingCallback? = null,
-): DependangerResult {
-    return try {
-        val pipeline = buildPipeline()
-        val context = ProcessingContext(
-            originalMetadata = metadata,
-            settings = metadata.settings,
-            environment = environment,
-            activeDistribution = distribution,
-            callback = callback,
-        )
+): DependangerResult = try {
+    val pipeline = buildPipeline()
+    val context = baseContext(
+        distribution = distribution ?: metadata.settings.defaultDistribution,
+        callback = callback,
+    )
 
-        val effective = pipeline.process(context)
+    val effective = pipeline.process(context)
 
-        DependangerResult(
-            effective = effective,
-            diagnostics = effective.diagnostics,
-        )
-    } catch (e: DependangerException) {
-        throw e
-    } catch (e: PipelineConfigurationException) {
-        throw DependangerConfigurationException(
-            "Pipeline configuration error: ${e.message}", e
-        )
-    } catch (e: Exception) {
-        throw DependangerProcessingException(
-            "Processing failed: ${e.message}",
-            phase = null,
-            cause = e,
-        )
-    }
+    DependangerResult(
+        effective = effective,
+        diagnostics = effective.diagnostics,
+    )
+} catch (e: DependangerException) {
+    throw e
+} catch (e: PipelineConfigurationException) {
+    throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
+} catch (e: Exception) {
+    currentCoroutineContext().ensureActive()
+    throw DependangerProcessingException("Processing failed: ${e.message}", phase = null, cause = e)
 }
 
-private fun buildPipeline(): ProcessingPipeline {
-    val builder = PipelineBuilder()
-
-    // Регистрация встроенных процессоров через ServiceLoader
-    val builtinProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-    builder.addProcessors(builtinProcessors.toList())
-
-    // Добавление пользовательских процессоров
-    builder.addProcessors(additionalProcessors)
-
-    // Конфигурация по preset
-    preset.configure(builder)
-
-    // Отключение указанных процессоров
-    disabledProcessorIds.forEach { id -> builder.disable(id) }
-
-    // Пользовательская кастомизация pipeline
-    pipelineCustomizer?.invoke(builder)
-
-    return builder.build()
+private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
+    addProcessors(coreProcessors)
+    addProcessors(discoveredProcessors)
+    addProcessors(additionalProcessors)
+    preset.configure(this)
+    disabledProcessorIds.forEach { id -> disable(id) }
+    pipelineCustomizer?.invoke(this)
 }
+
+private fun baseContext(
+    distribution: String? = null,
+    callback: ProcessingCallback? = null,
+): ProcessingContext = ProcessingContext(
+    originalMetadata = metadata,
+    settings = metadata.settings,
+    environment = environment,
+    activeDistribution = distribution,
+    callback = callback,
+    properties = emptyMap(),
+)
 ----
+
+NOTE: `buildPipeline()` использует `ProcessingPipeline { }` DSL вместо явного `PipelineBuilder()`.
+`baseContext()` выделен как общий метод для `process()`, `validate()` и `previewFilter()`.
 
 [[preset-configure-behavior]]
 === Поведение ProcessingPreset.configure()
@@ -210,30 +216,15 @@ private fun buildPipeline(): ProcessingPipeline {
 | Включить только 5 core-процессоров: `profile`, `metadata-conversion`, `extracted-versions`, `version-fallback`, `version-resolver`
 |===
 
-=== Регистрация встроенных процессоров
+=== Регистрация процессоров
 
-Встроенные процессоры загружаются через `java.util.ServiceLoader`.
-Каждый feature-модуль регистрирует свои процессоры через файл `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor`.
+Процессоры разделены на три категории в `DependangerBuilder.build()`:
 
-Альтернативный подход -- явная регистрация в `buildPipeline()`:
+1. **coreProcessors** — 12 встроенных процессоров, создаются через `coreProcessors()` фабричную функцию
+2. **discoveredProcessors** — feature-процессоры, обнаруженные через `ServiceLoader.load(EffectiveMetadataProcessor::class.java)`
+3. **additionalProcessors** — пользовательские процессоры, добавленные через `builder.addProcessor()`
 
-[source,kotlin]
-----
-private fun buildPipeline(): ProcessingPipeline {
-    val builder = PipelineBuilder()
-
-    // Явная регистрация встроенных процессоров из feature-модулей
-    // Каждый feature-модуль предоставляет свой основной процессор
-    builder.addProcessors(discoverBuiltinProcessors())
-
-    // ... остальная конфигурация
-    return builder.build()
-}
-
-private fun discoverBuiltinProcessors(): List<EffectiveMetadataProcessor> {
-    return ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList()
-}
-----
+В `buildPipeline()` все три группы добавляются последовательно (<<implementation-process,см. реализацию process()>>).
 
 === Edge cases
 
@@ -270,52 +261,39 @@ private fun discoverBuiltinProcessors(): List<EffectiveMetadataProcessor> {
 Однако, поскольку preset хранится в экземпляре Dependanger, validate() должен переопределить preset на MINIMAL:
 
 [[implementation-validate]]
-=== Детальная реализация
+=== Статус: РЕАЛИЗОВАНО
+
+=== Текущая реализация
 
 [source,kotlin]
 ----
-public suspend fun validate(): DependangerResult {
-    return try {
-        val builder = PipelineBuilder()
-
-        // Регистрация только базовых процессоров
-        val builtinProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java)
-        builder.addProcessors(builtinProcessors.toList())
-
-        // MINIMAL preset -- только базовые процессоры
-        ProcessingPreset.MINIMAL.configure(builder)
-        // Явно включаем валидацию (MINIMAL её отключает)
-        builder.enableOptional("validation")
-
-        val pipeline = builder.build()
-        val context = ProcessingContext(
-            originalMetadata = metadata,
-            settings = metadata.settings,
-            environment = environment,
-            activeDistribution = null,
-            callback = null,
-        )
-
-        val effective = pipeline.process(context)
-
-        DependangerResult(
-            effective = effective,
-            diagnostics = effective.diagnostics,
-        )
-    } catch (e: Exception) {
-        val diagnostics = Diagnostics(
-            errors = listOf(
-                DiagnosticMessage(
-                    code = "VALIDATION_FAILED",
-                    message = "Validation failed: ${e.message}",
-                    severity = Severity.ERROR,
-                )
-            )
-        )
-        DependangerResult(effective = null, diagnostics = diagnostics)
+public suspend fun validate(): DependangerResult = try {
+    val pipeline = ProcessingPipeline {
+        addProcessors(coreProcessors)
+        addProcessors(discoveredProcessors)
+        ProcessingPreset.MINIMAL.configure(this)
+        enableOptional(ProcessorIds.VALIDATION)
     }
+
+    val effective = pipeline.process(baseContext())
+
+    DependangerResult(
+        effective = effective,
+        diagnostics = effective.diagnostics,
+    )
+} catch (e: Exception) {
+    currentCoroutineContext().ensureActive()
+    val diagnostics = Diagnostics.error(
+        code = "VALIDATION_FAILED",
+        message = "Validation failed: ${e.message}",
+        processorId = null,
+        context = emptyMap(),
+    )
+    DependangerResult(effective = null, diagnostics = diagnostics)
 }
 ----
+
+NOTE: Использует `Diagnostics.error()` фабричный метод вместо прямого создания `DiagnosticMessage`.
 
 === Отличие от process()
 
@@ -360,7 +338,9 @@ Factory-метод для создания DependangerBuilder из JSON-стро
 ----
 
 [[implementation-from-json]]
-=== Детальная реализация
+=== Статус: РЕАЛИЗОВАНО
+
+=== Текущая реализация
 
 [source,kotlin]
 ----
@@ -406,7 +386,9 @@ Extension properties на `DependangerResult` для type-safe доступа к
 API module видит feature-модули (они `implementation` зависимости), а CLI/plugin видит только API.
 
 [[implementation-extraction]]
-=== Детальная реализация
+=== Статус: РЕАЛИЗОВАНО
+
+=== Текущая реализация
 
 [source,kotlin]
 ----
@@ -632,41 +614,35 @@ dependanger-api зависит от:
     - slf4j-simple:2.0.9
 ----
 
-[[files-to-modify]]
-== Файлы для изменения
+[[files]]
+== Файлы модуля
+
+Все файлы полностью реализованы:
 
 [cols="1,2"]
 |===
-| Файл | Изменение
+| Файл | Статус
 
-| `Dependanger.kt` | Расширить конструктор (additionalProcessors, disabledProcessorIds, pipelineCustomizer). Реализовать `process()`, `validate()`, `fromJson()`. Добавить приватный метод `buildPipeline()`.
-| `DependangerBuilder.kt` | Реализовать `build()`. Добавить приватный метод `resolveMetadata()`.
-| `DependangerResultExtensions.kt` | **НОВЫЙ ФАЙЛ**. Extension properties: `updates`, `vulnerabilities`, `licenseViolations`, `transitives`, `compatibilityIssues`, `versionConflicts`.
-|===
-
-=== Файлы НЕ требующие изменений
-
-[cols="1,2"]
-|===
-| Файл | Причина
-
-| `DependangerResult.kt` | Полностью реализован
-| `DependangerResultToml.kt` | Полностью реализован
-| `DependangerResultBom.kt` | Полностью реализован
-| `DependangerException.kt` | Полностью реализован
+| `Dependanger.kt` | Реализован: `process()`, `validate()`, `previewFilter()`, `fromJson()`, `buildPipeline()`, `baseContext()`
+| `DependangerBuilder.kt` | Реализован: `build()`, `resolveMetadata()`, fluent API
+| `DependangerResult.kt` | Реализован: `generate()`, `generateUnsafe()`, `writeTo()`, `writeToUnsafe()`
+| `DependangerResultExtensions.kt` | Реализован: `updates`, `vulnerabilities`, `licenseViolations`, `transitives`, `compatibilityIssues`, `versionConflicts`
+| `DependangerResultToml.kt` | Реализован: `toToml()`, `writeTomlTo()`
+| `DependangerResultBom.kt` | Реализован: `toBom()`, `writeBomTo()`
+| `DependangerResultReport.kt` | Реализован: `generateReport()`, `writeReportTo()`
+| `DependangerException.kt` | Реализован: иерархия исключений
+| `FilterPreview.kt` | Реализован: `FilterPreview`, `FilteredItems`
 |===
 
 [[priority]]
 == Приоритет
 
-**HIGH** -- этот модуль является основным фасадом, от которого зависят CLI и Gradle Plugin.
+Модуль **полностью реализован**.
+Является основным фасадом, от которого зависят CLI и Gradle Plugin.
 Зависит от: dependanger-core (SPEC-01), dependanger-effective (SPEC-03), dependanger-metadata-json (SPEC-02), генераторы (SPEC-04, SPEC-05), все feature-модули (SPEC-06..SPEC-12).
 Блокирует: dependanger-cli (SPEC-14), dependanger-gradle-plugin (SPEC-15).
 
-Рекомендуемый порядок реализации TODO:
+Следующие шаги:
 
-1. `DependangerBuilder.build()` -- без него невозможно создать экземпляр Dependanger
-2. `Dependanger.fromJson()` -- прост в реализации, нужен для CLI
-3. `Dependanger.process()` -- основной метод обработки
-4. `Dependanger.validate()` -- делегирует process() с MINIMAL preset
-5. `DependangerResultExtensions.kt` -- extraction-методы, нужны для CLI и Gradle analysis-тасков
+1. Написать unit-тесты (см. секцию <<testing>>)
+2. Написать интеграционные тесты (полный pipeline: DSL -> process -> generate)

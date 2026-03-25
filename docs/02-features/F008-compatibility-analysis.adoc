@@ -7,7 +7,7 @@
 [abstract]
 --
 Анализ совместимости библиотек на основе определённых правил.
-Опциональный процессор в pipeline (order: 75).
+Опциональный процессор в pipeline (order: 110).
 --
 
 == Метаданные
@@ -259,7 +259,7 @@ issues.forEach { issue ->
 
 == SPI: CompatibilityCheckProcessor
 
-`CompatibilityCheckProcessor` — опциональный процессор (order: 75, phase: PARALLEL_COMPUTE), который:
+`CompatibilityCheckProcessor` — опциональный процессор (order: 110, phase: COMPATIBILITY_ANALYSIS), который:
 
 1. Получает правила совместимости из metadata
 2. Проверяет каждое правило против effective библиотек
@@ -592,11 +592,11 @@ dependanger {
 
 * **Входные данные:** `EffectiveMetadata`, правила из `compatibility { }`
 * **Выходные данные:** `CompatibilityIssue` в diagnostics
-* **Позиция в pipeline:** order 75 (после UpdateCheck)
+* **Позиция в pipeline:** order: 110 (после UpdateCheck)
 
 == Связанные документы
 
-* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 75)
+* xref:F003-processing-pipeline.adoc[F003: Processing Pipeline] — место в pipeline (order: 110)
 * xref:../01-concepts/domain-model.adoc[CompatibilityRule] — определение правил
 * xref:F001-registry-dsl.adoc[F001: Registry DSL — блок compatibility]
 * xref:F009-report-generation.adoc[F009: Report Generation] — включает compatibility issues

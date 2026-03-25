@@ -600,6 +600,41 @@ result.writeBomTo(Path.of("build/bom.pom.xml"), config)
 `toBom()` **не имеет** default — `BomConfig` требует обязательные `groupId`, `artifactId`, `version`.
 ====
 
+=== Report
+
+Report-функции работают через SPI `ReportProvider` (обнаруживается через `ServiceLoader`).
+В отличие от TOML/BOM генераторов (`ArtifactGenerator<T>`), report — это feature-модуль с собственным SPI, что позволяет API не зависеть от конкретной реализации.
+
+[source,kotlin]
+----
+import io.github.zenhelix.dependanger.api.generateReport
+import io.github.zenhelix.dependanger.api.writeReportTo
+import io.github.zenhelix.dependanger.core.model.ReportFormat
+import io.github.zenhelix.dependanger.core.model.ReportSettings
+
+// Генерация отчёта в строку (default: Markdown, все секции)
+val report: GeneratedReport = result.generateReport()
+
+// С кастомными настройками
+val jsonReport = result.generateReport(ReportSettings(
+    format = ReportFormat.JSON,
+    outputDir = "build/reports/dependanger",
+    sections = listOf(ReportSection.UPDATES, ReportSection.VULNERABILITIES),
+))
+
+// Генерация + запись в файл (outputDir берётся из settings.outputDir)
+val written = result.writeReportTo()
+println("Report written to: ${written.outputPath}")
+----
+
+[NOTE]
+====
+`generateReport()` имеет default-параметр `ReportSettings.DEFAULT` (format=MARKDOWN, все секции).
+
+Если `dependanger-report` модуль не в classpath — бросается `DependangerConfigurationException`.
+Это SPI-based подход: API модуль зависит только от `ReportProvider` интерфейса (из `dependanger-effective`), а не от конкретной реализации.
+====
+
 === Универсальный generate()
 
 Для кастомных генераторов (реализующих `ArtifactGenerator<T>`):
@@ -1013,6 +1048,7 @@ import io.github.zenhelix.dependanger.generators.bom.BomConfig
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 
+
 fun main() = runBlocking {
     // 1. Создание Dependanger через DSL
     val dependanger = Dependanger(
@@ -1107,7 +1143,10 @@ fun main() = runBlocking {
         )
     )
 
-    // 7. Анализ feature-данных (через extraction extensions)
+    // 7. Генерация отчёта (через ReportProvider SPI, outputDir из settings)
+    result.writeReportTo()
+
+    // 8. Анализ feature-данных (через extraction extensions)
     val updates = result.updates
     if (updates.isNotEmpty()) {
         println("\nAvailable updates:")

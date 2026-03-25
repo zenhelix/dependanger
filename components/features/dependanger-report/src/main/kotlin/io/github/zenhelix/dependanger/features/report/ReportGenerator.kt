@@ -5,6 +5,8 @@ import io.github.zenhelix.dependanger.core.model.ReportFormat
 import io.github.zenhelix.dependanger.core.model.ReportSettings
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.spi.GeneratedReport
+import io.github.zenhelix.dependanger.effective.spi.ReportProvider
 import io.github.zenhelix.dependanger.features.report.mapper.ReportDataMapper
 import io.github.zenhelix.dependanger.features.report.renderer.HtmlReportRenderer
 import io.github.zenhelix.dependanger.features.report.renderer.JsonReportRenderer
@@ -12,10 +14,14 @@ import io.github.zenhelix.dependanger.features.report.renderer.MarkdownReportRen
 import io.github.zenhelix.dependanger.features.report.renderer.ReportRenderer
 import io.github.zenhelix.dependanger.features.report.renderer.YamlReportRenderer
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 
 private val logger = KotlinLogging.logger {}
 
-public class ReportGenerator {
+public class ReportGenerator : ReportProvider {
+
+    override val providerId: String = "report"
 
     private val markdownRenderer: MarkdownReportRenderer = MarkdownReportRenderer()
 
@@ -26,11 +32,11 @@ public class ReportGenerator {
         ReportFormat.HTML to HtmlReportRenderer(markdownRenderer = markdownRenderer),
     )
 
-    public fun generate(
+    override fun generate(
         effective: EffectiveMetadata,
-        settings: ReportSettings = ReportSettings.DEFAULT,
-        originalMetadata: DependangerMetadata? = null,
-    ): DependangerReport {
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport {
         logger.info { "Generating report in ${settings.format} format" }
 
         val reportData = ReportDataMapper.buildReportData(
@@ -45,41 +51,34 @@ public class ReportGenerator {
 
         logger.info { "Report generated: ${content.length} characters" }
 
-        return DependangerReport(
+        return GeneratedReport(
             format = settings.format,
             content = content,
             outputPath = null,
         )
     }
 
-    public fun generateToFile(
+    override fun generateToFile(
         effective: EffectiveMetadata,
-        settings: ReportSettings = ReportSettings.DEFAULT,
-        originalMetadata: DependangerMetadata? = null,
-    ): DependangerReport {
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport {
         val report = generate(
             effective = effective,
             settings = settings,
             originalMetadata = originalMetadata,
         )
 
-        val extension = when (settings.format) {
-            ReportFormat.JSON     -> "json"
-            ReportFormat.YAML     -> "yaml"
-            ReportFormat.MARKDOWN -> "md"
-            ReportFormat.HTML     -> "html"
-        }
+        val extension = formatExtension(settings.format)
+        val outputDir = Path.of(settings.outputDir)
+        Files.createDirectories(outputDir)
 
-        val outputPath = "${settings.outputDir}/dependanger-report.$extension"
-        val dir = File(settings.outputDir)
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-
+        val targetPath = outputDir.resolve("dependanger-report.$extension")
+        val dir = outputDir.toFile()
         val tempFile = File.createTempFile("report-", ".$extension", dir)
         try {
             tempFile.writeText(report.content, Charsets.UTF_8)
-            val targetFile = File(outputPath)
+            val targetFile = targetPath.toFile()
             val renamed = tempFile.renameTo(targetFile)
             if (!renamed) {
                 try {
@@ -88,12 +87,19 @@ public class ReportGenerator {
                     tempFile.delete()
                 }
             }
-            logger.info { "Report written to $outputPath" }
+            logger.info { "Report written to $targetPath" }
         } catch (e: Exception) {
             tempFile.delete()
             throw e
         }
 
-        return report.copy(outputPath = outputPath)
+        return report.copy(outputPath = targetPath)
+    }
+
+    private fun formatExtension(format: ReportFormat): String = when (format) {
+        ReportFormat.JSON     -> "json"
+        ReportFormat.YAML     -> "yaml"
+        ReportFormat.MARKDOWN -> "md"
+        ReportFormat.HTML     -> "html"
     }
 }

@@ -555,6 +555,40 @@ interface ArtifactGenerator<T> {
 
 '''
 
+=== ReportProvider
+
+Генератор отчётов.
+Отделён от `ArtifactGenerator`, так как report — feature-модуль с собственной логикой (форматы, секции, маппинг данных из extensions).
+
+[source,kotlin]
+----
+interface ReportProvider {
+    val providerId: String  // "report"
+
+    fun generate(
+        effective: EffectiveMetadata,
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport
+
+    fun generateToFile(
+        effective: EffectiveMetadata,
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport
+}
+
+data class GeneratedReport(
+    val format: ReportFormat,
+    val content: String,
+    val outputPath: Path?,
+)
+----
+
+**Встроенные реализации:** `ReportGenerator` (`dependanger-report`)
+
+'''
+
 === LibraryFilter
 
 Стратегия фильтрации библиотек.
@@ -593,6 +627,7 @@ META-INF/services/
 ├── io.github.zenhelix.dependanger.core.spi.SerializationFormat
 ├── io.github.zenhelix.dependanger.core.spi.SchemaMigrator
 ├── io.github.zenhelix.dependanger.effective.spi.EffectiveMetadataProcessor
+├── io.github.zenhelix.dependanger.effective.spi.ReportProvider
 └── io.github.zenhelix.dependanger.generator.spi.ArtifactGenerator
 ----
 

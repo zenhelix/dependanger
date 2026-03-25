@@ -692,28 +692,31 @@ result.writeTo(customGenerator, Path.of("output/custom-artifact"))
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // DSL конфигурация...
 }
-.withBomImport()                         // Включить BOM import
-.withUpdateCheck()                       // Включить проверку обновлений
-.withCompatibilityAnalysis(targetJdk = 17) // Включить анализ совместимости
-.forDistribution("android")              // Для конкретного distribution
+.preset(ProcessingPreset.STRICT)         // Включить все optional процессоры
+.jdkVersion(17)                          // JDK версия для fallback/compatibility
+.disableProcessor("license-check")       // Отключить конкретный процессор
 .build()
 
+val result = dependanger.process(distribution = "android")
+
 // Проверка результата
-if (result.diagnostics.hasErrors()) {
+if (result.diagnostics.hasErrors) {
     result.diagnostics.errors.forEach { println(it.message) }
 }
 ----
 
-=== Загрузка из файла
+=== Загрузка из JSON
 
 [source,kotlin]
 ----
-val result = Dependanger.fromFile(Path.of("metadata.json"))
-    .forDistribution("backend")
+val dependanger = Dependanger.fromJson(File("metadata.json").readText())
+    .jdkVersion(17)
     .build()
+
+val result = dependanger.process(distribution = "backend")
 ----
 
 == Связанные документы

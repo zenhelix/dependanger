@@ -308,35 +308,39 @@ libraries {
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // ... DSL config
+    settings {
+        licenseCheck {
+            // Whitelist (если указан — только эти разрешены)
+            allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause", "ISC")
+
+            // Blacklist (эти всегда запрещены)
+            deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
+
+            // Предупреждения
+            warnOnCopyleft = true          // warn для LGPL, MPL, EPL
+            warnOnUnknown = true           // warn если лицензия неизвестна
+
+            // Fail условия (по умолчанию false — только warn)
+            failOnDenied = false           // fail при denied лицензии
+            failOnUnknown = false          // fail при unknown лицензии
+
+            // Исключения
+            ignoreLibraries = listOf("test-lib")  // пропустить проверку
+        }
+    }
 }
-.withLicenseCheck {
-    // Whitelist (если указан — только эти разрешены)
-    allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause", "ISC")
-
-    // Blacklist (эти всегда запрещены)
-    deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
-
-    // Предупреждения
-    warnOnCopyleft = true          // warn для LGPL, MPL, EPL
-    warnOnUnknown = true           // warn если лицензия неизвестна
-
-    // Fail условия (по умолчанию false — только warn)
-    failOnDenied = false           // fail при denied лицензии
-    failOnUnknown = false          // fail при unknown лицензии
-
-    // Исключения
-    ignoreLibraries = listOf("test-lib")  // пропустить проверку
-}
+.preset(ProcessingPreset.STRICT)  // STRICT включает license-check
 .build()
 
-// Получить информацию о лицензиях
-val licenses = result.diagnostics.all
-    .filterIsInstance<LicenseInfo>()
+val result = dependanger.process()
 
-licenses.forEach { info ->
-    println("${info.library}: ${info.licenses.map { it.spdxId }}")
+// Получить нарушения лицензий (через extraction extension)
+val violations: List<LicenseViolation> = result.licenseViolations
+
+violations.forEach { violation ->
+    println("$\{violation.library\}: $\{violation.message\}")
 }
 ----
 
@@ -431,37 +435,40 @@ licenses.forEach { info ->
 
 [source,kotlin]
 ----
-.withLicenseCheck {
-    // === Политики ===
+// Конфигурация через DSL settings
+settings {
+    licenseCheck {
+        // === Политики ===
 
-    // Whitelist — только эти лицензии разрешены
-    // Если пустой — whitelist отключён (все разрешены кроме denied)
-    allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause")
+        // Whitelist — только эти лицензии разрешены
+        // Если пустой — whitelist отключён (все разрешены кроме denied)
+        allowedLicenses = listOf("MIT", "Apache-2.0", "BSD-3-Clause")
 
-    // Blacklist — эти лицензии запрещены
-    deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
+        // Blacklist — эти лицензии запрещены
+        deniedLicenses = listOf("GPL-3.0", "AGPL-3.0")
 
-    // === Предупреждения ===
+        // === Предупреждения ===
 
-    warnOnCopyleft = true          // warn для weak/strong copyleft (default: true)
-    warnOnUnknown = true           // warn если лицензия неизвестна (default: true)
+        warnOnCopyleft = true          // warn для weak/strong copyleft (default: true)
+        warnOnUnknown = true           // warn если лицензия неизвестна (default: true)
 
-    // === Fail условия (по умолчанию false — только warn) ===
+        // === Fail условия (по умолчанию false — только warn) ===
 
-    failOnDenied = false           // fail при denied лицензии
-    failOnUnknown = false          // fail при unknown лицензии
-    failOnCopyleft = false         // fail при copyleft лицензии
+        failOnDenied = false           // fail при denied лицензии
+        failOnUnknown = false          // fail при unknown лицензии
+        failOnCopyleft = false         // fail при copyleft лицензии
 
-    // === Исключения ===
+        // === Исключения ===
 
-    ignoreLibraries = listOf("internal-test-lib")  // пропустить проверку
+        ignoreLibraries = listOf("internal-test-lib")  // пропустить проверку
 
-    // === Транзитивные (требует F012) ===
+        // === Транзитивные (требует F012) ===
 
-    includeTransitives = false         // Проверять транзитивные (default: false)
+        includeTransitives = false         // Проверять транзитивные (default: false)
 
-    // Таймаут для сетевых запросов
-    timeout = 30.seconds
+        // Таймаут для сетевых запросов
+        timeout = 30.seconds
+    }
 }
 ----
 

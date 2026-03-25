@@ -310,12 +310,14 @@ ____
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // ... DSL config
 }
-.withUpdateCheck()
-.withCompatibilityAnalysis(targetJdk = 17)
+.preset(ProcessingPreset.STRICT)  // Включает update-check и compatibility-analysis
+.jdkVersion(17)
 .build()
+
+val result = dependanger.process()
 
 // Генерация отчёта
 val report = result.generateReport()

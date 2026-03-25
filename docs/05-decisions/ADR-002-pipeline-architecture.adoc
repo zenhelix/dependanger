@@ -139,12 +139,12 @@ interface EffectiveMetadataProcessor {
 
 [source,kotlin]
 ----
-val dependanger = Dependanger.builder()
-    .withProcessor(MyCustomProcessor(order = 80))
-    .withoutUpdateChecking()  // Отключить проверку обновлений
+val dependanger = Dependanger.fromDsl { /* ... */ }
+    .addProcessor(MyCustomProcessor())
+    .disableProcessor("update-check")  // Отключить проверку обновлений
     .build()
 
-val result = dependanger.buildEffectiveWithDiagnostics(metadata)
+val result = dependanger.process()
 ----
 
 == Связанные решения

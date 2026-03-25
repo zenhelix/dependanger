@@ -140,18 +140,19 @@ ____
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // ... DSL config
 }
-.withUpdateCheck()  // Включить проверку обновлений
+.preset(ProcessingPreset.STRICT)  // STRICT включает update-check процессор
 .build()
 
-// Получить информацию об обновлениях
-val updates = result.diagnostics.all
-    .filterIsInstance<UpdateAvailableInfo>()
+val result = dependanger.process()
+
+// Получить информацию об обновлениях (через extraction extension)
+val updates: List<UpdateAvailableInfo> = result.updates
 
 updates.forEach { update ->
-    println("${update.library}: ${update.currentVersion} -> ${update.latestVersion}")
+    println("$\{update.alias\}: $\{update.currentVersion\} -> $\{update.latestVersion\}")
 }
 ----
 
@@ -196,14 +197,21 @@ updates.forEach { update ->
 
 [source,kotlin]
 ----
-.withUpdateCheck(
-    includePrerelease = false,     // Включать RC/beta/alpha
-    repositories = listOf(         // Репозитории для проверки
-        "https://repo.maven.apache.org/maven2",
-        "https://maven.google.com"
-    ),
-    timeout = 30.seconds           // Таймаут на запрос
-)
+// Включить через preset
+Dependanger.fromDsl { /* ... */ }
+    .preset(ProcessingPreset.STRICT)  // STRICT включает update-check
+    .build()
+
+// Конфигурация в DSL
+settings {
+    updateCheck {
+        includePrerelease = false
+        repositories = listOf(
+            "https://repo.maven.apache.org/maven2",
+            "https://maven.google.com"
+        )
+    }
+}
 ----
 
 === Флаг ignoreUpdates

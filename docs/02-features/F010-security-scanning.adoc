@@ -232,24 +232,28 @@ ____
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // ... DSL config
+    settings {
+        securityCheck {
+            minSeverity = Severity.HIGH
+            failOnCritical = true
+            failOnHigh = false
+            ignoreCves = listOf("CVE-2023-ACCEPTED")
+            ignoreLibraries = listOf("internal-test-lib")
+        }
+    }
 }
-.withSecurityCheck {
-    minSeverity = Severity.HIGH
-    failOnCritical = true
-    failOnHigh = false
-    ignoreCves = listOf("CVE-2023-ACCEPTED")
-    ignoreLibraries = listOf("internal-test-lib")
-}
+.preset(ProcessingPreset.STRICT)  // STRICT включает security-check
 .build()
 
-// Получить информацию об уязвимостях
-val vulnerabilities = result.diagnostics.all
-    .filterIsInstance<VulnerabilityInfo>()
+val result = dependanger.process()
+
+// Получить информацию об уязвимостях (через extraction extension)
+val vulnerabilities: List<VulnerabilityInfo> = result.vulnerabilities
 
 vulnerabilities.forEach { vuln ->
-    println("${vuln.library}: ${vuln.cveId} (${vuln.severity})")
+    println("$\{vuln.library\}: $\{vuln.cveId\} ($\{vuln.severity\})")
     vuln.fixedVersion?.let { println("  Fix: upgrade to $it") }
 }
 ----
@@ -400,25 +404,28 @@ Dependanger группирует библиотеки в batches для эффе
 
 [source,kotlin]
 ----
-.withSecurityCheck {
-    // Фильтрация
-    minSeverity = Severity.HIGH        // Минимальный severity (default: HIGH)
-    minCvssScore = 7.0                 // Минимальный CVSS score (default: 7.0)
+// Конфигурация через DSL settings
+settings {
+    securityCheck {
+        // Фильтрация
+        minSeverity = Severity.HIGH        // Минимальный severity (default: HIGH)
+        minCvssScore = 7.0                 // Минимальный CVSS score (default: 7.0)
 
-    // Fail условия (по умолчанию только warn)
-    failOnCritical = false             // Fail при CRITICAL (default: false)
-    failOnHigh = false                 // Fail при HIGH (default: false)
+        // Fail условия (по умолчанию только warn)
+        failOnCritical = false             // Fail при CRITICAL (default: false)
+        failOnHigh = false                 // Fail при HIGH (default: false)
 
-    // Игнорирование
-    ignoreCves = listOf("CVE-2023-OLD")      // Игнорировать конкретные CVE
-    ignoreLibraries = listOf("test-lib")     // Игнорировать библиотеки
+        // Игнорирование
+        ignoreCves = listOf("CVE-2023-OLD")      // Игнорировать конкретные CVE
+        ignoreLibraries = listOf("test-lib")     // Игнорировать библиотеки
 
-    // Транзитивные зависимости (требует F012)
-    includeTransitives = false         // Проверять транзитивные (default: false)
+        // Транзитивные зависимости (требует F012)
+        includeTransitives = false         // Проверять транзитивные (default: false)
 
-    // Сеть
-    timeout = 30.seconds               // Таймаут на запрос
-    retries = 3                        // Количество retry при ошибках
+        // Сеть
+        timeout = 30.seconds               // Таймаут на запрос
+        retries = 3                        // Количество retry при ошибках
+    }
 }
 ----
 

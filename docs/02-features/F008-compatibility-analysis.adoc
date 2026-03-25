@@ -229,18 +229,20 @@ dependanger {
 
 [source,kotlin]
 ----
-val result = Dependanger.fromDsl {
+val dependanger = Dependanger.fromDsl {
     // ... DSL config
 }
-.withCompatibilityAnalysis(targetJdk = 17)  // Целевой JDK
+.preset(ProcessingPreset.STRICT)  // STRICT включает compatibility-analysis
+.jdkVersion(17)                   // Целевой JDK
 .build()
 
-// Получить проблемы совместимости
-val issues = result.diagnostics.all
-    .filterIsInstance<CompatibilityIssue>()
+val result = dependanger.process()
+
+// Получить проблемы совместимости (через extraction extension)
+val issues: List<CompatibilityIssue> = result.compatibilityIssues
 
 issues.forEach { issue ->
-    println("[${issue.severity}] ${issue.ruleId}: ${issue.message}")
+    println("[$\{issue.severity\}] $\{issue.ruleId\}: $\{issue.message\}")
 }
 ----
 

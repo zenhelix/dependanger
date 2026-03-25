@@ -198,16 +198,17 @@ dependanger {
 }
 ----
 
-Или через builder API:
+Или через builder API с preset, включающим BOM import:
 
 [source,kotlin]
 ----
 Dependanger.fromDsl { ... }
-    .withBomImport()  // Builder-style
+    .preset(ProcessingPreset.DEFAULT)  // DEFAULT и STRICT включают BOM import
     .build()
 ----
 
-NOTE: Без явного включения (`importBoms = true` или `withBomImport()`) процессор не выполняется, даже если `bomImports {}` объявлен.
+NOTE: BOM import процессор является optional и включается через `ProcessingPreset.DEFAULT`, `ProcessingPreset.STRICT`, или `ProcessingPreset.DISTRIBUTION`.
+В `ProcessingPreset.MINIMAL` он отключён.
 
 == Функциональные требования
 
@@ -462,7 +463,7 @@ val result = Dependanger.fromDsl {
         library("spring-web", "org.springframework:spring-web")
     }
 }
-.withBomImport()  // Включить BOM import процессор
+.preset(ProcessingPreset.DEFAULT)  // Включает BOM import процессор
 .build()
 
 // spring-web будет иметь версию из Spring Boot BOM

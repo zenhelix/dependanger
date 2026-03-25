@@ -251,7 +251,7 @@ Extension keys и extension properties определены в каждом feat
 
 * DSL: `settings { updateCheck { enabled = true } }`
 * CLI: флаги конкретных команд (e.g. `check-updates`)
-* API: `DependangerBuilder.withUpdateCheck()`, `.withSecurityCheck()`, etc.
+* API: `DependangerBuilder.preset(ProcessingPreset.STRICT)` или `.addProcessor()` / `.disableProcessor()`
 * Gradle Plugin: соответствующие задачи (e.g. `dependangerCheckUpdates`)
 
 [[processing-preset-definitions]]

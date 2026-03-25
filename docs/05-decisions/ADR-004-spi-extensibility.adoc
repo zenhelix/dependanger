@@ -94,7 +94,7 @@ class MyDependanger : Dependanger() { override fun ... }
 | Интерфейсы могут эволюционировать с deprecation
 
 | No magic
-| Все зависимости явные, без runtime discovery
+| SPI контракты явные. Runtime discovery через ServiceLoader — опциональный механизм наряду с явной регистрацией через `DependangerBuilder`
 |===
 
 == Последствия
@@ -110,7 +110,7 @@ class MyDependanger : Dependanger() { override fun ... }
 
 * Больше интерфейсов для поддержки
 * Изменения в интерфейсах требуют careful versioning
-* Нет автоматического discovery (явная регистрация)
+* ServiceLoader discovery добавляет неявность — реализация в classpath автоматически активируется
 
 === Нейтральные
 
@@ -128,18 +128,19 @@ class MyDependanger : Dependanger() { override fun ... }
 [source,kotlin]
 ----
 interface SerializationFormat<T> {
-    val formatName: String
+    val formatId: String
     val fileExtension: String
-    
-    fun serialize(value: T): String
-    fun deserialize(content: String): T
+    val description: String
+    fun serialize(metadata: DependangerMetadata): T
+    fun deserialize(input: T): DependangerMetadata
+    fun write(metadata: DependangerMetadata, path: Path)
+    fun read(path: Path): DependangerMetadata
 }
 ----
 
 Реализации:
 
-* `JsonMetadataFormat` — JSON для DependangerMetadata
-* `JsonEffectiveMetadataFormat` — JSON для EffectiveMetadata
+* `JsonSerializationFormat` — JSON для DependangerMetadata
 
 ==== EffectiveMetadataProcessor
 
@@ -148,40 +149,40 @@ interface SerializationFormat<T> {
 [source,kotlin]
 ----
 interface EffectiveMetadataProcessor {
-    val name: String
+    val id: String
+    val phase: ProcessingPhase
     val order: Int
-    
-    suspend fun process(
-        metadata: EffectiveMetadata,
-        context: ProcessingContext
-    ): EffectiveMetadata
+    val isOptional: Boolean
+    val description: String
+    fun supports(context: ProcessingContext): Boolean
+    suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata
 }
 ----
 
 Реализации:
 
-* `BomImportProcessor` — импорт версий из BOM
-* `UpdateCheckProcessor` — проверка обновлений
-* `CompatibilityCheckProcessor` — анализ совместимости
+* 12 core процессоров (MetadataConversion, VersionResolver, Validation и др.)
+* `CompatibilityCheckProcessor` — анализ совместимости (feature module)
 
-==== ArtifactGenerator
+==== ArtifactGenerator<T>
 
 Генератор выходных артефактов.
 
 [source,kotlin]
 ----
-interface ArtifactGenerator {
-    val formatName: String
-    
-    fun generate(metadata: EffectiveMetadata): String
-    fun generate(metadata: EffectiveMetadata, config: GeneratorConfig): String
+interface ArtifactGenerator<T> {
+    val generatorId: String
+    val description: String
+    val fileExtension: String
+    fun generate(effective: EffectiveMetadata): T
+    fun write(artifact: T, output: Path)
 }
 ----
 
 Реализации:
 
-* `EffectiveTomlGenerator` — TOML Version Catalog
-* `EffectiveBomGenerator` — Maven BOM
+* `TomlGenerator` — TOML Version Catalog
+* `BomGenerator` — Maven BOM
 
 ==== LibraryFilter
 
@@ -190,28 +191,25 @@ interface ArtifactGenerator {
 [source,kotlin]
 ----
 interface LibraryFilter {
-    fun filter(
-        libraries: List<Library>,
-        filterSpec: FilterSpec?
-    ): List<Library>
+    val filterId: String
+    fun filter(libraries: List<Library>): List<Library>
 }
 ----
 
-Реализации:
-
-* `DefaultLibraryFilter` — tag-based фильтрация
-* `RegexLibraryFilter` — regex-based фильтрация
-
 === Регистрация расширений
+
+Два способа регистрации:
 
 [source,kotlin]
 ----
-// Через Builder API
-val dependanger = Dependanger.builder()
-    .withProcessor(MyCustomProcessor())
-    .withLibraryFilter(MyLibraryFilter())
-    .withMetadataFormat(YamlMetadataFormat())
+// 1. Через DependangerBuilder (явная регистрация)
+val dependanger = Dependanger.fromDsl { /* ... */ }
+    .addProcessor(MyCustomProcessor())
     .build()
+
+// 2. Через ServiceLoader (автоматическое обнаружение)
+// Файл: META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+// Содержимое: com.example.MyCustomProcessor
 ----
 
 === Пример кастомного процессора
@@ -221,32 +219,38 @@ val dependanger = Dependanger.builder()
 class SecurityScanProcessor(
     private val vulnerabilityDb: VulnerabilityDatabase
 ) : EffectiveMetadataProcessor {
-    
-    override val name = "security-scan"
-    override val order = 85  // После compatibility analysis
-    
+    override val id = "security-scan"
+    override val phase = ProcessingPhase.SECURITY_CHECK
+    override val order = 120
+    override val isOptional = true
+    override val description = "Checks libraries for known vulnerabilities"
+
+    override fun supports(context: ProcessingContext): Boolean = true
+
     override suspend fun process(
         metadata: EffectiveMetadata,
         context: ProcessingContext
     ): EffectiveMetadata {
-        metadata.libraries.forEach { library ->
+        val diagnostics = metadata.libraries.values.flatMap { library ->
             val vulns = vulnerabilityDb.findVulnerabilities(
-                library.group, library.artifact, library.version
+                library.group, library.artifact, library.version?.value
             )
-            if (vulns.isNotEmpty()) {
-                context.addWarning(
-                    name,
-                    "Library ${library.alias} has ${vulns.size} known vulnerabilities"
+            vulns.map { vuln ->
+                Diagnostics.warning(
+                    code = "VULNERABILITY_FOUND",
+                    message = "Library $\{library.alias\} has vulnerability: $\{vuln.id\}",
+                    processorId = id,
                 )
             }
-        }
-        return metadata
+        }.fold(Diagnostics.EMPTY, Diagnostics::plus)
+
+        return metadata.copy(diagnostics = metadata.diagnostics + diagnostics)
     }
 }
 
 // Использование
-val dependanger = Dependanger.builder()
-    .withProcessor(SecurityScanProcessor(MyVulnDb()))
+val dependanger = Dependanger.fromDsl { /* ... */ }
+    .addProcessor(SecurityScanProcessor(MyVulnDb()))
     .build()
 ----
 

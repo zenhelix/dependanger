@@ -214,15 +214,17 @@ data class Diagnostics(
     val warnings: List<DiagnosticMessage>,
     val infos: List<DiagnosticMessage>
 ) {
-    fun hasErrors(): Boolean = errors.isNotEmpty()
-    fun hasWarnings(): Boolean = warnings.isNotEmpty()
+    val hasErrors: Boolean get() = errors.isNotEmpty()
+    val isValid: Boolean get() = errors.isEmpty()
+    operator fun plus(other: Diagnostics): Diagnostics
 }
 
 data class DiagnosticMessage(
-    val code: String,           // e.g., "UNRESOLVED_VERSION", "DEPRECATED_LIBRARY"
-    val message: String,        // Human-readable сообщение
-    val processorId: String,    // Процессор, который добавил сообщение
-    val context: Map<String, Any> = emptyMap()  // Дополнительный контекст
+    val code: String,            // e.g., "UNRESOLVED_VERSION", "DEPRECATED_LIBRARY"
+    val message: String,         // Human-readable сообщение
+    val severity: Severity,      // ERROR, WARNING, INFO
+    val processorId: String?,    // Процессор, который добавил сообщение (null для system-level)
+    val context: Map<String, String>  // Дополнительный контекст
 )
 ----
 

@@ -13,4 +13,5 @@ dependencies {
     implementation(libs.kotlin.logging.jvm)
 
     testImplementation(libs.kotlinx.coroutines.test)
+    testRuntimeOnly(libs.slf4j.simple)
 }

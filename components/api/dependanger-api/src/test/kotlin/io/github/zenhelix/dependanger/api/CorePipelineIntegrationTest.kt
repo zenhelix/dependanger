@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.api
 
+import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
@@ -18,7 +19,7 @@ class CorePipelineIntegrationTest {
     private fun dependanger(
         preset: ProcessingPreset = ProcessingPreset.DEFAULT,
         jdk: Int? = null,
-        dslBlock: io.github.zenhelix.dependanger.core.dsl.DependangerDsl.() -> Unit,
+        dslBlock: DependangerDsl.() -> Unit,
     ): Dependanger = Dependanger(dslBlock) {
         preset(preset)
         jdk?.let { jdkVersion(it) }
@@ -347,7 +348,7 @@ class CorePipelineIntegrationTest {
 
         @Test
         fun `fromJson round-trips through serialization`() = runTest {
-            val metadata = io.github.zenhelix.dependanger.core.dsl.DependangerDsl().apply {
+            val metadata = DependangerDsl().apply {
                 libraries { library("lib", "com.example:lib:1.0.0") }
             }.toMetadata()
 

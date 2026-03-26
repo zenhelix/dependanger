@@ -1,19 +1,26 @@
 package io.github.zenhelix.dependanger.gradle
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 
-public abstract class ListVersionsTask : DefaultTask() {
-    @get:Internal
-    public abstract val extension: Property<DependangerExtension>
-
+public abstract class ListVersionsTask : AbstractDependangerTask() {
     init {
-        group = DependangerPlugin.TASK_GROUP
-        description = "List all versions"
+        description = "List all resolved versions from effective metadata"
     }
 
     @TaskAction
-    public fun execute(): Unit = TODO()
+    public fun execute() {
+        val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
+        val effective = DependangerTaskHelper.readEffective(outputDir)
+
+        val versions = effective.versions
+
+        logger.lifecycle("Dependanger: Resolved versions (${versions.size}):")
+        logger.lifecycle("")
+
+        val maxAliasLen = versions.keys.maxOfOrNull { it.length } ?: 0
+        versions.entries.sortedBy { it.key }.forEach { (alias, resolved) ->
+            val paddedAlias = alias.padEnd(maxAliasLen)
+            logger.lifecycle("  $paddedAlias = ${resolved.value}")
+        }
+    }
 }

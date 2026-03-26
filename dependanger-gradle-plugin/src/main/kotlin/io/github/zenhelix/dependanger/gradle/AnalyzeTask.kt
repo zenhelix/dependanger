@@ -1,19 +1,43 @@
 package io.github.zenhelix.dependanger.gradle
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Internal
+import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.effective.ProcessorIds
+import kotlinx.coroutines.runBlocking
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
-public abstract class AnalyzeTask : DefaultTask() {
-    @get:Internal
-    public abstract val extension: Property<DependangerExtension>
-
+public abstract class AnalyzeTask : AbstractDependangerTask() {
     init {
-        group = DependangerPlugin.TASK_GROUP
-        description = "Analyze compatibility"
+        description = "Analyze dependency compatibility"
     }
 
     @TaskAction
-    public fun execute(): Unit = TODO()
+    public fun execute() {
+        val metadata = extension.dsl.toMetadata()
+        val failOnError = extension.failOnError.get()
+
+        runWithErrorHandling(failOnError) {
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .jdkVersion(Runtime.version().feature())
+                .configureProcessing { enableOptional(ProcessorIds.COMPATIBILITY_ANALYSIS) }
+                .build()
+
+            val result = runBlocking { dependanger.process() }
+
+            val errors = result.diagnostics.errors.filter { it.code.startsWith("COMPAT") }
+            val warnings = result.diagnostics.warnings.filter { it.code.startsWith("COMPAT") }
+
+            if (errors.isEmpty() && warnings.isEmpty()) {
+                logger.lifecycle("Dependanger: No compatibility issues found.")
+            } else {
+                errors.forEach { logger.error("Dependanger COMPAT ERROR: ${it.message}") }
+                warnings.forEach { logger.warn("Dependanger COMPAT WARN: ${it.message}") }
+                logger.lifecycle("Dependanger: Analysis complete: ${errors.size} errors, ${warnings.size} warnings")
+            }
+
+            if (errors.isNotEmpty() && failOnError) {
+                throw GradleException("Dependanger: Compatibility analysis found ${errors.size} error(s).")
+            }
+        }
+    }
 }

@@ -11,23 +11,38 @@ public class DependangerPlugin : Plugin<Project> {
     }
 
     override fun apply(project: Project) {
-        val extension = project.extensions.create(EXTENSION_NAME, DependangerExtension::class.java, project)
-        registerTasks(project, extension)
+        project.extensions.create(EXTENSION_NAME, DependangerExtension::class.java, project)
+        registerTasks(project)
     }
 
-    private fun registerTasks(project: Project, extension: DependangerExtension) {
-        project.tasks.register("dependangerGenerateMetadata", GenerateMetadataTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerGenerateEffective", GenerateEffectiveTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerGenerateToml", GenerateTomlTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerGenerateBom", GenerateBomTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerGenerate", GenerateAllTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerValidate", ValidateTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerCheckUpdates", CheckUpdatesTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerAnalyze", AnalyzeTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerReport", ReportTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerListVersions", ListVersionsTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerSecurityCheck", SecurityCheckTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerLicenseCheck", LicenseCheckTask::class.java) { it.extension.set(extension) }
-        project.tasks.register("dependangerResolveTransitives", ResolveTransitivesTask::class.java) { it.extension.set(extension) }
+    private fun registerTasks(project: Project) {
+        // Category 1: Generative tasks (file chain)
+        val generateMetadata = project.tasks.register("dependangerGenerateMetadata", GenerateMetadataTask::class.java)
+        val generateEffective = project.tasks.register("dependangerGenerateEffective", GenerateEffectiveTask::class.java) {
+            it.dependsOn(generateMetadata)
+        }
+        val generateToml = project.tasks.register("dependangerGenerateToml", GenerateTomlTask::class.java) {
+            it.dependsOn(generateEffective)
+        }
+        val generateBom = project.tasks.register("dependangerGenerateBom", GenerateBomTask::class.java) {
+            it.dependsOn(generateEffective)
+        }
+        project.tasks.register("dependangerGenerate", GenerateAllTask::class.java) {
+            it.dependsOn(generateToml, generateBom)
+        }
+        project.tasks.register("dependangerListVersions", ListVersionsTask::class.java) {
+            it.dependsOn(generateEffective)
+        }
+
+        // Category 2: Analytical tasks (standalone, no dependsOn)
+        project.tasks.register("dependangerCheckUpdates", CheckUpdatesTask::class.java)
+        project.tasks.register("dependangerAnalyze", AnalyzeTask::class.java)
+        project.tasks.register("dependangerSecurityCheck", SecurityCheckTask::class.java)
+        project.tasks.register("dependangerLicenseCheck", LicenseCheckTask::class.java)
+        project.tasks.register("dependangerResolveTransitives", ResolveTransitivesTask::class.java)
+
+        // Special tasks (standalone)
+        project.tasks.register("dependangerValidate", ValidateTask::class.java)
+        project.tasks.register("dependangerReport", ReportTask::class.java)
     }
 }

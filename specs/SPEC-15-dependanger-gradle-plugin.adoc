@@ -641,7 +641,7 @@ public fun execute() {
     } else {
         logger.lifecycle("Dependanger: Available updates:")
         updates.forEach { update ->
-            logger.lifecycle("  ${update.alias}: ${update.currentVersion} -> ${update.availableVersion} (${update.type})")
+            logger.lifecycle("  ${update.alias}: ${update.currentVersion} -> ${update.latestVersion} (${update.updateType})")
         }
         logger.lifecycle("  Total: ${updates.size} updates available")
     }
@@ -819,18 +819,14 @@ public fun execute() {
     } else {
         logger.lifecycle("Dependanger: Found ${vulnerabilities.size} vulnerabilities:")
         vulnerabilities.forEach { vuln ->
-            logger.warn("  ${vuln.library} (${vuln.cveId}): ${vuln.severity} - ${vuln.summary}")
+            logger.warn("  ${vuln.affectedGroup}:${vuln.affectedArtifact}:${vuln.affectedVersion} (${vuln.id}): ${vuln.severity} - ${vuln.summary}")
         }
-
-        outputDir.mkdirs()
-        val reportFile = outputDir.resolve("security-report.json")
-        // Сериализация vulnerabilities в JSON
-        logger.lifecycle("Dependanger: Security report -> $reportFile")
     }
 
-    if (vulnerabilities.any { it.severity == "CRITICAL" || it.severity == "HIGH" } && failOnError) {
+    val critical = vulnerabilities.filter { it.severity.meetsThreshold(VulnerabilitySeverity.HIGH) }
+    if (critical.isNotEmpty() && failOnError) {
         throw GradleException(
-            "Dependanger: Found ${vulnerabilities.size} vulnerabilities (HIGH or CRITICAL)."
+            "Dependanger: Found ${critical.size} vulnerabilities with HIGH or CRITICAL severity."
         )
     }
 }
@@ -869,19 +865,16 @@ public fun execute() {
 
     val licenseViolations = result.licenseViolations
 
-    val denied = licenseViolations.filter { it.status == "DENIED" }
-    val unknown = licenseViolations.filter { it.status == "UNKNOWN" }
+    val violations = result.licenseViolations
+    val denied = violations.filter { it.violationType == LicenseViolationType.DENIED }
+    val notAllowed = violations.filter { it.violationType == LicenseViolationType.NOT_ALLOWED }
 
-    if (denied.isEmpty() && unknown.isEmpty()) {
+    if (denied.isEmpty() && notAllowed.isEmpty()) {
         logger.lifecycle("Dependanger: All library licenses are compliant.")
     } else {
-        denied.forEach { logger.error("Dependanger LICENSE DENIED: ${it.library} - ${it.licenseName}") }
-        unknown.forEach { logger.warn("Dependanger LICENSE UNKNOWN: ${it.library}") }
+        denied.forEach { logger.error("Dependanger LICENSE DENIED: ${it.group}:${it.artifact} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
+        notAllowed.forEach { logger.warn("Dependanger LICENSE NOT_ALLOWED: ${it.group}:${it.artifact} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
     }
-
-    outputDir.mkdirs()
-    val reportFile = outputDir.resolve("license-report.json")
-    logger.lifecycle("Dependanger: License report -> $reportFile")
 
     if (denied.isNotEmpty() && failOnError) {
         throw GradleException("Dependanger: Found ${denied.size} denied license(s).")
@@ -931,7 +924,7 @@ public fun execute() {
         logger.lifecycle("")
         logger.lifecycle("  Conflicts:")
         conflicts.forEach { conflict ->
-            logger.warn("    ${conflict.artifact}: ${conflict.versions.joinToString(" vs ")}")
+            logger.warn("    ${conflict.group}:${conflict.artifact}: ${conflict.requestedVersions.joinToString(" vs ")} (resolved: ${conflict.resolvedVersion})")
         }
     }
 

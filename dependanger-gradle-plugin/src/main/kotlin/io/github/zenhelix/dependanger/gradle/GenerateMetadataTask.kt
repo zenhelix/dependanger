@@ -1,19 +1,36 @@
 package io.github.zenhelix.dependanger.gradle
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Internal
+import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
-public abstract class GenerateMetadataTask : DefaultTask() {
-    @get:Internal
-    public abstract val extension: Property<DependangerExtension>
-
+public abstract class GenerateMetadataTask : AbstractDependangerTask() {
     init {
-        group = DependangerPlugin.TASK_GROUP
         description = "Generate metadata.json from DSL"
     }
 
     @TaskAction
-    public fun execute(): Unit = TODO()
+    public fun execute() {
+        val metadata = try {
+            extension.dsl.toMetadata()
+        } catch (e: Exception) {
+            throw GradleException("Dependanger: Failed to evaluate DSL configuration: ${e.message}", e)
+        }
+
+        val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
+
+        try {
+            val format = JsonSerializationFormat()
+            val outputFile = outputDir.resolve(DependangerTaskHelper.METADATA_FILE).toPath()
+            format.write(metadata, outputFile)
+
+            logger.lifecycle("Dependanger: Generated ${DependangerTaskHelper.METADATA_FILE} -> $outputFile")
+            logger.lifecycle("  Versions: ${metadata.versions.size}")
+            logger.lifecycle("  Libraries: ${metadata.libraries.size}")
+            logger.lifecycle("  Plugins: ${metadata.plugins.size}")
+            logger.lifecycle("  Bundles: ${metadata.bundles.size}")
+        } catch (e: Exception) {
+            throw GradleException("Dependanger: Failed to write ${DependangerTaskHelper.METADATA_FILE}: ${e.message}", e)
+        }
+    }
 }

@@ -1,19 +1,15 @@
 package io.github.zenhelix.dependanger.gradle
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 
-public abstract class GenerateAllTask : DefaultTask() {
-    @get:Internal
-    public abstract val extension: Property<DependangerExtension>
-
+public abstract class GenerateAllTask : AbstractDependangerTask() {
     init {
-        group = DependangerPlugin.TASK_GROUP
-        description = "Run full generation pipeline"
+        description = "Run full generation pipeline (metadata -> effective -> TOML + BOM)"
     }
 
     @TaskAction
-    public fun execute(): Unit = TODO()
+    public fun execute() {
+        val outputDir = extension.outputDirectory.get().asFile
+        logger.lifecycle("Dependanger: Full generation complete -> $outputDir")
+    }
 }

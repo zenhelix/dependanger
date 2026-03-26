@@ -11,6 +11,13 @@ description = "Dependanger Gradle Plugin - Gradle integration"
 
 dependencies {
     implementation(projects.components.api.dependangerApi)
+
+    // Feature model types used by analytical tasks (not transitively exposed by dependanger-api)
+    implementation(projects.components.features.dependangerSecurity)
+    implementation(projects.components.features.dependangerLicense)
+    implementation(projects.components.features.dependangerUpdates)
+    implementation(projects.components.features.dependangerTransitive)
+
     compileOnly(libs.kotlin.gradle.plugin)
 }
 

@@ -1,19 +1,44 @@
 package io.github.zenhelix.dependanger.gradle
 
-import org.gradle.api.DefaultTask
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Internal
+import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.updates
+import io.github.zenhelix.dependanger.effective.ProcessorIds
+import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
-public abstract class CheckUpdatesTask : DefaultTask() {
-    @get:Internal
-    public abstract val extension: Property<DependangerExtension>
-
+public abstract class CheckUpdatesTask : AbstractDependangerTask() {
     init {
-        group = DependangerPlugin.TASK_GROUP
-        description = "Check for available updates"
+        description = "Check for available dependency updates"
     }
 
     @TaskAction
-    public fun execute(): Unit = TODO()
+    public fun execute() {
+        val metadata = extension.dsl.toMetadata()
+        val failOnError = extension.failOnError.get()
+
+        runWithErrorHandling(failOnError) {
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .configureProcessing { enableOptional(ProcessorIds.UPDATE_CHECK) }
+                .build()
+
+            val result = runBlocking { dependanger.process() }
+
+            if (!result.isSuccess) {
+                DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
+                return@runWithErrorHandling
+            }
+
+            val updates = result.updates
+
+            if (updates.isEmpty()) {
+                logger.lifecycle("Dependanger: All dependencies are up to date.")
+            } else {
+                logger.lifecycle("Dependanger: Available updates:")
+                updates.forEach { update ->
+                    logger.lifecycle("  ${update.alias}: ${update.currentVersion} -> ${update.latestVersion} (${update.updateType})")
+                }
+                logger.lifecycle("  Total: ${updates.size} updates available")
+            }
+        }
+    }
 }

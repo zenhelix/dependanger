@@ -231,6 +231,8 @@ public data class TransitiveResolutionSettings(
     val conflictResolution: ConflictResolutionStrategy,
     val includeOptional: Boolean,
     val scopes: List<String>,
+    val cacheDirectory: String?,
+    val cacheTtlHours: Long,
 ) {
     public companion object {
         public val DEFAULT: TransitiveResolutionSettings = TransitiveResolutionSettings(
@@ -241,6 +243,8 @@ public data class TransitiveResolutionSettings(
             conflictResolution = ConflictResolutionStrategy.HIGHEST,
             includeOptional = false,
             scopes = listOf("compile", "runtime"),
+            cacheDirectory = null,
+            cacheTtlHours = SettingsDefaults.DEFAULT_CACHE_TTL_HOURS,
         )
     }
 }

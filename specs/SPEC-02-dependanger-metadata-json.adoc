@@ -289,16 +289,21 @@ override fun deserialize(input: String): DependangerMetadata {
 }
 ----
 
-=== Класс исключения
+=== Иерархия исключений
 
-Необходимо создать класс `MetadataDeserializationException` для типизированной обработки ошибок десериализации:
+Все исключения модуля наследуют от базового `MetadataSerializationException`:
 
 [source,kotlin]
 ----
+public open class MetadataSerializationException(
+    message: String,
+    cause: Throwable?,
+) : RuntimeException(message, cause)
+
 public class MetadataDeserializationException(
     message: String,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)
+    cause: Throwable?,
+) : MetadataSerializationException(message, cause)
 ----
 
 === Поведение Json-конфигурации при десериализации
@@ -427,8 +432,8 @@ override fun write(metadata: DependangerMetadata, path: Path) {
 ----
 public class MetadataWriteException(
     message: String,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)
+    cause: Throwable?,
+) : MetadataSerializationException(message, cause)
 ----
 
 === Требования к imports
@@ -550,8 +555,8 @@ override fun read(path: Path): DependangerMetadata {
 ----
 public class MetadataReadException(
     message: String,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)
+    cause: Throwable?,
+) : MetadataSerializationException(message, cause)
 ----
 
 === Требования к imports
@@ -677,10 +682,9 @@ public class EffectiveJsonFormat {
      * Extensions сериализуются через KSerializer из ExtensionKey.
      */
     public fun serialize(metadata: EffectiveMetadata): String {
-        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata)
-            .jsonObject.toMutableMap()
+        val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata).jsonObject
 
-        if (metadata.extensions.isNotEmpty()) {
+        val resultJson = if (metadata.extensions.isNotEmpty()) {
             val extensionsJson = buildJsonObject {
                 for ((key, value) in metadata.extensions) {
                     @Suppress("UNCHECKED_CAST")
@@ -688,10 +692,12 @@ public class EffectiveJsonFormat {
                     put(key.name, json.encodeToJsonElement(serializer, value))
                 }
             }
-            baseJson["extensions"] = extensionsJson
+            JsonObject(baseJson + ("extensions" to extensionsJson))
+        } else {
+            baseJson
         }
 
-        return json.encodeToString(JsonElement.serializer(), JsonObject(baseJson))
+        return json.encodeToString(JsonElement.serializer(), resultJson)
     }
 
     /**
@@ -705,19 +711,16 @@ public class EffectiveJsonFormat {
         val base = json.decodeFromJsonElement(EffectiveMetadata.serializer(), jsonObject)
 
         val extensionsJson = jsonObject["extensions"]?.jsonObject ?: return base
-        val extensions = mutableMapOf<ExtensionKey<*>, Any>()
 
-        for ((keyName, element) in extensionsJson) {
-            val extensionKey = knownKeys[keyName]
-            if (extensionKey == null) {
-                logger.warn { "Unknown extension key '$keyName', skipping" }
-                continue
-            }
-            try {
-                val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
-                extensions[extensionKey] = deserialized
-            } catch (e: Exception) {
-                logger.warn { "Failed to deserialize extension '$keyName': ${e.message}" }
+        val extensions = buildMap<ExtensionKey<*>, Any> {
+            for ((keyName, element) in extensionsJson) {
+                val extensionKey = knownKeys[keyName] ?: continue
+                try {
+                    val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
+                    put(extensionKey, deserialized)
+                } catch (_: Exception) {
+                    // Skip extensions that fail to deserialize
+                }
             }
         }
 
@@ -727,22 +730,22 @@ public class EffectiveJsonFormat {
     /**
      * Записывает EffectiveMetadata в файл.
      */
-    public fun write(metadata: EffectiveMetadata, path: java.nio.file.Path) {
+    public fun write(metadata: EffectiveMetadata, path: Path) {
         val jsonString = serialize(metadata)
         path.parent?.let { parent ->
-            if (!parent.toFile().exists()) parent.toFile().mkdirs()
+            if (!parent.exists()) parent.createDirectories()
         }
-        path.toFile().writeText(jsonString, Charsets.UTF_8)
+        path.writeText(jsonString, Charsets.UTF_8)
     }
 
     /**
      * Читает EffectiveMetadata из файла.
      */
-    public fun read(path: java.nio.file.Path): EffectiveMetadata {
-        if (!path.toFile().exists()) {
+    public fun read(path: Path): EffectiveMetadata {
+        if (!path.exists()) {
             throw IllegalArgumentException("Effective metadata file not found: '$path'")
         }
-        val content = path.toFile().readText(Charsets.UTF_8)
+        val content = path.readText(Charsets.UTF_8)
         return deserialize(content)
     }
 }

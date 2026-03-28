@@ -69,7 +69,8 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
         TransitiveResolverContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
-            cacheDirectory = null,
+            cacheDirectory = settings.cacheDirectory,
+            cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = DEFAULT_READ_TIMEOUT_MS,
         ).use { ctx ->
             val builder = TransitiveTreeBuilder(

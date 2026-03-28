@@ -102,9 +102,8 @@ NOTE: `BomImportProcessor` (order=15) -- **early feature processor**.
 | `VALIDATION_CIRCULAR_EXTENDS` | ERROR | ValidationProcessor | Циклическое наследование бандлов
 | `VALIDATION_DEPRECATED_REF` | WARNING | ValidationProcessor | Deprecated replacedBy ссылается на несуществующее
 | `VALIDATION_INVALID_COORDINATES` | ERROR | ValidationProcessor | Некорректные Maven-координаты
-| `COMPAT_JDK_REQUIREMENT` | varies | CompatRulesProcessor | Нарушение JDK-требования
-| `COMPAT_MUTUAL_EXCLUSION` | varies | CompatRulesProcessor | Взаимоисключающие библиотеки
-| `COMPAT_VERSION_CONSTRAINT` | varies | CompatRulesProcessor | Нарушение version constraint
+| `COMPAT_${issue.ruleId.uppercase()}` | varies | CompatRulesProcessor | Динамический код на основе ruleId правила
+| `CUSTOM_RULE_DEFERRED` | INFO | CompatRulesProcessor | CustomRule делегирован CompatibilityCheckProcessor
 | `COMPAT_CUSTOM_RULE` | varies | CompatibilityCheckProcessor | Результат custom rule (feature-модуль `dependanger-analysis`)
 |===
 
@@ -325,7 +324,7 @@ EffectiveMetadata(
 ----
 1. КОНВЕРТАЦИЯ ВЕРСИЙ:
    a. Для каждой Version в originalMetadata.versions:
-      - Создать ResolvedVersion(alias=name, value=value, source=DECLARED)
+      - Создать ResolvedVersion(alias=name, value=value, source=DECLARED, originalRef=null)
       - Ключ map = version.name
    b. Результат: Map<String, ResolvedVersion>
 
@@ -344,9 +343,10 @@ EffectiveMetadata(
         - license = library.license
         - constraints = library.constraints
         - isPlatform = library.isPlatform
+        - ignoreUpdates = library.ignoreUpdates
       - Ключ map = library.alias
    b. Конвертация VersionReference -> ResolvedVersion:
-      - Literal(v) -> ResolvedVersion(alias="", value=v, source=DECLARED)
+      - Literal(v) -> ResolvedVersion(alias="", value=v, source=DECLARED, originalRef=null)
       - Reference(name) -> null (будет разрешен VersionResolverProcessor)
       - Range(...) -> null (оставляем для специальной обработки)
       - null -> null
@@ -394,6 +394,7 @@ override suspend fun process(
             alias = version.name,
             value = version.value,
             source = VersionSource.DECLARED,
+            originalRef = null,
         )
     }
 
@@ -412,6 +413,7 @@ override suspend fun process(
             license = lib.license,
             constraints = lib.constraints,
             isPlatform = lib.isPlatform,
+            ignoreUpdates = lib.ignoreUpdates,
         )
     }
 
@@ -447,6 +449,7 @@ private fun convertVersionReference(ref: VersionReference?): ResolvedVersion? = 
         alias = "",
         value = ref.version,
         source = VersionSource.DECLARED,
+        originalRef = null,
     )
     is VersionReference.Reference -> null  // разрешится в VersionResolverProcessor
     is VersionReference.Range -> null      // range не поддерживает resolved value
@@ -588,99 +591,121 @@ EffectiveMetadata(
 
 [source,text]
 ----
-1. Инициализировать newVersions = mutableMapOf из metadata.versions
+1. Инициализировать иммутабельный ExtractionAccumulator:
+   - usedNames = metadata.versions.keys (множество уже занятых имён)
+   - versions = emptyMap()
+   - diagnostics = Diagnostics.EMPTY
+   - resolvedByAlias = emptyMap()
 
-2. ДЛЯ КАЖДОЙ библиотеки в metadata.libraries:
+2. fold по metadata.libraries.entries с аккумулятором:
    a. ЕСЛИ library.version != null И library.version.alias == "" И library.version.value != "":
       (это литерал, созданный MetadataConversionProcessor из VersionReference.Literal)
-      b. Генерировать имя версии: versionName = "${library.alias}-version"
-      c. ЕСЛИ versionName уже есть в newVersions:
-         - ЕСЛИ значение совпадает -> пропустить (уже извлечено)
-         - ЕСЛИ значение отличается -> добавить warning EXTRACTED_VERSION_CONFLICT,
-           использовать суффикс: versionName = "${library.alias}-version-2"
-      d. Создать ResolvedVersion(alias=versionName, value=library.version.value, source=DECLARED)
-      e. Добавить в newVersions
-      f. Обновить library: version = ResolvedVersion(alias=versionName, value=library.version.value, source=DECLARED)
-      g. Добавить info diagnostic EXTRACTED_VERSION_CREATED
+      b. Генерировать имя версии: versionName = generateVersionName(alias, acc.usedNames)
+         - base = "$alias-version"
+         - ЕСЛИ base не в usedNames -> вернуть base
+         - ИНАЧЕ перебор суффиксов: "$base-2", "$base-3", ... пока не найдено свободное
+      c. Создать ResolvedVersion(alias=versionName, value=library.version.value, source=DECLARED, originalRef=null)
+      d. Вернуть новый ExtractionAccumulator с обновлёнными usedNames, versions, diagnostics, resolvedByAlias
 
-3. ДЛЯ КАЖДОГО плагина в metadata.plugins:
-   a. Аналогичная логика: если version литеральный -> извлечь в versions map
-   b. versionName = "${plugin.alias}-version"
+3. fold по metadata.plugins.entries (продолжая с аккумулятора после библиотек):
+   a. Аналогичная логика: если version литеральный -> извлечь
 
-4. Вернуть metadata.copy(versions=newVersions, libraries=updatedLibraries, plugins=updatedPlugins, diagnostics=...)
+4. Обновить библиотеки и плагины: для каждого alias, если есть resolved в resolvedByAlias -> обновить version
+
+5. Вернуть metadata.copy(
+     versions = metadata.versions + afterAll.versions,
+     libraries = updatedLibraries,
+     plugins = updatedPlugins,
+     diagnostics = metadata.diagnostics + afterAll.diagnostics,
+   )
 ----
 
 === Детальная реализация
 
 [source,kotlin]
 ----
+private data class ExtractionAccumulator(
+    val usedNames: Set<String>,
+    val versions: Map<String, ResolvedVersion>,
+    val diagnostics: Diagnostics,
+    val resolvedByAlias: Map<String, ResolvedVersion>,
+)
+
 override suspend fun process(
     metadata: EffectiveMetadata,
     context: ProcessingContext,
 ): EffectiveMetadata {
-    val newVersions = metadata.versions.toMutableMap()
-    var diagnostics = metadata.diagnostics
+    val initialAcc = ExtractionAccumulator(
+        usedNames = metadata.versions.keys,
+        versions = emptyMap(),
+        diagnostics = Diagnostics.EMPTY,
+        resolvedByAlias = emptyMap(),
+    )
 
-    // Извлечение из библиотек
-    val updatedLibraries = metadata.libraries.mapValues { (alias, lib) ->
-        val version = lib.version
-        if (version != null && version.alias.isEmpty() && version.value.isNotEmpty()) {
-            val versionName = generateVersionName(alias, newVersions)
-            val resolved = ResolvedVersion(
-                alias = versionName,
-                value = version.value,
-                source = VersionSource.DECLARED,
-            )
-            newVersions[versionName] = resolved
-            diagnostics = diagnostics + Diagnostics.info(
-                code = "EXTRACTED_VERSION_CREATED",
-                message = "Extracted version '$versionName' = '${version.value}' from library '$alias'",
-                processorId = id,
-            )
-            lib.copy(version = resolved)
-        } else {
-            lib
-        }
+    val afterLibraries = metadata.libraries.entries.fold(initialAcc) { acc, (alias, lib) ->
+        extractVersion(acc, alias, lib.version, "library")
     }
 
-    // Извлечение из плагинов
+    val afterAll = metadata.plugins.entries.fold(afterLibraries) { acc, (alias, plugin) ->
+        extractVersion(acc, alias, plugin.version, "plugin")
+    }
+
+    val updatedLibraries = metadata.libraries.mapValues { (alias, lib) ->
+        val resolved = afterAll.resolvedByAlias[alias]
+        if (resolved != null) lib.copy(version = resolved) else lib
+    }
+
     val updatedPlugins = metadata.plugins.mapValues { (alias, plugin) ->
-        val version = plugin.version
-        if (version != null && version.alias.isEmpty() && version.value.isNotEmpty()) {
-            val versionName = generateVersionName(alias, newVersions)
-            val resolved = ResolvedVersion(
-                alias = versionName,
-                value = version.value,
-                source = VersionSource.DECLARED,
-            )
-            newVersions[versionName] = resolved
-            diagnostics = diagnostics + Diagnostics.info(
-                code = "EXTRACTED_VERSION_CREATED",
-                message = "Extracted version '$versionName' = '${version.value}' from plugin '$alias'",
-                processorId = id,
-            )
-            plugin.copy(version = resolved)
-        } else {
-            plugin
-        }
+        val resolved = afterAll.resolvedByAlias[alias]
+        if (resolved != null) plugin.copy(version = resolved) else plugin
     }
 
     return metadata.copy(
-        versions = newVersions,
+        versions = metadata.versions + afterAll.versions,
         libraries = updatedLibraries,
         plugins = updatedPlugins,
-        diagnostics = diagnostics,
+        diagnostics = metadata.diagnostics + afterAll.diagnostics,
+    )
+}
+
+private fun extractVersion(
+    acc: ExtractionAccumulator,
+    alias: String,
+    version: ResolvedVersion?,
+    sourceType: String,
+): ExtractionAccumulator {
+    if (version == null || version.alias.isNotEmpty() || version.value.isEmpty()) return acc
+
+    val versionName = generateVersionName(alias, acc.usedNames)
+    val resolved = ResolvedVersion(
+        alias = versionName,
+        value = version.value,
+        source = VersionSource.DECLARED,
+        originalRef = null,
+    )
+    val diagnostic = Diagnostics.info(
+        code = DiagnosticCodes.Version.EXTRACTED_CREATED,
+        message = "Extracted version '$versionName' = '${version.value}' from $sourceType '$alias'",
+        processorId = id,
+        context = emptyMap(),
+    )
+
+    return ExtractionAccumulator(
+        usedNames = acc.usedNames + versionName,
+        versions = acc.versions + (versionName to resolved),
+        diagnostics = acc.diagnostics + diagnostic,
+        resolvedByAlias = acc.resolvedByAlias + (alias to resolved),
     )
 }
 
 private fun generateVersionName(
     alias: String,
-    existing: Map<String, ResolvedVersion>,
+    existingNames: Set<String>,
 ): String {
     val base = "$alias-version"
-    if (base !in existing) return base
+    if (base !in existingNames) return base
     var counter = 2
-    while ("$base-$counter" in existing) counter++
+    while ("$base-$counter" in existingNames) counter++
     return "$base-$counter"
 }
 ----
@@ -1036,24 +1061,24 @@ override suspend fun process(
 
     if (versionsWithFallbacks.isEmpty()) return metadata
 
-    val updatedVersions = metadata.versions.toMutableMap()
-    var diagnostics = metadata.diagnostics
+    val (updatedVersions, diagnostics) = versionsWithFallbacks.fold(
+        metadata.versions to metadata.diagnostics
+    ) { (versions, diags), version ->
+        val current = versions[version.name]
+            ?: return@fold versions to diags
 
-    for (version in versionsWithFallbacks) {
-        val current = updatedVersions[version.name] ?: continue
+        val matchedFallback = version.fallbacks
+            .firstOrNull { evaluateCondition(it.condition, context) }
+            ?: return@fold versions to diags
 
-        for (fallback in version.fallbacks) {
-            if (evaluateCondition(fallback.condition, context)) {
-                updatedVersions[version.name] = current.copy(value = fallback.value)
-                diagnostics = diagnostics + Diagnostics.info(
-                    code = "FALLBACK_APPLIED",
-                    message = "Version '${version.name}': fallback '${fallback.value}' applied " +
-                            "(was '${current.value}', condition: ${fallback.condition})",
-                    processorId = id,
-                )
-                break  // first match wins
-            }
-        }
+        val newVersions = versions + (version.name to current.copy(value = matchedFallback.value))
+        val newDiags = diags + Diagnostics.info(
+            code = DiagnosticCodes.Version.FALLBACK_APPLIED,
+            message = "Version '${version.name}': fallback '${matchedFallback.value}' applied (was '${current.value}', condition: ${matchedFallback.condition})",
+            processorId = id,
+            context = emptyMap(),
+        )
+        newVersions to newDiags
     }
 
     return metadata.copy(versions = updatedVersions, diagnostics = diagnostics)
@@ -1075,16 +1100,16 @@ private fun evaluateCondition(
             env.jdkVersion != null && env.jdkVersion in condition.min..condition.max
 
         is FallbackCondition.KotlinVersionBelow ->
-            env.kotlinVersion != null && compareVersions(env.kotlinVersion, condition.version) < 0
+            env.kotlinVersion != null && VersionComparator.compare(env.kotlinVersion, condition.version) < 0
 
         is FallbackCondition.KotlinVersionAtLeast ->
-            env.kotlinVersion != null && compareVersions(env.kotlinVersion, condition.version) >= 0
+            env.kotlinVersion != null && VersionComparator.compare(env.kotlinVersion, condition.version) >= 0
 
         is FallbackCondition.GradleVersionBelow ->
-            env.gradleVersion != null && compareVersions(env.gradleVersion, condition.version) < 0
+            env.gradleVersion != null && VersionComparator.compare(env.gradleVersion, condition.version) < 0
 
         is FallbackCondition.GradleVersionAtLeast ->
-            env.gradleVersion != null && compareVersions(env.gradleVersion, condition.version) >= 0
+            env.gradleVersion != null && VersionComparator.compare(env.gradleVersion, condition.version) >= 0
 
         is FallbackCondition.DistributionCondition ->
             context.activeDistribution == condition.name
@@ -1105,7 +1130,6 @@ private fun evaluateCondition(
 
 // Используется VersionComparator из dependanger-core:
 // import io.github.zenhelix.dependanger.core.util.VersionComparator
-// VersionComparator.compare(a, b)
 ----
 
 === Input/Output пример
@@ -1718,39 +1742,37 @@ override suspend fun process(
     metadata: EffectiveMetadata,
     context: ProcessingContext,
 ): EffectiveMetadata {
-    val usedVersionNames = mutableSetOf<String>()
-
-    // Собираем используемые версии из библиотек
-    for ((_, lib) in metadata.libraries) {
-        lib.version?.let { v ->
-            if (v.alias.isNotEmpty()) usedVersionNames.add(v.alias)
-            v.originalRef?.let { usedVersionNames.add(it) }
+    val usedVersionNames = buildSet {
+        metadata.libraries.values.forEach { lib ->
+            lib.version?.let { v ->
+                if (v.alias.isNotEmpty()) add(v.alias)
+                v.originalRef?.let { add(it) }
+            }
+        }
+        metadata.plugins.values.forEach { plugin ->
+            plugin.version?.let { v ->
+                if (v.alias.isNotEmpty()) add(v.alias)
+                v.originalRef?.let { add(it) }
+            }
         }
     }
 
-    // Собираем используемые версии из плагинов
-    for ((_, plugin) in metadata.plugins) {
-        plugin.version?.let { v ->
-            if (v.alias.isNotEmpty()) usedVersionNames.add(v.alias)
-            v.originalRef?.let { usedVersionNames.add(it) }
-        }
-    }
-
-    var diagnostics = metadata.diagnostics
-
-    val usedVersions = metadata.versions.filter { (name, _) ->
-        val used = name in usedVersionNames
-        if (!used) {
-            diagnostics = diagnostics + Diagnostics.info(
-                code = "UNUSED_VERSION_REMOVED",
+    val (usedVersions, removedDiagnostics) = metadata.versions.entries.fold(
+        emptyMap<String, ResolvedVersion>() to metadata.diagnostics
+    ) { (accVersions, accDiag), (name, version) ->
+        if (name in usedVersionNames) {
+            (accVersions + (name to version)) to accDiag
+        } else {
+            accVersions to (accDiag + Diagnostics.info(
+                code = DiagnosticCodes.Version.UNUSED_REMOVED,
                 message = "Version '$name' removed: not referenced by any library or plugin",
                 processorId = id,
-            )
+                context = emptyMap(),
+            ))
         }
-        used
     }
 
-    return metadata.copy(versions = usedVersions, diagnostics = diagnostics)
+    return metadata.copy(versions = usedVersions, diagnostics = removedDiagnostics)
 }
 ----
 
@@ -2159,64 +2181,45 @@ override suspend fun process(
     val rules = context.originalMetadata.compatibility
     if (rules.isEmpty()) return metadata
 
-    val issues = mutableListOf<CompatibilityIssue>()
-    var diagnostics = metadata.diagnostics
+    val (issues, rulesDiagnostics) = rules.fold(
+        emptyList<CompatibilityIssue>() to metadata.diagnostics
+    ) { (accIssues, accDiag), rule ->
+        when (rule) {
+            is CompatibilityRule.JdkRequirement    ->
+                (accIssues + checkJdkRequirement(rule, metadata, context.environment)) to accDiag
 
-    for (rule in rules) {
-        val ruleIssues = when (rule) {
-            is CompatibilityRule.JdkRequirement ->
-                checkJdkRequirement(rule, metadata, context.environment)
+            is CompatibilityRule.MutualExclusion   ->
+                (accIssues + checkMutualExclusion(rule, metadata)) to accDiag
 
-            is CompatibilityRule.MutualExclusion ->
-                checkMutualExclusion(rule, metadata)
+            is CompatibilityRule.VersionConstraint -> (accIssues + checkVersionConstraint(rule, metadata)) to accDiag
 
-            is CompatibilityRule.VersionConstraint ->
-                checkVersionConstraint(rule, metadata)
-
-            is CompatibilityRule.CustomRule -> {
-                // CustomRule делегируется CompatibilityCheckProcessor (order=110)
-                diagnostics = diagnostics + Diagnostics.info(
-                    code = "COMPAT_CUSTOM_RULE_DEFERRED",
+            is CompatibilityRule.CustomRule        ->
+                accIssues to (accDiag + Diagnostics.info(
+                    code = DiagnosticCodes.Compatibility.CUSTOM_RULE_DEFERRED,
                     message = "Custom rule '${rule.ruleId}' deferred to compatibility-analysis processor",
                     processorId = id,
-                )
-                emptyList()
-            }
+                    context = emptyMap(),
+                ))
         }
-        issues.addAll(ruleIssues)
     }
 
-    // Записать issues в extensions
-    val existingIssues = metadata.compatibilityIssues
-    val allIssues = existingIssues + issues
+    val allIssues = metadata.compatibilityIssues + issues
 
-    var result = metadata.withExtension(
+    val result = metadata.withExtension(
         CompatibilityIssuesExtensionKey,
         allIssues,
     )
 
-    // Добавить diagnostics
-    for (issue in issues) {
-        diagnostics = diagnostics + when (issue.severity) {
-            Severity.ERROR -> Diagnostics.error(
-                code = "COMPAT_${issue.ruleId.uppercase()}",
-                message = issue.message,
-                processorId = id,
-            )
-            Severity.WARNING -> Diagnostics.warning(
-                code = "COMPAT_${issue.ruleId.uppercase()}",
-                message = issue.message,
-                processorId = id,
-            )
-            Severity.INFO -> Diagnostics.info(
-                code = "COMPAT_${issue.ruleId.uppercase()}",
-                message = issue.message,
-                processorId = id,
-            )
-        }
+    val issueDiagnostics = issues.fold(rulesDiagnostics) { accDiag, issue ->
+        accDiag + issue.toDiagnostics(
+            code = "COMPAT_${issue.ruleId.uppercase()}",
+            processorId = id,
+            message = issue.message,
+            context = emptyMap(),
+        )
     }
 
-    return result.copy(diagnostics = diagnostics)
+    return result.copy(diagnostics = issueDiagnostics)
 }
 
 private fun checkJdkRequirement(
@@ -2226,25 +2229,27 @@ private fun checkJdkRequirement(
 ): List<CompatibilityIssue> {
     val jdkVersion = environment.jdkVersion ?: return emptyList()
     val matchingLibs = metadata.libraries.filter { (alias, lib) ->
-        globMatch("${lib.group}:${lib.artifact}", rule.matches) || globMatch(alias, rule.matches)
+        GlobMatcher.matches(rule.matches, lib.group, lib.artifact) || GlobMatcher.matchesGlob(rule.matches, alias)
     }
 
-    val issues = mutableListOf<CompatibilityIssue>()
-    for ((alias, _) in matchingLibs) {
-        val violatesMin = rule.minJdk != null && jdkVersion < rule.minJdk
-        val violatesMax = rule.maxJdk != null && jdkVersion > rule.maxJdk
+    val minJdk = rule.minJdk
+    val maxJdk = rule.maxJdk
+    return matchingLibs.mapNotNull { (alias, _) ->
+        val violatesMin = minJdk != null && jdkVersion < minJdk
+        val violatesMax = maxJdk != null && jdkVersion > maxJdk
         if (violatesMin || violatesMax) {
-            issues.add(CompatibilityIssue(
+            CompatibilityIssue(
                 ruleId = rule.name,
                 message = rule.message
                     ?: "Library '$alias' requires JDK ${rule.minJdk ?: "?"}-${rule.maxJdk ?: "?"}, current: $jdkVersion",
                 severity = rule.severity,
                 affectedLibraries = listOf(alias),
                 suggestion = "Upgrade JDK or use a compatible library version",
-            ))
+            )
+        } else {
+            null
         }
     }
-    return issues
 }
 
 private fun checkMutualExclusion(
@@ -2277,8 +2282,8 @@ private fun checkVersionConstraint(
     val versions = libraryVersions.map { it.second }
     val violation = when (rule.constraint) {
         VersionConstraintType.SAME_VERSION -> versions.distinct().size > 1
-        VersionConstraintType.SAME_MAJOR -> versions.map { parseMajor(it) }.distinct().size > 1
-        VersionConstraintType.SAME_MAJOR_MINOR -> versions.map { parseMajorMinor(it) }.distinct().size > 1
+        VersionConstraintType.SAME_MAJOR -> versions.map { VersionComparator.parseMajor(it) }.distinct().size > 1
+        VersionConstraintType.SAME_MAJOR_MINOR -> versions.map { VersionComparator.parseMajorMinor(it) }.distinct().size > 1
     }
 
     return if (violation) {

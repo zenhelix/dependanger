@@ -32,12 +32,12 @@
    a. Исключить библиотеки с ignoreUpdates = true
    b. Исключить библиотеки matching excludePatterns
    c. Исключить библиотеки без version (version == null)
-5. Создать VersionCache (файловый кеш, TTL 1h)
+5. Создать VersionCache (наследует AbstractFileCache, файловый кеш, TTL 1h)
 6. Параллельно (Semaphore с concurrency = parallelism, default 10):
    Для каждой отфильтрованной библиотеки:
    a. Проверить кеш -> если есть и не истёк -> использовать
    b. Запросить maven-metadata.xml из репозиториев
-   c. Распарсить XML: извлечь <versioning><versions><version>
+   c. Распарсить XML через Regex `<version>([^<]+)</version>` (не DOM)
    d. Отфильтровать prerelease (alpha, beta, rc, snapshot, M, CR, ea)
    e. Сравнить текущую версию с найденными
    f. Определить latestStable, latestAny, updateType
@@ -58,51 +58,41 @@
 public class MavenMetadataFetcher(
     private val repositories: List<MavenRepository>,
     private val httpClient: HttpClient,
-    private val timeout: Long = 30_000,
-    private val credentialsProvider: CredentialsProvider? = null,
+    private val credentialsProvider: CredentialsProvider?,
+    private val connectTimeoutMs: Long,
+    private val readTimeoutMs: Long,
 ) {
     /**
      * Запрашивает maven-metadata.xml для артефакта.
      * URL: {repoUrl}/{groupPath}/{artifactId}/maven-metadata.xml
+     * @return MetadataFetchResult (sealed interface: Success, NotFound, Failed)
      */
-    public suspend fun fetchAvailableVersions(
+    public suspend fun fetchVersions(
         group: String,
-        artifact: String
-    ): VersionFetchResult {
+        artifact: String,
+    ): MetadataFetchResult {
         val groupPath = group.replace('.', '/')
         for (repo in repositories) {
             val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/maven-metadata.xml"
-            try {
-                val response = httpClient.get(url) {
-                    timeout { requestTimeoutMillis = this@MavenMetadataFetcher.timeout }
-                    credentialsProvider?.getCredentials(repo.url)?.let { creds ->
-                        basicAuth(creds.username, creds.password)
-                    }
-                }
-                if (response.status == HttpStatusCode.OK) {
-                    val versions = parseMavenMetadataXml(response.bodyAsText())
-                    return VersionFetchResult(versions, repo.url)
-                }
-            } catch (e: Exception) {
-                logger.warn { "Failed to fetch metadata for $group:$artifact from ${repo.url}: ${e.message}" }
+            when (val result = fetchFromRepo(url, repo)) {
+                is MetadataFetchResult.Success  -> return result
+                is MetadataFetchResult.NotFound -> { /* continue to next repo */ }
+                is MetadataFetchResult.Failed   -> { /* continue, track last failure */ }
             }
         }
-        return VersionFetchResult(emptyList(), null)
+        return MetadataFetchResult.NotFound
     }
 
-    private fun parseMavenMetadataXml(xml: String): List<String> {
-        // Парсинг: <metadata><versioning><versions><version>X.Y.Z</version>...
-        val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder()
-            .parse(xml.byteInputStream())
-        val versionNodes = doc.getElementsByTagName("version")
-        return (0 until versionNodes.length).map { versionNodes.item(it).textContent }
-    }
+    /** XML парсинг через Regex (не DOM): */
+    // private val versionRegex = Regex("<version>([^<]+)</version>")
+    // versions = versionRegex.findAll(responseBody).map { it.groupValues[1] }.toList()
 }
 
-public data class VersionFetchResult(
-    val versions: List<String>,
-    val repository: String?,
-)
+public sealed interface MetadataFetchResult {
+    public data class Success(val versions: List<String>, val repository: String) : MetadataFetchResult
+    public data object NotFound : MetadataFetchResult
+    public data class Failed(val error: String) : MetadataFetchResult
+}
 ----
 
 ==== VersionComparator
@@ -131,8 +121,8 @@ override suspend fun process(
             listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
         }
     }
-    val fetcher = MavenMetadataFetcher(repos, createHttpClient(), settings.timeout)
-    val cache = VersionCache(settings.cacheDirectory, settings.cacheTtlHours)
+    val fetcher = MavenMetadataFetcher(repos, httpClient, credentialsProvider, connectTimeoutMs, readTimeoutMs)
+    val cache = VersionCache(settings.cacheDirectory, settings.cacheTtlHours) // наследует AbstractFileCache
     val includePrerelease = settings.includePrerelease
     val parallelism = settings.parallelism
 
@@ -156,17 +146,15 @@ override suspend fun process(
 
     return metadata
         .withExtension(UpdatesExtensionKey, updates)
-        .let { m ->
-            if (updates.isNotEmpty()) {
-                val summary = "Updates available: ${updates.size} " +
-                    "(${updates.count { it.updateType == UpdateType.MAJOR }} major, " +
-                    "${updates.count { it.updateType == UpdateType.MINOR }} minor, " +
-                    "${updates.count { it.updateType == UpdateType.PATCH }} patch)"
-                m.withDiagnostic(
-                    Diagnostics.info("UPDATES_AVAILABLE", summary, "update-check")
-                )
-            } else m
-        }
+    val summary = if (updates.isNotEmpty()) {
+        Diagnostics.info(
+            DiagnosticCodes.Update.UPDATES_AVAILABLE,
+            "${updates.size} update(s) available",
+            id, mapOf("count" to updates.size.toString())
+        )
+    } else {
+        Diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "All libraries are up to date", id, emptyMap())
+    }
 }
 
 private suspend fun checkUpdate(
@@ -179,11 +167,21 @@ private suspend fun checkUpdate(
     val currentParsed = VersionComparator.parse(currentVersion) ?: return null
 
     // Кеш
-    val cachedVersions = cache.get(lib.group, lib.artifact)
-    val result = cachedVersions ?: fetcher.fetchAvailableVersions(lib.group, lib.artifact)
-
-    if (cachedVersions == null && result.versions.isNotEmpty()) {
-        cache.put(lib.group, lib.artifact, result)
+    // Кеш: CacheResult sealed interface (Hit, Miss, Corrupted)
+    val cachedResult = cache.get(lib.group, lib.artifact)
+    val result = when (cachedResult) {
+        is CacheResult.Hit -> cachedResult.data
+        else -> {
+            when (val fetchResult = fetcher.fetchVersions(lib.group, lib.artifact)) {
+                is MetadataFetchResult.Success -> {
+                    val vfr = VersionFetchResult(fetchResult.versions, fetchResult.repository)
+                    cache.put(lib.group, lib.artifact, vfr)
+                    vfr
+                }
+                is MetadataFetchResult.NotFound -> cache.getStale(lib.group, lib.artifact) ?: return null
+                is MetadataFetchResult.Failed -> cache.getStale(lib.group, lib.artifact) ?: return null
+            }
+        }
     }
 
     if (result.versions.isEmpty()) return null
@@ -302,7 +300,7 @@ Dots в groupId сохраняются как есть (НЕ заменяютс�
 |===
 | Код | Описание | Уровень
 
-| `UPDATES_AVAILABLE` | Сводка доступных обновлений | INFO
+| `UPDATES_AVAILABLE` | Краткое сообщение: `"N update(s) available"` (без разбивки по типам major/minor/patch) | INFO
 | `ALL_UP_TO_DATE` | Все библиотеки актуальны | INFO
 | `UPDATE_REPO_UNREACHABLE` | Репозиторий недоступен | WARNING
 | `UPDATE_TIMEOUT` | Таймаут запроса | WARNING
@@ -371,7 +369,7 @@ dependanger-updates зависит от:
 
 | `UpdateCheckProcessor.kt` | Реализация `process()` -- основная логика проверки обновлений
 | `MavenMetadataFetcher.kt` | **Создать** -- HTTP-загрузка и парсинг maven-metadata.xml
-| `VersionCache.kt` | **Создать** -- файловый кеш результатов проверки версий
+| `VersionCache.kt` | **Создать** -- файловый кеш результатов проверки версий (наследует `AbstractFileCache`)
 | `META-INF/services/io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor` | **Создать** -- SPI-регистрация `UpdateCheckProcessor` для discovery через ServiceLoader
 |===
 

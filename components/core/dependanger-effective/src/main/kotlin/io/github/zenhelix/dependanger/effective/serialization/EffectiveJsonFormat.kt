@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.serialization
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
 import io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
@@ -15,6 +16,8 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
+
+private val logger = KotlinLogging.logger {}
 
 public class EffectiveJsonFormat {
 
@@ -62,12 +65,16 @@ public class EffectiveJsonFormat {
 
         val extensions = buildMap<ExtensionKey<*>, Any> {
             for ((keyName, element) in extensionsJson) {
-                val extensionKey = knownKeys[keyName] ?: continue
+                val extensionKey = knownKeys[keyName]
+                if (extensionKey == null) {
+                    logger.warn { "Unknown extension key '$keyName', skipping" }
+                    continue
+                }
                 try {
                     val deserialized = json.decodeFromJsonElement(extensionKey.serializer, element)
                     put(extensionKey, deserialized)
-                } catch (_: Exception) {
-                    // Skip extensions that fail to deserialize
+                } catch (e: Exception) {
+                    logger.warn { "Failed to deserialize extension '$keyName': ${e.message}" }
                 }
             }
         }

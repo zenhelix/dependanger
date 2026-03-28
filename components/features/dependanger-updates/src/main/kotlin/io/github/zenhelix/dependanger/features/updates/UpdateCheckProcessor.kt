@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
+import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.core.util.VersionComparator
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -95,10 +96,19 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
             }
 
             val summary = if (updates.isNotEmpty()) {
+                val typeCounts = updates.groupingBy { it.updateType }.eachCount()
+                val major = typeCounts.getOrDefault(UpdateType.MAJOR, 0)
+                val minor = typeCounts.getOrDefault(UpdateType.MINOR, 0)
+                val patch = typeCounts.getOrDefault(UpdateType.PATCH, 0)
                 Diagnostics.info(
                     DiagnosticCodes.Update.UPDATES_AVAILABLE,
-                    "${updates.size} update(s) available",
-                    id, mapOf("count" to updates.size.toString())
+                    "Updates available: ${updates.size} ($major major, $minor minor, $patch patch)",
+                    id, mapOf(
+                        "count" to updates.size.toString(),
+                        "major" to major.toString(),
+                        "minor" to minor.toString(),
+                        "patch" to patch.toString(),
+                    )
                 )
             } else {
                 Diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "All libraries are up to date", id, emptyMap())
@@ -130,11 +140,12 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
             )
         }
 
-        val fetchResult = fetchVersions(lib.group, lib.artifact, ctx)
-        if (fetchResult == null) {
-            return UpdateCheckResult(update = null, diagnostics = Diagnostics.EMPTY)
+        val fetchOutcome = fetchVersions(lib.group, lib.artifact, ctx)
+        if (fetchOutcome.result == null) {
+            return UpdateCheckResult(update = null, diagnostics = fetchOutcome.diagnostics)
         }
 
+        val fetchResult = fetchOutcome.result
         val allVersions = fetchResult.versions
         if (allVersions.isEmpty()) {
             return UpdateCheckResult(update = null, diagnostics = Diagnostics.EMPTY)
@@ -176,46 +187,76 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
         group: String,
         artifact: String,
         ctx: UpdateCheckContext,
-    ): VersionFetchResult? {
+    ): FetchOutcome {
         val coordinate = "$group:$artifact"
 
         when (val cached = ctx.cache.get(group, artifact)) {
-            is CacheResult.Hit       -> return cached.data
+            is CacheResult.Hit  -> return FetchOutcome(cached.data, Diagnostics.EMPTY)
             is CacheResult.Corrupted -> logger.warn { "Corrupted version cache for $coordinate: ${cached.error}" }
-            is CacheResult.Miss      -> { /* proceed to fetch */
+            is CacheResult.Miss -> { /* proceed to fetch */
             }
         }
 
         return when (val fetchResult = ctx.fetcher.fetchVersions(group, artifact)) {
-            is MetadataFetchResult.Success  -> {
+            is MetadataFetchResult.Success     -> {
                 val result = VersionFetchResult(versions = fetchResult.versions, repository = fetchResult.repository)
                 try {
                     ctx.cache.put(group, artifact, result)
                 } catch (e: Exception) {
                     logger.warn { "Failed to write version cache for $coordinate: ${e.message}" }
                 }
-                result
+                FetchOutcome(result, Diagnostics.EMPTY)
             }
 
-            is MetadataFetchResult.NotFound -> {
+            is MetadataFetchResult.NotFound    -> {
                 val stale = ctx.cache.getStale(group, artifact)
                 if (stale != null) {
                     logger.debug { "Using stale version cache for $coordinate" }
-                    stale
+                    FetchOutcome(stale, Diagnostics.EMPTY)
                 } else {
                     logger.debug { "Library $coordinate not found in any repository" }
-                    null
+                    val diag = Diagnostics.warning(
+                        DiagnosticCodes.Update.LIB_NOT_FOUND,
+                        "Library $coordinate not found in any configured repository",
+                        id, mapOf("library" to coordinate)
+                    )
+                    FetchOutcome(null, diag)
                 }
             }
 
-            is MetadataFetchResult.Failed   -> {
+            is MetadataFetchResult.RateLimited -> {
+                logger.warn { "Rate limited when fetching $coordinate: ${fetchResult.error}" }
+                val diag = Diagnostics.warning(
+                    DiagnosticCodes.Update.RATE_LIMITED,
+                    "Rate limited when checking updates for $coordinate",
+                    id, mapOf("library" to coordinate)
+                )
+                FetchOutcome(ctx.cache.getStale(group, artifact), diag)
+            }
+
+            is MetadataFetchResult.TimedOut    -> {
+                logger.warn { "Timeout when fetching $coordinate: ${fetchResult.error}" }
+                val diag = Diagnostics.warning(
+                    DiagnosticCodes.Update.TIMEOUT,
+                    "Timeout when checking updates for $coordinate",
+                    id, mapOf("library" to coordinate)
+                )
+                FetchOutcome(ctx.cache.getStale(group, artifact), diag)
+            }
+
+            is MetadataFetchResult.Failed      -> {
                 val stale = ctx.cache.getStale(group, artifact)
                 if (stale != null) {
                     logger.debug { "Using stale version cache for $coordinate after fetch failure" }
-                    stale
+                    FetchOutcome(stale, Diagnostics.EMPTY)
                 } else {
                     logger.warn { "Failed to fetch versions for $coordinate: ${fetchResult.error}" }
-                    null
+                    val diag = Diagnostics.warning(
+                        DiagnosticCodes.Update.REPO_UNREACHABLE,
+                        "Failed to fetch versions for $coordinate: ${fetchResult.error}",
+                        id, mapOf("library" to coordinate, "error" to fetchResult.error)
+                    )
+                    FetchOutcome(null, diag)
                 }
             }
         }
@@ -224,6 +265,11 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
 
 private data class UpdateCheckResult(
     val update: UpdateAvailableInfo?,
+    val diagnostics: Diagnostics,
+)
+
+private data class FetchOutcome(
+    val result: VersionFetchResult?,
     val diagnostics: Diagnostics,
 )
 

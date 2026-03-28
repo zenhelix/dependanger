@@ -332,6 +332,8 @@ public class TransitiveResolutionSettingsDsl {
     public var conflictResolution: ConflictResolutionStrategy = TransitiveResolutionSettings.DEFAULT.conflictResolution
     public var includeOptional: Boolean = TransitiveResolutionSettings.DEFAULT.includeOptional
     public var scopes: List<String> = TransitiveResolutionSettings.DEFAULT.scopes
+    public var cacheDirectory: String? = TransitiveResolutionSettings.DEFAULT.cacheDirectory
+    public var cacheTtlHours: Long = TransitiveResolutionSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): TransitiveResolutionSettings = TransitiveResolutionSettings(
         enabled = enabled,
@@ -341,6 +343,8 @@ public class TransitiveResolutionSettingsDsl {
         conflictResolution = conflictResolution,
         includeOptional = includeOptional,
         scopes = scopes,
+        cacheDirectory = cacheDirectory,
+        cacheTtlHours = cacheTtlHours,
     )
 }
 

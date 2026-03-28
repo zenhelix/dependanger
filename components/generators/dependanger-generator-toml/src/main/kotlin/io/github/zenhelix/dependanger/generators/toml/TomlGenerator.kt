@@ -64,6 +64,9 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
 
         return buildString {
             for (lib in sortedByAlias(libraries.values) { it.alias }) {
+                if (lib.isDeprecated && lib.deprecation == null) {
+                    logger.warn { "Library '${lib.alias}' (${lib.group}:${lib.artifact}) is marked as deprecated but has no DeprecationInfo" }
+                }
                 if (lib.isDeprecated && config.includeDeprecationComments) {
                     appendLine(buildDeprecationComment(lib))
                 }

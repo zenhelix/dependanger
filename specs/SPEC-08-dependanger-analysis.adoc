@@ -49,13 +49,14 @@
 3. ЕСЛИ CustomRule правил нет -> вернуть metadata, INFO "No custom rules to process"
 
 4. ДЛЯ КАЖДОГО CustomRule:
-   a. Найти handler по ruleId через SPI:
+   a. Найти handler по ruleType через SPI:
       ServiceLoader: `META-INF/services/io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler`
+      handlers загружаются через `associateBy { it.ruleType }`, lookup по `handlers[rule.ruleId]`
    b. ЕСЛИ handler не найден:
       - WARNING "Custom rule handler not found for '{ruleId}'"
       - Продолжить к следующему правилу
    c. ЕСЛИ handler найден:
-      - Вызвать `handler.evaluate(rule, metadata.libraries, context)` в try-catch
+      - Вызвать `handler.evaluate(rule, metadata.libraries, context)` в try-catch (синхронный вызов, НЕ suspend)
       - ЕСЛИ exception -> ERROR "Custom rule '{ruleId}' failed: {message}", продолжить pipeline
       - ЕСЛИ результат содержит issues -> собрать CompatibilityIssue
 
@@ -76,17 +77,18 @@
 ----
 // Определён в dependanger-effective/spi/
 public interface CustomRuleHandler {
-    /** Уникальный идентификатор правила, которое обрабатывает этот handler */
-    public val ruleId: String
+    /** Уникальный идентификатор типа правила, которое обрабатывает этот handler */
+    public val ruleType: String
 
     /**
-     * Оценить пользовательское правило совместимости.
+     * Выполнить проверку правила и вернуть найденные проблемы.
+     * Метод синхронный (НЕ suspend).
      * @param rule Правило из DSL
      * @param libraries Текущие effective-библиотеки
      * @param context Контекст обработки
      * @return Список обнаруженных issues (пустой если проверка пройдена)
      */
-    public suspend fun evaluate(
+    public fun evaluate(
         rule: CompatibilityRule.CustomRule,
         libraries: Map<String, EffectiveLibrary>,
         context: ProcessingContext,
@@ -120,7 +122,7 @@ override suspend fun process(
 
     // Загрузка handlers через SPI
     val handlers = ServiceLoader.load(CustomRuleHandler::class.java)
-        .associateBy { it.ruleId }
+        .associateBy { it.ruleType }
 
     val newIssues = mutableListOf<CompatibilityIssue>()
     var diagnostics = metadata.diagnostics
@@ -208,7 +210,7 @@ override suspend fun process(
 | Exception в handler.evaluate() | ERROR, issue с severity=ERROR, pipeline продолжается | `COMPAT_CUSTOM_RULE_FAILED`
 | Handler возвращает пустой список | Правило прошло проверку, без issues | --
 | Существующие issues от CompatRulesProcessor | Merge: existingIssues + newIssues | --
-| Несколько handlers с одним ruleId | ServiceLoader: последний загруженный побеждает (associateBy) | --
+| Несколько handlers с одним ruleType | ServiceLoader: последний загруженный побеждает (associateBy) | --
 | Strict mode + ERROR severity | ERROR в diagnostics | --
 |===
 

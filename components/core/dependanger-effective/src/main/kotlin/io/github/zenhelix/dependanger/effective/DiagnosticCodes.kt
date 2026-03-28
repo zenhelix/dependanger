@@ -32,7 +32,9 @@ public object DiagnosticCodes {
         public const val RESOLVED: String = "VERSION_RESOLVED"
         public const val UNRESOLVED: String = "UNRESOLVED_VERSION"
         public const val EXTRACTED_CREATED: String = "EXTRACTED_VERSION_CREATED"
+        public const val EXTRACTED_VERSION_CONFLICT: String = "EXTRACTED_VERSION_CONFLICT"
         public const val FALLBACK_APPLIED: String = "FALLBACK_APPLIED"
+        public const val FALLBACK_ENV_MISSING: String = "FALLBACK_ENV_MISSING"
         public const val UNUSED_REMOVED: String = "UNUSED_VERSION_REMOVED"
     }
 

@@ -17,6 +17,7 @@ internal class TransitiveResolverContext(
     repositories: List<MavenRepository>,
     credentialsProvider: CredentialsProvider?,
     cacheDirectory: String?,
+    cacheTtlHours: Long?,
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
@@ -36,7 +37,7 @@ internal class TransitiveResolverContext(
 
     val cache: DirBasedCache<TransitiveTree> = DirBasedCache(
         cacheDirectory = cacheDirectory ?: DependangerPaths.resolveInUserHome(DependangerPaths.TRANSITIVES_CACHE_DIR),
-        ttlHours = DEFAULT_TTL_HOURS,
+        ttlHours = cacheTtlHours ?: DEFAULT_TTL_HOURS,
         ttlSnapshotHours = DEFAULT_SNAPSHOT_TTL_HOURS,
         contentSerializer = TransitiveTree.serializer(),
         contentFileName = "tree-content.json",

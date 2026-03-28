@@ -19,19 +19,31 @@ Gradle Version Catalog -- стандартный механизм централ
 [source,kotlin]
 ----
 public data class TomlConfig(
-    val filename: String = "libs.versions.toml",
-    val includeComments: Boolean = true,
-    val sortSections: Boolean = true,
-    val useInlineVersions: Boolean = false,
-    val includeDeprecationComments: Boolean = true,
-)
+    val filename: String,
+    val includeComments: Boolean,
+    val sortSections: Boolean,
+    val useInlineVersions: Boolean,
+    val includeDeprecationComments: Boolean,
+) {
+    public companion object {
+        public const val DEFAULT_FILENAME: String = "libs.versions.toml"
+
+        public val DEFAULT: TomlConfig = TomlConfig(
+            filename = DEFAULT_FILENAME,
+            includeComments = true,
+            sortSections = true,
+            useInlineVersions = false,
+            includeDeprecationComments = true,
+        )
+    }
+}
 ----
 
 === Описание полей
 
 [cols="2,1,1,4"]
 |===
-| Поле | Тип | По умолчанию | Описание
+| Поле | Тип | DEFAULT значение | Описание
 
 | `filename` | `String` | `"libs.versions.toml"` | Имя выходного файла. Поддерживает плейсхолдер `\{distribution\}` для мульти-дистрибуций.
 | `includeComments` | `Boolean` | `true` | Включать ли служебные комментарии (заголовок, секции).
@@ -39,6 +51,8 @@ public data class TomlConfig(
 | `useInlineVersions` | `Boolean` | `false` | Использовать ли инлайн-версии вместо `version.ref`. Не рекомендуется для production.
 | `includeDeprecationComments` | `Boolean` | `true` | Включать ли комментарии о deprecated-библиотеках.
 |===
+
+NOTE: Дефолтных значений в конструкторе нет -- дефолты определены через `companion object { val DEFAULT: TomlConfig }`.
 
 [[generate-algorithm]]
 == Алгоритм generate()

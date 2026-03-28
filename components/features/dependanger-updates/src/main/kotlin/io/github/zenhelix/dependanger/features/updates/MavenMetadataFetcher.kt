@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.github.zenhelix.dependanger.http.client.getWithRetry
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.basicAuth
 
@@ -22,7 +23,7 @@ public class MavenMetadataFetcher(
         val groupPath = group.replace('.', '/')
         val metadataFileName = "maven-metadata.xml"
 
-        var lastFailure: MetadataFetchResult.Failed? = null
+        var lastFailure: MetadataFetchResult? = null
 
         for (repo in repositories) {
             val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/$metadataFileName"
@@ -31,6 +32,8 @@ public class MavenMetadataFetcher(
                 is MetadataFetchResult.NotFound -> { /* continue to next repo */
                 }
 
+                is MetadataFetchResult.RateLimited,
+                is MetadataFetchResult.TimedOut,
                 is MetadataFetchResult.Failed   -> lastFailure = result
             }
         }
@@ -59,8 +62,15 @@ public class MavenMetadataFetcher(
 
             is HttpResult.NotFound     -> MetadataFetchResult.NotFound
             is HttpResult.AuthRequired -> MetadataFetchResult.Failed("Authentication required for ${repo.name} ($url)")
-            is HttpResult.RateLimited  -> MetadataFetchResult.Failed("Rate limited by ${repo.name}, retry after ${httpResult.retryAfterMs}ms")
-            is HttpResult.Failed       -> MetadataFetchResult.Failed(httpResult.error)
+            is HttpResult.RateLimited -> MetadataFetchResult.RateLimited("Rate limited by ${repo.name}, retry after ${httpResult.retryAfterMs}ms")
+            is HttpResult.Failed      -> classifyFailure(httpResult, repo)
         }
+    }
+
+    private fun classifyFailure(result: HttpResult.Failed, repo: MavenRepository): MetadataFetchResult {
+        if (result.cause is HttpRequestTimeoutException) {
+            return MetadataFetchResult.TimedOut("Timeout fetching metadata from ${repo.name}: ${result.error}")
+        }
+        return MetadataFetchResult.Failed(result.error)
     }
 }

@@ -238,23 +238,23 @@ listOf(
 
 [source,kotlin]
 ----
+@Suppress("UNCHECKED_CAST")
 private fun buildExtensionsMap(): Map<String, JsonElement> {
-    val result = mutableMapOf<String, JsonElement>()
-    for ((key, value) in allExtensions()) {
-        // Попытка сериализовать через kotlinx-serialization
-        // Если значение @Serializable — сериализовать в JsonElement
-        // Если нет — пропустить с warning или выбросить исключение
-        result[key.name] = Json.encodeToJsonElement(serializer(value::class.starProjectedType), value)
+    val json = Json { encodeDefaults = true }
+    return buildMap {
+        for ((key, value) in extensions) {
+            val serializer = (key as DslExtensionKey<Any>).serializer
+            put(key.name, json.encodeToJsonElement(serializer, value))
+        }
     }
-    return result
 }
 ----
 
 *Edge cases:*
 
-- Extension не @Serializable → выбрасывать `IllegalStateException` с сообщением о несериализуемом расширении
 - Пустой map extensions → пустой map в metadata (OK)
 - Extension с одинаковым именем → последний побеждает (уже обеспечивается Map)
+- Type-safe подход: каждый `DslExtensionKey<T>` содержит `serializer: KSerializer<T>`, поэтому несериализуемые расширения невозможны на уровне типов
 
 [[spec-apply-preset]]
 == SPEC-01.2: DependangerDsl.applyPreset(name: String)

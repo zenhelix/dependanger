@@ -56,140 +56,164 @@
 
 ==== MavenPomDownloader (новый класс)
 
+Возвращает `DownloadResult` (sealed interface) вместо `String?` для типизированной обработки различных ошибок:
+
 [source,kotlin]
 ----
+public sealed interface DownloadResult {
+    public data class Success(val content: String) : DownloadResult
+    public data object NotFound : DownloadResult
+    public data class AuthRequired(val url: String, val statusCode: Int) : DownloadResult
+    public data class Failed(val error: String) : DownloadResult
+}
+
 public class MavenPomDownloader(
     private val repositories: List<MavenRepository>,
     private val httpClient: HttpClient,
-    private val credentialsProvider: CredentialsProvider? = null,
-    private val connectTimeoutMs: Long = 30_000,
-    private val readTimeoutMs: Long = 60_000,
+    private val credentialsProvider: CredentialsProvider?,
+    private val connectTimeoutMs: Long,
+    private val readTimeoutMs: Long,
 ) {
     public suspend fun downloadPom(
         group: String,
         artifact: String,
-        version: String
-    ): String? {
+        version: String,
+    ): DownloadResult {
         val groupPath = group.replace('.', '/')
         val pomFileName = "$artifact-$version.pom"
 
+        var lastAuthRequired: DownloadResult.AuthRequired? = null
+        var lastFailure: DownloadResult.Failed? = null
+        var allNotFound = true
+
         for (repo in repositories) {
             val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/$version/$pomFileName"
-            try {
-                val response = httpClient.get(url) {
-                    credentialsProvider?.getCredentials(repo.url)?.let { creds ->
-                        basicAuth(creds.username, creds.password)
-                    }
-                    timeout {
-                        connectTimeoutMillis = connectTimeoutMs
-                        requestTimeoutMillis = readTimeoutMs
-                    }
+            when (val result = downloadWithRetry(url, repo.url)) {
+                is DownloadResult.Success      -> return result
+                is DownloadResult.AuthRequired -> {
+                    allNotFound = false
+                    lastAuthRequired = result
                 }
-                if (response.status == HttpStatusCode.OK) {
-                    return response.bodyAsText()
+                is DownloadResult.NotFound     -> { /* continue to next repo */ }
+                is DownloadResult.Failed       -> {
+                    allNotFound = false
+                    lastFailure = result
                 }
-            } catch (e: Exception) {
-                logger.warn { "Failed to download POM from ${repo.url}: ${e.message}" }
             }
         }
-        return null
+
+        return when {
+            lastAuthRequired != null -> lastAuthRequired
+            allNotFound              -> DownloadResult.NotFound
+            lastFailure != null      -> lastFailure
+            else                     -> DownloadResult.NotFound
+        }
     }
 }
 ----
 
 ==== Retry Logic
 
-`MavenPomDownloader` ДОЛЖЕН реализовать retry с exponential backoff:
+Retry логика делегирована в `getWithRetry()` extension function из модуля `dependanger-http-client`:
 
 [source,kotlin]
 ----
-private suspend fun downloadWithRetry(url: String, maxRetries: Int = 3): String {
-    var delay = 1000L
-    repeat(maxRetries) { attempt ->
-        try {
-            return httpClient.get(url).bodyAsText()
-        } catch (e: Exception) {
-            if (attempt == maxRetries - 1) throw e
-            kotlinx.coroutines.delay(delay)
-            delay *= 2
+private suspend fun downloadWithRetry(url: String, repoUrl: String): DownloadResult {
+    val httpResult = httpClient.getWithRetry(url, RetryConfig()) {
+        credentialsProvider?.getCredentials(repoUrl)?.let { creds ->
+            basicAuth(creds.username, creds.password)
+        }
+        timeout {
+            connectTimeoutMillis = connectTimeoutMs
+            requestTimeoutMillis = readTimeoutMs
         }
     }
-    throw IllegalStateException("Unreachable")
+
+    return when (httpResult) {
+        is HttpResult.Success      -> DownloadResult.Success(httpResult.data)
+        is HttpResult.NotFound     -> DownloadResult.NotFound
+        is HttpResult.AuthRequired -> DownloadResult.AuthRequired(httpResult.url, httpResult.statusCode)
+        is HttpResult.RateLimited  -> DownloadResult.Failed("Rate limited for $url, retry after ${httpResult.retryAfterMs}ms")
+        is HttpResult.Failed       -> DownloadResult.Failed(httpResult.error)
+    }
 }
 ----
 
 ==== PomXmlParser (новый класс)
+
+Парсинг XML делегирован в `PomParser.parse()` из модуля `dependanger-maven-pom`.
+Property resolution делегирован в `PropertyResolver` из того же модуля.
 
 [source,kotlin]
 ----
 public class PomXmlParser {
 
     public fun parseBomContent(pomXml: String): PomParseResult {
-        // Использовать javax.xml.parsers.DocumentBuilderFactory
-        val doc = parseXmlDocument(pomXml)
-
-        // 1. Извлечь <parent> координаты (если есть)
-        val parent = extractParent(doc)
-
-        // 2. Извлечь <properties> + синтезировать project.* built-in properties
-        val explicitProperties = extractProperties(doc)
-        val syntheticProperties = buildSyntheticProperties(doc, parent)
-        // synthetic + explicit: explicit overrides synthetic (как в Maven)
-        val properties = syntheticProperties + explicitProperties
-
-        // 3. Извлечь <dependencyManagement><dependencies>
-        val rawDependencies = extractDependencyManagement(doc)
-
-        return PomParseResult(properties, parent, rawDependencies)
+        val project = PomParser.parse(pomXml)
+        return toPomParseResult(project)
     }
 
-    /**
-     * Синтезирует Maven built-in `project.*` properties из координат POM.
-     * Maven делает эти свойства доступными имплицитно, без объявления в `<properties>`.
-     */
-    private fun buildSyntheticProperties(doc: Document, parent: ParentPom?): Map<String, String> {
-        val props = mutableMapOf<String, String>()
+    public fun resolveProperty(
+        value: String,
+        properties: Map<String, String>,
+    ): String {
+        val resolver = PropertyResolver(properties)
+        return try {
+            resolver.resolve(value)
+        } catch (e: PropertyResolutionException) {
+            throw IllegalStateException("Unresolved property in BOM: ${e.message}", e)
+        }
+    }
 
-        // Координаты текущего проекта
-        extractProjectCoordinates(doc)?.let { (groupId, artifactId, version) ->
-            groupId?.let { props["project.groupId"] = it }
-            artifactId?.let { props["project.artifactId"] = it }
-            version?.let { props["project.version"] = it }
+    private fun toPomParseResult(project: PomProject): PomParseResult {
+        val parent = project.parent?.let {
+            ParentPom(
+                group = it.coordinates.groupId,
+                artifact = it.coordinates.artifactId,
+                version = it.coordinates.version,
+            )
         }
 
-        // Координаты parent (если есть)
-        parent?.let {
-            props["project.parent.groupId"] = it.group
-            props["project.parent.artifactId"] = it.artifact
-            props["project.parent.version"] = it.version
-            // Если project.groupId/version не заданы явно -- наследуются от parent (стандарт Maven)
-            props.putIfAbsent("project.groupId", it.group)
-            props.putIfAbsent("project.version", it.version)
+        val syntheticProperties = buildSyntheticProperties(project)
+        val explicitProperties = project.properties.entries
+        val properties = syntheticProperties + explicitProperties
+
+        val rawDependencies = project.dependencyManagement?.dependencies?.map {
+            RawBomDependency(
+                group = it.groupId,
+                artifact = it.artifactId,
+                version = it.version ?: "",
+                scope = it.scope,
+                type = it.type,
+            )
+        } ?: emptyList()
+
+        return PomParseResult(
+            properties = properties,
+            parent = parent,
+            dependencies = rawDependencies,
+        )
+    }
+
+    private fun buildSyntheticProperties(project: PomProject): Map<String, String> {
+        val props = mutableMapOf<String, String>()
+
+        props["project.groupId"] = project.coordinates.groupId
+        props["project.artifactId"] = project.coordinates.artifactId
+        props["project.version"] = project.coordinates.version
+
+        project.parent?.let { p ->
+            props["project.parent.groupId"] = p.coordinates.groupId
+            props["project.parent.artifactId"] = p.coordinates.artifactId
+            props["project.parent.version"] = p.coordinates.version
         }
 
         return props
     }
-
-    /**
-     * Резолвит property placeholders `${name}` в строке.
-     * Выбрасывает [IllegalStateException] если property не найден.
-     */
-    public fun resolveProperty(
-        value: String,
-        properties: Map<String, String>
-    ): String {
-        // Regex: \$\{([^}]+)\}
-        val pattern = Regex("""\$\{([^}]+)\}""")
-        return pattern.replace(value) { match ->
-            val propName = match.groupValues[1]
-            properties[propName]
-                ?: throw IllegalStateException(
-                    "Unresolved property '$propName' in BOM"
-                )
-        }
-    }
 }
 ----
+
+NOTE: `PomParser`, `PomProject`, `PropertyResolver`, `PropertyResolutionException` -- классы из модуля `dependanger-maven-pom`.
 
 ==== Property Resolution Precedence
 
@@ -260,22 +284,23 @@ override suspend fun process(
     if (bomImports.isEmpty()) return metadata
 
     val settings = context.settings
-    val cache = BomCache(
-        cacheDirectory = settings.bomCache.directory.ifEmpty {
-            System.getProperty("user.home") + "/.dependanger/cache/bom"
-        },
+    val cacheDir = settings.bomCache.directory
+        ?: DependangerPaths.resolveInUserHome(DependangerPaths.BOM_CACHE_DIR)
+    val repositories = settings.repositories
+        .filterIsInstance<MavenRepository>()
+        .ifEmpty {
+            listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
+        }
+    val credentialsProvider = context[CredentialsProviderKey]
+
+    // BomResolutionContext (AutoCloseable) управляет HTTP-клиентом, кешем, downloader'ом и парсером
+    BomResolutionContext(
+        repositories = repositories,
+        credentialsProvider = credentialsProvider,
+        cacheDirectory = cacheDir,
         ttlHours = settings.bomCache.ttlHours,
         ttlSnapshotHours = settings.bomCache.ttlSnapshotHours,
-    )
-    val repositories = context.settings.repositories.ifEmpty {
-        listOf(MavenRepository("https://repo.maven.apache.org/maven2", "Maven Central"))
-    }
-    val credentialsProvider = context[CredentialsProviderKey]
-    val downloader = MavenPomDownloader(repositories, createHttpClient(), credentialsProvider)
-    val parser = PomXmlParser()
-
-    // Key для получения CredentialsProvider из ProcessingContext:
-    // internal val CredentialsProviderKey = ProcessingContextKey<CredentialsProvider>("credentialsProvider")
+    ).use { resolutionCtx ->
 
     // Резолвить все BOM (с path-based обнаружением циклов + кеш уже разрешённых)
     val resolvedBoms = mutableListOf<BomContent>()
@@ -285,7 +310,7 @@ override suspend fun process(
     for (bomImport in bomImports) {
         // Разрешить VersionReference в строку версии
         val resolvedVersion = when (val v = bomImport.version) {
-            is VersionReference.Literal -> v.value
+            is VersionReference.Literal -> v.version
             is VersionReference.Reference -> {
                 val found = context.originalMetadata.versions.find { it.name == v.name }
                 if (found == null) {
@@ -339,6 +364,28 @@ override suspend fun process(
         libraries = updatedLibraries,
         diagnostics = diagnostics,
     )
+}
+----
+
+==== BomResolutionContext
+
+`BomResolutionContext` (`AutoCloseable`) инкапсулирует управление HTTP-клиентом, кешем, downloader'ом и парсером для BOM resolution:
+
+[source,kotlin]
+----
+private class BomResolutionContext(
+    repositories: List<MavenRepository>,
+    credentialsProvider: CredentialsProvider?,
+    cacheDirectory: String,
+    ttlHours: Long,
+    ttlSnapshotHours: Long,
+) : AutoCloseable {
+    val httpClient: HttpClient = HttpClientFactory.create { ... }
+    val cache: DirBasedCache<BomContent> = DirBasedCache(...)
+    val downloader: MavenPomDownloader = MavenPomDownloader(...)
+    val parser: PomXmlParser = PomXmlParser()
+
+    override fun close() { httpClient.close() }
 }
 ----
 

@@ -23,6 +23,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         val versions: Map<String, ResolvedVersion>,
         val diagnostics: Diagnostics,
         val resolvedByAlias: Map<String, ResolvedVersion>,
+        val allVersionValues: Map<String, String>,
     )
 
     override suspend fun process(
@@ -34,6 +35,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
             versions = emptyMap(),
             diagnostics = Diagnostics.EMPTY,
             resolvedByAlias = emptyMap(),
+            allVersionValues = metadata.versions.mapValues { (_, v) -> v.value },
         )
 
         val afterLibraries = metadata.libraries.entries.fold(initialAcc) { acc, (alias, lib) ->
@@ -62,6 +64,8 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         )
     }
 
+    private data class NameResult(val name: String, val baseName: String, val wasCollision: Boolean)
+
     private fun extractVersion(
         acc: ExtractionAccumulator,
         alias: String,
@@ -70,36 +74,54 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
     ): ExtractionAccumulator {
         if (version == null || version.alias.isNotEmpty() || version.value.isEmpty()) return acc
 
-        val versionName = generateVersionName(alias, acc.usedNames)
+        val nameResult = generateVersionName(alias, acc.usedNames)
         val resolved = ResolvedVersion(
-            alias = versionName,
+            alias = nameResult.name,
             value = version.value,
             source = VersionSource.DECLARED,
             originalRef = null,
         )
-        val diagnostic = Diagnostics.info(
+
+        val conflictDiagnostic = if (nameResult.wasCollision) {
+            val existingValue = acc.allVersionValues[nameResult.baseName]
+            if (existingValue != null && existingValue != version.value) {
+                Diagnostics.warning(
+                    code = DiagnosticCodes.Version.EXTRACTED_VERSION_CONFLICT,
+                    message = "Extracted version name '${nameResult.baseName}' conflicts with existing version (existing: $existingValue, new: ${version.value}), using '${nameResult.name}'",
+                    processorId = id,
+                    context = emptyMap(),
+                )
+            } else {
+                Diagnostics.EMPTY
+            }
+        } else {
+            Diagnostics.EMPTY
+        }
+
+        val infoDiagnostic = Diagnostics.info(
             code = DiagnosticCodes.Version.EXTRACTED_CREATED,
-            message = "Extracted version '$versionName' = '${version.value}' from $sourceType '$alias'",
+            message = "Extracted version '${nameResult.name}' = '${version.value}' from $sourceType '$alias'",
             processorId = id,
             context = emptyMap(),
         )
 
         return ExtractionAccumulator(
-            usedNames = acc.usedNames + versionName,
-            versions = acc.versions + (versionName to resolved),
-            diagnostics = acc.diagnostics + diagnostic,
+            usedNames = acc.usedNames + nameResult.name,
+            versions = acc.versions + (nameResult.name to resolved),
+            diagnostics = acc.diagnostics + conflictDiagnostic + infoDiagnostic,
             resolvedByAlias = acc.resolvedByAlias + (alias to resolved),
+            allVersionValues = acc.allVersionValues + (nameResult.name to version.value),
         )
     }
 
     private fun generateVersionName(
         alias: String,
         existingNames: Set<String>,
-    ): String {
+    ): NameResult {
         val base = "$alias-version"
-        if (base !in existingNames) return base
+        if (base !in existingNames) return NameResult(name = base, baseName = base, wasCollision = false)
         var counter = 2
         while ("$base-$counter" in existingNames) counter++
-        return "$base-$counter"
+        return NameResult(name = "$base-$counter", baseName = base, wasCollision = true)
     }
 }

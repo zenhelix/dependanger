@@ -7,7 +7,7 @@
 == Обзор
 
 Модуль `dependanger-license` проверяет лицензии библиотек и их соответствие политикам организации (whitelist/blacklist).
-Информация о лицензиях получается из нескольких источников по приоритету: User-defined > Maven POM > ClearlyDefined API.
+Информация о лицензиях получается из нескольких источников по приоритету: DECLARED > CUSTOM (через `LicenseSourceProvider` SPI) > MAVEN_POM > CLEARLY_DEFINED.
 Результаты хранятся в `EffectiveMetadata.extensions` через `LicenseViolationsExtensionKey`.
 
 Приоритет: **P3** (желательно).
@@ -18,7 +18,8 @@
 [[purpose-license]]
 === Назначение
 
-Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензии (одну или несколько — dual-license) из нескольких источников по приоритету (DECLARED > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам с учётом dual-license семантики (настраиваемой через `dualLicensePolicy: OR | AND`) и сохранить нарушения в extensions.
+Собрать все библиотеки из EffectiveMetadata, для каждой определить лицензии (одну или несколько -- dual-license) из нескольких источников по приоритету (DECLARED > CUSTOM > MAVEN_POM > CLEARLY_DEFINED), классифицировать по категориям, проверить соответствие whitelist/blacklist политикам с учётом dual-license семантики (настраиваемой через `dualLicensePolicy: OR | AND`) и сохранить нарушения в extensions.
+Параллелизм контролируется через `Semaphore(settings.parallelism)`.
 
 [[algorithm-license]]
 === Алгоритм
@@ -30,10 +31,12 @@
    a. Все библиотеки из metadata.libraries с version != null
    b. Исключить библиотеки из ignoreLibraries
    c. Если includeTransitives=true -> добавить транзитивные из extensions (FLAT_DEPENDENCIES)
-3. Создать LicenseResolver с настроенными источниками и кешем
-4. Для каждой библиотеки (параллельно, PARALLEL_IO):
-   a. Проверить user-defined лицензию в context (если есть -> LicenseSource.DECLARED)
-   b. Если нет -> вызвать licenseResolver.resolve(group, artifact, version)
+3. Создать LicenseResolver с зависимостями:
+   `LicenseResolver(cache, pomDownloader, clearlyDefinedClient, customProviders)`
+   где `customProviders: List<LicenseSourceProvider>` загружаются через `ServiceLoader.load(LicenseSourceProvider::class.java)`
+4. Для каждой библиотеки (параллельно, Semaphore(settings.parallelism)):
+   a. Вызвать `licenseResolver.resolve(group, artifact, version, declaredLicenseId = lib.license?.id)`
+   b. Внутри resolve() приоритет: DECLARED > CUSTOM > MAVEN_POM > CLEARLY_DEFINED
    c. Результат: List<LicenseResult> -- одна или несколько лицензий (dual-license)
 5. Для каждого List<LicenseResult> проверить политики (семантика зависит от dualLicensePolicy):
    ЕСЛИ dualLicensePolicy == OR (дефолт, dual-license = выбор одной из альтернатив):
@@ -77,10 +80,14 @@
 2. Если есть в кеше и не expired -> вернуть из кеша
 3. Последовательно по источникам (в порядке приоритета):
    a. DECLARED:
-      - Проверить контекст на user-defined лицензию для данной библиотеки
-      - Если есть -> нормализовать SPDX ID, определить категорию
+      - Если `declaredLicenseId` передан и не пуст
+      - Нормализовать SPDX ID, определить категорию
       - Вернуть listOf(LicenseResult(source=DECLARED))
-   b. MAVEN_POM:
+   b. CUSTOM (через LicenseSourceProvider SPI):
+      - Перебрать customProviders (отсортированные по priority)
+      - Каждый `provider.resolve(group, artifact, version)` может вернуть `List<ResolvedLicense>?`
+      - Если вернул не null -> маппить в LicenseResult(source=CUSTOM)
+   c. MAVEN_POM:
       - Скачать POM файл через MavenPomDownloader (из dependanger-maven-resolver)
       - Распарсить секцию <licenses>
       - Для КАЖДОЙ <license> (не только первой):
@@ -89,7 +96,7 @@
         iii. Определить LicenseCategory по SPDX ID
         iv.  Создать LicenseResult(source=MAVEN_POM)
       - Если найдены лицензии -> вернуть List<LicenseResult>
-   c. CLEARLY_DEFINED:
+   d. CLEARLY_DEFINED:
       - GET https://api.clearlydefined.io/definitions/maven/mavencentral/{group}/{artifact}/{version}
       - Парсить response -> licensed.declared (SPDX expression)
       - Если expression содержит "OR" -> split и создать LicenseResult для каждой
@@ -119,15 +126,16 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
     ): EffectiveMetadata {
         val settings = context.settings.licenseCheck ?: return metadata
 
-        // Создание LicenseResolver с зависимостями из context (аналогично SPEC-06, SPEC-12)
-        val repositories = settings.repositories.ifEmpty {
-            context.settings.repositories.ifEmpty {
+        val repositories = context.settings.repositories
+            .filterIsInstance<MavenRepository>()
+            .ifEmpty {
                 listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
             }
-        }
-        val licenseResolver = LicenseResolver(
-            pomDownloader = MavenPomDownloader(repositories, createHttpClient()),
-        )
+        val credentialsProvider = context[CredentialsProviderKey]
+        val customProviders = ServiceLoader.load(LicenseSourceProvider::class.java).toList()
+
+        // LicenseCheckContext (AutoCloseable) создаёт LicenseResolver с зависимостями:
+        // LicenseResolver(cache, pomDownloader, clearlyDefinedClient, customProviders)
 
         val libraries = collectLibraries(metadata, settings)
 
@@ -137,17 +145,20 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
             )
         }
 
-        // Параллельный резолвинг лицензий (каждая библиотека -> List<LicenseResult>)
+        // Параллельный резолвинг лицензий (Semaphore для контроля параллелизма)
+        val semaphore = Semaphore(settings.parallelism)
         val results: List<Pair<EffectiveLibrary, List<LicenseResult>>> = coroutineScope {
             libraries.map { lib ->
                 async {
-                    val declared = context.getDeclaredLicense(lib.alias)
-                    val licenses = if (declared != null) {
-                        listOf(resolveDeclared(declared))
-                    } else {
-                        licenseResolver.resolve(lib.group, lib.artifact, lib.version!!.value)
+                    semaphore.withPermit {
+                        val licenses = ctx.resolver.resolve(
+                            group = lib.group,
+                            artifact = lib.artifact,
+                            version = lib.version!!.value,
+                            declaredLicenseId = lib.license?.id,
+                        )
+                        lib to licenses
                     }
-                    lib to licenses
                 }
             }.awaitAll()
         }
@@ -207,46 +218,66 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
 [source,kotlin]
 ----
 public class LicenseResolver(
-    private val httpClient: HttpClient = createDefaultClient(),
+    private val cache: DirBasedCache<List<LicenseResult>>,
     private val pomDownloader: MavenPomDownloader,
-    private val spdxMapper: SpdxLicenseMapper = SpdxLicenseMapper(),
-    private val cache: LicenseCache = LicenseCache(),
-    private val timeout: Long = 30_000,
-    private val retries: Int = 3,
+    private val clearlyDefinedClient: ClearlyDefinedClient,
+    private val customProviders: List<LicenseSourceProvider> = emptyList(),
 ) {
     /**
      * Резолвит лицензии для библиотеки.
      * Возвращает List<LicenseResult> -- одна или несколько лицензий (dual-license).
-     * При dual-license ("MIT OR Apache-2.0") возвращает по элементу на каждую альтернативу.
+     * Порядок приоритета: DECLARED > CUSTOM (через LicenseSourceProvider SPI) > MAVEN_POM > CLEARLY_DEFINED.
+     *
+     * @param declaredLicenseId SPDX ID задекларированной лицензии (если есть)
      */
     public suspend fun resolve(
         group: String,
         artifact: String,
         version: String,
+        declaredLicenseId: String?,
     ): List<LicenseResult> {
-        // 1. Проверить кеш
-        cache.get(group, artifact, version)?.let { return it }
+        // 1. Проверить кеш (CacheResult sealed interface: Hit, Miss, Corrupted)
+        when (val cacheResult = cache.get(group, artifact, version)) {
+            is CacheResult.Hit -> return cacheResult.data
+            else -> { /* proceed */ }
+        }
 
-        // 2. Maven POM (может вернуть несколько <license>)
-        val pomResults = tryResolveMavenPom(group, artifact, version)
-        if (pomResults.isNotEmpty()) {
+        // 2. DECLARED: если declaredLicenseId передан
+        if (!declaredLicenseId.isNullOrBlank()) {
+            val results = resolveDeclared(declaredLicenseId)
+            cache.put(group, artifact, version, results)
+            return results
+        }
+
+        // 3. CUSTOM: через LicenseSourceProvider SPI (4-й источник)
+        val customResults = resolveFromCustom(group, artifact, version)
+        if (customResults != null) {
+            cache.put(group, artifact, version, customResults)
+            return customResults
+        }
+
+        // 4. MAVEN_POM (может вернуть несколько <license>)
+        val pomResults = resolveFromPom(group, artifact, version)
+        if (pomResults != null) {
             cache.put(group, artifact, version, pomResults)
             return pomResults
         }
 
-        // 3. ClearlyDefined API (может содержать SPDX expression с OR)
-        val cdResults = tryResolveClearlyDefined(group, artifact, version)
-        if (cdResults.isNotEmpty()) {
+        // 5. CLEARLY_DEFINED API (может содержать SPDX expression с OR)
+        val cdResults = resolveFromClearlyDefined(group, artifact, version)
+        if (cdResults != null) {
             cache.put(group, artifact, version, cdResults)
             return cdResults
         }
 
-        // 4. Неизвестная лицензия
+        // 6. Stale cache fallback
+        val stale = cache.getStale(group, artifact, version)
+        if (stale != null) return stale
+
+        // 7. Неизвестная лицензия
         val unknownResults = listOf(LicenseResult(
-            spdxId = null,
-            licenseName = null,
-            source = LicenseSource.UNKNOWN,
-            category = LicenseCategory.UNKNOWN,
+            spdxId = null, licenseName = null,
+            source = LicenseSource.UNKNOWN, category = LicenseCategory.UNKNOWN,
         ))
         cache.put(group, artifact, version, unknownResults)
         return unknownResults
@@ -851,6 +882,7 @@ dependanger-license зависит от:
 | `LicenseCheckProcessor.kt` | Реализация `process()` -- сбор библиотек, резолвинг лицензий, проверка политик с учётом `dualLicensePolicy`
 | `LicenseResolver.kt` | Реализация `resolve()` -> `List<LicenseResult>` -- мульти-источниковый резолвинг (DECLARED > MAVEN_POM > CLEARLY_DEFINED) с поддержкой dual-license
 | `SpdxLicenseMapper.kt` | **Создать** -- нормализация названий лицензий в SPDX ID + категоризация
+| `LicenseSourceProvider.kt` | **Создать** -- SPI для custom license providers (`sourceId`, `priority`, `resolve()` -> `List<ResolvedLicense>?`)
 | `ClearlyDefinedClient.kt` | **Создать** -- HTTP клиент для ClearlyDefined API
 | `ClearlyDefinedModels.kt` | **Создать** -- @Serializable модели для ClearlyDefined API response
 | `LicenseCache.kt` | **Создать** -- файловый кеш результатов лицензий (TTL 7 дней)

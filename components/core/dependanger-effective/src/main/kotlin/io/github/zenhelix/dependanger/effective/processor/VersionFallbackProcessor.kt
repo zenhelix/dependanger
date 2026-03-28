@@ -18,6 +18,11 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
     override val description: String = "Applies version fallback rules based on environment conditions"
     override fun supports(context: ProcessingContext): Boolean = true
 
+    private data class ConditionResult(
+        val matched: Boolean,
+        val diagnostics: Diagnostics,
+    )
+
     override suspend fun process(
         metadata: EffectiveMetadata,
         context: ProcessingContext,
@@ -33,18 +38,25 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
             val current = versions[version.name]
                 ?: return@fold versions to diags
 
+            var conditionDiags = Diagnostics.EMPTY
             val matchedFallback = version.fallbacks
-                .firstOrNull { evaluateCondition(it.condition, context) }
-                ?: return@fold versions to diags
+                .firstOrNull { fallback ->
+                    val result = evaluateCondition(fallback.condition, context, version.name)
+                    conditionDiags = conditionDiags + result.diagnostics
+                    result.matched
+                }
+
+            val newDiags = diags + conditionDiags
+            if (matchedFallback == null) return@fold versions to newDiags
 
             val newVersions = versions + (version.name to current.copy(value = matchedFallback.value))
-            val newDiags = diags + Diagnostics.info(
+            val appliedDiag = Diagnostics.info(
                 code = DiagnosticCodes.Version.FALLBACK_APPLIED,
                 message = "Version '${version.name}': fallback '${matchedFallback.value}' applied (was '${current.value}', condition: ${matchedFallback.condition})",
                 processorId = id,
                 context = emptyMap(),
             )
-            newVersions to newDiags
+            newVersions to (newDiags + appliedDiag)
         }
 
         return metadata.copy(versions = updatedVersions, diagnostics = diagnostics)
@@ -53,44 +65,85 @@ public class VersionFallbackProcessor : EffectiveMetadataProcessor {
     private fun evaluateCondition(
         condition: FallbackCondition,
         context: ProcessingContext,
-    ): Boolean {
+        versionAlias: String,
+    ): ConditionResult {
         val env = context.environment
         return when (condition) {
             is FallbackCondition.JdkBelow              ->
-                env.jdkVersion != null && env.jdkVersion < condition.version
+                checkEnvField(env.jdkVersion, "jdkVersion", versionAlias) { jdk ->
+                    jdk < condition.version
+                }
 
             is FallbackCondition.JdkAtLeast            ->
-                env.jdkVersion != null && env.jdkVersion >= condition.version
+                checkEnvField(env.jdkVersion, "jdkVersion", versionAlias) { jdk ->
+                    jdk >= condition.version
+                }
 
             is FallbackCondition.JdkBetween            ->
-                env.jdkVersion != null && env.jdkVersion in condition.min..condition.max
+                checkEnvField(env.jdkVersion, "jdkVersion", versionAlias) { jdk ->
+                    jdk in condition.min..condition.max
+                }
 
             is FallbackCondition.KotlinVersionBelow    ->
-                env.kotlinVersion != null && VersionComparator.compare(env.kotlinVersion, condition.version) < 0
+                checkEnvField(env.kotlinVersion, "kotlinVersion", versionAlias) { kv ->
+                    VersionComparator.compare(kv, condition.version) < 0
+                }
 
             is FallbackCondition.KotlinVersionAtLeast  ->
-                env.kotlinVersion != null && VersionComparator.compare(env.kotlinVersion, condition.version) >= 0
+                checkEnvField(env.kotlinVersion, "kotlinVersion", versionAlias) { kv ->
+                    VersionComparator.compare(kv, condition.version) >= 0
+                }
 
             is FallbackCondition.GradleVersionBelow    ->
-                env.gradleVersion != null && VersionComparator.compare(env.gradleVersion, condition.version) < 0
+                checkEnvField(env.gradleVersion, "gradleVersion", versionAlias) { gv ->
+                    VersionComparator.compare(gv, condition.version) < 0
+                }
 
             is FallbackCondition.GradleVersionAtLeast  ->
-                env.gradleVersion != null && VersionComparator.compare(env.gradleVersion, condition.version) >= 0
+                checkEnvField(env.gradleVersion, "gradleVersion", versionAlias) { gv ->
+                    VersionComparator.compare(gv, condition.version) >= 0
+                }
 
             is FallbackCondition.DistributionCondition ->
-                context.activeDistribution == condition.name
+                ConditionResult(context.activeDistribution == condition.name, Diagnostics.EMPTY)
 
             is FallbackCondition.EnvironmentCondition  ->
-                env.environmentVariables[condition.key] == condition.value
+                ConditionResult(env.environmentVariables[condition.key] == condition.value, Diagnostics.EMPTY)
 
-            is FallbackCondition.All                   ->
-                condition.conditions.all { evaluateCondition(it, context) }
+            is FallbackCondition.All                   -> {
+                val results = condition.conditions.map { evaluateCondition(it, context, versionAlias) }
+                val combinedDiags = results.fold(Diagnostics.EMPTY) { acc, r -> acc + r.diagnostics }
+                ConditionResult(results.all { it.matched }, combinedDiags)
+            }
 
-            is FallbackCondition.Any                   ->
-                condition.conditions.any { evaluateCondition(it, context) }
+            is FallbackCondition.Any                   -> {
+                val results = condition.conditions.map { evaluateCondition(it, context, versionAlias) }
+                val combinedDiags = results.fold(Diagnostics.EMPTY) { acc, r -> acc + r.diagnostics }
+                ConditionResult(results.any { it.matched }, combinedDiags)
+            }
 
-            is FallbackCondition.Not                   ->
-                !evaluateCondition(condition.condition, context)
+            is FallbackCondition.Not                   -> {
+                val inner = evaluateCondition(condition.condition, context, versionAlias)
+                ConditionResult(!inner.matched, inner.diagnostics)
+            }
         }
+    }
+
+    private fun <T : Any> checkEnvField(
+        fieldValue: T?,
+        fieldName: String,
+        versionAlias: String,
+        evaluate: (T) -> Boolean,
+    ): ConditionResult {
+        if (fieldValue == null) {
+            val diagnostic = Diagnostics.warning(
+                code = DiagnosticCodes.Version.FALLBACK_ENV_MISSING,
+                message = "Environment field '$fieldName' is null, cannot evaluate fallback condition for version '$versionAlias'",
+                processorId = id,
+                context = emptyMap(),
+            )
+            return ConditionResult(matched = false, diagnostics = diagnostic)
+        }
+        return ConditionResult(matched = evaluate(fieldValue), diagnostics = Diagnostics.EMPTY)
     }
 }

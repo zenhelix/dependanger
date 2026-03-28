@@ -9,9 +9,9 @@
 Модуль `dependanger-report` генерирует единый отчёт о состоянии зависимостей, объединяя данные из EffectiveMetadata и extensions (updates, vulnerabilities, licenses, compatibility, transitives).
 Поддерживает форматы: JSON, YAML, Markdown, HTML.
 
-NOTE: `ReportGenerator` -- это **standalone утилита**, а НЕ `EffectiveMetadataProcessor`.
-Он не участвует в pipeline и не регистрируется через ServiceLoader.
-Вызывается напрямую из CLI (`report` command), Gradle (`dependangerReport` task) и API после завершения pipeline.
+NOTE: `ReportGenerator` реализует SPI `ReportProvider` (из `io.github.zenhelix.dependanger.effective.spi`) и регистрируется через ServiceLoader.
+Он НЕ является `EffectiveMetadataProcessor` и не участвует в pipeline напрямую.
+Вызывается через SPI discovery из CLI (`report` command), Gradle (`dependangerReport` task) и API после завершения pipeline.
 В `ProcessingPhase` нет фазы REPORT.
 
 Приоритет: **P3** (желательно).
@@ -43,9 +43,9 @@ public data class ReportLibrary(
     val group: String,
     val artifact: String,
     val version: String?,
-    val tags: Set<String> = emptySet(),
-    val isDeprecated: Boolean = false,
-    val isPlatform: Boolean = false,
+    val tags: Set<String>,
+    val isDeprecated: Boolean,
+    val isPlatform: Boolean,
 )
 
 @Serializable
@@ -64,8 +64,8 @@ public data class ReportBundle(
 @Serializable
 public data class ReportDeprecated(
     val alias: String,
-    val reason: String? = null,
-    val replacement: String? = null,
+    val reason: String?,
+    val replacement: String?,
 )
 
 @Serializable
@@ -81,7 +81,7 @@ public data class ReportCompatibilityIssue(
     val ruleId: String,
     val severity: String,
     val message: String,
-    val suggestion: String? = null,
+    val suggestion: String?,
 )
 
 @Serializable
@@ -106,7 +106,7 @@ public data class ReportLicense(
 public data class ReportVersion(
     val alias: String,
     val value: String,
-    val hasFallback: Boolean = false,
+    val hasFallback: Boolean,
 )
 
 @Serializable
@@ -114,7 +114,7 @@ public data class ReportTransitives(
     val directCount: Int,
     val transitiveCount: Int,
     val conflictCount: Int,
-    val conflicts: List<ReportConflict> = emptyList(),
+    val conflicts: List<ReportConflict>,
 )
 
 @Serializable
@@ -131,8 +131,8 @@ public data class ReportConstraint(
 
 @Serializable
 public data class ReportValidation(
-    val errors: List<ReportDiagnostic> = emptyList(),
-    val warnings: List<ReportDiagnostic> = emptyList(),
+    val errors: List<ReportDiagnostic>,
+    val warnings: List<ReportDiagnostic>,
 )
 
 @Serializable
@@ -182,8 +182,8 @@ public data class ReportDiagnostic(
    b. YAML -> kaml (kotlinx-serialization YAML): Yaml.default.encodeToString(data)
    c. Markdown -> шаблонный рендеринг (buildString, все 13 секций)
    d. HTML -> Markdown -> commonmark-java Parser+HtmlRenderer -> HTML template с CSS
-5. Если outputDir указан -> записать файл (atomic write)
-6. Вернуть DependangerReport(format, content, outputPath)
+5. `generate()` возвращает `GeneratedReport(format, content, outputPath = null)` -- без записи в файл
+6. Запись в файл через отдельный метод `generateToFile()` (atomic write через temp файл)
 ----
 
 [[implementation-report]]
@@ -195,88 +195,127 @@ public data class ReportDiagnostic(
 ----
 @Serializable
 internal data class ReportData(
-    val schemaVersion: String = "1.0",
+    val schemaVersion: String,
     val generatedAt: String, // ISO 8601 UTC
     val distribution: String?,
     val summary: ReportSummary,
-    val libraries: List<ReportLibrary>? = null,
-    val plugins: List<ReportPlugin>? = null,
-    val bundles: List<ReportBundle>? = null,
-    val versions: List<ReportVersion>? = null,
-    val updates: List<ReportUpdate>? = null,
-    val compatibility: List<ReportCompatibilityIssue>? = null,
-    val vulnerabilities: List<ReportVulnerability>? = null,
-    val deprecated: List<ReportDeprecated>? = null,
-    val licenses: List<ReportLicense>? = null,
-    val transitives: ReportTransitives? = null,
-    val constraints: List<ReportConstraint>? = null,
-    val validation: ReportValidation? = null,
+    val libraries: List<ReportLibrary>?,
+    val plugins: List<ReportPlugin>?,
+    val bundles: List<ReportBundle>?,
+    val versions: List<ReportVersion>?,
+    val updates: List<ReportUpdate>?,
+    val compatibility: List<ReportCompatibilityIssue>?,
+    val vulnerabilities: List<ReportVulnerability>?,
+    val deprecated: List<ReportDeprecated>?,
+    val licenses: List<ReportLicense>?,
+    val transitives: ReportTransitives?,
+    val constraints: List<ReportConstraint>?,
+    val validation: ReportValidation?,
 )
 
 @Serializable
 internal data class ReportSummary(
-    val libraryCount: Int = 0,
-    val pluginCount: Int = 0,
-    val bundleCount: Int = 0,
-    val deprecatedCount: Int = 0,
-    val updatesAvailable: Int = 0,
-    val vulnerabilitiesCount: Int = 0,
-    val criticalVulnerabilities: Int = 0,
-    val highVulnerabilities: Int = 0,
-    val deniedLicenses: Int = 0,
-    val unknownLicenses: Int = 0,
-    val compatibilityIssues: Int = 0,
-    val validationErrors: Int = 0,
-    val validationWarnings: Int = 0,
+    val libraryCount: Int,
+    val pluginCount: Int,
+    val bundleCount: Int,
+    val deprecatedCount: Int,
+    val updatesAvailable: Int,
+    val vulnerabilitiesCount: Int,
+    val criticalVulnerabilities: Int,
+    val highVulnerabilities: Int,
+    val deniedLicenses: Int,
+    val unknownLicenses: Int,
+    val compatibilityIssues: Int,
+    val validationErrors: Int,
+    val validationWarnings: Int,
 )
 ----
 
-==== ReportGenerator.generate()
+==== ReportGenerator (implements ReportProvider SPI)
+
+`GeneratedReport` определён в `io.github.zenhelix.dependanger.effective.spi.ReportProvider`:
 
 [source,kotlin]
 ----
-public fun generate(
-    effective: EffectiveMetadata,
-    settings: ReportSettings = ReportSettings(),
-    originalMetadata: DependangerMetadata? = null,
-): DependangerReport {
-    val format = settings.format
-    val sections = settings.sections
-    val outputDir = settings.outputDir
+public data class GeneratedReport(
+    val format: ReportFormat,
+    val content: String,
+    val outputPath: Path?,
+)
+----
 
-    // 1. Собрать данные
-    val reportData = buildReportData(effective, sections)
+[source,kotlin]
+----
+public class ReportGenerator : ReportProvider {
 
-    // 2. Сериализовать в формат
-    val content = when (format) {
-        ReportFormat.JSON -> renderJson(reportData)
-        ReportFormat.YAML -> renderYaml(reportData)
-        ReportFormat.MARKDOWN -> renderMarkdown(reportData)
-        ReportFormat.HTML -> renderHtml(reportData)
+    override val providerId: String = "report"
+
+    private val renderers: Map<ReportFormat, ReportRenderer> = mapOf(
+        ReportFormat.JSON to JsonReportRenderer(),
+        ReportFormat.YAML to YamlReportRenderer(),
+        ReportFormat.MARKDOWN to MarkdownReportRenderer(),
+        ReportFormat.HTML to HtmlReportRenderer(markdownRenderer = MarkdownReportRenderer()),
+    )
+
+    /**
+     * Генерация отчёта без записи в файл (outputPath = null).
+     */
+    override fun generate(
+        effective: EffectiveMetadata,
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport {
+        val reportData = ReportDataMapper.buildReportData(
+            effective = effective,
+            sections = settings.sections,
+            originalMetadata = originalMetadata,
+            summaryOnly = false,
+        )
+
+        val renderer = renderers.getValue(settings.format)
+        val content = renderer.render(reportData)
+
+        return GeneratedReport(
+            format = settings.format,
+            content = content,
+            outputPath = null,
+        )
     }
 
-    // 3. Записать файл
-    val extension = when (format) {
-        ReportFormat.JSON -> "json"
-        ReportFormat.YAML -> "yaml"
-        ReportFormat.MARKDOWN -> "md"
-        ReportFormat.HTML -> "html"
+    /**
+     * Генерация + запись в файл (atomic write через temp файл).
+     */
+    override fun generateToFile(
+        effective: EffectiveMetadata,
+        settings: ReportSettings,
+        originalMetadata: DependangerMetadata?,
+    ): GeneratedReport {
+        val report = generate(effective, settings, originalMetadata)
+        // Atomic write: создать temp файл, записать, переименовать в target
+        val outputPath = Path.of(settings.outputDir).resolve("dependanger-report.${formatExtension(settings.format)}")
+        // ...
+        return report.copy(outputPath = outputPath)
     }
-    val outputPath = "$outputDir/dependanger-report.$extension"
-    val dir = File(outputDir)
-    if (!dir.exists()) dir.mkdirs()
-
-    // Atomic write
-    val tempFile = File.createTempFile("report-", ".$extension", dir)
-    tempFile.writeText(content)
-    val targetFile = File(outputPath)
-    tempFile.renameTo(targetFile)
-
-    return DependangerReport(format, content, outputPath)
 }
 ----
 
-==== JSON рендеринг
+==== Renderer архитектура
+
+Sealed interface `ReportRenderer` + 4 отдельных класса-реализации:
+
+[source,kotlin]
+----
+internal sealed interface ReportRenderer {
+    fun render(data: ReportData): String
+}
+
+internal class JsonReportRenderer : ReportRenderer { ... }
+internal class YamlReportRenderer : ReportRenderer { ... }
+internal class MarkdownReportRenderer : ReportRenderer { ... }
+internal class HtmlReportRenderer(markdownRenderer: MarkdownReportRenderer) : ReportRenderer { ... }
+----
+
+==== JSON рендеринг (JsonReportRenderer)
 
 [source,kotlin]
 ----
@@ -286,11 +325,11 @@ private val json = Json {
     explicitNulls = false
 }
 
-private fun renderJson(data: ReportData): String =
+override fun render(data: ReportData): String =
     json.encodeToString(data)
 ----
 
-==== YAML рендеринг
+==== YAML рендеринг (YamlReportRenderer)
 
 Используется библиотека https://github.com/charleskorn/kaml[kaml] -- нативная kotlinx-serialization поддержка YAML.
 `ReportData` уже `@Serializable`, рендеринг -- одна строка.
@@ -299,7 +338,7 @@ private fun renderJson(data: ReportData): String =
 ----
 import com.charleskorn.kaml.Yaml
 
-private fun renderYaml(data: ReportData): String =
+override fun render(data: ReportData): String =
     Yaml.default.encodeToString(ReportData.serializer(), data)
 ----
 
@@ -675,10 +714,11 @@ dependanger-report зависит от:
 |===
 | Файл | Изменение
 
-| `ReportGenerator.kt` | Реализация `generate()` -- сбор данных, dispatch по формату
-| `ReportData.kt` | **Создать** -- внутренние @Serializable модели: ReportData, ReportSummary, Report*-модели для каждой секции
-| `ReportModels.kt` | **Создать** -- публичные @Serializable модели секций (ReportUpdate, ReportVulnerability, etc.)
-| `ReportRenderer.kt` | **Создать** -- sealed interface ReportRenderer + 4 реализации: JsonRenderer, YamlRenderer (kaml), MarkdownRenderer (buildString), HtmlRenderer (commonmark)
+| `ReportGenerator.kt` | Реализация `ReportProvider` SPI -- `generate()` (возвращает `GeneratedReport` с `outputPath = null`) и `generateToFile()` (atomic write)
+| `ReportData.kt` | **Создать** -- внутренние @Serializable модели: ReportData, ReportSummary (поля без default values)
+| `ReportModels.kt` | **Создать** -- публичные @Serializable модели секций (ReportUpdate, ReportVulnerability, etc.), поля без default values
+| `ReportRenderer.kt` | **Создать** -- sealed interface `ReportRenderer` + 4 отдельных класса: `JsonReportRenderer`, `YamlReportRenderer`, `MarkdownReportRenderer`, `HtmlReportRenderer`
+| `ReportDataMapper.kt` | **Создать** -- маппинг `EffectiveMetadata` -> `ReportData`
 |===
 
 [[priority]]

@@ -123,7 +123,7 @@ library("spring-web", "org.springframework:spring-web")  // без версии
 | Источник версии (DECLARED или BOM_IMPORT)
 
 | `originalRef`
-| VersionReference?
+| String?
 | Оригинальная ссылка на версию из DSL (до резолвинга)
 |===
 

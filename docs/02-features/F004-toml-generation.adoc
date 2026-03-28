@@ -330,25 +330,22 @@ dependanger {
     settings {
         toml {
             // Имя файла (поддерживает placeholder {distribution})
-            filename = "libs.versions.toml"
+            filename = "libs.versions.toml"  // default
             // или для multi-distribution:
             filename = "libs-{distribution}.versions.toml"
 
-            // Добавлять комментарии о deprecated библиотеках
-            includeDeprecationComments = true
+            // Включать комментарии
+            includeComments = true  // default
 
-            // Добавлять метаданные (generated at, distribution)
-            includeMetadata = true
-
-            // Сортировать секции алфавитно
-            sortAlphabetically = true
+            // Сортировать секции
+            sortSections = true  // default
 
             // Использовать inline версии вместо version.ref
             // (не рекомендуется, но поддерживается)
-            useInlineVersions = false
+            useInlineVersions = false  // default
 
-            // Выходная директория
-            outputDirectory = file("gradle")
+            // Включать комментарии о deprecation
+            includeDeprecationComments = true  // default
         }
     }
 }

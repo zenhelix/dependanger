@@ -637,29 +637,23 @@ dependanger report --output /path/to/report.json effective-metadata.json
 dependanger {
     settings {
         report {
-            // Выходной файл
-            filename = "dependanger-report.json"  // default
-            format = JSON  // JSON, YAML, MARKDOWN
+            // Формат отчёта: JSON, YAML, MARKDOWN, HTML
+            format = MARKDOWN  // default
 
-            // Секции для включения
-            includeUpdates = true  // default
-            includeCompatibility = true  // default
-            includeVulnerabilities = true  // default
-            includeLicenses = true  // default
-            includeTransitives = true  // default
-            includeDeprecated = true  // default
-            includeValidation = true  // default
+            // Директория вывода
+            outputDir = "build/reports/dependanger"  // default
 
-            // Краткий режим
-            summaryOnly = false  // default
-
-            // Форматирование
-            prettyPrint = true  // default
-            indent = "  "  // default: 2 spaces
-
-            // Метаданные
-            includeGeneratedAt = true  // default
-            includeSchemaVersion = true  // default
+            // Секции для включения (по умолчанию — все)
+            // Доступные значения ReportSection:
+            // SUMMARY, LIBRARIES, PLUGINS, BUNDLES, VERSIONS,
+            // UPDATES, COMPATIBILITY, VULNERABILITIES, DEPRECATED,
+            // LICENSES, TRANSITIVES, CONSTRAINTS, VALIDATION
+            sections = listOf(
+                ReportSection.SUMMARY,
+                ReportSection.LIBRARIES,
+                ReportSection.UPDATES,
+                ReportSection.VULNERABILITIES
+            )
         }
     }
 }

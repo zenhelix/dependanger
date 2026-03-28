@@ -188,12 +188,14 @@ public class TomlSettingsDsl {
     public var includeComments: Boolean = TomlSettings.DEFAULT.includeComments
     public var sortSections: Boolean = TomlSettings.DEFAULT.sortSections
     public var useInlineVersions: Boolean = TomlSettings.DEFAULT.useInlineVersions
+    public var includeDeprecationComments: Boolean = TomlSettings.DEFAULT.includeDeprecationComments
 
     public fun toSettings(): TomlSettings = TomlSettings(
         filename = filename,
         includeComments = includeComments,
         sortSections = sortSections,
         useInlineVersions = useInlineVersions,
+        includeDeprecationComments = includeDeprecationComments,
     )
 }
 
@@ -202,13 +204,21 @@ public class BomSettingsDsl {
     public var groupId: String? = BomSettings.DEFAULT.groupId
     public var artifactId: String? = BomSettings.DEFAULT.artifactId
     public var version: String? = BomSettings.DEFAULT.version
+    public var name: String? = BomSettings.DEFAULT.name
+    public var description: String? = BomSettings.DEFAULT.description
     public var includeOptionalDependencies: Boolean = BomSettings.DEFAULT.includeOptionalDependencies
+    public var prettyPrint: Boolean = BomSettings.DEFAULT.prettyPrint
+    public var includeDeprecationComments: Boolean = BomSettings.DEFAULT.includeDeprecationComments
 
     public fun toSettings(): BomSettings = BomSettings(
         groupId = groupId,
         artifactId = artifactId,
         version = version,
+        name = name,
+        description = description,
         includeOptionalDependencies = includeOptionalDependencies,
+        prettyPrint = prettyPrint,
+        includeDeprecationComments = includeDeprecationComments,
     )
 }
 
@@ -254,11 +264,15 @@ public class UpdateCheckSettingsDsl {
 public class CompatibilityAnalysisSettingsDsl {
     public var enabled: Boolean = CompatibilityAnalysisSettings.DEFAULT.enabled
     public var targetJdk: Int? = CompatibilityAnalysisSettings.DEFAULT.targetJdk
+    public var targetKotlin: String? = CompatibilityAnalysisSettings.DEFAULT.targetKotlin
+    public var minSeverity: Severity = CompatibilityAnalysisSettings.DEFAULT.minSeverity
     public var failOnErrors: Boolean = CompatibilityAnalysisSettings.DEFAULT.failOnErrors
 
     public fun toSettings(): CompatibilityAnalysisSettings = CompatibilityAnalysisSettings(
         enabled = enabled,
         targetJdk = targetJdk,
+        targetKotlin = targetKotlin,
+        minSeverity = minSeverity,
         failOnErrors = failOnErrors,
     )
 }

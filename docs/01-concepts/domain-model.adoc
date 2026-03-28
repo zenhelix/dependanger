@@ -160,7 +160,7 @@ erDiagram
     BomImport {
         string alias PK
         string group
-        string name
+        string artifact
         string version
     }
 
@@ -260,9 +260,13 @@ NOTE: Полная спецификация DSL синтаксиса: xref:../06
 | `presets { }`
 | PresetsDsl
 | Именованные пресеты конфигурации для переиспользования
+
+| `constraints { }`
+| ConstraintsDsl
+| Ограничения для зависимостей (версии, исключения, подстановки)
 |===
 
-NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings` → `presets`
+NOTE: Канонический порядок блоков: `versions` → `libraries` → `plugins` → `bundles` → `bomImports` → `targetPlatforms` → `distributions` → `compatibility` → `settings` → `presets` → `processing`
 
 ==== Пример DSL
 
@@ -396,6 +400,21 @@ ____
 | DeprecationInfo
 | Нет
 | Информация об устаревании библиотеки (замена, сообщение, версия удаления)
+
+| description
+| String
+| Нет
+| Описание библиотеки
+
+| isPlatform
+| Boolean
+| Нет (default: false)
+| Является ли библиотека платформой (BOM)
+
+| ignoreUpdates
+| Boolean
+| Нет (default: false)
+| Пропускать проверку обновлений для этой библиотеки
 |===
 
 ==== DeprecationInfo
@@ -435,9 +454,20 @@ ____
 [source,kotlin]
 ----
 sealed class Constraint {
-    data class VersionConstraintDef(val constraint: String) : Constraint()
-    data class Exclude(val group: String?, val module: String?) : Constraint()
-    data class Substitute(val with: String) : Constraint()
+    data class VersionConstraintDef(
+        val coordinates: String,
+        val version: VersionReference?,
+        val because: String?
+    ) : Constraint()
+    data class Exclude(
+        val group: String,
+        val artifact: String
+    ) : Constraint()
+    data class Substitute(
+        val from: String,
+        val to: String,
+        val because: String?
+    ) : Constraint()
 }
 ----
 
@@ -446,13 +476,13 @@ sealed class Constraint {
 | Подтип | Описание
 
 | `VersionConstraintDef`
-| Ограничение версии (например: `strictly`, `require`, `prefer`)
+| Ограничение версии по координатам (`coordinates`), с опциональной целевой версией и причиной (`because`)
 
 | `Exclude`
-| Исключение транзитивной зависимости по group/module
+| Исключение транзитивной зависимости по `group` и `artifact`
 
 | `Substitute`
-| Подмена зависимости на другую библиотеку (alias)
+| Подмена зависимости `from` на `to` с опциональной причиной
 |===
 
 ==== LicenseInfo
@@ -463,17 +493,13 @@ sealed class Constraint {
 |===
 | Поле | Тип | Описание
 
-| `spdxId`
+| `id`
 | String?
-| SPDX идентификатор лицензии (например: `Apache-2.0`, `MIT`)
+| Идентификатор лицензии (SPDX формат, например: `Apache-2.0`, `MIT`)
 
-| `name`
+| `url`
 | String?
-| Человекочитаемое название лицензии
-
-| `category`
-| LicenseCategory?
-| Категория лицензии (см. xref:../06-reference/model-schema.adoc#license-category[LicenseCategory])
+| URL текста лицензии
 |===
 
 ==== VersionReference

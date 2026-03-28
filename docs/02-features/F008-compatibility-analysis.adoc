@@ -554,35 +554,19 @@ dependanger {
     settings {
         compatibilityAnalysis {
             // Включение процессора
-            enabled = true  // или через processing { analyzeCompatibility = true }
+            enabled = false  // default
 
-            // Целевое окружение
-            targetJdk = 17
-            targetKotlin = "2.1.0"
-            targetGradle = "8.5"
+            // Целевая версия JDK
+            targetJdk = 17  // default: null
 
-            // Фильтрация результатов
-            minSeverity = INFO  // INFO, WARNING, ERROR
+            // Целевая версия Kotlin
+            targetKotlin = "2.1.0"  // default: null
 
-            // CI интеграция
-            failOnError = false  // default
-            failOnWarning = false  // default
+            // Минимальный уровень серьёзности
+            minSeverity = WARNING  // default: WARNING
 
-            // Встроенные правила
-            enableBuiltinRules = true  // default
-
-            // Настройки отчёта
-            includePassedRules = false  // показывать правила которые прошли
-            groupBySeverity = true  // группировать по severity
-        }
-    }
-
-    // Или короткая форма через processing
-    processing {
-        analyzeCompatibility {
-            enabled = true
-            targetJdk = 17
-            failOnErrors = true
+            // Останавливать pipeline при ERROR
+            failOnErrors = true  // default: true
         }
     }
 }

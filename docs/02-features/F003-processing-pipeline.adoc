@@ -44,7 +44,7 @@ Processing Pipeline выполняет многоэтапную обработк
 
 | Версии
 | `versionRef("kotlin")` — ссылка
-| `resolvedVersion = "2.1.20"`, `versionSource = DECLARED`
+| `version = ResolvedVersion("2.1.20", DECLARED)`
 
 | Библиотеки
 | Все определённые библиотеки
@@ -79,18 +79,30 @@ data class EffectiveMetadata(
     val bundles: Map<String, EffectiveBundle>,
     val versions: Map<String, ResolvedVersion>,
     val diagnostics: Diagnostics,
-    val processingInfo: ProcessingInfo? = null
+    val processingInfo: ProcessingInfo? = null,
+    val extensions: Map<ExtensionKey<*>, Any> = emptyMap()
 )
 
 data class EffectiveLibrary(
     val alias: String,
     val group: String,
     val artifact: String,
-    val resolvedVersion: String?,
-    val versionSource: VersionSource,
+    val version: ResolvedVersion?,
+    val description: String?,
     val tags: Set<String>,
+    val requires: Requirements?,
     val isDeprecated: Boolean,
-    val deprecation: DeprecationInfo?
+    val deprecation: DeprecationInfo?,
+    val license: LicenseInfo?,
+    val constraints: List<Constraint>,
+    val isPlatform: Boolean,
+    val ignoreUpdates: Boolean
+)
+
+data class EffectivePlugin(
+    val alias: String,
+    val id: String,
+    val version: ResolvedVersion?
 )
 
 data class ResolvedVersion(
@@ -118,27 +130,40 @@ enum class VersionSource {
       "alias": "spring-web",
       "group": "org.springframework",
       "artifact": "spring-web",
-      "resolvedVersion": "6.2.0",
-      "versionSource": "BOM_IMPORT",
+      "version": {
+        "alias": "spring-web",
+        "value": "6.2.0",
+        "source": "BOM_IMPORT"
+      },
       "tags": ["spring", "web"],
-      "isDeprecated": false
+      "isDeprecated": false,
+      "isPlatform": false,
+      "ignoreUpdates": false
     },
     "kotlin-stdlib": {
       "alias": "kotlin-stdlib",
       "group": "org.jetbrains.kotlin",
       "artifact": "kotlin-stdlib",
-      "resolvedVersion": "2.1.20",
-      "versionSource": "DECLARED",
+      "version": {
+        "alias": "kotlin",
+        "value": "2.1.20",
+        "source": "DECLARED"
+      },
       "tags": ["kotlin", "core"],
-      "isDeprecated": false
+      "isDeprecated": false,
+      "isPlatform": false,
+      "ignoreUpdates": false
     }
   },
   "plugins": {
     "kotlin-jvm": {
       "alias": "kotlin-jvm",
       "id": "org.jetbrains.kotlin.jvm",
-      "resolvedVersion": "2.1.20",
-      "versionSource": "DECLARED"
+      "version": {
+        "alias": "kotlin",
+        "value": "2.1.20",
+        "source": "DECLARED"
+      }
     }
   },
   "bundles": {

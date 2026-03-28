@@ -73,6 +73,7 @@ public data class TomlSettings(
     val includeComments: Boolean,
     val sortSections: Boolean,
     val useInlineVersions: Boolean,
+    val includeDeprecationComments: Boolean = true,
 ) {
     public companion object {
         public val DEFAULT: TomlSettings = TomlSettings(
@@ -80,6 +81,7 @@ public data class TomlSettings(
             includeComments = true,
             sortSections = true,
             useInlineVersions = false,
+            includeDeprecationComments = true,
         )
     }
 }
@@ -89,14 +91,22 @@ public data class BomSettings(
     val groupId: String?,
     val artifactId: String?,
     val version: String?,
+    val name: String? = null,
+    val description: String? = null,
     val includeOptionalDependencies: Boolean,
+    val prettyPrint: Boolean = true,
+    val includeDeprecationComments: Boolean = true,
 ) {
     public companion object {
         public val DEFAULT: BomSettings = BomSettings(
             groupId = null,
             artifactId = null,
             version = null,
+            name = null,
+            description = null,
             includeOptionalDependencies = false,
+            prettyPrint = true,
+            includeDeprecationComments = true,
         )
     }
 }
@@ -147,12 +157,16 @@ public data class UpdateCheckSettings(
 public data class CompatibilityAnalysisSettings(
     val enabled: Boolean,
     val targetJdk: Int?,
+    val targetKotlin: String? = null,
+    val minSeverity: Severity = Severity.WARNING,
     val failOnErrors: Boolean,
 ) {
     public companion object {
         public val DEFAULT: CompatibilityAnalysisSettings = CompatibilityAnalysisSettings(
             enabled = false,
             targetJdk = null,
+            targetKotlin = null,
+            minSeverity = Severity.WARNING,
             failOnErrors = true,
         )
     }

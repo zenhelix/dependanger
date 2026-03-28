@@ -301,7 +301,7 @@ dependanger {
 |===
 | Параметр | Значение
 
-| Order | 90
+| Order | 101
 | Processor ID | `transitive-resolver`
 | Phase | PARALLEL_IO
 | Optional | Yes

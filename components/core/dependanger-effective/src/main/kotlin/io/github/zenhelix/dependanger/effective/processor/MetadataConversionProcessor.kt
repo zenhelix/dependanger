@@ -68,6 +68,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
             bundle.alias to EffectiveBundle(
                 alias = bundle.alias,
                 libraries = resolvedLibraries,
+                resolvedFrom = bundle.extends,
             )
         }
 

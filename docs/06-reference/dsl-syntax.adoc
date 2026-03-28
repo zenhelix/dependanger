@@ -380,6 +380,7 @@ libraries {
 
     // С настройками
     library("guava", "com.google.guava:guava", version = "33.0.0-jre") {
+        description = "Google core libraries for Java"
         tags("core", "utils", "google")
 
         requires {
@@ -390,6 +391,12 @@ libraries {
             id = "Apache-2.0"
             url = "https://www.apache.org/licenses/LICENSE-2.0"
         }
+    }
+
+    // Игнорировать обновления для конкретной библиотеки
+    library("internal-utils", "com.example:internal-utils:1.0.0") {
+        description = "Internal utilities pinned to specific version"
+        ignoreUpdates = true
     }
 
     // Deprecated библиотека
@@ -425,6 +432,14 @@ libraries {
 [cols="1,1,3",options="header"]
 |===
 | Метод/Свойство | Тип | Описание
+
+| `description`
+| String?
+| Описание библиотеки (по умолчанию `null`)
+
+| `ignoreUpdates`
+| Boolean
+| Пропускать проверку обновлений (по умолчанию `false`)
 
 | `tags(vararg tags: String)`
 | Unit
@@ -1279,6 +1294,9 @@ toml {
 
     // Использовать inline версии вместо версий в секции [versions]
     useInlineVersions = false
+
+    // Добавлять комментарии о deprecated библиотеках
+    includeDeprecationComments = true
 }
 ----
 
@@ -1294,8 +1312,20 @@ bom {
     artifactId = "my-dependencies-bom"
     version = "1.0.0"  // или versionRef("bom")
 
+    // Человекочитаемое имя BOM
+    name = "My Dependencies BOM"
+
+    // Описание BOM
+    description = "Managed dependencies for my project"
+
     // Включать зависимости с optional=true
     includeOptionalDependencies = false
+
+    // Форматировать XML с отступами
+    prettyPrint = true
+
+    // Добавлять комментарии о deprecated библиотеках
+    includeDeprecationComments = true
 }
 ----
 
@@ -1312,11 +1342,11 @@ bomCache {
     // Директория кеша
     directory = "${System.getProperty("user.home")}/.dependanger/cache/bom"
 
-    // TTL для релизных BOM
-    ttl = Duration.ofHours(24)
+    // TTL для релизных BOM (часы)
+    ttlHours = 24
 
-    // TTL для SNAPSHOT BOM
-    ttlSnapshot = Duration.ofHours(1)
+    // TTL для SNAPSHOT BOM (часы)
+    ttlSnapshotHours = 1
 }
 ----
 
@@ -1355,10 +1385,16 @@ updateCheck {
 ----
 compatibilityAnalysis {
     // Включить анализ
-    enabled = true
+    enabled = false
 
     // Целевая версия JDK для проверки правил
     targetJdk = 17
+
+    // Целевая версия Kotlin для проверки правил
+    targetKotlin = "2.1"
+
+    // Минимальная severity для включения в результаты
+    minSeverity = Severity.WARNING
 
     // Завершать с ошибкой при обнаружении ERROR
     failOnErrors = true
@@ -1376,16 +1412,16 @@ securityCheck {
     enabled = true
 
     // Минимальная severity для fail
-    failOnVulnerability = Severity.HIGH
+    failOnVulnerability = Severity.ERROR
+
+    // Минимальная severity для проверки
+    minSeverity = "HIGH"
 
     // Игнорируемые CVE
     ignoreVulnerabilities = listOf(
         "CVE-2023-XXXXX",  // Accepted risk
         "GHSA-XXXXX"
     )
-
-    // URL OSV API (опционально)
-    osvApiUrl = "https://api.osv.dev"
 }
 ----
 

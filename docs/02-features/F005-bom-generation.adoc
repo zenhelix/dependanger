@@ -378,32 +378,25 @@ dependanger generate --bom \
 dependanger {
     settings {
         bom {
-            // Координаты (обязательные)
+            // Maven координаты BOM (опциональные)
             groupId = "com.example"
-            artifactId = "dependanger-bom"
+            artifactId = "dependanger-bom"  // поддерживает placeholder {distribution}
             version = project.version.toString()
 
-            // Метаданные (опциональные)
+            // Human-readable имя BOM (опциональное)
             name = "My Project BOM"
+
+            // Описание BOM (опциональное)
             description = "Centralized dependency versions"
 
-            // Сортировка зависимостей
-            sortDependencies = true  // default: true
+            // Включать optional зависимости
+            includeOptionalDependencies = false  // default
 
-            // Deprecated библиотеки
-            includeDeprecated = true  // default: true
-            includeDeprecatedComments = true  // default: true
+            // Форматированный XML
+            prettyPrint = true  // default
 
-            // Форматирование
-            prettyPrint = true  // default: true
-            indent = "    "  // default: 4 spaces
-
-            // Выходной файл
-            filename = "bom.pom.xml"  // default
-
-            // Placeholder support (для distribution-aware artifactId)
-            // {distribution} → имя профиля
-            artifactId = "my-bom-{distribution}"
+            // XML-комментарии для deprecated библиотек
+            includeDeprecationComments = true  // default
         }
     }
 }

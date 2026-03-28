@@ -19,9 +19,9 @@ public abstract class ValidateTask : AbstractDependangerTask() {
             val dependanger = Dependanger.fromMetadata(metadata).build()
             val result = runBlocking { dependanger.validate() }
 
-            result.diagnostics.errors.forEach { logger.error("Dependanger validation ERROR: ${it.message}") }
-            result.diagnostics.warnings.forEach { logger.warn("Dependanger validation WARN: ${it.message}") }
-            result.diagnostics.infos.forEach { logger.info("Dependanger validation INFO: ${it.message}") }
+            logger.error("Dependanger validation ERROR: ${result.diagnostics.errors.joinToString("\n") { it.message }}")
+            logger.warn("Dependanger validation WARN: ${result.diagnostics.warnings.joinToString("\n") { it.message }}")
+            logger.info("Dependanger validation INFO: ${result.diagnostics.infos.joinToString("\n") { it.message }}")
 
             val errCount = result.diagnostics.errors.size
             val warnCount = result.diagnostics.warnings.size

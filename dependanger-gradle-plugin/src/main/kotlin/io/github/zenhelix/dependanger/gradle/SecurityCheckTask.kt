@@ -43,9 +43,7 @@ public abstract class SecurityCheckTask : AbstractDependangerTask() {
 
             val critical = vulnerabilities.filter { it.severity.meetsThreshold(VulnerabilitySeverity.HIGH) }
             if (critical.isNotEmpty() && failOnError) {
-                throw GradleException(
-                    "Dependanger: Found ${critical.size} vulnerabilities with HIGH or CRITICAL severity."
-                )
+                throw GradleException("Dependanger: Found ${critical.size} vulnerabilities with HIGH or CRITICAL severity.")
             }
         }
     }

@@ -30,8 +30,8 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
             if (errors.isEmpty() && warnings.isEmpty()) {
                 logger.lifecycle("Dependanger: No compatibility issues found.")
             } else {
-                errors.forEach { logger.error("Dependanger COMPAT ERROR: ${it.message}") }
-                warnings.forEach { logger.warn("Dependanger COMPAT WARN: ${it.message}") }
+                logger.error("Dependanger COMPAT ERROR: ${errors.joinToString("\n") { it.message }}")
+                logger.warn("Dependanger COMPAT WARN: ${warnings.joinToString("\n") { it.message }}")
                 logger.lifecycle("Dependanger: Analysis complete: ${errors.size} errors, ${warnings.size} warnings")
             }
 

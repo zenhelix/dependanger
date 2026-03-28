@@ -26,8 +26,7 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
         val groupId = bomSettings.groupId
             ?: project.group.toString().takeIf { it.isNotBlank() }
             ?: throw GradleException("BOM groupId not configured. Set it in dependanger { settings { bom { groupId = \"...\" } } } or set project.group.")
-        val artifactId = bomSettings.artifactId
-            ?: "${project.name}-bom"
+        val artifactId = bomSettings.artifactId ?: "${project.name}-bom"
         val version = bomSettings.version
             ?: project.version.toString().takeIf { it != "unspecified" && it.isNotBlank() }
             ?: throw GradleException("BOM version not configured. Set it in dependanger { settings { bom { version = \"...\" } } } or set project.version.")
@@ -44,8 +43,7 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
             includeDeprecationComments = true,
         )
 
-        val outputPath = outputDir.toPath()
-        result.writeBomTo(outputPath, bomConfig)
+        result.writeBomTo(outputDir.toPath(), bomConfig)
 
         logger.lifecycle("Dependanger: Generated ${bomConfig.filename} -> ${outputDir.resolve(bomConfig.filename)}")
     }

@@ -15,10 +15,7 @@ internal object DependangerTaskHelper {
     internal fun readEffective(outputDir: File): EffectiveMetadata {
         val effectiveFile = outputDir.resolve(EFFECTIVE_FILE)
         if (!effectiveFile.exists()) {
-            throw GradleException(
-                "effective.json not found in $outputDir. " +
-                        "Ensure dependangerGenerateEffective has been executed."
-            )
+            throw GradleException("effective.json not found in $outputDir. Ensure dependangerGenerateEffective has been executed.")
         }
         val format = EffectiveJsonFormat()
         return format.read(effectiveFile.toPath())
@@ -38,10 +35,7 @@ internal object DependangerTaskHelper {
         logDiagnostics(result, logger)
 
         if (result.diagnostics.hasErrors && failOnError) {
-            throw GradleException(
-                "Dependanger processing failed with ${result.diagnostics.errors.size} error(s). " +
-                        "Set dependanger { failOnError = false } to continue despite errors."
-            )
+            throw GradleException("Dependanger processing failed with ${result.diagnostics.errors.size} error(s). Set dependanger { failOnError = false } to continue despite errors.")
         }
     }
 

@@ -20,4 +20,7 @@ public class ProcessingContext(
 
     public fun <T : Any> with(key: ProcessingContextKey<T>, value: T): ProcessingContext =
         ProcessingContext(originalMetadata, settings, environment, activeDistribution, callback, properties + (key to value))
+
+    public fun <T : Any> require(key: ProcessingContextKey<T>): T =
+        this[key] ?: error("Required context property '${key.name}' is not set")
 }

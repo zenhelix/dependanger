@@ -114,6 +114,10 @@ public class SettingsDsl {
         reportSettings = dsl.toSettings()
     }
 
+    public fun putCustomSetting(key: String, value: JsonElement) {
+        customSettings = customSettings + (key to value)
+    }
+
     public fun applyTo(target: SettingsDsl) {
         if (_defaultDistribution.isSet) target.defaultDistribution = defaultDistribution
         if (_strictVersionResolution.isSet) target.strictVersionResolution = strictVersionResolution

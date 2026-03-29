@@ -49,7 +49,6 @@ public class Dependanger internal constructor(
     private val metadata: DependangerMetadata,
     private val preset: ProcessingPreset,
     private val environment: ProcessingEnvironment,
-    private val coreProcessors: List<EffectiveMetadataProcessor>,
     private val discoveredProcessors: List<EffectiveMetadataProcessor>,
     private val additionalProcessors: List<EffectiveMetadataProcessor>,
     private val disabledProcessorIds: Set<String>,
@@ -83,7 +82,7 @@ public class Dependanger internal constructor(
 
     public suspend fun validate(): DependangerResult = try {
         val pipeline = ProcessingPipeline {
-            addProcessors(coreProcessors)
+            addCoreProcessors()
             addProcessors(discoveredProcessors)
             ProcessingPreset.MINIMAL.configure(this)
             enableOptional(ProcessorIds.VALIDATION)
@@ -106,7 +105,8 @@ public class Dependanger internal constructor(
 
     public suspend fun previewFilter(distribution: String): FilterPreview {
         val pipeline = ProcessingPipeline {
-            addProcessors(coreProcessors.filter { it.id !in PREVIEW_EXCLUDED_PROCESSORS })
+            addCoreProcessors()
+            PREVIEW_EXCLUDED_PROCESSORS.forEach { disable(it) }
         }
 
         val (unfiltered, filtered) = coroutineScope {
@@ -157,7 +157,7 @@ public class Dependanger internal constructor(
     }
 
     private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
-        addProcessors(coreProcessors)
+        addCoreProcessors()
         addProcessors(discoveredProcessors)
         addProcessors(additionalProcessors)
         preset.configure(this)

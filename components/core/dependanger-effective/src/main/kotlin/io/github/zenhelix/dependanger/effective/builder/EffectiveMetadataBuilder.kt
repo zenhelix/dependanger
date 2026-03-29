@@ -2,7 +2,6 @@ package io.github.zenhelix.dependanger.effective.builder
 
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
-import io.github.zenhelix.dependanger.effective.coreProcessors
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
@@ -28,7 +27,7 @@ public class EffectiveMetadataBuilder {
 
     public suspend fun build(metadata: DependangerMetadata): EffectiveMetadata {
         val pipeline = ProcessingPipeline {
-            addProcessors(coreProcessors())
+            addCoreProcessors()
             this@EffectiveMetadataBuilder.preset.configure(this)
         }
 

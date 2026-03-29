@@ -5,6 +5,10 @@ public class PipelineBuilder {
     private val enabledOptionalIds: MutableSet<String> = mutableSetOf()
     private val disabledIds: MutableSet<String> = mutableSetOf()
 
+    public fun addCoreProcessors() {
+        processors.addAll(io.github.zenhelix.dependanger.effective.coreProcessors())
+    }
+
     public fun addProcessor(processor: EffectiveMetadataProcessor) {
         processors.add(processor)
     }

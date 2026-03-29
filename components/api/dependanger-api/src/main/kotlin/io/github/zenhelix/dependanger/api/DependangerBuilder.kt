@@ -3,7 +3,6 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
-import io.github.zenhelix.dependanger.effective.coreProcessors
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
@@ -74,7 +73,6 @@ public class DependangerBuilder {
             metadata = resolvedMetadata,
             preset = preset,
             environment = environment,
-            coreProcessors = coreProcessors(),
             discoveredProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList(),
             additionalProcessors = additionalProcessors.toList(),
             disabledProcessorIds = disabledProcessorIds.toSet(),

@@ -14,7 +14,7 @@ import io.github.zenhelix.dependanger.effective.processor.ValidationProcessor
 import io.github.zenhelix.dependanger.effective.processor.VersionFallbackProcessor
 import io.github.zenhelix.dependanger.effective.processor.VersionResolverProcessor
 
-public fun coreProcessors(): List<EffectiveMetadataProcessor> = listOf(
+internal fun coreProcessors(): List<EffectiveMetadataProcessor> = listOf(
     ProfileProcessor(),
     MetadataConversionProcessor(),
     ExtractedVersionsProcessor(),

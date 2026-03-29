@@ -4,10 +4,6 @@ import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.ExtensionKey
-import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
@@ -20,21 +16,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class FeatureProcessorIntegrationTest {
-
-    private class FakeProcessor<T : Any>(
-        override val id: String,
-        override val phase: ProcessingPhase,
-        override val order: Int,
-        private val extensionKey: ExtensionKey<T>,
-        private val provider: (EffectiveMetadata) -> T,
-    ) : EffectiveMetadataProcessor {
-        override val isOptional: Boolean = false
-        override val description: String = "Fake $id for tests"
-        override fun supports(context: ProcessingContext): Boolean = true
-
-        override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata =
-            metadata.withExtension(extensionKey, provider(metadata))
-    }
 
     private fun fakeUpdateCheck(provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>): FakeProcessor<List<UpdateAvailableInfo>> =
         FakeProcessor("fake-update-check", ProcessingPhase.UPDATE_CHECK, 100, UpdatesExtensionKey, provider)

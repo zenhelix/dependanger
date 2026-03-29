@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
-import io.github.zenhelix.dependanger.features.transitive.model.FlatDependency
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
+import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 
 internal object FlatListBuilder {
 
@@ -19,11 +19,12 @@ internal object FlatListBuilder {
             if (tree.isCycle) return
 
             val coordinate = "${tree.group}:${tree.artifact}"
-            if (coordinate !in seen && tree.version != null) {
+            val version = tree.version
+            if (coordinate !in seen && version != null) {
                 seen[coordinate] = FlatDependency(
                     group = tree.group,
                     artifact = tree.artifact,
-                    version = tree.version,
+                    version = version,
                     scope = tree.scope,
                     isDirectDependency = coordinate in directCoordinates,
                     isOptional = false,

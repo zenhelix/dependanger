@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.cli
 
 import io.github.zenhelix.dependanger.core.util.UpdateType
-import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach

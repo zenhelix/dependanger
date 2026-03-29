@@ -7,6 +7,7 @@ plugins {
 description = "Dependanger API - High-level facade for external consumers"
 
 dependencies {
+    api(projects.components.shared.dependangerFeatureModel)
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
     api(projects.components.core.dependangerMetadataJson)

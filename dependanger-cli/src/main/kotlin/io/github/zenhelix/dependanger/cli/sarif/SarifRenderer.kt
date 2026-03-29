@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.cli.sarif
 
 import io.github.zenhelix.dependanger.cli.CliDefaults
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 
 private const val TOOL_NAME: String = "dependanger"
 private const val TOOL_INFO_URI: String = "https://github.com/zenhelix/dependanger"

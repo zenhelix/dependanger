@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.updates.model
+package io.github.zenhelix.dependanger.feature.model.updates
 
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import kotlinx.serialization.Serializable

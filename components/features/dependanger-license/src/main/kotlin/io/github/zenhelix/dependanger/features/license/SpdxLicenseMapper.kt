@@ -1,6 +1,6 @@
 package io.github.zenhelix.dependanger.features.license
 
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 
 /**
  * Maps license names to canonical SPDX identifiers and categorizes them.

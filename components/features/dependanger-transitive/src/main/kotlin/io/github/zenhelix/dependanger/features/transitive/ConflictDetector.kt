@@ -1,11 +1,11 @@
 package io.github.zenhelix.dependanger.features.transitive
 
-import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.core.util.VersionComparator
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
+import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
 
 internal object ConflictDetector {
 
@@ -29,9 +29,10 @@ internal object ConflictDetector {
         val result = mutableMapOf<String, MutableList<String>>()
 
         fun traverse(tree: TransitiveTree) {
-            if (tree.version != null && !tree.isCycle) {
+            val version = tree.version
+            if (version != null && !tree.isCycle) {
                 val coordinate = "${tree.group}:${tree.artifact}"
-                result.getOrPut(coordinate) { mutableListOf() }.add(tree.version)
+                result.getOrPut(coordinate) { mutableListOf() }.add(version)
             }
             tree.children.forEach { traverse(it) }
         }

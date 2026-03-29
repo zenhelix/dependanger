@@ -6,11 +6,9 @@ import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.generators.bom.BomConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.ktor.client.HttpClient
 import io.ktor.serialization.kotlinx.json.json
-import io.mockk.every
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.io.TempDir
@@ -19,7 +17,8 @@ import java.nio.file.Path
 /**
  * Abstract base class for all integration tests.
  *
- * Sets up and tears down HTTP mocking via MockK + Ktor MockEngine.
+ * Provides mock HTTP infrastructure via Ktor MockEngine injected through
+ * [HttpClientFactoryKey] — no global mocking required.
  * Provides helpers for configuring mock HTTP responses and creating Dependanger instances.
  */
 abstract class IntegrationTestBase {
@@ -32,13 +31,11 @@ abstract class IntegrationTestBase {
 
     @BeforeEach
     fun setUpBase() {
-        mockkObject(HttpClientFactory)
         setCacheSystemProperties()
     }
 
     @AfterEach
     fun tearDownBase() {
-        unmockkObject(HttpClientFactory)
         restoreSystemProperties()
     }
 
@@ -48,14 +45,16 @@ abstract class IntegrationTestBase {
      */
     protected fun mockHttp(block: MockHttpRouter.Builder.() -> Unit) {
         router = mockHttpRouter(block)
+    }
 
-        every { HttpClientFactory.create(any()) } answers {
-            // Create a fresh MockEngine per HttpClient so that closing one client
-            // does not invalidate engines used by other clients
+    /**
+     * Creates an [HttpClientFactory] that produces mock-engine clients
+     * backed by the current [router].
+     */
+    private fun mockHttpClientFactory(): HttpClientFactory = object : HttpClientFactory {
+        override fun create(block: io.github.zenhelix.dependanger.http.client.HttpClientConfig.() -> Unit): HttpClient {
             val engine = router.createMockEngine()
-            HttpClient(engine) {
-                // MockEngine client does not need CIO-specific config,
-                // but we keep ContentNegotiation for JSON parsing if needed
+            return HttpClient(engine) {
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
                     json(
                         kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
@@ -75,6 +74,7 @@ abstract class IntegrationTestBase {
     ): Dependanger {
         val builder = DependangerBuilder(dslBlock)
             .preset(preset)
+            .withContextProperty(HttpClientFactoryKey, mockHttpClientFactory())
 
         if (jdk != null) {
             builder.jdkVersion(jdk)

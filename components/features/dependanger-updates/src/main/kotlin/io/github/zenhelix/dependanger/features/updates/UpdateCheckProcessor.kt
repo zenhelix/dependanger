@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
+import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
@@ -19,11 +20,12 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
-import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -47,6 +49,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
         val settings = context.require(UpdateCheckSettingsKey)
         val repositories = context.resolveMavenRepositories(settings.repositories)
         val credentialsProvider = context[CredentialsProviderKey]
+        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
 
         val candidates = metadata.libraries.values.filter { lib ->
             !lib.ignoreUpdates
@@ -65,6 +68,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
         UpdateCheckContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
+            httpClientFactory = httpClientFactory,
             cacheDirectory = cacheDir,
             cacheTtlHours = settings.cacheTtlHours,
             connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
@@ -268,13 +272,14 @@ private data class FetchOutcome(
 private class UpdateCheckContext(
     repositories: List<MavenRepository>,
     credentialsProvider: CredentialsProvider?,
+    httpClientFactory: HttpClientFactory,
     cacheDirectory: String,
     cacheTtlHours: Long,
     connectTimeoutMs: Long,
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = HttpClientFactory.create {
+    val httpClient: HttpClient = httpClientFactory.create {
         this.connectTimeoutMs = connectTimeoutMs
         this.requestTimeoutMs = readTimeoutMs
         this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS

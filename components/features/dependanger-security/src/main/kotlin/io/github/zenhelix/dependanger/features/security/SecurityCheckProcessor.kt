@@ -13,11 +13,13 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcess
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.ktor.client.HttpClient
 
@@ -37,6 +39,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         context[SecurityCheckSettingsKey]?.enabled == true
 
     override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
+        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
         val settings = context.require(SecurityCheckSettingsKey)
         val minSeverity = parseMinSeverity(settings.minSeverity)
 
@@ -83,7 +86,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         val fetchedVulns = mutableListOf<VulnerabilityInfo>()
 
         if (uncachedPackages.isNotEmpty()) {
-            SecurityCheckContext(timeoutMs = settings.timeout).use { ctx ->
+            SecurityCheckContext(httpClientFactory = httpClientFactory, timeoutMs = settings.timeout).use { ctx ->
                 when (val result = ctx.osvClient.queryBatch(uncachedPackages)) {
                     is OsvBatchResult.Success -> {
                         for ((i, vulns) in result.vulnerabilities.withIndex()) {
@@ -246,10 +249,11 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
 }
 
 private class SecurityCheckContext(
+    httpClientFactory: HttpClientFactory,
     timeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = HttpClientFactory.create {
+    val httpClient: HttpClient = httpClientFactory.create {
         connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
         requestTimeoutMs = timeoutMs
         keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS

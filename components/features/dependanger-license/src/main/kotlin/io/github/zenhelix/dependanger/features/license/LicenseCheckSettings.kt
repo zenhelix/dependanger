@@ -2,11 +2,10 @@ package io.github.zenhelix.dependanger.features.license
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
-import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 public val LicenseCheckSettingsKey: ProcessingContextKey<LicenseCheckSettings> =
     ProcessingContextKey("licenseCheck")
@@ -59,14 +58,11 @@ public data class LicenseCheckSettings(
     }
 }
 
-public class LicenseCheckSettingsProvider : FeatureSettingsProvider {
-    override val settingsKey: String = "licenseCheck"
-
-    override fun deserialize(json: JsonElement): Pair<ProcessingContextKey<*>, Any> {
-        val settings = Json.decodeFromJsonElement(LicenseCheckSettings.serializer(), json)
-        return LicenseCheckSettingsKey to settings
-    }
-}
+public class LicenseCheckSettingsProvider : AbstractFeatureSettingsProvider<LicenseCheckSettings>(
+    settingsKey = "licenseCheck",
+    contextKey = LicenseCheckSettingsKey,
+    serializer = LicenseCheckSettings.serializer(),
+)
 
 @DependangerDslMarker
 public class LicenseCheckSettingsDsl {

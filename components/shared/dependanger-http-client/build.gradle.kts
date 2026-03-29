@@ -6,6 +6,7 @@ plugins {
 description = "Dependanger HTTP Client - Shared HTTP client infrastructure with retry and error handling"
 
 dependencies {
+    api(projects.components.core.dependangerCore)
     api(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)

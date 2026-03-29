@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.cli
 
-import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach

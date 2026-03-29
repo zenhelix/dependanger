@@ -4,7 +4,7 @@ import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import io.github.zenhelix.dependanger.features.security.securityCheck
 import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase

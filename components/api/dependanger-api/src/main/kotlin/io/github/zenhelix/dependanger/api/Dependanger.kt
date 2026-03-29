@@ -3,23 +3,23 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
 import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
-import java.util.ServiceLoader
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import java.util.ServiceLoader
 
 private val PREVIEW_EXCLUDED_PROCESSORS: Set<String> = setOf(
     ProcessorIds.VALIDATION,
@@ -81,12 +81,7 @@ public class Dependanger internal constructor(
     }
 
     public suspend fun validate(): DependangerResult = try {
-        val pipeline = ProcessingPipeline {
-            addCoreProcessors()
-            addProcessors(discoveredProcessors)
-            ProcessingPreset.MINIMAL.configure(this)
-            enableOptional(ProcessorIds.VALIDATION)
-        }
+        val pipeline = buildValidationPipeline()
 
         val effective = pipeline.process(baseContext())
 
@@ -156,13 +151,25 @@ public class Dependanger internal constructor(
         )
     }
 
-    private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
+    private fun buildValidationPipeline(): ProcessingPipeline = buildPipeline {
+        disable(ProcessorIds.UPDATE_CHECK)
+        disable(ProcessorIds.SECURITY_CHECK)
+        disable(ProcessorIds.LICENSE_CHECK)
+        disable(ProcessorIds.TRANSITIVE_RESOLVER)
+        disable(ProcessorIds.COMPATIBILITY_ANALYSIS)
+        enableOptional(ProcessorIds.VALIDATION)
+    }
+
+    private fun buildPipeline(
+        postConfigure: (PipelineBuilder.() -> Unit)? = null,
+    ): ProcessingPipeline = ProcessingPipeline {
         addCoreProcessors()
         addProcessors(discoveredProcessors)
         addProcessors(additionalProcessors)
         preset.configure(this)
         disabledProcessorIds.forEach { id -> disable(id) }
         pipelineCustomizer?.invoke(this)
+        postConfigure?.invoke(this)
     }
 
     public companion object {

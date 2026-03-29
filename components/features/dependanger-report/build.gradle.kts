@@ -7,6 +7,7 @@ plugins {
 description = "Dependanger Report - Dependency report generation"
 
 dependencies {
+    api(projects.components.shared.dependangerFeatureModel)
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
     implementation(projects.components.features.dependangerUpdates)

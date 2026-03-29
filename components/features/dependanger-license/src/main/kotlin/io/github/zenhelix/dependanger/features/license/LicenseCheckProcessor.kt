@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
@@ -13,16 +14,17 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.license.isCopyleft
+import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
+import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
-import io.github.zenhelix.dependanger.features.license.model.isCopyleft
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
-import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
-import io.github.zenhelix.dependanger.features.transitive.model.FlatDependency
-import io.github.zenhelix.dependanger.features.transitive.model.flatDependencies
+import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -46,6 +48,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         val settings = context.require(LicenseCheckSettingsKey)
         val repositories = context.resolveMavenRepositories()
         val credentialsProvider = context[CredentialsProviderKey]
+        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
         val customProviders = ServiceLoader.load(LicenseSourceProvider::class.java).toList()
         if (customProviders.isNotEmpty()) {
             logger.info { "Loaded ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
@@ -90,6 +93,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         LicenseCheckContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
+            httpClientFactory = httpClientFactory,
             cacheDirectory = settings.cacheDirectory,
             cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = settings.timeout,

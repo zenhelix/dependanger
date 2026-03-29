@@ -8,6 +8,7 @@ plugins {
 description = "Dependanger CLI - Command-line interface"
 
 dependencies {
+    implementation(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.api.dependangerApi)
     implementation(projects.components.features.dependangerUpdates)
     implementation(projects.components.features.dependangerSecurity)

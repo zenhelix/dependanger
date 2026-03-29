@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.gradle
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.effective.ProcessorIds
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction

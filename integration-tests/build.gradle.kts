@@ -17,6 +17,7 @@ dependencies {
     testImplementation(projects.components.core.dependangerCore)
     testImplementation(projects.components.core.dependangerEffective)
     testImplementation(projects.components.core.dependangerMetadataJson)
+    testImplementation(projects.components.shared.dependangerFeatureModel)
     testImplementation(projects.components.shared.dependangerHttpClient)
     testImplementation(projects.components.shared.dependangerMavenPom)
     testImplementation(projects.components.shared.dependangerCache)
@@ -38,7 +39,6 @@ dependencies {
     testImplementation(libs.ktor.serialization.kotlinx.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotlinx.serialization.json)
-    testImplementation(libs.mockk)
     testImplementation(libs.clikt)
 
     testRuntimeOnly(libs.slf4j.simple)

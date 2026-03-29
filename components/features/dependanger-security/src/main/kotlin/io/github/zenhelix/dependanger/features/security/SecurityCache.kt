@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.security
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.AbstractFileCache
 import io.github.zenhelix.dependanger.cache.CacheResult
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import java.io.File
 
 private val logger = KotlinLogging.logger {}

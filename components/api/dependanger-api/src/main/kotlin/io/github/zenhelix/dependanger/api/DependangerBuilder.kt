@@ -3,9 +3,9 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import java.util.ServiceLoader
 

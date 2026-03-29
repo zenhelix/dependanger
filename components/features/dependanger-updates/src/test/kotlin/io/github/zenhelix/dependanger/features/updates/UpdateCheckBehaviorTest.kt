@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.updates
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.core.util.VersionComparator
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

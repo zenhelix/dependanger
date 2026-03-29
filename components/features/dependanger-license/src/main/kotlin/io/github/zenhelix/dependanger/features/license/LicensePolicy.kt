@@ -3,12 +3,12 @@ package io.github.zenhelix.dependanger.features.license
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.license.isCopyleft
+import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.model.isCopyleft
-import io.github.zenhelix.dependanger.features.transitive.model.FlatDependency
 
 /**
  * Result of policy compliance check for a single library.

@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.license
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider

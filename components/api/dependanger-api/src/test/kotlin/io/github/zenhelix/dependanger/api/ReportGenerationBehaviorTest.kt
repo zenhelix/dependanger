@@ -3,13 +3,13 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.effective.spi.ReportSection
 import io.github.zenhelix.dependanger.effective.spi.ReportSettings
-import io.github.zenhelix.dependanger.core.util.UpdateType
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested

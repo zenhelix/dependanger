@@ -9,6 +9,7 @@ description = "Dependanger Transitive - Transitive dependency resolution and con
 dependencies {
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
+    api(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.features.dependangerMavenResolver)
     implementation(projects.components.shared.dependangerMavenPom)
     implementation(projects.components.shared.dependangerHttpClient)

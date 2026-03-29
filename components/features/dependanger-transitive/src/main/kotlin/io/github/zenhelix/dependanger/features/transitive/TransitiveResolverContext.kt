@@ -4,8 +4,8 @@ import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
@@ -16,12 +16,13 @@ private const val DEFAULT_SNAPSHOT_TTL_HOURS = 1L
 internal class TransitiveResolverContext(
     repositories: List<MavenRepository>,
     credentialsProvider: CredentialsProvider?,
+    httpClientFactory: HttpClientFactory,
     cacheDirectory: String?,
     cacheTtlHours: Long?,
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = HttpClientFactory.create {
+    val httpClient: HttpClient = httpClientFactory.create {
         this.connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
         this.requestTimeoutMs = readTimeoutMs
         this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS

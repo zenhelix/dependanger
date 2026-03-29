@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.gradle
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.effective.ProcessorIds
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction

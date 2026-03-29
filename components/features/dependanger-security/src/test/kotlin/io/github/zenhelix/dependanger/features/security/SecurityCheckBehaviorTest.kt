@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.features.security
 
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested

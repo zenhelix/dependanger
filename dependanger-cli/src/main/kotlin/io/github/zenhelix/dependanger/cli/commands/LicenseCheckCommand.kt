@@ -10,10 +10,10 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.features.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.features.license.LicenseCheckSettingsKey
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText

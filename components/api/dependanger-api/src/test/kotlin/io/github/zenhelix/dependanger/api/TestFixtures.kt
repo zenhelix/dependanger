@@ -1,23 +1,23 @@
 package io.github.zenhelix.dependanger.api
 
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
 import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
-import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 
 internal class FakeProcessor<T : Any>(
     override val id: String,

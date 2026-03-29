@@ -7,8 +7,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
+import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import java.nio.file.Path
 
 public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<String> {
@@ -39,12 +38,8 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
 
     override fun write(artifact: String, output: Path) {
         val targetFile = output.resolve(config.filename)
-
         logger.info { "Writing TOML to: $targetFile" }
-
-        Files.createDirectories(targetFile.parent)
-        Files.writeString(targetFile, artifact, StandardCharsets.UTF_8)
-
+        writeStringArtifact(artifact, output, config.filename)
         logger.info { "TOML written successfully: $targetFile (${artifact.length} chars)" }
     }
 

@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.features.security
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.github.zenhelix.dependanger.http.client.postWithRetry

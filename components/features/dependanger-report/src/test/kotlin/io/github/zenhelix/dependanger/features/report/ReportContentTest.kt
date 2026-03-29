@@ -3,7 +3,6 @@ package io.github.zenhelix.dependanger.features.report
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
@@ -12,11 +11,12 @@ import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.assertj.core.api.Assertions.assertThat

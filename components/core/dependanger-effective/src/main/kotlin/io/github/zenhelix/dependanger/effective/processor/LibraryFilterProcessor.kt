@@ -22,7 +22,10 @@ import java.util.ServiceLoader
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.LIBRARY_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.LIBRARY_FILTER
-    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))
+    override val constraints: Set<OrderConstraint> = setOf(
+        OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION),
+        OrderConstraint.runsAfter(ProcessorIds.BOM_IMPORT),
+    )
     override val isOptional: Boolean = false
     override val description: String = "Filters libraries based on distribution specification"
     override fun supports(context: ProcessingContext): Boolean = true

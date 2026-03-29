@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -12,10 +13,11 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
-import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
-import io.github.zenhelix.dependanger.features.transitive.model.FlatDependenciesExtensionKey
-import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflictsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependenciesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
+import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 
 private val logger = KotlinLogging.logger {}
 
@@ -38,6 +40,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
         val settings = context.require(TransitiveResolutionSettingsKey)
         val repositories = context.resolveMavenRepositories(settings.repositories)
         val credentialsProvider = context[CredentialsProviderKey]
+        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
         val constraints = context.originalMetadata.constraints
         val effectiveMaxDepth = settings.maxDepth ?: DEFAULT_MAX_DEPTH
         val effectiveMaxTransitives = settings.maxTransitives ?: DEFAULT_MAX_TRANSITIVES
@@ -62,6 +65,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
         TransitiveResolverContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
+            httpClientFactory = httpClientFactory,
             cacheDirectory = settings.cacheDirectory,
             cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = DEFAULT_READ_TIMEOUT_MS,

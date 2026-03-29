@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.transitive
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.VersionReference
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 
 private val logger = KotlinLogging.logger {}
 

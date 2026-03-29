@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.transitive.model
+package io.github.zenhelix.dependanger.feature.model.transitive
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey

@@ -16,6 +16,7 @@ public class UsedVersionsProcessor : EffectiveMetadataProcessor {
     override val constraints: Set<OrderConstraint> = setOf(
         OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER),
         OrderConstraint.runsAfter(ProcessorIds.PLUGIN),
+        OrderConstraint.runsAfter(ProcessorIds.VALIDATION),
     )
     override val isOptional: Boolean = false
     override val description: String = "Removes unused version entries"

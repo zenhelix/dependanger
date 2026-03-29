@@ -29,6 +29,7 @@ include(":components:core:dependanger-metadata-json")
 include(":components:core:dependanger-effective")
 
 // Shared modules
+include(":components:shared:dependanger-feature-model")
 include(":components:shared:dependanger-maven-pom")
 include(":components:shared:dependanger-http-client")
 include(":components:shared:dependanger-cache")

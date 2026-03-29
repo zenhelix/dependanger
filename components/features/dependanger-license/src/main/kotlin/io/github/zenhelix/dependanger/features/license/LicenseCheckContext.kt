@@ -17,13 +17,14 @@ private const val DEFAULT_SNAPSHOT_TTL_HOURS = 24L
 internal class LicenseCheckContext(
     repositories: List<MavenRepository>,
     credentialsProvider: CredentialsProvider?,
+    httpClientFactory: HttpClientFactory,
     cacheDirectory: String?,
     cacheTtlHours: Long,
     readTimeoutMs: Long,
     customProviders: List<LicenseSourceProvider> = emptyList(),
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = HttpClientFactory.create {
+    val httpClient: HttpClient = httpClientFactory.create {
         this.connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
         this.requestTimeoutMs = readTimeoutMs
         this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS

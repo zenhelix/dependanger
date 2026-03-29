@@ -1,14 +1,12 @@
 package io.github.zenhelix.dependanger.features.license
 
-import io.github.zenhelix.dependanger.features.license.DualLicensePolicy
-import io.github.zenhelix.dependanger.features.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

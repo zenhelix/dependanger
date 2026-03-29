@@ -4,14 +4,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
+import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
 import io.github.zenhelix.dependanger.maven.pom.writer.PomWriter
 import io.github.zenhelix.dependanger.maven.pom.writer.PomWriterConfig
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.nio.file.Path
 
 public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<String> {
@@ -35,12 +34,8 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
 
     override fun write(artifact: String, output: Path) {
         val targetFile = output.resolve(config.filename)
-
         logger.info { "Writing BOM to: $targetFile" }
-
-        Files.createDirectories(targetFile.parent)
-        Files.writeString(targetFile, artifact, StandardCharsets.UTF_8)
-
+        writeStringArtifact(artifact, output, config.filename)
         logger.info { "BOM written successfully: $targetFile (${artifact.length} chars)" }
     }
 

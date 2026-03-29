@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
-import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 
 internal fun tree(
     group: String,

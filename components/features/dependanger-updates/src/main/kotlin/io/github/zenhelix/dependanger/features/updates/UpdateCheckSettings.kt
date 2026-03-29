@@ -3,11 +3,10 @@ package io.github.zenhelix.dependanger.features.updates
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Repository
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
-import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 public val UpdateCheckSettingsKey: ProcessingContextKey<UpdateCheckSettings> =
     ProcessingContextKey("updateCheck")
@@ -41,14 +40,11 @@ public data class UpdateCheckSettings(
     }
 }
 
-public class UpdateCheckSettingsProvider : FeatureSettingsProvider {
-    override val settingsKey: String = "updateCheck"
-
-    override fun deserialize(json: JsonElement): Pair<ProcessingContextKey<*>, Any> {
-        val settings = Json.decodeFromJsonElement(UpdateCheckSettings.serializer(), json)
-        return UpdateCheckSettingsKey to settings
-    }
-}
+public class UpdateCheckSettingsProvider : AbstractFeatureSettingsProvider<UpdateCheckSettings>(
+    settingsKey = "updateCheck",
+    contextKey = UpdateCheckSettingsKey,
+    serializer = UpdateCheckSettings.serializer(),
+)
 
 @DependangerDslMarker
 public class UpdateCheckSettingsDsl {

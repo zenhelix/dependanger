@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
+import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.VersionReference
@@ -18,8 +19,10 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
+import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}
@@ -43,10 +46,12 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             ?: DependangerPaths.resolveInUserHome(DependangerPaths.BOM_CACHE_DIR)
         val repositories = context.resolveMavenRepositories()
         val credentialsProvider = context[CredentialsProviderKey]
+        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
 
         BomResolutionContext(
             repositories = repositories,
             credentialsProvider = credentialsProvider,
+            httpClientFactory = httpClientFactory,
             cacheDirectory = cacheDir,
             ttlHours = bomCache.ttlHours,
             ttlSnapshotHours = bomCache.ttlSnapshotHours,
@@ -377,12 +382,13 @@ private data class ResolutionState(
 private class BomResolutionContext(
     repositories: List<MavenRepository>,
     credentialsProvider: CredentialsProvider?,
+    httpClientFactory: HttpClientFactory,
     cacheDirectory: String,
     ttlHours: Long,
     ttlSnapshotHours: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = HttpClientFactory.create {
+    val httpClient: HttpClient = httpClientFactory.create {
         connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
         requestTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS
         keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS

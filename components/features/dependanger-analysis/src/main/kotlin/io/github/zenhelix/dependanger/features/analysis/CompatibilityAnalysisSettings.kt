@@ -3,11 +3,10 @@ package io.github.zenhelix.dependanger.features.analysis
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Severity
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
-import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 public val CompatibilityAnalysisSettingsKey: ProcessingContextKey<CompatibilityAnalysisSettings> =
     ProcessingContextKey("compatibilityAnalysis")
@@ -31,14 +30,11 @@ public data class CompatibilityAnalysisSettings(
     }
 }
 
-public class CompatibilityAnalysisSettingsProvider : FeatureSettingsProvider {
-    override val settingsKey: String = "compatibilityAnalysis"
-
-    override fun deserialize(json: JsonElement): Pair<ProcessingContextKey<*>, Any> {
-        val settings = Json.decodeFromJsonElement(CompatibilityAnalysisSettings.serializer(), json)
-        return CompatibilityAnalysisSettingsKey to settings
-    }
-}
+public class CompatibilityAnalysisSettingsProvider : AbstractFeatureSettingsProvider<CompatibilityAnalysisSettings>(
+    settingsKey = "compatibilityAnalysis",
+    contextKey = CompatibilityAnalysisSettingsKey,
+    serializer = CompatibilityAnalysisSettings.serializer(),
+)
 
 @DependangerDslMarker
 public class CompatibilityAnalysisSettingsDsl {

@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.cli
 
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationsExtensionKey
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationsExtensionKey
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach

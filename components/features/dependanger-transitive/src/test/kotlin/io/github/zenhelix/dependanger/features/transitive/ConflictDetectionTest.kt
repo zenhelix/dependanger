@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.features.transitive
 
-import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.VersionReference
+import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutionStrategy
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

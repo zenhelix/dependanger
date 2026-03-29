@@ -3,11 +3,10 @@ package io.github.zenhelix.dependanger.features.security
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Severity
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
-import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 public val SecurityCheckSettingsKey: ProcessingContextKey<SecurityCheckSettings> =
     ProcessingContextKey("securityCheck")
@@ -41,14 +40,11 @@ public data class SecurityCheckSettings(
     }
 }
 
-public class SecurityCheckSettingsProvider : FeatureSettingsProvider {
-    override val settingsKey: String = "securityCheck"
-
-    override fun deserialize(json: JsonElement): Pair<ProcessingContextKey<*>, Any> {
-        val settings = Json.decodeFromJsonElement(SecurityCheckSettings.serializer(), json)
-        return SecurityCheckSettingsKey to settings
-    }
-}
+public class SecurityCheckSettingsProvider : AbstractFeatureSettingsProvider<SecurityCheckSettings>(
+    settingsKey = "securityCheck",
+    contextKey = SecurityCheckSettingsKey,
+    serializer = SecurityCheckSettings.serializer(),
+)
 
 @DependangerDslMarker
 public class SecurityCheckSettingsDsl {

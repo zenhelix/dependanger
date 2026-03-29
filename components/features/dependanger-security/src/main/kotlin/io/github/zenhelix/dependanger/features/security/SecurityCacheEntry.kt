@@ -1,6 +1,6 @@
 package io.github.zenhelix.dependanger.features.security
 
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 

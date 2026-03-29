@@ -9,8 +9,8 @@ description = "Dependanger License - License compliance checking via Maven POM /
 dependencies {
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
+    api(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.features.dependangerMavenResolver)
-    implementation(projects.components.features.dependangerTransitive)
     implementation(projects.components.shared.dependangerHttpClient)
     implementation(projects.components.shared.dependangerCache)
     implementation(libs.kotlinx.serialization.json)

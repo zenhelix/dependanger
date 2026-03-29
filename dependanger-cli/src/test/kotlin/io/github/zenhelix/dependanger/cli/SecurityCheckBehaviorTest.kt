@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.cli
 
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach

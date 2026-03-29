@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.updates.model
+package io.github.zenhelix.dependanger.feature.model.updates
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey

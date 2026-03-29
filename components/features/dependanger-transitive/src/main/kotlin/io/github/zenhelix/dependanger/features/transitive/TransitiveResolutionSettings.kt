@@ -3,19 +3,14 @@ package io.github.zenhelix.dependanger.features.transitive
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Repository
-import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
-import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
+import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutionStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 public val TransitiveResolutionSettingsKey: ProcessingContextKey<TransitiveResolutionSettings> =
     ProcessingContextKey("transitiveResolution")
-
-@Serializable
-public enum class ConflictResolutionStrategy {
-    HIGHEST, FIRST, FAIL, CONSTRAINT
-}
 
 @Serializable
 public data class TransitiveResolutionSettings(
@@ -46,14 +41,11 @@ public data class TransitiveResolutionSettings(
     }
 }
 
-public class TransitiveResolutionSettingsProvider : FeatureSettingsProvider {
-    override val settingsKey: String = "transitiveResolution"
-
-    override fun deserialize(json: JsonElement): Pair<ProcessingContextKey<*>, Any> {
-        val settings = Json.decodeFromJsonElement(TransitiveResolutionSettings.serializer(), json)
-        return TransitiveResolutionSettingsKey to settings
-    }
-}
+public class TransitiveResolutionSettingsProvider : AbstractFeatureSettingsProvider<TransitiveResolutionSettings>(
+    settingsKey = "transitiveResolution",
+    contextKey = TransitiveResolutionSettingsKey,
+    serializer = TransitiveResolutionSettings.serializer(),
+)
 
 @DependangerDslMarker
 public class TransitiveResolutionSettingsDsl {

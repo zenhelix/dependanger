@@ -1,17 +1,25 @@
 package io.github.zenhelix.dependanger.features.report.mapper
 
 import io.github.zenhelix.dependanger.core.model.Constraint
-import io.github.zenhelix.dependanger.effective.spi.ReportSection
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
 import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
-import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
-import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.model.licenseViolations
+import io.github.zenhelix.dependanger.effective.spi.ReportSection
+import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
+import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.license.licenseViolations
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.security.vulnerabilities
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
+import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
+import io.github.zenhelix.dependanger.feature.model.transitive.versionConflicts
+import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.feature.model.updates.updates
 import io.github.zenhelix.dependanger.features.report.model.ReportBundle
 import io.github.zenhelix.dependanger.features.report.model.ReportCompatibilityIssue
 import io.github.zenhelix.dependanger.features.report.model.ReportConflict
@@ -28,14 +36,6 @@ import io.github.zenhelix.dependanger.features.report.model.ReportUpdate
 import io.github.zenhelix.dependanger.features.report.model.ReportValidation
 import io.github.zenhelix.dependanger.features.report.model.ReportVersion
 import io.github.zenhelix.dependanger.features.report.model.ReportVulnerability
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
-import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.security.model.vulnerabilities
-import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
-import io.github.zenhelix.dependanger.features.transitive.model.flatDependencies
-import io.github.zenhelix.dependanger.features.transitive.model.versionConflicts
-import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.updates.model.updates
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 

@@ -39,10 +39,10 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
     override val description: String = "Checks for available library updates"
 
     override fun supports(context: ProcessingContext): Boolean =
-        context.settings.updateCheck.enabled
+        context[UpdateCheckSettingsKey]?.enabled == true
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
-        val settings = context.settings.updateCheck
+        val settings = context.require(UpdateCheckSettingsKey)
         val repositories = settings.repositories
             .filterIsInstance<MavenRepository>()
             .ifEmpty {

@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import java.nio.file.Path
 
 public class RemoveBundleCommand : CliktCommand(name = "remove-bundle") {
     override fun help(context: Context): String = "Remove a bundle from metadata.json"
@@ -15,5 +16,31 @@ public class RemoveBundleCommand : CliktCommand(name = "remove-bundle") {
     public val output: String? by option("-o", "--output", help = "Output file")
     public val force: Boolean by option("-f", "--force", help = "Skip dependency checks").flag()
 
-    override fun run(): Unit = TODO()
+    override fun run() {
+        val formatter = OutputFormatter()
+        val metadataService = MetadataService()
+        withErrorHandling(formatter) {
+            val inputPath = Path.of(input)
+            val outputPath = Path.of(output ?: input)
+            val metadata = metadataService.read(inputPath)
+
+            if (metadata.bundles.none { it.alias == name }) {
+                throw CliException.AliasNotFound("Bundle", name)
+            }
+
+            if (!force) {
+                val referencingBundles = metadata.bundles
+                    .filter { it.alias != name && name in it.extends }
+                    .map { it.alias }
+                if (referencingBundles.isNotEmpty()) {
+                    throw CliException.ReferenceConflict(name, referencingBundles)
+                }
+            }
+
+            val updated = metadata.copy(bundles = metadata.bundles.filter { it.alias != name })
+
+            metadataService.write(updated, outputPath)
+            formatter.success("Removed bundle '$name'")
+        }
+    }
 }

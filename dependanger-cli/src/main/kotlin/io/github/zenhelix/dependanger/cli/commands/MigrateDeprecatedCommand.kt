@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import java.nio.file.Path
 
 public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated") {
     override fun help(context: Context): String = "Migrate deprecated libraries to their replacements"
@@ -17,5 +18,76 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
     public val backup: Boolean by option("--backup", help = "Create backup before modifying").flag()
 
-    override fun run(): Unit = TODO()
+    override fun run() {
+        val formatter = OutputFormatter()
+        val metadataService = MetadataService()
+        withErrorHandling(formatter) {
+            val inputPath = Path.of(input)
+            val outputPath = Path.of(output ?: input)
+            val metadata = metadataService.read(inputPath)
+
+            val deprecated = metadata.libraries.filter { it.deprecation != null }
+
+            if (deprecated.isEmpty()) {
+                formatter.info("No deprecated libraries found")
+                return@withErrorHandling
+            }
+
+            val headers = listOf("Alias", "Replaced By", "Message")
+            val rows = deprecated.map { lib ->
+                listOf(
+                    lib.alias,
+                    lib.deprecation?.replacedBy ?: "-",
+                    lib.deprecation?.message ?: "-",
+                )
+            }
+
+            if (dryRun) {
+                formatter.info("Migration plan (dry run):")
+                formatter.renderTable(headers, rows)
+                return@withErrorHandling
+            }
+
+            formatter.renderTable(headers, rows)
+
+            if (backup) {
+                val backupPath = Path.of("$input.bak")
+                metadataService.write(metadata, backupPath)
+                formatter.info("Backup saved to '$backupPath'")
+            }
+
+            val deprecatedAliases = deprecated.map { it.alias }.toSet()
+            val replacementMap = deprecated
+                .filter { it.deprecation?.replacedBy != null }
+                .associate { it.alias to it.deprecation!!.replacedBy!! }
+
+            val updatedBundles = metadata.bundles.map { bundle ->
+                val updatedLibraries = bundle.libraries.flatMap { libAlias ->
+                    when {
+                        removeFromBundles && libAlias in deprecatedAliases -> emptyList()
+                        replace && libAlias in replacementMap              -> listOf(replacementMap.getValue(libAlias))
+                        else                                               -> listOf(libAlias)
+                    }
+                }
+                bundle.copy(libraries = updatedLibraries)
+            }
+
+            val updatedLibraries = if (remove) {
+                metadata.libraries.filter { it.deprecation == null }
+            } else {
+                metadata.libraries
+            }
+
+            val updated = metadata.copy(
+                libraries = updatedLibraries,
+                bundles = updatedBundles,
+            )
+
+            metadataService.write(updated, outputPath)
+
+            val removedCount = if (remove) deprecated.size else 0
+            val replacedCount = replacementMap.size
+            formatter.success("Migration complete: $replacedCount replaced, $removedCount removed")
+        }
+    }
 }

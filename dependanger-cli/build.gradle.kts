@@ -8,6 +8,12 @@ description = "Dependanger CLI - Command-line interface"
 
 dependencies {
     implementation(projects.components.api.dependangerApi)
+    implementation(projects.components.features.dependangerUpdates)
+    implementation(projects.components.features.dependangerSecurity)
+    implementation(projects.components.features.dependangerLicense)
+    implementation(projects.components.features.dependangerTransitive)
+    implementation(projects.components.features.dependangerAnalysis)
+    implementation(projects.components.features.dependangerReport)
     implementation(libs.clikt)
     implementation(libs.mordant)
     implementation(libs.kotlinx.coroutines.core)

@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.coreProcessors
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import java.util.ServiceLoader
 
@@ -17,6 +18,7 @@ public class DependangerBuilder {
     private val additionalProcessors: MutableList<EffectiveMetadataProcessor> = mutableListOf()
     private val disabledProcessorIds: MutableSet<String> = mutableSetOf()
     private var pipelineCustomizer: (PipelineBuilder.() -> Unit)? = null
+    private val contextProperties: MutableMap<ProcessingContextKey<*>, Any> = mutableMapOf()
 
     public constructor(dslBlock: DependangerDsl.() -> Unit) {
         this.dslBlock = dslBlock
@@ -62,6 +64,10 @@ public class DependangerBuilder {
         }
     }
 
+    public fun <T : Any> withContextProperty(key: ProcessingContextKey<T>, value: T): DependangerBuilder = apply {
+        contextProperties[key] = value
+    }
+
     public fun build(): Dependanger {
         val resolvedMetadata = resolveMetadata()
         return Dependanger(
@@ -73,6 +79,7 @@ public class DependangerBuilder {
             additionalProcessors = additionalProcessors.toList(),
             disabledProcessorIds = disabledProcessorIds.toSet(),
             pipelineCustomizer = pipelineCustomizer,
+            contextProperties = contextProperties.toMap(),
         )
     }
 

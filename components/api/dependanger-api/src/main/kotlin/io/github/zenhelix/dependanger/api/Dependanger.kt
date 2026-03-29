@@ -9,10 +9,13 @@ import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
+import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
+import java.util.ServiceLoader
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -51,6 +54,7 @@ public class Dependanger internal constructor(
     private val additionalProcessors: List<EffectiveMetadataProcessor>,
     private val disabledProcessorIds: Set<String>,
     private val pipelineCustomizer: (PipelineBuilder.() -> Unit)?,
+    private val contextProperties: Map<ProcessingContextKey<*>, Any>,
 ) {
     public suspend fun process(
         distribution: String? = null,
@@ -129,14 +133,28 @@ public class Dependanger internal constructor(
     private fun baseContext(
         distribution: String? = null,
         callback: ProcessingCallback? = null,
-    ): ProcessingContext = ProcessingContext(
-        originalMetadata = metadata,
-        settings = metadata.settings,
-        environment = environment,
-        activeDistribution = distribution,
-        callback = callback,
-        properties = emptyMap(),
-    )
+    ): ProcessingContext {
+        val settingsProviders = ServiceLoader.load(FeatureSettingsProvider::class.java)
+        val resolvedProperties = buildMap<ProcessingContextKey<*>, Any> {
+            for (provider in settingsProviders) {
+                val json = metadata.settings.customSettings[provider.settingsKey]
+                if (json != null) {
+                    val (key, value) = provider.deserialize(json)
+                    put(key, value)
+                }
+            }
+            putAll(contextProperties)
+        }
+
+        return ProcessingContext(
+            originalMetadata = metadata,
+            settings = metadata.settings,
+            environment = environment,
+            activeDistribution = distribution ?: metadata.settings.defaultDistribution,
+            callback = callback,
+            properties = resolvedProperties,
+        )
+    }
 
     private fun buildPipeline(): ProcessingPipeline = ProcessingPipeline {
         addProcessors(coreProcessors)

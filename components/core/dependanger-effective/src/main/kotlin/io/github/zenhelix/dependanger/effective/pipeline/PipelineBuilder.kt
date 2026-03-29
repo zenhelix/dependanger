@@ -1,12 +1,14 @@
 package io.github.zenhelix.dependanger.effective.pipeline
 
+import io.github.zenhelix.dependanger.effective.coreProcessors
+
 public class PipelineBuilder {
     private val processors: MutableList<EffectiveMetadataProcessor> = mutableListOf()
     private val enabledOptionalIds: MutableSet<String> = mutableSetOf()
     private val disabledIds: MutableSet<String> = mutableSetOf()
 
     public fun addCoreProcessors() {
-        processors.addAll(io.github.zenhelix.dependanger.effective.coreProcessors())
+        processors.addAll(coreProcessors())
     }
 
     public fun addProcessor(processor: EffectiveMetadataProcessor) {

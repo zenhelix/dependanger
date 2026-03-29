@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.cli
 
+import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.VersionReference
 
 public data class MavenCoordinates(
@@ -30,3 +31,8 @@ public fun parseVersionRef(raw: String?): VersionReference? {
 
 public fun parseCommaSeparated(raw: String?): List<String> =
     raw?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+
+public fun parseMavenRepositories(raw: String?): List<MavenRepository>? =
+    raw?.split(",")?.mapIndexed { i, url ->
+        MavenRepository(url = url.trim(), name = "cli-repo-$i")
+    }

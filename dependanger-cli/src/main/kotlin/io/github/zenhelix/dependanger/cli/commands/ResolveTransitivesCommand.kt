@@ -28,7 +28,7 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
 
     public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file")
-    public val format: String by option("--format", help = "Format: json, yaml, tree, text").default(CliDefaults.OUTPUT_FORMAT_TEXT)
+    public val format: String by option("--format", help = "Format: json, text").default(CliDefaults.OUTPUT_FORMAT_TEXT)
     public val depth: Int? by option("--depth", help = "Max resolution depth").int()
     public val includeOptional: Boolean by option("--include-optional", help = "Include optional deps").flag()
     public val repositories: String? by option("--repositories", help = "Maven repos (comma-separated)")
@@ -60,6 +60,8 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
                     maxDepth = depth ?: metadata.settings.transitiveResolution.maxDepth,
                     includeOptional = includeOptional,
                     conflictResolution = strategy,
+                    repositories = parseMavenRepositories(repositories) ?: metadata.settings.transitiveResolution.repositories,
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.transitiveResolution.cacheTtlHours,
                 )
             )
             val updatedMetadata = metadata.copy(settings = updatedSettings)

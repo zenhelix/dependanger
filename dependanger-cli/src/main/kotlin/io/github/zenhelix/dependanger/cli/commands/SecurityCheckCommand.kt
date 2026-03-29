@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.vulnerabilities
+import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
@@ -30,7 +31,8 @@ public class SecurityCheckCommand : CliktCommand(name = "security-check") {
 
     override fun run() {
         val jsonMode = format == CliDefaults.OUTPUT_FORMAT_JSON
-        val formatter = OutputFormatter(jsonMode = jsonMode)
+        val sarifMode = format == CliDefaults.OUTPUT_FORMAT_SARIF
+        val formatter = OutputFormatter(jsonMode = jsonMode || sarifMode)
         val metadataService = MetadataService()
 
         withErrorHandling(formatter) {
@@ -50,6 +52,7 @@ public class SecurityCheckCommand : CliktCommand(name = "security-check") {
                 securityCheck = metadata.settings.securityCheck.copy(
                     enabled = true,
                     ignoreVulnerabilities = ignore,
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.securityCheck.cacheTtlHours,
                 )
             )
             val updatedMetadata = metadata.copy(settings = updatedSettings)
@@ -64,7 +67,9 @@ public class SecurityCheckCommand : CliktCommand(name = "security-check") {
 
             val vulnerabilities = result.vulnerabilities
 
-            if (jsonMode) {
+            if (sarifMode) {
+                echo(renderSarif(vulnerabilities))
+            } else if (jsonMode) {
                 formatter.renderJson(vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
             } else {
                 if (vulnerabilities.isEmpty()) {
@@ -87,8 +92,12 @@ public class SecurityCheckCommand : CliktCommand(name = "security-check") {
 
             output?.let { outputFile ->
                 val outputPath = Path.of(outputFile)
-                val jsonString = CliDefaults.CLI_JSON.encodeToString(ListSerializer(VulnerabilityInfo.serializer()), vulnerabilities)
-                outputPath.writeText(jsonString)
+                val outputContent = if (sarifMode) {
+                    renderSarif(vulnerabilities)
+                } else {
+                    CliDefaults.CLI_JSON.encodeToString(ListSerializer(VulnerabilityInfo.serializer()), vulnerabilities)
+                }
+                outputPath.writeText(outputContent)
                 formatter.success("Report written to $outputPath")
             }
 

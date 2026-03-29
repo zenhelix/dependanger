@@ -41,6 +41,8 @@ public class CheckUpdatesCommand : CliktCommand(name = "check-updates") {
                     enabled = true,
                     includePrerelease = includePrerelease,
                     excludePatterns = exclude,
+                    repositories = parseMavenRepositories(repositories) ?: metadata.settings.updateCheck.repositories,
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.updateCheck.cacheTtlHours,
                 )
             )
             val updatedMetadata = metadata.copy(settings = updatedSettings)

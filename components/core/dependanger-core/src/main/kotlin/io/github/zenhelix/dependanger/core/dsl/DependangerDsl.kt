@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonElement
 public class DslExtensionKey<T : Any>(name: String, serializer: KSerializer<T>) : TypedKey<T>(name, serializer)
 
 @DependangerDslMarker
-public class DependangerDsl {
+public class DependangerDsl : DependangerDslApi {
     public val versionsDsl: VersionsDsl = VersionsDsl()
     public val librariesDsl: LibrariesDsl = LibrariesDsl()
     public val pluginsDsl: PluginsDsl = PluginsDsl()
@@ -24,51 +24,51 @@ public class DependangerDsl {
     public val processingDsl: ProcessingDsl = ProcessingDsl()
     private val extensions: MutableMap<DslExtensionKey<*>, Any> = mutableMapOf()
 
-    public fun versions(block: VersionsDsl.() -> Unit) {
+    override public fun versions(block: VersionsDsl.() -> Unit) {
         versionsDsl.apply(block)
     }
 
-    public fun libraries(block: LibrariesDsl.() -> Unit) {
+    override public fun libraries(block: LibrariesDsl.() -> Unit) {
         librariesDsl.apply(block)
     }
 
-    public fun plugins(block: PluginsDsl.() -> Unit) {
+    override public fun plugins(block: PluginsDsl.() -> Unit) {
         pluginsDsl.apply(block)
     }
 
-    public fun bundles(block: BundlesDsl.() -> Unit) {
+    override public fun bundles(block: BundlesDsl.() -> Unit) {
         bundlesDsl.apply(block)
     }
 
-    public fun bomImports(block: BomImportsDsl.() -> Unit) {
+    override public fun bomImports(block: BomImportsDsl.() -> Unit) {
         bomImportsDsl.apply(block)
     }
 
-    public fun targetPlatforms(block: TargetPlatformsDsl.() -> Unit) {
+    override public fun targetPlatforms(block: TargetPlatformsDsl.() -> Unit) {
         targetPlatformsDsl.apply(block)
     }
 
-    public fun distributions(block: DistributionsDsl.() -> Unit) {
+    override public fun distributions(block: DistributionsDsl.() -> Unit) {
         distributionsDsl.apply(block)
     }
 
-    public fun constraints(block: ConstraintsDsl.() -> Unit) {
+    override public fun constraints(block: ConstraintsDsl.() -> Unit) {
         constraintsDsl.apply(block)
     }
 
-    public fun compatibility(block: CompatibilityDsl.() -> Unit) {
+    override public fun compatibility(block: CompatibilityDsl.() -> Unit) {
         compatibilityDsl.apply(block)
     }
 
-    public fun settings(block: SettingsDsl.() -> Unit) {
+    override public fun settings(block: SettingsDsl.() -> Unit) {
         settingsDsl.apply(block)
     }
 
-    public fun presets(block: PresetsDsl.() -> Unit) {
+    override public fun presets(block: PresetsDsl.() -> Unit) {
         presetsDsl.apply(block)
     }
 
-    public fun processing(block: ProcessingDsl.() -> Unit) {
+    override public fun processing(block: ProcessingDsl.() -> Unit) {
         processingDsl.apply(block)
     }
 

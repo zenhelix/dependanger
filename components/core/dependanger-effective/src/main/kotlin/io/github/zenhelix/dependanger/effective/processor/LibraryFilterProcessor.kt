@@ -15,6 +15,8 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.spi.LibraryFilter
+import java.util.ServiceLoader
 
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.LIBRARY_FILTER
@@ -28,24 +30,33 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
-        val distName = metadata.distribution ?: return metadata
-        val distribution = context.originalMetadata.distributions.find { it.name == distName }
-        val spec = distribution?.spec ?: return metadata
+        val distName = metadata.distribution
+        val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
+        val spec = distribution?.spec
+
+        val customFilters = ServiceLoader.load(LibraryFilter::class.java).toList()
+
+        // Nothing to filter
+        if (spec == null && customFilters.isEmpty()) return metadata
 
         var diagnostics = metadata.diagnostics
         val bundleIndex = metadata.bundles
 
         val filtered = metadata.libraries.filter { (alias, lib) ->
-            val passes = passesTagFilter(lib, spec.byTags)
-                    && passesGroupFilter(lib, spec.byGroups)
-                    && passesAliasFilter(alias, spec.byAliases)
-                    && passesBundleFilter(alias, bundleIndex, spec.byBundles)
-                    && passesDeprecatedFilter(lib, spec.byDeprecated)
+            val passesSpec = spec == null || (
+                passesTagFilter(lib, spec.byTags)
+                && passesGroupFilter(lib, spec.byGroups)
+                && passesAliasFilter(alias, spec.byAliases)
+                && passesBundleFilter(alias, bundleIndex, spec.byBundles)
+                && passesDeprecatedFilter(lib, spec.byDeprecated)
+            )
+            val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, lib, context) }
+            val passes = passesSpec && passesCustom
 
             if (!passes) {
                 diagnostics += Diagnostics.info(
                     code = DiagnosticCodes.Library.FILTERED,
-                    message = "Library '$alias' filtered out by distribution '$distName'",
+                    message = "Library '$alias' filtered out by distribution '${distName ?: "custom"}'",
                     processorId = id,
                     context = emptyMap(),
                 )

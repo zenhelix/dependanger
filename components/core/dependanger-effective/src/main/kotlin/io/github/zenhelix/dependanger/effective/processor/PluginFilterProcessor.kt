@@ -8,6 +8,8 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.spi.PluginFilter
+import java.util.ServiceLoader
 
 public class PluginFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PLUGIN_FILTER
@@ -21,22 +23,29 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
-        val distName = metadata.distribution ?: return metadata
-        val distribution = context.originalMetadata.distributions.find { it.name == distName }
-        val tagFilter = distribution?.spec?.byTags ?: return metadata
+        val distName = metadata.distribution
+        val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
+        val tagFilter = distribution?.spec?.byTags
+
+        val customFilters = ServiceLoader.load(PluginFilter::class.java).toList()
+
+        // Nothing to filter
+        if (tagFilter == null && customFilters.isEmpty()) return metadata
 
         val originalPluginsIndex = context.originalMetadata.plugins.associateBy { it.alias }
         var diagnostics = metadata.diagnostics
 
-        val filteredPlugins = metadata.plugins.filter { (alias, _) ->
-            val originalPlugin = originalPluginsIndex[alias]
-            val tags = originalPlugin?.tags ?: emptySet()
+        val filtered = metadata.plugins.filter { (alias, plugin) ->
+            val tags = originalPluginsIndex[alias]?.tags ?: emptySet()
 
-            val passes = passesTagFilter(tags, tagFilter)
+            val passesTagFilter = tagFilter == null || passesTagFilter(tags, tagFilter)
+            val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, plugin, context) }
+            val passes = passesTagFilter && passesCustom
+
             if (!passes) {
                 diagnostics += Diagnostics.info(
                     code = DiagnosticCodes.Plugin.FILTERED,
-                    message = "Plugin '$alias' filtered out by distribution '$distName'",
+                    message = "Plugin '$alias' filtered out by distribution '${distName ?: "custom"}'",
                     processorId = id,
                     context = emptyMap(),
                 )
@@ -44,7 +53,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
             passes
         }
 
-        return metadata.copy(plugins = filteredPlugins, diagnostics = diagnostics)
+        return metadata.copy(plugins = filtered, diagnostics = diagnostics)
     }
 
     private fun passesTagFilter(tags: Set<String>, filter: TagFilter): Boolean {

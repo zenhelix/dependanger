@@ -8,8 +8,8 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
@@ -25,7 +25,7 @@ private val logger = KotlinLogging.logger {}
 private const val OSV_API_URL: String = "https://api.osv.dev"
 private const val OSV_BATCH_SIZE: Int = 1000
 
-public class SecurityCheckProcessor : EffectiveMetadataProcessor {
+public class SecurityCheckProcessor : ParallelMetadataProcessor {
     override val id: String = ProcessorIds.SECURITY_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.SECURITY_CHECK
     override val order: Int = phase.order
@@ -35,7 +35,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[SecurityCheckSettingsKey]?.enabled == true
 
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
         val settings = context.require(SecurityCheckSettingsKey)
         val minSeverity = parseMinSeverity(settings.minSeverity)
 
@@ -47,8 +47,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
                 "No libraries to scan for vulnerabilities",
                 id, emptyMap(),
             )
-            return metadata.copy(diagnostics = metadata.diagnostics + diag)
-                .withExtension(VulnerabilitiesExtensionKey, emptyList())
+            return ParallelResult(diag, mapOf(VulnerabilitiesExtensionKey to emptyList<VulnerabilityInfo>()))
         }
 
         val cacheDir = settings.cacheDirectory
@@ -79,7 +78,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
             }
         }
 
-        var diagnostics = metadata.diagnostics
+        var diagnostics = Diagnostics.EMPTY
         val fetchedVulns = mutableListOf<VulnerabilityInfo>()
 
         if (uncachedPackages.isNotEmpty()) {
@@ -148,8 +147,7 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
 
         diagnostics += buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability)
 
-        return metadata.copy(diagnostics = diagnostics)
-            .withExtension(VulnerabilitiesExtensionKey, allVulns)
+        return ParallelResult(diagnostics, mapOf(VulnerabilitiesExtensionKey to allVulns))
     }
 
     private data class ApiFailureResult(

@@ -13,8 +13,8 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
@@ -31,7 +31,7 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-public class UpdateCheckProcessor : EffectiveMetadataProcessor {
+public class UpdateCheckProcessor : ParallelMetadataProcessor {
     override val id: String = ProcessorIds.UPDATE_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.UPDATE_CHECK
     override val order: Int = phase.order
@@ -41,7 +41,7 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[UpdateCheckSettingsKey]?.enabled == true
 
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
         val settings = context.require(UpdateCheckSettingsKey)
         val repositories = settings.repositories
             .filterIsInstance<MavenRepository>()
@@ -62,8 +62,7 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
 
         if (candidates.isEmpty()) {
             val diag = Diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "No libraries to check for updates", id, emptyMap())
-            return metadata.copy(diagnostics = metadata.diagnostics + diag)
-                .withExtension(UpdatesExtensionKey, emptyList())
+            return ParallelResult(diag, mapOf(UpdatesExtensionKey to emptyList<UpdateAvailableInfo>()))
         }
 
         val cacheDir = settings.cacheDirectory
@@ -90,7 +89,7 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
             }
 
             val updates = results.mapNotNull { it.update }
-            var diagnostics = metadata.diagnostics
+            var diagnostics = Diagnostics.EMPTY
             for (result in results) {
                 diagnostics += result.diagnostics
             }
@@ -115,8 +114,7 @@ public class UpdateCheckProcessor : EffectiveMetadataProcessor {
             }
             diagnostics += summary
 
-            return metadata.copy(diagnostics = diagnostics)
-                .withExtension(UpdatesExtensionKey, updates)
+            return ParallelResult(diagnostics, mapOf(UpdatesExtensionKey to updates))
         }
     }
 

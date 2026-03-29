@@ -80,13 +80,47 @@ public class ProcessingPipeline(
 
         val outputs = coroutineScope {
             processors.map { processor ->
-                async { executeProcessor(processor, base, context) }
+                async { executeParallelProcessor(processor, base, context) }
             }.awaitAll()
         }
 
         val executedIds = outputs.mapNotNull { it.executedId }
-        val merged = mergeParallelResults(base, outputs.map { it.metadata })
+        val merged = mergeParallelResults(base, outputs.map { it.result })
         return GroupResult(merged, executedIds)
+    }
+
+    private suspend fun executeParallelProcessor(
+        processor: EffectiveMetadataProcessor,
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+    ): ParallelProcessorOutput {
+        if (!processor.supports(context)) {
+            return ParallelProcessorOutput(ParallelResult.EMPTY, executedId = null)
+        }
+
+        emitEvent(context, ProcessingEvent.PhaseStarted(processor.phase))
+        val mark = TimeSource.Monotonic.markNow()
+        return try {
+            val result = when (processor) {
+                is ParallelMetadataProcessor -> processor.processParallel(metadata, context)
+                else -> {
+                    // Fallback for legacy processors that don't implement ParallelMetadataProcessor.
+                    // Validate that they didn't modify core fields.
+                    val fullResult = processor.process(metadata, context)
+                    validateParallelResult(metadata, fullResult)
+                    ParallelResult(
+                        diagnostics = collectNewDiagnostics(metadata.diagnostics, fullResult.diagnostics),
+                        extensions = fullResult.extensions - metadata.extensions.keys,
+                    )
+                }
+            }
+            emitNewDiagnostics(context, Diagnostics.EMPTY, result.diagnostics)
+            emitEvent(context, ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
+            ParallelProcessorOutput(result, executedId = processor.id)
+        } catch (e: Throwable) {
+            emitEvent(context, ProcessingEvent.PhaseError(processor.phase, e))
+            throw e
+        }
     }
 
     private suspend fun executeProcessor(
@@ -113,17 +147,14 @@ public class ProcessingPipeline(
 
     private fun mergeParallelResults(
         base: EffectiveMetadata,
-        results: List<EffectiveMetadata>,
-    ): EffectiveMetadata {
-        results.forEach { validateParallelResult(base, it) }
-
-        return results.fold(base) { merged, result ->
+        results: List<ParallelResult>,
+    ): EffectiveMetadata =
+        results.fold(base) { merged, result ->
             merged.copy(
-                diagnostics = merged.diagnostics + collectNewDiagnostics(base.diagnostics, result.diagnostics),
-                extensions = merged.extensions + (result.extensions - base.extensions.keys),
+                diagnostics = merged.diagnostics + result.diagnostics,
+                extensions = merged.extensions + result.extensions,
             )
         }
-    }
 
     private fun validateParallelResult(base: EffectiveMetadata, result: EffectiveMetadata) {
         assertUnchanged("versions", base.versions, result.versions)
@@ -177,6 +208,11 @@ public class ProcessingPipeline(
 
     private data class ProcessorOutput(
         val metadata: EffectiveMetadata,
+        val executedId: String?,
+    )
+
+    private data class ParallelProcessorOutput(
+        val result: ParallelResult,
         val executedId: String?,
     )
 

@@ -8,8 +8,8 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
-import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
@@ -31,7 +31,7 @@ import java.util.ServiceLoader
 
 private val logger = KotlinLogging.logger {}
 
-public class LicenseCheckProcessor : EffectiveMetadataProcessor {
+public class LicenseCheckProcessor : ParallelMetadataProcessor {
     override val id: String = ProcessorIds.LICENSE_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.LICENSE_CHECK
     override val order: Int = phase.order
@@ -41,7 +41,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[LicenseCheckSettingsKey]?.enabled == true
 
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
         val settings = context.require(LicenseCheckSettingsKey)
         val repositories = context.settings.repositories
             .filterIsInstance<MavenRepository>()
@@ -54,7 +54,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
             logger.info { "Loaded ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
         }
 
-        var diagnostics = metadata.diagnostics
+        var diagnostics = Diagnostics.EMPTY
 
         val candidates = metadata.libraries.values.filter { lib ->
             lib.version != null
@@ -87,8 +87,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
 
         if (candidates.isEmpty() && transitiveCandidates.isEmpty()) {
             diagnostics = diagnostics + Diagnostics.info(DiagnosticCodes.License.NO_LIBS, "No libraries to check for licenses", id, emptyMap())
-            return metadata.copy(diagnostics = diagnostics)
-                .withExtension(LicenseViolationsExtensionKey, emptyList())
+            return ParallelResult(diagnostics, mapOf(LicenseViolationsExtensionKey to emptyList<LicenseViolation>()))
         }
 
         LicenseCheckContext(
@@ -201,8 +200,7 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
                 }
             }
 
-            return metadata.copy(diagnostics = diagnostics)
-                .withExtension(LicenseViolationsExtensionKey, allViolations)
+            return ParallelResult(diagnostics, mapOf(LicenseViolationsExtensionKey to allViolations))
         }
     }
 }

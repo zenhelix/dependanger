@@ -39,10 +39,10 @@ public class LicenseCheckProcessor : EffectiveMetadataProcessor {
     override val description: String = "Checks library license compliance"
 
     override fun supports(context: ProcessingContext): Boolean =
-        context.settings.licenseCheck.enabled
+        context[LicenseCheckSettingsKey]?.enabled == true
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
-        val settings = context.settings.licenseCheck
+        val settings = context.require(LicenseCheckSettingsKey)
         val repositories = context.settings.repositories
             .filterIsInstance<MavenRepository>()
             .ifEmpty {

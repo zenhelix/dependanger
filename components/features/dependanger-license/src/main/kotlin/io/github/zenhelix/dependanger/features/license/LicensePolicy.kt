@@ -1,8 +1,6 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.DualLicensePolicy
-import io.github.zenhelix.dependanger.core.model.LicenseCheckSettings
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.features.license.model.LicenseCategory

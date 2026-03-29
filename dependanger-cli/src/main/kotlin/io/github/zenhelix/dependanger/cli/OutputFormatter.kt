@@ -12,8 +12,9 @@ import kotlinx.serialization.KSerializer
 
 public class OutputFormatter(
     public val jsonMode: Boolean = false,
+    terminal: Terminal? = null,
 ) {
-    private val terminal: Terminal = Terminal()
+    private val terminal: Terminal = terminal ?: Terminal()
 
     public fun success(message: String) {
         if (!jsonMode) {

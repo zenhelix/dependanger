@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -18,7 +19,7 @@ public class RemoveVersionCommand : CliktCommand(name = "remove-version") {
     public val force: Boolean by option("-f", "--force", help = "Skip reference checks").flag()
 
     override fun run() {
-        val formatter = OutputFormatter()
+        val formatter = OutputFormatter(terminal = terminal)
         val metadataService = MetadataService()
         withErrorHandling(formatter) {
             val inputPath = Path.of(input)

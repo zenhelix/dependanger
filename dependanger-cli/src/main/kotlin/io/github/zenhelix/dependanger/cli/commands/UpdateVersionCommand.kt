@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -19,7 +20,7 @@ public class UpdateVersionCommand : CliktCommand(name = "update-version") {
     public val library: Boolean by option("-l", "--library", help = "Update library version").flag()
 
     override fun run() {
-        val formatter = OutputFormatter()
+        val formatter = OutputFormatter(terminal = terminal)
         val metadataService = MetadataService()
         withErrorHandling(formatter) {
             val inputPath = Path.of(input)

@@ -126,7 +126,10 @@ object CliTestSupport {
         ),
     )
 
-    fun mockDependangerResult(extensions: Map<ExtensionKey<*>, Any> = emptyMap()): AutoCloseable {
+    fun mockDependangerResult(
+        extensions: Map<ExtensionKey<*>, Any> = emptyMap(),
+        diagnostics: Diagnostics = Diagnostics.EMPTY,
+    ): AutoCloseable {
         val effective = EffectiveMetadata(
             schemaVersion = "1.0",
             distribution = null,
@@ -134,17 +137,19 @@ object CliTestSupport {
             libraries = emptyMap(),
             plugins = emptyMap(),
             bundles = emptyMap(),
-            diagnostics = Diagnostics.EMPTY,
+            diagnostics = diagnostics,
             processingInfo = null,
             extensions = extensions,
         )
-        val result = DependangerResult(effective = effective, diagnostics = Diagnostics.EMPTY)
+        val result = DependangerResult(effective = effective, diagnostics = diagnostics)
 
         val mockDependanger = mockk<Dependanger>()
         coEvery { mockDependanger.process(any(), any()) } returns result
+        coEvery { mockDependanger.validate() } returns result
 
         val mockBuilder = mockk<DependangerBuilder>()
         every { mockBuilder.preset(any()) } returns mockBuilder
+        every { mockBuilder.disableProcessor(any()) } returns mockBuilder
         every { mockBuilder.build() } returns mockDependanger
 
         mockkObject(Dependanger.Companion)

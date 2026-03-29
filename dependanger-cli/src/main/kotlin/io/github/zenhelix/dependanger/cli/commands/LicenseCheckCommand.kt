@@ -3,6 +3,7 @@ package io.github.zenhelix.dependanger.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -29,7 +30,7 @@ public class LicenseCheckCommand : CliktCommand(name = "license-check") {
 
     override fun run() {
         val jsonMode = format == CliDefaults.OUTPUT_FORMAT_JSON
-        val formatter = OutputFormatter(jsonMode = jsonMode)
+        val formatter = OutputFormatter(jsonMode = jsonMode, terminal = terminal)
         val metadataService = MetadataService()
 
         withErrorHandling(formatter) {

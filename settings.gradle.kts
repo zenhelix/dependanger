@@ -21,6 +21,7 @@ pluginManagement {
 
 include(":dependanger-gradle-plugin")
 include(":dependanger-cli")
+include(":integration-tests")
 
 // Core modules (MODEL layer)
 include(":components:core:dependanger-core")

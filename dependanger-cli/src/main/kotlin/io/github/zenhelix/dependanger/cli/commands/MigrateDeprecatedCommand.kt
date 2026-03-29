@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -19,7 +20,7 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
     public val backup: Boolean by option("--backup", help = "Create backup before modifying").flag()
 
     override fun run() {
-        val formatter = OutputFormatter()
+        val formatter = OutputFormatter(terminal = terminal)
         val metadataService = MetadataService()
         withErrorHandling(formatter) {
             val inputPath = Path.of(input)

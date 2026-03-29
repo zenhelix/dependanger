@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
@@ -21,7 +22,7 @@ public class ProcessCommand : CliktCommand(name = "process") {
     public val disableProcessor: List<String> by option("--disable-processor", help = "Disable a processor by ID").multiple()
 
     override fun run() {
-        val formatter = OutputFormatter(jsonMode = false)
+        val formatter = OutputFormatter(jsonMode = false, terminal = terminal)
         val metadataService = MetadataService()
 
         withErrorHandling(formatter) {

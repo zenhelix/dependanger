@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
@@ -24,7 +25,7 @@ public class AddDistributionCommand : CliktCommand(name = "add-distribution") {
     public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
 
     override fun run() {
-        val formatter = OutputFormatter()
+        val formatter = OutputFormatter(terminal = terminal)
         val metadataService = MetadataService()
         withErrorHandling(formatter) {
             val inputPath = Path.of(input)

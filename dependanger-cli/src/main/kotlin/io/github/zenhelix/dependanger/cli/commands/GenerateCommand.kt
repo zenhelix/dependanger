@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -30,7 +31,7 @@ public class GenerateCommand : CliktCommand(name = "generate") {
     public val bomIncludeOptional: Boolean by option("--bom-include-optional", help = "Include optional").flag()
 
     override fun run() {
-        val formatter = OutputFormatter(jsonMode = false)
+        val formatter = OutputFormatter(jsonMode = false, terminal = terminal)
         val metadataService = MetadataService()
 
         withErrorHandling(formatter) {

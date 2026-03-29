@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
@@ -15,7 +16,7 @@ public class InitCommand : CliktCommand(name = "init") {
     public val force: Boolean by option("-f", "--force", help = "Overwrite existing file").flag()
 
     override fun run() {
-        val formatter = OutputFormatter(jsonMode = false)
+        val formatter = OutputFormatter(jsonMode = false, terminal = terminal)
         val metadataService = MetadataService()
 
         withErrorHandling(formatter) {

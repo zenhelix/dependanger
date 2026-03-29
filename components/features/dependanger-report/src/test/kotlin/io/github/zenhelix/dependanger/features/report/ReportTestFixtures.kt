@@ -2,9 +2,9 @@ package io.github.zenhelix.dependanger.features.report
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.ReportFormat
-import io.github.zenhelix.dependanger.core.model.ReportSection
-import io.github.zenhelix.dependanger.core.model.ReportSettings
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportSection
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion

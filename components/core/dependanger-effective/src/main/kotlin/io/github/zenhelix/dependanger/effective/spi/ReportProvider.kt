@@ -1,7 +1,5 @@
 package io.github.zenhelix.dependanger.effective.spi
 
-import io.github.zenhelix.dependanger.core.model.ReportFormat
-import io.github.zenhelix.dependanger.core.model.ReportSettings
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import java.nio.file.Path

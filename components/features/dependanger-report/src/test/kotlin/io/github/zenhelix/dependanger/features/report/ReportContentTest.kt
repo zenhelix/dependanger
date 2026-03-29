@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.report
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle

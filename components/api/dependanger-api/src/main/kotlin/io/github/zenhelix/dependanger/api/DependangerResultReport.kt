@@ -1,6 +1,6 @@
 package io.github.zenhelix.dependanger.api
 
-import io.github.zenhelix.dependanger.core.model.ReportSettings
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.GeneratedReport
 import io.github.zenhelix.dependanger.effective.spi.ReportProvider

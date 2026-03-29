@@ -3,9 +3,9 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.core.model.ReportFormat
-import io.github.zenhelix.dependanger.core.model.ReportSection
-import io.github.zenhelix.dependanger.core.model.ReportSettings
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportSection
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity

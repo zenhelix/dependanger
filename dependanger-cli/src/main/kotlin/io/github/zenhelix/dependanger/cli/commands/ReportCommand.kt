@@ -9,9 +9,9 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.writeReportTo
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.core.model.ReportFormat
-import io.github.zenhelix.dependanger.core.model.ReportSection
-import io.github.zenhelix.dependanger.core.model.ReportSettings
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportSection
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import java.nio.file.Path
 
 public class ReportCommand : CliktCommand(name = "report") {

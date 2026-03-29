@@ -1,6 +1,6 @@
 package io.github.zenhelix.dependanger.features.report
 
-import io.github.zenhelix.dependanger.core.model.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import kotlinx.serialization.Serializable
 
 @Serializable

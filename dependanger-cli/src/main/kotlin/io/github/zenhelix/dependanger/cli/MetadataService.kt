@@ -12,7 +12,7 @@ public class MetadataService {
     public fun read(path: Path): DependangerMetadata = try {
         format.read(path)
     } catch (e: MetadataReadException) {
-        throw CliException.FileNotFound(path.toString())
+        throw CliException.ParseError("Failed to parse metadata from '$path': ${e.message}", e)
     } catch (e: Exception) {
         throw CliException.ParseError("Failed to read metadata from '$path': ${e.message}", e)
     }

@@ -1,7 +1,6 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
-import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -92,15 +91,13 @@ public class Dependanger internal constructor(
             effective = effective,
             diagnostics = effective.diagnostics,
         )
+    } catch (e: DependangerException) {
+        throw e
+    } catch (e: PipelineConfigurationException) {
+        throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
     } catch (e: Exception) {
         currentCoroutineContext().ensureActive()
-        val diagnostics = Diagnostics.error(
-            code = "VALIDATION_FAILED",
-            message = "Validation failed: ${e.message}",
-            processorId = null,
-            context = emptyMap(),
-        )
-        DependangerResult(effective = null, diagnostics = diagnostics)
+        throw DependangerProcessingException("Validation failed: ${e.message}", phase = null, cause = e)
     }
 
     public suspend fun previewFilter(distribution: String): FilterPreview {

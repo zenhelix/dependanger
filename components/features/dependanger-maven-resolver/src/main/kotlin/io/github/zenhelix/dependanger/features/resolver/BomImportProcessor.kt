@@ -17,6 +17,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.ktor.client.HttpClient
@@ -40,11 +41,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
         val bomCache = context[BomCacheSettingsKey] ?: BomCacheSettings.DEFAULT
         val cacheDir = bomCache.directory
             ?: DependangerPaths.resolveInUserHome(DependangerPaths.BOM_CACHE_DIR)
-        val repositories = context.settings.repositories
-            .filterIsInstance<MavenRepository>()
-            .ifEmpty {
-                listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
-            }
+        val repositories = context.resolveMavenRepositories()
         val credentialsProvider = context[CredentialsProviderKey]
 
         BomResolutionContext(

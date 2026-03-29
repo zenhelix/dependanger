@@ -13,7 +13,7 @@ public abstract class GenerateTomlTask : AbstractDependangerTask() {
     @TaskAction
     public fun execute() {
         val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
-        val effective = DependangerTaskHelper.readEffective(outputDir)
+        val effective = DependangerTaskHelper.readEffective(outputDir, logger)
 
         val result = DependangerResult(
             effective = effective,

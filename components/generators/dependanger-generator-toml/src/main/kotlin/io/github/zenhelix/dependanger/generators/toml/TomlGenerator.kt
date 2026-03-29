@@ -89,13 +89,7 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
     }
 
     private fun buildDeprecationComment(lib: EffectiveLibrary): String {
-        val deprecation = lib.deprecation
-        val parts = buildList {
-            add(if (deprecation?.message != null) "DEPRECATED: ${deprecation.message}" else "DEPRECATED")
-            deprecation?.replacedBy?.let { add("Use $it instead") }
-            deprecation?.removalVersion?.let { add("Removal: $it") }
-        }
-
+        val parts = lib.deprecation?.toCommentParts() ?: listOf("DEPRECATED")
         return "# ${parts.joinToString(". ")}."
     }
 

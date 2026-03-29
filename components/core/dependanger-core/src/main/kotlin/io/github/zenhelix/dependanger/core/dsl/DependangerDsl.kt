@@ -10,65 +10,65 @@ public class DslExtensionKey<T : Any>(name: String, serializer: KSerializer<T>) 
 
 @DependangerDslMarker
 public class DependangerDsl : DependangerDslApi {
-    public val versionsDsl: VersionsDsl = VersionsDsl()
-    public val librariesDsl: LibrariesDsl = LibrariesDsl()
-    public val pluginsDsl: PluginsDsl = PluginsDsl()
-    public val bundlesDsl: BundlesDsl = BundlesDsl()
-    public val bomImportsDsl: BomImportsDsl = BomImportsDsl()
-    public val targetPlatformsDsl: TargetPlatformsDsl = TargetPlatformsDsl()
-    public val distributionsDsl: DistributionsDsl = DistributionsDsl()
-    public val constraintsDsl: ConstraintsDsl = ConstraintsDsl()
-    public val compatibilityDsl: CompatibilityDsl = CompatibilityDsl()
-    public val settingsDsl: SettingsDsl = SettingsDsl()
-    public val presetsDsl: PresetsDsl = PresetsDsl()
-    public val processingDsl: ProcessingDsl = ProcessingDsl()
+    private val versionsDsl: VersionsDsl = VersionsDsl()
+    private val librariesDsl: LibrariesDsl = LibrariesDsl()
+    private val pluginsDsl: PluginsDsl = PluginsDsl()
+    private val bundlesDsl: BundlesDsl = BundlesDsl()
+    private val bomImportsDsl: BomImportsDsl = BomImportsDsl()
+    private val targetPlatformsDsl: TargetPlatformsDsl = TargetPlatformsDsl()
+    private val distributionsDsl: DistributionsDsl = DistributionsDsl()
+    private val constraintsDsl: ConstraintsDsl = ConstraintsDsl()
+    private val compatibilityDsl: CompatibilityDsl = CompatibilityDsl()
+    private val settingsDsl: SettingsDsl = SettingsDsl()
+    private val presetsDsl: PresetsDsl = PresetsDsl()
+    private val processingDsl: ProcessingDsl = ProcessingDsl()
     private val extensions: MutableMap<DslExtensionKey<*>, Any> = mutableMapOf()
 
-    override public fun versions(block: VersionsDsl.() -> Unit) {
+    public override fun versions(block: VersionsDsl.() -> Unit) {
         versionsDsl.apply(block)
     }
 
-    override public fun libraries(block: LibrariesDsl.() -> Unit) {
+    public override fun libraries(block: LibrariesDsl.() -> Unit) {
         librariesDsl.apply(block)
     }
 
-    override public fun plugins(block: PluginsDsl.() -> Unit) {
+    public override fun plugins(block: PluginsDsl.() -> Unit) {
         pluginsDsl.apply(block)
     }
 
-    override public fun bundles(block: BundlesDsl.() -> Unit) {
+    public override fun bundles(block: BundlesDsl.() -> Unit) {
         bundlesDsl.apply(block)
     }
 
-    override public fun bomImports(block: BomImportsDsl.() -> Unit) {
+    public override fun bomImports(block: BomImportsDsl.() -> Unit) {
         bomImportsDsl.apply(block)
     }
 
-    override public fun targetPlatforms(block: TargetPlatformsDsl.() -> Unit) {
+    public override fun targetPlatforms(block: TargetPlatformsDsl.() -> Unit) {
         targetPlatformsDsl.apply(block)
     }
 
-    override public fun distributions(block: DistributionsDsl.() -> Unit) {
+    public override fun distributions(block: DistributionsDsl.() -> Unit) {
         distributionsDsl.apply(block)
     }
 
-    override public fun constraints(block: ConstraintsDsl.() -> Unit) {
+    public override fun constraints(block: ConstraintsDsl.() -> Unit) {
         constraintsDsl.apply(block)
     }
 
-    override public fun compatibility(block: CompatibilityDsl.() -> Unit) {
+    public override fun compatibility(block: CompatibilityDsl.() -> Unit) {
         compatibilityDsl.apply(block)
     }
 
-    override public fun settings(block: SettingsDsl.() -> Unit) {
+    public override fun settings(block: SettingsDsl.() -> Unit) {
         settingsDsl.apply(block)
     }
 
-    override public fun presets(block: PresetsDsl.() -> Unit) {
+    public override fun presets(block: PresetsDsl.() -> Unit) {
         presetsDsl.apply(block)
     }
 
-    override public fun processing(block: ProcessingDsl.() -> Unit) {
+    public override fun processing(block: ProcessingDsl.() -> Unit) {
         processingDsl.apply(block)
     }
 

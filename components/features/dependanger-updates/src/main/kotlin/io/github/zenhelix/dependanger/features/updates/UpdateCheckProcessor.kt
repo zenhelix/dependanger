@@ -18,6 +18,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcess
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
 import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.features.updates.model.UpdatesExtensionKey
@@ -44,15 +45,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
 
     override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
         val settings = context.require(UpdateCheckSettingsKey)
-        val repositories = settings.repositories
-            .filterIsInstance<MavenRepository>()
-            .ifEmpty {
-                context.settings.repositories
-                    .filterIsInstance<MavenRepository>()
-                    .ifEmpty {
-                        listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
-                    }
-            }
+        val repositories = context.resolveMavenRepositories(settings.repositories)
         val credentialsProvider = context[CredentialsProviderKey]
 
         val candidates = metadata.libraries.values.filter { lib ->

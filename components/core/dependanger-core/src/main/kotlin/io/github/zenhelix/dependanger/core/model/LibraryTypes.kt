@@ -8,7 +8,13 @@ public data class DeprecationInfo(
     val message: String?,
     val since: String?,
     val removalVersion: String?,
-)
+) {
+    public fun toCommentParts(): List<String> = buildList {
+        add(if (message != null) "DEPRECATED: $message" else "DEPRECATED")
+        replacedBy?.let { add("Use $it instead") }
+        removalVersion?.let { add("Removal: $it") }
+    }
+}
 
 @Serializable
 public data class Requirements(

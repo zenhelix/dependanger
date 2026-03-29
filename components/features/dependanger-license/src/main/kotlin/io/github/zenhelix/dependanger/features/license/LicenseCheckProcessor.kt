@@ -2,7 +2,6 @@ package io.github.zenhelix.dependanger.features.license
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -13,6 +12,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcess
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.features.license.model.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
@@ -44,11 +44,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
 
     override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
         val settings = context.require(LicenseCheckSettingsKey)
-        val repositories = context.settings.repositories
-            .filterIsInstance<MavenRepository>()
-            .ifEmpty {
-                listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
-            }
+        val repositories = context.resolveMavenRepositories()
         val credentialsProvider = context[CredentialsProviderKey]
         val customProviders = ServiceLoader.load(LicenseSourceProvider::class.java).toList()
         if (customProviders.isNotEmpty()) {

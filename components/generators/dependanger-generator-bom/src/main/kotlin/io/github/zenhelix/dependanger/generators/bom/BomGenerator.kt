@@ -100,14 +100,7 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     }
 
     private fun buildDeprecationComment(lib: EffectiveLibrary): String {
-        val deprecation = lib.deprecation
-        val parts = mutableListOf<String>()
-
-        parts.add(if (deprecation?.message != null) "DEPRECATED: ${deprecation.message}" else "DEPRECATED")
-
-        deprecation?.replacedBy?.let { parts.add("Use $it instead") }
-        deprecation?.removalVersion?.let { parts.add("Removal: $it") }
-
+        val parts = lib.deprecation?.toCommentParts() ?: listOf("DEPRECATED")
         return parts.joinToString(". ")
     }
 

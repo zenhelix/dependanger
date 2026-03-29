@@ -2,7 +2,6 @@ package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -12,6 +11,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
 import io.github.zenhelix.dependanger.features.transitive.model.FlatDependenciesExtensionKey
 import io.github.zenhelix.dependanger.features.transitive.model.TransitivesExtensionKey
@@ -36,15 +36,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
         val settings = context.require(TransitiveResolutionSettingsKey)
-        val repositories = settings.repositories
-            .filterIsInstance<MavenRepository>()
-            .ifEmpty {
-                context.settings.repositories
-                    .filterIsInstance<MavenRepository>()
-                    .ifEmpty {
-                        listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
-                    }
-            }
+        val repositories = context.resolveMavenRepositories(settings.repositories)
         val credentialsProvider = context[CredentialsProviderKey]
         val constraints = context.originalMetadata.constraints
         val effectiveMaxDepth = settings.maxDepth ?: DEFAULT_MAX_DEPTH

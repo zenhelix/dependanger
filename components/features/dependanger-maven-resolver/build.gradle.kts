@@ -10,7 +10,7 @@ dependencies {
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
     api(projects.components.shared.dependangerMavenPom)
-    api(projects.components.shared.dependangerHttpClient)
+    implementation(projects.components.shared.dependangerHttpClient)
     api(projects.components.shared.dependangerCache)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.kotlinx.datetime)

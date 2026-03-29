@@ -12,13 +12,17 @@ internal object DependangerTaskHelper {
     internal const val METADATA_FILE: String = "metadata.json"
     internal const val EFFECTIVE_FILE: String = "effective.json"
 
-    internal fun readEffective(outputDir: File): EffectiveMetadata {
+    internal fun readEffective(outputDir: File, logger: Logger): EffectiveMetadata {
         val effectiveFile = outputDir.resolve(EFFECTIVE_FILE)
         if (!effectiveFile.exists()) {
             throw GradleException("effective.json not found in $outputDir. Ensure dependangerGenerateEffective has been executed.")
         }
         val format = EffectiveJsonFormat()
-        return format.read(effectiveFile.toPath())
+        val result = format.readDetailed(effectiveFile.toPath())
+        result.warnings.forEach { warning ->
+            logger.warn("Dependanger deserialization warning: ${warning.message}")
+        }
+        return result.metadata
     }
 
     internal fun logDiagnostics(result: DependangerResult, logger: Logger) {

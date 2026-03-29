@@ -11,7 +11,7 @@ dependencies {
     api(projects.components.core.dependangerEffective)
     implementation(projects.components.features.dependangerMavenResolver)
     implementation(projects.components.features.dependangerTransitive)
-    api(projects.components.shared.dependangerHttpClient)
+    implementation(projects.components.shared.dependangerHttpClient)
     implementation(projects.components.shared.dependangerCache)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)

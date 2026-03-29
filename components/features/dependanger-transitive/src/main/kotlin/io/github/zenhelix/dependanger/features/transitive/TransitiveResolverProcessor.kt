@@ -31,10 +31,10 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val description: String = "Resolves transitive dependency tree"
 
     override fun supports(context: ProcessingContext): Boolean =
-        context.settings.transitiveResolution.enabled
+        context[TransitiveResolutionSettingsKey]?.enabled == true
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
-        val settings = context.settings.transitiveResolution
+        val settings = context.require(TransitiveResolutionSettingsKey)
         val repositories = settings.repositories
             .filterIsInstance<MavenRepository>()
             .ifEmpty {

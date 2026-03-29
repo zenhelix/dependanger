@@ -1,6 +1,6 @@
 package io.github.zenhelix.dependanger.features.transitive
 
-import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import org.assertj.core.api.Assertions.assertThat

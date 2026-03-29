@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
+import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat

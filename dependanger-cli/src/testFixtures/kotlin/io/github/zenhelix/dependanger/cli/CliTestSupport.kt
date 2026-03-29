@@ -7,7 +7,7 @@ import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.DependangerBuilder
 import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.model.Bundle
-import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Library
 import io.github.zenhelix.dependanger.core.model.Plugin
@@ -150,6 +150,7 @@ object CliTestSupport {
         val mockBuilder = mockk<DependangerBuilder>()
         every { mockBuilder.preset(any()) } returns mockBuilder
         every { mockBuilder.disableProcessor(any()) } returns mockBuilder
+        every { mockBuilder.withContextProperty(any(), any()) } returns mockBuilder
         every { mockBuilder.build() } returns mockDependanger
 
         mockkObject(Dependanger.Companion)

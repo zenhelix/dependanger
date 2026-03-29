@@ -21,15 +21,11 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
             diagnostics = effective.diagnostics,
         )
 
-        val metadata = extension.dsl.toMetadata()
-        val bomSettings = metadata.settings.bom
-        val groupId = bomSettings.groupId
-            ?: project.group.toString().takeIf { it.isNotBlank() }
-            ?: throw GradleException("BOM groupId not configured. Set it in dependanger { settings { bom { groupId = \"...\" } } } or set project.group.")
-        val artifactId = bomSettings.artifactId ?: "${project.name}-bom"
-        val version = bomSettings.version
-            ?: project.version.toString().takeIf { it != "unspecified" && it.isNotBlank() }
-            ?: throw GradleException("BOM version not configured. Set it in dependanger { settings { bom { version = \"...\" } } } or set project.version.")
+        val groupId = project.group.toString().takeIf { it.isNotBlank() }
+            ?: throw GradleException("BOM groupId not configured. Set project.group.")
+        val artifactId = "${project.name}-bom"
+        val version = project.version.toString().takeIf { it != "unspecified" && it.isNotBlank() }
+            ?: throw GradleException("BOM version not configured. Set project.version.")
 
         val bomConfig = BomConfig(
             groupId = groupId,
@@ -38,7 +34,7 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
             name = null,
             description = null,
             filename = BomConfig.DEFAULT_FILENAME,
-            includeOptionalDependencies = bomSettings.includeOptionalDependencies,
+            includeOptionalDependencies = false,
             prettyPrint = true,
             includeDeprecationComments = true,
         )

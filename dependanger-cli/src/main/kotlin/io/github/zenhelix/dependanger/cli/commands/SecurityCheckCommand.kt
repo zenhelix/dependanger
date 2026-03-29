@@ -12,6 +12,8 @@ import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.security.SecurityCheckSettings
+import io.github.zenhelix.dependanger.features.security.SecurityCheckSettingsKey
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
 import kotlinx.serialization.builtins.ListSerializer
@@ -49,17 +51,18 @@ public class SecurityCheckCommand : CliktCommand(name = "security-check") {
                 null
             }
 
-            val updatedSettings = metadata.settings.copy(
-                securityCheck = metadata.settings.securityCheck.copy(
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .preset(ProcessingPreset.STRICT)
+                .withContextProperty(SecurityCheckSettingsKey, SecurityCheckSettings(
                     enabled = true,
                     ignoreVulnerabilities = ignore,
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.securityCheck.cacheTtlHours,
-                )
-            )
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
-                .preset(ProcessingPreset.STRICT)
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else SecurityCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                    failOnVulnerability = SecurityCheckSettings.DEFAULT.failOnVulnerability,
+                    minSeverity = SecurityCheckSettings.DEFAULT.minSeverity,
+                    timeout = SecurityCheckSettings.DEFAULT_TIMEOUT_MS,
+                    parallelism = SecurityCheckSettings.DEFAULT_PARALLELISM,
+                    cacheDirectory = null,
+                ))
                 .build()
 
             val result = CoroutineRunner.run {

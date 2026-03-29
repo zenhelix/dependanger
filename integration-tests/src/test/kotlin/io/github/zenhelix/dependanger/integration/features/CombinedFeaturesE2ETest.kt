@@ -9,6 +9,10 @@ import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.license.licenseCheck
+import io.github.zenhelix.dependanger.features.security.securityCheck
+import io.github.zenhelix.dependanger.features.transitive.transitiveResolution
+import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.MavenResponses
 import io.github.zenhelix.dependanger.integration.support.OsvVulnResponse

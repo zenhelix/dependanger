@@ -20,15 +20,7 @@ public abstract class GenerateTomlTask : AbstractDependangerTask() {
             diagnostics = effective.diagnostics,
         )
 
-        val metadata = extension.dsl.toMetadata()
-        val tomlSettings = metadata.settings.toml
-        val tomlConfig = TomlConfig(
-            filename = tomlSettings.filename,
-            includeComments = tomlSettings.includeComments,
-            sortSections = tomlSettings.sortSections,
-            useInlineVersions = tomlSettings.useInlineVersions,
-            includeDeprecationComments = true,
-        )
+        val tomlConfig = TomlConfig.DEFAULT
 
         val outputPath = outputDir.toPath()
         result.writeTomlTo(outputPath, tomlConfig)

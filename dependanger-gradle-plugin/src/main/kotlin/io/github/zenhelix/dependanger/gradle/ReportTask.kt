@@ -33,8 +33,7 @@ public abstract class ReportTask : AbstractDependangerTask() {
 
             // TODO: Report generation depends on dependanger-report module being on classpath.
             // If ReportProvider SPI is not found, writeReportTo will throw DependangerConfigurationException.
-            val reportSettings = metadata.settings.report
-            result.writeReportTo(reportSettings)
+            result.writeReportTo()
 
             logger.lifecycle("Dependanger: Report generated -> $outputDir")
         }

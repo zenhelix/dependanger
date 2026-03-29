@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.license.LicenseCheckSettings
+import io.github.zenhelix.dependanger.features.license.LicenseCheckSettingsKey
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolation
 import io.github.zenhelix.dependanger.features.license.model.LicenseViolationType
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,23 +38,28 @@ public class LicenseCheckCommand : CliktCommand(name = "license-check") {
         withErrorHandling(formatter) {
             val metadata = metadataService.read(Path.of(input))
 
-            val allowedLicenses = allow?.split(",")?.map { it.trim() } ?: metadata.settings.licenseCheck.allowedLicenses
-            val deniedLicenses = deny?.split(",")?.map { it.trim() } ?: metadata.settings.licenseCheck.deniedLicenses
+            val allowedLicenses = allow?.split(",")?.map { it.trim() } ?: LicenseCheckSettings.DEFAULT.allowedLicenses
+            val deniedLicenses = deny?.split(",")?.map { it.trim() } ?: LicenseCheckSettings.DEFAULT.deniedLicenses
 
-            val updatedSettings = metadata.settings.copy(
-                licenseCheck = metadata.settings.licenseCheck.copy(
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .preset(ProcessingPreset.STRICT)
+                .withContextProperty(LicenseCheckSettingsKey, LicenseCheckSettings(
                     enabled = true,
                     allowedLicenses = allowedLicenses,
                     deniedLicenses = deniedLicenses,
                     failOnDenied = failOnDenied,
                     failOnUnknown = failOnUnknown,
                     includeTransitives = includeTransitives,
-                )
-            )
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
-                .preset(ProcessingPreset.STRICT)
+                    dualLicensePolicy = LicenseCheckSettings.DEFAULT.dualLicensePolicy,
+                    failOnCopyleft = LicenseCheckSettings.DEFAULT.failOnCopyleft,
+                    warnOnCopyleft = LicenseCheckSettings.DEFAULT.warnOnCopyleft,
+                    warnOnUnknown = LicenseCheckSettings.DEFAULT.warnOnUnknown,
+                    ignoreLibraries = LicenseCheckSettings.DEFAULT.ignoreLibraries,
+                    timeout = LicenseCheckSettings.DEFAULT_TIMEOUT_MS,
+                    parallelism = LicenseCheckSettings.DEFAULT_PARALLELISM,
+                    cacheDirectory = null,
+                    cacheTtlHours = LicenseCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                ))
                 .build()
 
             val result = CoroutineRunner.run {

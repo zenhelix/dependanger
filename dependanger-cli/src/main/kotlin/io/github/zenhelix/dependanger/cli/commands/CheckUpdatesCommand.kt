@@ -11,6 +11,8 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.updates.UpdateCheckSettings
+import io.github.zenhelix.dependanger.features.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.features.updates.model.UpdateAvailableInfo
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
@@ -37,19 +39,18 @@ public class CheckUpdatesCommand : CliktCommand(name = "check-updates") {
         withErrorHandling(formatter) {
             val metadata = metadataService.read(Path.of(input))
 
-            val updatedSettings = metadata.settings.copy(
-                updateCheck = metadata.settings.updateCheck.copy(
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .preset(ProcessingPreset.STRICT)
+                .withContextProperty(UpdateCheckSettingsKey, UpdateCheckSettings(
                     enabled = true,
                     includePrerelease = includePrerelease,
                     excludePatterns = exclude,
-                    repositories = parseMavenRepositories(repositories) ?: metadata.settings.updateCheck.repositories,
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.updateCheck.cacheTtlHours,
-                )
-            )
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
-                .preset(ProcessingPreset.STRICT)
+                    repositories = parseMavenRepositories(repositories) ?: emptyList(),
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else UpdateCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                    timeout = UpdateCheckSettings.DEFAULT_TIMEOUT_MS,
+                    parallelism = UpdateCheckSettings.DEFAULT_PARALLELISM,
+                    cacheDirectory = null,
+                ))
                 .build()
 
             val result = CoroutineRunner.run {

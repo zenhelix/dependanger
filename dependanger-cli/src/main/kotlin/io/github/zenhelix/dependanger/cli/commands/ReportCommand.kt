@@ -12,6 +12,8 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.effective.spi.ReportSection
 import io.github.zenhelix.dependanger.effective.spi.ReportSettings
+import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettings
+import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettingsKey
 import java.nio.file.Path
 
 public class ReportCommand : CliktCommand(name = "report") {
@@ -59,18 +61,15 @@ public class ReportCommand : CliktCommand(name = "report") {
                 sections = reportSections,
             )
 
-            val updatedSettings = if (includeTransitives) {
-                metadata.settings.copy(
-                    transitiveResolution = metadata.settings.transitiveResolution.copy(enabled = true)
-                )
-            } else {
-                metadata.settings
-            }
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
+            val builder = Dependanger.fromMetadata(metadata)
                 .preset(ProcessingPreset.STRICT)
-                .build()
+            if (includeTransitives) {
+                builder.withContextProperty(
+                    TransitiveResolutionSettingsKey,
+                    TransitiveResolutionSettings.DEFAULT.copy(enabled = true),
+                )
+            }
+            val dependanger = builder.build()
 
             val result = CoroutineRunner.run {
                 dependanger.process()

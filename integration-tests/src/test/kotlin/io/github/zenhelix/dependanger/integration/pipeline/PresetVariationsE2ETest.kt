@@ -2,6 +2,9 @@ package io.github.zenhelix.dependanger.integration.pipeline
 
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.license.licenseCheck
+import io.github.zenhelix.dependanger.features.security.securityCheck
+import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor

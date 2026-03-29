@@ -33,10 +33,10 @@ public class SecurityCheckProcessor : EffectiveMetadataProcessor {
     override val description: String = "Checks for known security vulnerabilities"
 
     override fun supports(context: ProcessingContext): Boolean =
-        context.settings.securityCheck.enabled
+        context[SecurityCheckSettingsKey]?.enabled == true
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
-        val settings = context.settings.securityCheck
+        val settings = context.require(SecurityCheckSettingsKey)
         val minSeverity = parseMinSeverity(settings.minSeverity)
 
         val candidates = metadata.libraries.values.filter { it.version != null }

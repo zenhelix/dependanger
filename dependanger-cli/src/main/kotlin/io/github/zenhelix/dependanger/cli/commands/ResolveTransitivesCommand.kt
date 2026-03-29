@@ -10,8 +10,10 @@ import com.github.ajalt.clikt.parameters.types.int
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
-import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettings
+import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.features.transitive.model.TransitiveTree
 import io.github.zenhelix.dependanger.features.transitive.model.VersionConflict
 import kotlinx.serialization.Serializable
@@ -55,20 +57,19 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
                 )
             }
 
-            val updatedSettings = metadata.settings.copy(
-                transitiveResolution = metadata.settings.transitiveResolution.copy(
+            val dependanger = Dependanger.fromMetadata(metadata)
+                .preset(ProcessingPreset.STRICT)
+                .withContextProperty(TransitiveResolutionSettingsKey, TransitiveResolutionSettings(
                     enabled = true,
-                    maxDepth = depth ?: metadata.settings.transitiveResolution.maxDepth,
+                    maxDepth = depth,
                     includeOptional = includeOptional,
                     conflictResolution = strategy,
-                    repositories = parseMavenRepositories(repositories) ?: metadata.settings.transitiveResolution.repositories,
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else metadata.settings.transitiveResolution.cacheTtlHours,
-                )
-            )
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
-                .preset(ProcessingPreset.STRICT)
+                    repositories = parseMavenRepositories(repositories) ?: emptyList(),
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else TransitiveResolutionSettings.DEFAULT_CACHE_TTL_HOURS,
+                    maxTransitives = TransitiveResolutionSettings.DEFAULT.maxTransitives,
+                    scopes = TransitiveResolutionSettings.DEFAULT.scopes,
+                    cacheDirectory = null,
+                ))
                 .build()
 
             val result = CoroutineRunner.run {

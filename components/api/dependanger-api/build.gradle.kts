@@ -25,6 +25,8 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     implementation(libs.kotlin.logging.jvm)
 
+    testImplementation(projects.components.features.dependangerTransitive)
+
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.slf4j.simple)

@@ -5,6 +5,8 @@ import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.features.security.securityCheck
+import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.OsvVulnResponse
 import kotlinx.coroutines.test.runTest

@@ -13,6 +13,8 @@ import io.github.zenhelix.dependanger.api.compatibilityIssues
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
+import io.github.zenhelix.dependanger.features.analysis.CompatibilityAnalysisSettings
+import io.github.zenhelix.dependanger.features.analysis.CompatibilityAnalysisSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
@@ -35,16 +37,15 @@ public class AnalyzeCommand : CliktCommand(name = "analyze") {
         withErrorHandling(formatter) {
             val metadata = metadataService.read(Path.of(input))
 
-            val updatedSettings = metadata.settings.copy(
-                compatibilityAnalysis = metadata.settings.compatibilityAnalysis.copy(
-                    enabled = true,
-                    targetJdk = targetJdk ?: metadata.settings.compatibilityAnalysis.targetJdk,
-                )
-            )
-            val updatedMetadata = metadata.copy(settings = updatedSettings)
-
-            val dependanger = Dependanger.fromMetadata(updatedMetadata)
+            val dependanger = Dependanger.fromMetadata(metadata)
                 .preset(ProcessingPreset.STRICT)
+                .withContextProperty(CompatibilityAnalysisSettingsKey, CompatibilityAnalysisSettings(
+                    enabled = true,
+                    targetJdk = targetJdk,
+                    targetKotlin = CompatibilityAnalysisSettings.DEFAULT.targetKotlin,
+                    minSeverity = CompatibilityAnalysisSettings.DEFAULT.minSeverity,
+                    failOnErrors = CompatibilityAnalysisSettings.DEFAULT.failOnErrors,
+                ))
                 .build()
 
             val result = CoroutineRunner.run {

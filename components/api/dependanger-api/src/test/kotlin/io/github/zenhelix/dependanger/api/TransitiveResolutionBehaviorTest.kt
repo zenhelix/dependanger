@@ -2,7 +2,7 @@ package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
-import io.github.zenhelix.dependanger.core.model.ConflictResolutionStrategy
+import io.github.zenhelix.dependanger.features.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.features.license.model.LicenseCategory

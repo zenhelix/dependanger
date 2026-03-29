@@ -7,13 +7,14 @@ import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class PluginProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PLUGIN
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.PLUGIN_FILTER))
     override val isOptional: Boolean = false
     override val description: String = "Resolves plugin version references"
     override fun supports(context: ProcessingContext): Boolean = true

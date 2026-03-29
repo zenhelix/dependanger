@@ -49,7 +49,6 @@ public class PipelineBuilder {
 
     private fun validate(processors: List<EffectiveMetadataProcessor>) {
         validateDuplicateIds(processors)
-        validateOrderCollisions(processors)
     }
 
     private fun validateDuplicateIds(processors: List<EffectiveMetadataProcessor>) {
@@ -59,21 +58,6 @@ public class PipelineBuilder {
                 "'$id' (${procs.size} instances)"
             }
             throw PipelineConfigurationException("Duplicate processor IDs: $details")
-        }
-    }
-
-    private fun validateOrderCollisions(processors: List<EffectiveMetadataProcessor>) {
-        val collisions = processors
-            .groupBy { it.order }
-            .filterValues { group -> group.map { it.phase.executionMode }.distinct().size > 1 }
-
-        if (collisions.isNotEmpty()) {
-            val details = collisions.entries.joinToString { (order, procs) ->
-                "order=$order: ${procs.joinToString { "${it.id}(${it.phase.executionMode})" }}"
-            }
-            throw PipelineConfigurationException(
-                "Processors with same order but different execution modes: $details"
-            )
         }
     }
 }

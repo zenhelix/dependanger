@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -28,7 +29,7 @@ private const val OSV_BATCH_SIZE: Int = 1000
 public class SecurityCheckProcessor : ParallelMetadataProcessor {
     override val id: String = ProcessorIds.SECURITY_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.SECURITY_CHECK
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks for known security vulnerabilities"
 

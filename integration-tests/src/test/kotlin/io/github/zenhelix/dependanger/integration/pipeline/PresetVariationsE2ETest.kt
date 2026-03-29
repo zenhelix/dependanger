@@ -182,7 +182,6 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
             val fakeProcessor = object : EffectiveMetadataProcessor {
                 override val id: String = "fake-processor"
                 override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
-                override val order: Int = 67
                 override val isOptional: Boolean = false
                 override val description: String = "Fake processor for test"
                 override fun supports(context: ProcessingContext): Boolean = true

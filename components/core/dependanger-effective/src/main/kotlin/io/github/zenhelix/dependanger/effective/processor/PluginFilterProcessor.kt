@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.PluginFilter
@@ -14,7 +15,7 @@ import java.util.ServiceLoader
 public class PluginFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PLUGIN_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN_FILTER
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))
     override val isOptional: Boolean = false
     override val description: String = "Filters plugins based on distribution tag rules"
     override fun supports(context: ProcessingContext): Boolean = true

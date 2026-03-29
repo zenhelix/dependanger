@@ -9,6 +9,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withDiagnostic
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.resolver.CredentialsProviderKey
@@ -26,7 +27,7 @@ private const val LARGE_TREE_THRESHOLD = 5_000
 public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.TRANSITIVE_RESOLVER
     override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Resolves transitive dependency tree"
 

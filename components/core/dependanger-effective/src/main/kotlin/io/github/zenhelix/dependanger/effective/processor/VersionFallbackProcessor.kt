@@ -7,13 +7,14 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionFallbackProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.VERSION_FALLBACK
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_FALLBACK
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.LIBRARY_FILTER))
     override val isOptional: Boolean = false
     override val description: String = "Applies version fallback rules based on environment conditions"
     override fun supports(context: ProcessingContext): Boolean = true

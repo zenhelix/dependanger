@@ -13,8 +13,10 @@ import kotlin.time.TimeSource
 private val logger = KotlinLogging.logger {}
 
 public class ProcessingPipeline(
-    private val processors: List<EffectiveMetadataProcessor>,
+    processors: List<EffectiveMetadataProcessor>,
 ) {
+    private val sortedProcessors: List<EffectiveMetadataProcessor> = topologicalSort(processors)
+
     public suspend fun process(context: ProcessingContext): EffectiveMetadata {
         val initial = EffectiveMetadata(
             schemaVersion = context.originalMetadata.schemaVersion,
@@ -27,7 +29,7 @@ public class ProcessingPipeline(
             processingInfo = null,
         )
 
-        val groups = groupByExecutionMode(processors.sortedBy { it.order })
+        val groups = groupByExecutionMode(sortedProcessors)
 
         val groupResult = groups.fold(GroupResult(initial, emptyList())) { acc, group ->
             val result = when (group.executionMode) {
@@ -227,6 +229,65 @@ public class ProcessingPipeline(
     )
 
     private companion object {
+        fun topologicalSort(processors: List<EffectiveMetadataProcessor>): List<EffectiveMetadataProcessor> {
+            val byId = processors.associateBy { it.id }
+
+            // Build adjacency: edges[A] contains B means A must run before B
+            val edges = mutableMapOf<String, MutableSet<String>>()
+            val inDegree = mutableMapOf<String, Int>()
+            for (p in processors) {
+                edges.getOrPut(p.id) { mutableSetOf() }
+                inDegree.getOrPut(p.id) { 0 }
+            }
+
+            for (p in processors) {
+                for (c in p.constraints) {
+                    when (c) {
+                        is OrderConstraint.RunsAfter -> {
+                            // p runs after c.processorId -> edge from c.processorId to p.id
+                            if (c.processorId in byId) {
+                                edges.getOrPut(c.processorId) { mutableSetOf() }.add(p.id)
+                                inDegree[p.id] = (inDegree[p.id] ?: 0) + 1
+                            }
+                        }
+                        is OrderConstraint.RunsBefore -> {
+                            // p runs before c.processorId -> edge from p.id to c.processorId
+                            if (c.processorId in byId) {
+                                edges.getOrPut(p.id) { mutableSetOf() }.add(c.processorId)
+                                inDegree[c.processorId] = (inDegree[c.processorId] ?: 0) + 1
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Kahn's algorithm with deterministic tie-breaking (alphabetical by id)
+            val queue = java.util.TreeSet<String>() // sorted set for determinism
+            for ((id, deg) in inDegree) {
+                if (deg == 0) queue.add(id)
+            }
+
+            val result = mutableListOf<EffectiveMetadataProcessor>()
+            while (queue.isNotEmpty()) {
+                val current = queue.pollFirst()!!
+                result.add(byId[current]!!)
+                for (neighbor in edges[current].orEmpty()) {
+                    val newDeg = (inDegree[neighbor] ?: 1) - 1
+                    inDegree[neighbor] = newDeg
+                    if (newDeg == 0) queue.add(neighbor)
+                }
+            }
+
+            if (result.size != processors.size) {
+                val remaining = processors.map { it.id }.toSet() - result.map { it.id }.toSet()
+                throw PipelineConfigurationException(
+                    "Circular dependency detected among processors: ${remaining.sorted().joinToString(", ")}"
+                )
+            }
+
+            return result
+        }
+
         fun groupByExecutionMode(sorted: List<EffectiveMetadataProcessor>): List<ProcessorGroup> {
             if (sorted.isEmpty()) return emptyList()
 

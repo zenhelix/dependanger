@@ -11,7 +11,6 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class ProfileProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PROFILE
     override val phase: ProcessingPhase = ProcessingPhase.PROFILE
-    override val order: Int = phase.order
     override val isOptional: Boolean = false
     override val description: String = "Applies distribution profile to metadata"
     override fun supports(context: ProcessingContext): Boolean = true

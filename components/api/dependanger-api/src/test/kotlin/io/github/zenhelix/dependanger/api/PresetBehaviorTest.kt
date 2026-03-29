@@ -4,7 +4,9 @@ import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.serializer
@@ -239,7 +241,7 @@ class PresetBehaviorTest {
             val customProcessor = FakeProcessor(
                 id = "custom-enrichment",
                 phase = ProcessingPhase.VALIDATION,
-                order = 200,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = testExtensionKey,
                 provider = { metadata -> "processed ${metadata.libraries.size} libraries" },
             )

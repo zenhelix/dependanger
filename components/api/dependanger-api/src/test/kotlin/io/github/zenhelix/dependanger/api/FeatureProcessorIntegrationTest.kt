@@ -3,7 +3,9 @@ package io.github.zenhelix.dependanger.api
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
+import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.features.security.model.VulnerabilityInfo
@@ -18,10 +20,10 @@ import org.junit.jupiter.api.Test
 class FeatureProcessorIntegrationTest {
 
     private fun fakeUpdateCheck(provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>): FakeProcessor<List<UpdateAvailableInfo>> =
-        FakeProcessor("fake-update-check", ProcessingPhase.UPDATE_CHECK, 100, UpdatesExtensionKey, provider)
+        FakeProcessor("fake-update-check", ProcessingPhase.UPDATE_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = UpdatesExtensionKey, provider = provider)
 
     private fun fakeSecurityCheck(provider: (EffectiveMetadata) -> List<VulnerabilityInfo>): FakeProcessor<List<VulnerabilityInfo>> =
-        FakeProcessor("fake-security-check", ProcessingPhase.SECURITY_CHECK, 120, VulnerabilitiesExtensionKey, provider)
+        FakeProcessor("fake-security-check", ProcessingPhase.SECURITY_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = VulnerabilitiesExtensionKey, provider = provider)
 
     @Nested
     inner class UpdateCheckFlow {

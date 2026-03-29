@@ -6,13 +6,17 @@ import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class UsedVersionsProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.USED_VERSIONS
     override val phase: ProcessingPhase = ProcessingPhase.USED_VERSIONS
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(
+        OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER),
+        OrderConstraint.runsAfter(ProcessorIds.PLUGIN),
+    )
     override val isOptional: Boolean = false
     override val description: String = "Removes unused version entries"
     override fun supports(context: ProcessingContext): Boolean = true

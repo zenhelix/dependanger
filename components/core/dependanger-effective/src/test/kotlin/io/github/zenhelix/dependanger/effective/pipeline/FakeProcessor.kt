@@ -5,7 +5,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 class FakeProcessor(
     override val id: String,
     override val phase: ProcessingPhase,
-    override val order: Int,
+    override val constraints: Set<OrderConstraint> = emptySet(),
     override val isOptional: Boolean = false,
     override val description: String = "test",
     private val supported: Boolean = true,

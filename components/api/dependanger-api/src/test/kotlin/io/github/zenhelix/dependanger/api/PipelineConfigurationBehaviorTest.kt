@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
 import kotlinx.coroutines.test.runTest
@@ -147,7 +148,7 @@ class PipelineConfigurationBehaviorTest {
             val processor = FakeProcessor(
                 id = "custom-lib-inspector",
                 phase = ProcessingPhase.VALIDATION,
-                order = 200,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = testExtensionKey,
                 provider = { metadata ->
                     receivedLibraries.addAll(metadata.libraries.keys)
@@ -175,7 +176,7 @@ class PipelineConfigurationBehaviorTest {
             val processor = FakeProcessor(
                 id = "custom-enrichment",
                 phase = ProcessingPhase.VALIDATION,
-                order = 200,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = testExtensionKey,
                 provider = { metadata -> "found ${metadata.libraries.size} libraries" },
             )
@@ -204,7 +205,7 @@ class PipelineConfigurationBehaviorTest {
             val processor1 = FakeProcessor(
                 id = "custom-enrichment",
                 phase = ProcessingPhase.UPDATE_CHECK,
-                order = 200,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = key1,
                 provider = { "transform-done" },
             )
@@ -212,7 +213,7 @@ class PipelineConfigurationBehaviorTest {
             val processor2 = FakeProcessor(
                 id = "custom-validate",
                 phase = ProcessingPhase.SECURITY_CHECK,
-                order = 300,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = key2,
                 provider = { "validation-done" },
             )
@@ -235,7 +236,7 @@ class PipelineConfigurationBehaviorTest {
             val processor = FakeProcessor(
                 id = "custom-late-runner",
                 phase = ProcessingPhase.VALIDATION,
-                order = 9999,
+                constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.USED_VERSIONS)),
                 extensionKey = testExtensionKey,
                 provider = { "ran" },
             )

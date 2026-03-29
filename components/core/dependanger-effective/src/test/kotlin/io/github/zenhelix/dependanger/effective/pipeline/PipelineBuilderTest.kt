@@ -55,7 +55,7 @@ class PipelineBuilderTest {
         @Test
         fun `single processor builds and executes`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("p1", ProcessingPhase.VALIDATION, order = 10))
+                addProcessor(FakeProcessor("p1", ProcessingPhase.VALIDATION))
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
             assertThat(ids).containsExactly("p1")
@@ -64,9 +64,9 @@ class PipelineBuilderTest {
         @Test
         fun `multiple processors with different orders build successfully`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE, order = 5))
-                addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, order = 65))
-                addProcessor(FakeProcessor("p3", ProcessingPhase.USED_VERSIONS, order = 60))
+                addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE))
+                addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("p3"))))
+                addProcessor(FakeProcessor("p3", ProcessingPhase.USED_VERSIONS, constraints = setOf(OrderConstraint.runsAfter("p1"))))
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
             assertThat(ids).containsExactly("p1", "p3", "p2")
@@ -80,8 +80,8 @@ class PipelineBuilderTest {
         fun `duplicate processor IDs throws PipelineConfigurationException`() {
             assertThatThrownBy {
                 ProcessingPipeline {
-                    addProcessor(FakeProcessor("dup", ProcessingPhase.PROFILE, order = 5))
-                    addProcessor(FakeProcessor("dup", ProcessingPhase.VALIDATION, order = 65))
+                    addProcessor(FakeProcessor("dup", ProcessingPhase.PROFILE))
+                    addProcessor(FakeProcessor("dup", ProcessingPhase.VALIDATION))
                 }
             }.isInstanceOf(PipelineConfigurationException::class.java)
                 .hasMessageContaining("Duplicate processor IDs")
@@ -91,9 +91,9 @@ class PipelineBuilderTest {
         @Test
         fun `all processors with same ID are excluded when that ID is disabled`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("shared-id", ProcessingPhase.PROFILE, order = 5))
-                addProcessor(FakeProcessor("shared-id", ProcessingPhase.VALIDATION, order = 65))
-                addProcessor(FakeProcessor("survivor", ProcessingPhase.USED_VERSIONS, order = 60))
+                addProcessor(FakeProcessor("shared-id", ProcessingPhase.PROFILE))
+                addProcessor(FakeProcessor("shared-id", ProcessingPhase.VALIDATION))
+                addProcessor(FakeProcessor("survivor", ProcessingPhase.USED_VERSIONS))
                 disable("shared-id")
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
@@ -102,27 +102,27 @@ class PipelineBuilderTest {
     }
 
     @Nested
-    inner class OrderCollisionValidation {
+    inner class TopologicalSortValidation {
 
         @Test
-        fun `same order same execution mode builds successfully`() = runTest {
+        fun `processors without constraints are sorted alphabetically`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("p1", ProcessingPhase.UPDATE_CHECK, order = 100))
-                addProcessor(FakeProcessor("p2", ProcessingPhase.SECURITY_CHECK, order = 100))
+                addProcessor(FakeProcessor("p1", ProcessingPhase.UPDATE_CHECK))
+                addProcessor(FakeProcessor("p2", ProcessingPhase.SECURITY_CHECK))
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
             assertThat(ids).containsExactlyInAnyOrder("p1", "p2")
         }
 
         @Test
-        fun `same order different execution modes throws PipelineConfigurationException`() {
+        fun `circular dependency throws PipelineConfigurationException`() {
             assertThatThrownBy {
                 ProcessingPipeline {
-                    addProcessor(FakeProcessor("seq", ProcessingPhase.VALIDATION, order = 100))
-                    addProcessor(FakeProcessor("par", ProcessingPhase.UPDATE_CHECK, order = 100))
+                    addProcessor(FakeProcessor("a", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("b"))))
+                    addProcessor(FakeProcessor("b", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("a"))))
                 }
             }.isInstanceOf(PipelineConfigurationException::class.java)
-                .hasMessageContaining("same order but different execution modes")
+                .hasMessageContaining("Circular dependency")
         }
     }
 
@@ -132,8 +132,8 @@ class PipelineBuilderTest {
         @Test
         fun `optional processor excluded by default`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("required", ProcessingPhase.PROFILE, order = 5))
-                addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, order = 65, isOptional = true))
+                addProcessor(FakeProcessor("required", ProcessingPhase.PROFILE))
+                addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, isOptional = true))
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
             assertThat(ids).containsExactly("required")
@@ -142,7 +142,7 @@ class PipelineBuilderTest {
         @Test
         fun `optional processor included when enabled`() = runTest {
             val builder = PipelineBuilder()
-            builder.addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, order = 65, isOptional = true))
+            builder.addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, isOptional = true))
             builder.enableOptional("opt")
             val pipeline = builder.build()
             val ids = runPipelineAndGetProcessorIds(pipeline)
@@ -152,7 +152,7 @@ class PipelineBuilderTest {
         @Test
         fun `non-optional processor always included`() = runTest {
             val builder = PipelineBuilder()
-            builder.addProcessor(FakeProcessor("always", ProcessingPhase.PROFILE, order = 5, isOptional = false))
+            builder.addProcessor(FakeProcessor("always", ProcessingPhase.PROFILE, isOptional = false))
             val pipeline = builder.build()
             val ids = runPipelineAndGetProcessorIds(pipeline)
             assertThat(ids).containsExactly("always")
@@ -165,8 +165,8 @@ class PipelineBuilderTest {
         @Test
         fun `disabled processor excluded from pipeline`() = runTest {
             val builder = PipelineBuilder()
-            builder.addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE, order = 5))
-            builder.addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, order = 65))
+            builder.addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE))
+            builder.addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION))
             builder.disable("p1")
             val pipeline = builder.build()
             val ids = runPipelineAndGetProcessorIds(pipeline)
@@ -176,8 +176,8 @@ class PipelineBuilderTest {
         @Test
         fun `disabled optional processor excluded`() = runTest {
             val builder = PipelineBuilder()
-            builder.addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, order = 65, isOptional = true))
-            builder.addProcessor(FakeProcessor("other", ProcessingPhase.PROFILE, order = 5))
+            builder.addProcessor(FakeProcessor("opt", ProcessingPhase.VALIDATION, isOptional = true))
+            builder.addProcessor(FakeProcessor("other", ProcessingPhase.PROFILE))
             builder.enableOptional("opt")
             builder.disable("opt")
             val pipeline = builder.build()

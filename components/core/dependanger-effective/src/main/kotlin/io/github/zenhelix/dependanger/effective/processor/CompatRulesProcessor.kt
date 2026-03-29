@@ -14,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
 import io.github.zenhelix.dependanger.effective.model.toDiagnostics
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -21,7 +22,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 public class CompatRulesProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.COMPAT_RULES
     override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VALIDATION))
     override val isOptional: Boolean = false
     override val description: String = "Checks compatibility rules between libraries"
     override fun supports(context: ProcessingContext): Boolean = true

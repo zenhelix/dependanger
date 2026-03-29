@@ -43,7 +43,7 @@ private fun context(metadata: DependangerMetadata = emptyMetadata()): Processing
 private class DiagnosticProcessor(
     override val id: String,
     override val phase: ProcessingPhase,
-    override val order: Int,
+    override val constraints: Set<OrderConstraint> = emptySet(),
     private val diagnosticMessage: String,
     override val isOptional: Boolean = false,
     override val description: String = "test",
@@ -58,7 +58,7 @@ private class DiagnosticProcessor(
 private class ExtensionAddingProcessor(
     override val id: String,
     override val phase: ProcessingPhase,
-    override val order: Int,
+    override val constraints: Set<OrderConstraint> = emptySet(),
     private val extensionKey: ExtensionKey<String>,
     private val extensionValue: String,
     override val isOptional: Boolean = false,
@@ -72,7 +72,7 @@ private class ExtensionAddingProcessor(
 private class VersionModifyingProcessor(
     override val id: String,
     override val phase: ProcessingPhase,
-    override val order: Int,
+    override val constraints: Set<OrderConstraint> = emptySet(),
     override val isOptional: Boolean = false,
     override val description: String = "test",
 ) : EffectiveMetadataProcessor {
@@ -109,8 +109,8 @@ class ProcessingPipelineTest {
         @Test
         fun `processors run in order and add diagnostics sequentially`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, order = 5, diagnosticMessage = "msg-first"))
-                addProcessor(DiagnosticProcessor("second", ProcessingPhase.VALIDATION, order = 65, diagnosticMessage = "msg-second"))
+                addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, diagnosticMessage = "msg-first"))
+                addProcessor(DiagnosticProcessor("second", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("first")), diagnosticMessage = "msg-second"))
             }
 
             val result = pipeline.process(context())
@@ -123,9 +123,9 @@ class ProcessingPipelineTest {
         @Test
         fun `processor that does not support context is skipped`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, order = 5, diagnosticMessage = "msg-first"))
-                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, order = 10, supported = false))
-                addProcessor(DiagnosticProcessor("third", ProcessingPhase.VALIDATION, order = 65, diagnosticMessage = "msg-third"))
+                addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, diagnosticMessage = "msg-first"))
+                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, constraints = setOf(OrderConstraint.runsAfter("first")), supported = false))
+                addProcessor(DiagnosticProcessor("third", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("skipped")), diagnosticMessage = "msg-third"))
             }
 
             val result = pipeline.process(context())
@@ -137,9 +137,9 @@ class ProcessingPipelineTest {
         @Test
         fun `processingInfo contains executed processor IDs excluding skipped`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE, order = 5))
-                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, order = 10, supported = false))
-                addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, order = 65))
+                addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE))
+                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, constraints = setOf(OrderConstraint.runsAfter("p1")), supported = false))
+                addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("skipped"))))
             }
 
             val result = pipeline.process(context())
@@ -158,10 +158,10 @@ class ProcessingPipelineTest {
         fun `parallel processors can add diagnostics`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    DiagnosticProcessor("update-check", ProcessingPhase.UPDATE_CHECK, order = 100, diagnosticMessage = "update-diag")
+                    DiagnosticProcessor("update-check", ProcessingPhase.UPDATE_CHECK, diagnosticMessage = "update-diag")
                 )
                 addProcessor(
-                    DiagnosticProcessor("security-check", ProcessingPhase.SECURITY_CHECK, order = 120, diagnosticMessage = "security-diag")
+                    DiagnosticProcessor("security-check", ProcessingPhase.SECURITY_CHECK, diagnosticMessage = "security-diag")
                 )
             }
 
@@ -179,10 +179,10 @@ class ProcessingPipelineTest {
 
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    ExtensionAddingProcessor("ext-proc-1", ProcessingPhase.UPDATE_CHECK, order = 100, key1, "value1")
+                    ExtensionAddingProcessor("ext-proc-1", ProcessingPhase.UPDATE_CHECK, extensionKey = key1, extensionValue = "value1")
                 )
                 addProcessor(
-                    ExtensionAddingProcessor("ext-proc-2", ProcessingPhase.SECURITY_CHECK, order = 120, key2, "value2")
+                    ExtensionAddingProcessor("ext-proc-2", ProcessingPhase.SECURITY_CHECK, extensionKey = key2, extensionValue = "value2")
                 )
             }
 
@@ -195,10 +195,10 @@ class ProcessingPipelineTest {
         fun `parallel processor modifying versions throws IllegalStateException`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK, order = 100)
+                    VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK)
                 )
                 addProcessor(
-                    VersionModifyingProcessor("mod-2", ProcessingPhase.SECURITY_CHECK, order = 120)
+                    VersionModifyingProcessor("mod-2", ProcessingPhase.SECURITY_CHECK)
                 )
             }
 

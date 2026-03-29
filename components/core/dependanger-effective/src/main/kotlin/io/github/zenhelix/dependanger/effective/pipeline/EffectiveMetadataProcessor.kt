@@ -5,7 +5,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 public interface EffectiveMetadataProcessor {
     public val id: String
     public val phase: ProcessingPhase
-    public val order: Int
+    public val constraints: Set<OrderConstraint> get() = emptySet()
     public val isOptional: Boolean
     public val description: String
     public fun supports(context: ProcessingContext): Boolean

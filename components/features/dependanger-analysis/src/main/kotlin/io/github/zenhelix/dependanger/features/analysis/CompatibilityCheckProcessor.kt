@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
 import io.github.zenhelix.dependanger.effective.model.toDiagnostics
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler
@@ -23,7 +24,7 @@ private val logger = KotlinLogging.logger {}
 public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.COMPATIBILITY_ANALYSIS
     override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Performs advanced compatibility analysis between libraries"
     override fun supports(context: ProcessingContext): Boolean = true

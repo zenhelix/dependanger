@@ -14,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
@@ -27,7 +28,7 @@ private const val MAX_BOM_DEPTH = 10
 public class BomImportProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.BOM_IMPORT
     override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))
     override val isOptional: Boolean = true
     override val description: String = "Imports dependencies from Maven BOM files"
     override fun supports(context: ProcessingContext): Boolean = true

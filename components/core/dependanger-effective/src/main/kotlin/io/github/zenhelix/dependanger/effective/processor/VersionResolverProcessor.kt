@@ -7,13 +7,18 @@ import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class VersionResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.VERSION_RESOLVER
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_RESOLVER
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(
+        OrderConstraint.runsAfter(ProcessorIds.VERSION_FALLBACK),
+        OrderConstraint.runsAfter(ProcessorIds.EXTRACTED_VERSIONS),
+        OrderConstraint.runsAfter(ProcessorIds.BOM_IMPORT),
+    )
     override val isOptional: Boolean = false
     override val description: String = "Resolves version references to actual version values"
     override fun supports(context: ProcessingContext): Boolean = true

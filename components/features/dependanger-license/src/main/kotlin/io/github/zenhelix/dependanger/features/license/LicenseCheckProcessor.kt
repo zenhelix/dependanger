@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -34,7 +35,7 @@ private val logger = KotlinLogging.logger {}
 public class LicenseCheckProcessor : ParallelMetadataProcessor {
     override val id: String = ProcessorIds.LICENSE_CHECK
     override val phase: ProcessingPhase = ProcessingPhase.LICENSE_CHECK
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks library license compliance"
 

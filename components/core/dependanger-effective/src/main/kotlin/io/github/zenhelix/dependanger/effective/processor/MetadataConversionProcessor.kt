@@ -10,13 +10,14 @@ import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
 public class MetadataConversionProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.METADATA_CONVERSION
     override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
-    override val order: Int = phase.order
+    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.PROFILE))
     override val isOptional: Boolean = false
     override val description: String = "Converts raw metadata to effective model"
     override fun supports(context: ProcessingContext): Boolean = true

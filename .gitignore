@@ -13,3 +13,9 @@ build/
 *.ipr
 out/
 
+### Eclipse ###
+.project
+.settings/
+.classpath
+bin/
+

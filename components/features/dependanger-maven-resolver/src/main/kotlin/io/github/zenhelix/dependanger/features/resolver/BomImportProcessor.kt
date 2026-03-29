@@ -36,10 +36,10 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
         val bomImports = context.originalMetadata.bomImports
         if (bomImports.isEmpty()) return metadata
 
-        val settings = context.settings
-        val cacheDir = settings.bomCache.directory
+        val bomCache = context[BomCacheSettingsKey] ?: BomCacheSettings.DEFAULT
+        val cacheDir = bomCache.directory
             ?: DependangerPaths.resolveInUserHome(DependangerPaths.BOM_CACHE_DIR)
-        val repositories = settings.repositories
+        val repositories = context.settings.repositories
             .filterIsInstance<MavenRepository>()
             .ifEmpty {
                 listOf(MavenRepository(url = "https://repo.maven.apache.org/maven2", name = "Maven Central"))
@@ -50,8 +50,8 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             repositories = repositories,
             credentialsProvider = credentialsProvider,
             cacheDirectory = cacheDir,
-            ttlHours = settings.bomCache.ttlHours,
-            ttlSnapshotHours = settings.bomCache.ttlSnapshotHours,
+            ttlHours = bomCache.ttlHours,
+            ttlSnapshotHours = bomCache.ttlSnapshotHours,
         ).use { resolutionCtx ->
             val resolvedBoms = mutableListOf<BomContent>()
             val resolvedCache = mutableMapOf<String, BomContent>()

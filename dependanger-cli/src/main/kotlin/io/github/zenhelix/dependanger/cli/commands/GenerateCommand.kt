@@ -59,9 +59,8 @@ public class GenerateCommand : CliktCommand(name = "generate") {
                     useInlineVersions = tomlInlineVersions,
                     includeDeprecationComments = true,
                 )
-                val tomlPath = outDir.resolve(tomlConfig.filename)
-                result.writeTomlTo(tomlPath, tomlConfig)
-                formatter.success("Generated TOML version catalog: $tomlPath")
+                result.writeTomlTo(outDir, tomlConfig)
+                formatter.success("Generated TOML version catalog: ${outDir.resolve(tomlConfig.filename)}")
             }
 
             if (generateBom) {
@@ -83,9 +82,8 @@ public class GenerateCommand : CliktCommand(name = "generate") {
                     prettyPrint = true,
                     includeDeprecationComments = true,
                 )
-                val bomPath = outDir.resolve(bomConfig.filename)
-                result.writeBomTo(bomPath, bomConfig)
-                formatter.success("Generated Maven BOM: $bomPath")
+                result.writeBomTo(outDir, bomConfig)
+                formatter.success("Generated Maven BOM: ${outDir.resolve(bomConfig.filename)}")
             }
         }
     }

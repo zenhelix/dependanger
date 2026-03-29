@@ -1,12 +1,11 @@
 package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.testing.test
 import com.github.ajalt.clikt.testing.CliktCommandTestResult
+import com.github.ajalt.clikt.testing.test
 import io.github.zenhelix.dependanger.core.model.Bundle
 import io.github.zenhelix.dependanger.core.model.Library
 import io.github.zenhelix.dependanger.core.model.Plugin
-import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.Version
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
@@ -43,28 +42,14 @@ object CliTestSupport {
     private val format = JsonSerializationFormat()
 
     fun writeMetadata(dir: Path, metadata: DependangerMetadata): Path {
-        val file = dir.resolve("metadata.json")
+        val file = dir.resolve(CliDefaults.METADATA_FILE)
         format.write(metadata, file)
         return file
     }
 
     fun readMetadata(path: Path): DependangerMetadata = format.read(path)
 
-    fun emptyMetadata(): DependangerMetadata = DependangerMetadata(
-        schemaVersion = DependangerMetadata.SCHEMA_VERSION,
-        versions = emptyList(),
-        libraries = emptyList(),
-        plugins = emptyList(),
-        bundles = emptyList(),
-        bomImports = emptyList(),
-        constraints = emptyList(),
-        targetPlatforms = emptyList(),
-        distributions = emptyList(),
-        compatibility = emptyList(),
-        settings = Settings.DEFAULT,
-        presets = emptyList(),
-        extensions = emptyMap(),
-    )
+    fun emptyMetadata(): DependangerMetadata = MetadataService().emptyMetadata()
 
     fun minimalMetadata(): DependangerMetadata = emptyMetadata().copy(
         versions = listOf(

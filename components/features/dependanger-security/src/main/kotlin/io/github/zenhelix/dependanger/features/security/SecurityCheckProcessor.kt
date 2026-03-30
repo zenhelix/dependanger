@@ -17,10 +17,10 @@ import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExte
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.http.client.RetryConfig
+import io.github.zenhelix.dependanger.http.client.createDefault
 import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}
@@ -46,12 +46,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         val candidates = metadata.libraries.values.filter { it.version != null }
 
         if (candidates.isEmpty()) {
-            val diag = Diagnostics.info(
-                DiagnosticCodes.Security.NO_VULNS,
-                "No libraries to scan for vulnerabilities",
-                id, emptyMap(),
-            )
-            return ParallelResult(diag, mapOf(VulnerabilitiesExtensionKey to emptyList<VulnerabilityInfo>()))
+            return ParallelResult.emptyResult(DiagnosticCodes.Security.NO_VULNS, "No libraries to scan for vulnerabilities", id, VulnerabilitiesExtensionKey)
         }
 
         val cacheDir = settings.cacheDirectory
@@ -253,11 +248,7 @@ private class SecurityCheckContext(
     timeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.create {
-        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
-        requestTimeoutMs = timeoutMs
-        keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
-    }
+    val httpClient: HttpClient = httpClientFactory.createDefault(timeoutMs)
 
     val osvClient: OsvApiClient = OsvApiClient(
         apiUrl = OSV_API_URL,

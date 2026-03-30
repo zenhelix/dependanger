@@ -23,6 +23,7 @@ import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
+import io.github.zenhelix.dependanger.http.client.createDefault
 import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}
@@ -388,11 +389,7 @@ private class BomResolutionContext(
     ttlSnapshotHours: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.create {
-        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
-        requestTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS
-        keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
-    }
+    val httpClient: HttpClient = httpClientFactory.createDefault(HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS)
 
     val cache: DirBasedCache<BomContent> = DirBasedCache(
         cacheDirectory = cacheDirectory,
@@ -406,7 +403,6 @@ private class BomResolutionContext(
         repositories = repositories,
         httpClient = httpClient,
         credentialsProvider = credentialsProvider,
-        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
         readTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS,
     )
 

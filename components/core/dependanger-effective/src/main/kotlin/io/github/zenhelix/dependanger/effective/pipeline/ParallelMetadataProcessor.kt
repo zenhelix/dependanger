@@ -15,6 +15,21 @@ public data class ParallelResult(
 ) {
     public companion object {
         public val EMPTY: ParallelResult = ParallelResult(Diagnostics.EMPTY, emptyMap())
+
+        /**
+         * Creates a [ParallelResult] with an info diagnostic and an empty extension list.
+         * Useful for early-return when there are no candidates to process.
+         */
+        public fun emptyResult(
+            diagnosticCode: String,
+            message: String,
+            processorId: String,
+            extensionKey: ExtensionKey<*>,
+            baseDiagnostics: Diagnostics = Diagnostics.EMPTY,
+        ): ParallelResult = ParallelResult(
+            diagnostics = baseDiagnostics + Diagnostics.info(diagnosticCode, message, processorId, emptyMap()),
+            extensions = mapOf(extensionKey to emptyList<Any>()),
+        )
     }
 }
 

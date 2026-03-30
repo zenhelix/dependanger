@@ -7,8 +7,8 @@ import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
 import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
-import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
+import io.github.zenhelix.dependanger.http.client.createDefault
 import io.ktor.client.HttpClient
 import kotlinx.serialization.builtins.ListSerializer
 
@@ -24,11 +24,7 @@ internal class LicenseCheckContext(
     customProviders: List<LicenseSourceProvider> = emptyList(),
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.create {
-        this.connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
-        this.requestTimeoutMs = readTimeoutMs
-        this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
-    }
+    val httpClient: HttpClient = httpClientFactory.createDefault(readTimeoutMs)
 
     val cache: DirBasedCache<List<LicenseResult>> = DirBasedCache(
         cacheDirectory = cacheDirectory ?: DependangerPaths.resolveInUserHome(DependangerPaths.LICENSES_CACHE_DIR),
@@ -42,7 +38,6 @@ internal class LicenseCheckContext(
         repositories = repositories,
         httpClient = httpClient,
         credentialsProvider = credentialsProvider,
-        connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
         readTimeoutMs = readTimeoutMs,
     )
 

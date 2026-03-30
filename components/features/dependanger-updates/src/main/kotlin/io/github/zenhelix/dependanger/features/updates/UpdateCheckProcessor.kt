@@ -23,9 +23,9 @@ import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositorie
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
+import io.github.zenhelix.dependanger.http.client.createDefault
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -58,8 +58,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
         }
 
         if (candidates.isEmpty()) {
-            val diag = Diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "No libraries to check for updates", id, emptyMap())
-            return ParallelResult(diag, mapOf(UpdatesExtensionKey to emptyList<UpdateAvailableInfo>()))
+            return ParallelResult.emptyResult(DiagnosticCodes.Update.ALL_UP_TO_DATE, "No libraries to check for updates", id, UpdatesExtensionKey)
         }
 
         val cacheDir = settings.cacheDirectory
@@ -71,7 +70,6 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
             httpClientFactory = httpClientFactory,
             cacheDirectory = cacheDir,
             cacheTtlHours = settings.cacheTtlHours,
-            connectTimeoutMs = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
             readTimeoutMs = settings.timeout,
         ).use { ctx ->
             val semaphore = Semaphore(settings.parallelism)
@@ -275,15 +273,10 @@ private class UpdateCheckContext(
     httpClientFactory: HttpClientFactory,
     cacheDirectory: String,
     cacheTtlHours: Long,
-    connectTimeoutMs: Long,
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.create {
-        this.connectTimeoutMs = connectTimeoutMs
-        this.requestTimeoutMs = readTimeoutMs
-        this.keepAliveMs = HttpClientConfig.DEFAULT_KEEP_ALIVE_MS
-    }
+    val httpClient: HttpClient = httpClientFactory.createDefault(readTimeoutMs)
 
     val cache: VersionCache = VersionCache(
         cacheDirectory = cacheDirectory,
@@ -294,7 +287,6 @@ private class UpdateCheckContext(
         repositories = repositories,
         httpClient = httpClient,
         credentialsProvider = credentialsProvider,
-        connectTimeoutMs = connectTimeoutMs,
         readTimeoutMs = readTimeoutMs,
     )
 

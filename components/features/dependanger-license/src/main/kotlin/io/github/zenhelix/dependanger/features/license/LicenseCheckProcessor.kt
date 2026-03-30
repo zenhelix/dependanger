@@ -86,8 +86,13 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         }
 
         if (candidates.isEmpty() && transitiveCandidates.isEmpty()) {
-            diagnostics = diagnostics + Diagnostics.info(DiagnosticCodes.License.NO_LIBS, "No libraries to check for licenses", id, emptyMap())
-            return ParallelResult(diagnostics, mapOf(LicenseViolationsExtensionKey to emptyList<LicenseViolation>()))
+            return ParallelResult.emptyResult(
+                DiagnosticCodes.License.NO_LIBS,
+                "No libraries to check for licenses",
+                id,
+                LicenseViolationsExtensionKey,
+                diagnostics
+            )
         }
 
         LicenseCheckContext(

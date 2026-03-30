@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.resolver
 
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
+import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.RetryConfig
 import io.github.zenhelix.dependanger.http.client.getWithRetry
@@ -13,7 +14,7 @@ public class MavenPomDownloader(
     private val repositories: List<MavenRepository>,
     private val httpClient: HttpClient,
     private val credentialsProvider: CredentialsProvider?,
-    private val connectTimeoutMs: Long,
+    private val connectTimeoutMs: Long = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
     private val readTimeoutMs: Long,
 ) {
     public suspend fun downloadPom(

@@ -141,7 +141,7 @@ object CliTestSupport {
             processingInfo = null,
             extensions = extensions,
         )
-        val result = DependangerResult(effective = effective, diagnostics = diagnostics)
+        val result = DependangerResult.Success(effective = effective, diagnostics = diagnostics)
 
         val mockDependanger = mockk<Dependanger>()
         coEvery { mockDependanger.process(any(), any()) } returns result

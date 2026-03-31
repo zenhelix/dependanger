@@ -15,6 +15,41 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
+private class ParallelDiagnosticProcessor(
+    override val id: String,
+    override val phase: ProcessingPhase,
+    override val constraints: Set<OrderConstraint> = emptySet(),
+    private val diagnosticMessage: String,
+    override val isOptional: Boolean = false,
+    override val description: String = "test",
+) : ParallelMetadataProcessor {
+    override fun supports(context: ProcessingContext): Boolean = true
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
+        val diag = Diagnostics.info("TEST", diagnosticMessage, id, emptyMap())
+        return ParallelResult(
+            diagnostics = diag,
+            extensions = emptyMap(),
+        )
+    }
+}
+
+private class ParallelExtensionAddingProcessor(
+    override val id: String,
+    override val phase: ProcessingPhase,
+    override val constraints: Set<OrderConstraint> = emptySet(),
+    private val extensionKey: ExtensionKey<String>,
+    private val extensionValue: String,
+    override val isOptional: Boolean = false,
+    override val description: String = "test",
+) : ParallelMetadataProcessor {
+    override fun supports(context: ProcessingContext): Boolean = true
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult =
+        ParallelResult(
+            diagnostics = Diagnostics.EMPTY,
+            extensions = mapOf(extensionKey to extensionValue),
+        )
+}
+
 private fun emptyMetadata(): DependangerMetadata = DependangerMetadata(
     schemaVersion = "1.0",
     versions = emptyList(),
@@ -158,10 +193,10 @@ class ProcessingPipelineTest {
         fun `parallel processors can add diagnostics`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    DiagnosticProcessor("update-check", ProcessingPhase.UPDATE_CHECK, diagnosticMessage = "update-diag")
+                    ParallelDiagnosticProcessor("update-check", ProcessingPhase.UPDATE_CHECK, diagnosticMessage = "update-diag")
                 )
                 addProcessor(
-                    DiagnosticProcessor("security-check", ProcessingPhase.SECURITY_CHECK, diagnosticMessage = "security-diag")
+                    ParallelDiagnosticProcessor("security-check", ProcessingPhase.SECURITY_CHECK, diagnosticMessage = "security-diag")
                 )
             }
 
@@ -179,10 +214,10 @@ class ProcessingPipelineTest {
 
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    ExtensionAddingProcessor("ext-proc-1", ProcessingPhase.UPDATE_CHECK, extensionKey = key1, extensionValue = "value1")
+                    ParallelExtensionAddingProcessor("ext-proc-1", ProcessingPhase.UPDATE_CHECK, extensionKey = key1, extensionValue = "value1")
                 )
                 addProcessor(
-                    ExtensionAddingProcessor("ext-proc-2", ProcessingPhase.SECURITY_CHECK, extensionKey = key2, extensionValue = "value2")
+                    ParallelExtensionAddingProcessor("ext-proc-2", ProcessingPhase.SECURITY_CHECK, extensionKey = key2, extensionValue = "value2")
                 )
             }
 
@@ -192,7 +227,7 @@ class ProcessingPipelineTest {
         }
 
         @Test
-        fun `parallel processor modifying versions throws IllegalStateException`() = runTest {
+        fun `non-parallel processor in parallel phase throws PipelineConfigurationException`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(
                     VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK)
@@ -202,10 +237,10 @@ class ProcessingPipelineTest {
                 )
             }
 
-            val thrown = assertThrows<IllegalStateException> {
+            val thrown = assertThrows<PipelineConfigurationException> {
                 pipeline.process(context())
             }
-            assertThat(thrown.message).contains("versions")
+            assertThat(thrown.message).contains("ParallelMetadataProcessor")
         }
     }
 }

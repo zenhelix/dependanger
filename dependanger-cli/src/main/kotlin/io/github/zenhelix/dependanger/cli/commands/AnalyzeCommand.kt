@@ -13,8 +13,8 @@ import io.github.zenhelix.dependanger.api.compatibilityIssues
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
-import io.github.zenhelix.dependanger.features.analysis.CompatibilityAnalysisSettings
-import io.github.zenhelix.dependanger.features.analysis.CompatibilityAnalysisSettingsKey
+import io.github.zenhelix.dependanger.feature.model.settings.analysis.CompatibilityAnalysisSettings
+import io.github.zenhelix.dependanger.feature.model.settings.analysis.CompatibilityAnalysisSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
@@ -55,7 +55,7 @@ public class AnalyzeCommand : CliktCommand(name = "analyze") {
             val issues = result.compatibilityIssues
 
             val filteredIssues = rules?.let { rulesFilter ->
-                val allowedRules = rulesFilter.split(",").map { it.trim() }.toSet()
+                val allowedRules = parseCommaSeparated(rulesFilter).toSet()
                 issues.filter { it.ruleId in allowedRules }
             } ?: issues
 

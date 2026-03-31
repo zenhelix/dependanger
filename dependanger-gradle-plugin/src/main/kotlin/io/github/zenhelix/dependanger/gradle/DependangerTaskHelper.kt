@@ -12,10 +12,9 @@ internal object DependangerTaskHelper {
     internal const val METADATA_FILE: String = "metadata.json"
     internal const val EFFECTIVE_FILE: String = "effective.json"
 
-    internal fun readEffective(outputDir: File, logger: Logger): EffectiveMetadata {
-        val effectiveFile = outputDir.resolve(EFFECTIVE_FILE)
+    internal fun readEffective(effectiveFile: File, logger: Logger): EffectiveMetadata {
         if (!effectiveFile.exists()) {
-            throw GradleException("effective.json not found in $outputDir. Ensure dependangerGenerateEffective has been executed.")
+            throw GradleException("${effectiveFile.name} not found at $effectiveFile. Ensure dependangerGenerateEffective has been executed.")
         }
         val format = EffectiveJsonFormat()
         val result = format.readDetailed(effectiveFile.toPath())

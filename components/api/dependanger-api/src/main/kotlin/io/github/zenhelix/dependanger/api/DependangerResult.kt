@@ -5,40 +5,42 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
 import java.nio.file.Path
 
-public data class DependangerResult(
-    val effective: EffectiveMetadata?,
-    val diagnostics: Diagnostics,
-) {
-    public val isSuccess: Boolean get() = effective != null && !diagnostics.hasErrors
+public sealed class DependangerResult {
+    public abstract val diagnostics: Diagnostics
 
-    public fun <T> generate(generator: ArtifactGenerator<T>): T {
-        if (!isSuccess) {
-            throw DependangerProcessingException(
-                "Cannot generate: processing completed with errors. Check diagnostics for details.",
-                null,
-                null,
-            )
-        }
-        return generateUnsafe(generator)
+    public data class Success(
+        val effective: EffectiveMetadata,
+        override val diagnostics: Diagnostics,
+    ) : DependangerResult()
+
+    public data class Failure(
+        override val diagnostics: Diagnostics,
+    ) : DependangerResult()
+
+    public val isSuccess: Boolean get() = this is Success && !diagnostics.hasErrors
+
+    public fun effectiveOrNull(): EffectiveMetadata? = when (this) {
+        is Success -> effective
+        is Failure -> null
     }
 
-    public fun <T> generateUnsafe(generator: ArtifactGenerator<T>): T {
-        val metadata = effective
-            ?: throw DependangerProcessingException("Cannot generate: processing failed (no effective metadata)", null, null)
+    public fun <T> generate(generator: ArtifactGenerator<T>): T {
+        val success = this as? Success
+        if (success == null || diagnostics.hasErrors) {
+            throw DependangerProcessingException(
+                "Cannot generate: processing completed with errors. Check diagnostics for details.",
+                null, null,
+            )
+        }
         return wrapNonDependangerException({ e ->
                                                DependangerGenerationException("Generation failed: ${e.message}", generator.generatorId, e)
                                            }) {
-            generator.generate(metadata)
+            generator.generate(success.effective)
         }
     }
 
     public fun <T> writeTo(generator: ArtifactGenerator<T>, path: Path): Path {
         val artifact = generate(generator)
-        return writeArtifact(generator, artifact, path)
-    }
-
-    public fun <T> writeToUnsafe(generator: ArtifactGenerator<T>, path: Path): Path {
-        val artifact = generateUnsafe(generator)
         return writeArtifact(generator, artifact, path)
     }
 

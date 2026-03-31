@@ -31,24 +31,25 @@ public class ProcessingPipeline(
 
         val groups = groupByExecutionMode(sortedProcessors)
 
-        val groupResult = groups.fold(GroupResult(initial, emptyList())) { acc, group ->
+        var currentMetadata = initial
+        val allExecutedIds = mutableListOf<String>()
+
+        for (group in groups) {
             val result = when (group.executionMode) {
                 ExecutionMode.PARALLEL_IO, ExecutionMode.PARALLEL_COMPUTE ->
-                    executeParallel(acc.metadata, group.processors, context)
+                    executeParallel(currentMetadata, group.processors, context)
 
                 else                                                      ->
-                    executeSequential(acc.metadata, group.processors, context)
+                    executeSequential(currentMetadata, group.processors, context)
             }
-            GroupResult(
-                metadata = result.metadata,
-                executedProcessorIds = acc.executedProcessorIds + result.executedProcessorIds,
-            )
+            currentMetadata = result.metadata
+            allExecutedIds.addAll(result.executedProcessorIds)
         }
 
-        return groupResult.metadata.copy(
+        return currentMetadata.copy(
             processingInfo = ProcessingInfo(
                 processedAt = Instant.now().toString(),
-                processorIds = groupResult.executedProcessorIds,
+                processorIds = allExecutedIds,
                 environment = context.environment.toSnapshot(),
             )
         )
@@ -103,19 +104,14 @@ public class ProcessingPipeline(
         emitEvent(context, ProcessingEvent.PhaseStarted(processor.phase))
         val mark = TimeSource.Monotonic.markNow()
         return try {
-            val result = when (processor) {
-                is ParallelMetadataProcessor -> processor.processParallel(metadata, context)
-                else -> {
-                    // Fallback for legacy processors that don't implement ParallelMetadataProcessor.
-                    // Validate that they didn't modify core fields.
-                    val fullResult = processor.process(metadata, context)
-                    validateParallelResult(metadata, fullResult)
-                    ParallelResult(
-                        diagnostics = collectNewDiagnostics(metadata.diagnostics, fullResult.diagnostics),
-                        extensions = fullResult.extensions - metadata.extensions.keys,
-                    )
-                }
+            if (processor !is ParallelMetadataProcessor) {
+                throw PipelineConfigurationException(
+                    "Processor '${processor.id}' is assigned to parallel phase '${processor.phase.name}' " +
+                            "but does not implement ParallelMetadataProcessor. " +
+                            "Parallel processors must implement ParallelMetadataProcessor to ensure thread safety."
+                )
             }
+            val result = processor.processParallel(metadata, context)
             emitNewDiagnostics(context, Diagnostics.EMPTY, result.diagnostics)
             emitEvent(context, ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
             ParallelProcessorOutput(result, executedId = processor.id)
@@ -158,28 +154,12 @@ public class ProcessingPipeline(
             )
         }
 
-    private fun validateParallelResult(base: EffectiveMetadata, result: EffectiveMetadata) {
-        assertUnchanged("versions", base.versions, result.versions)
-        assertUnchanged("libraries", base.libraries, result.libraries)
-        assertUnchanged("plugins", base.plugins, result.plugins)
-        assertUnchanged("bundles", base.bundles, result.bundles)
-    }
-
-    private fun assertUnchanged(fieldName: String, base: Any?, result: Any?) {
-        if (result != base) {
-            throw IllegalStateException(
-                "Parallel processor modified '$fieldName' which is not supported. " +
-                        "Only diagnostics and extensions can be modified in parallel execution mode."
-            )
-        }
-    }
-
     /**
-     * Collects diagnostics added by a parallel processor.
+     * Collects diagnostics added since [base] by computing the diff.
+     * Used by [emitNewDiagnostics] to emit events for newly added diagnostics.
      *
-     * Contract: parallel processors MUST only append diagnostics.
-     * The base lists are guaranteed to be prefixes of result lists
-     * because [validateParallelResult] prevents modification of core fields.
+     * Contract: processors append diagnostics via `metadata.diagnostics + newDiags`,
+     * so base lists are prefixes of result lists.
      */
     private fun collectNewDiagnostics(base: Diagnostics, result: Diagnostics): Diagnostics = Diagnostics(
         errors = result.errors.drop(base.errors.size),
@@ -195,9 +175,9 @@ public class ProcessingPipeline(
         ) return
 
         val newMessages = collectNewDiagnostics(before, after)
-        for (message in newMessages.errors + newMessages.warnings + newMessages.infos) {
-            emitEvent(context, ProcessingEvent.DiagnosticAdded(message))
-        }
+        for (message in newMessages.errors) emitEvent(context, ProcessingEvent.DiagnosticAdded(message))
+        for (message in newMessages.warnings) emitEvent(context, ProcessingEvent.DiagnosticAdded(message))
+        for (message in newMessages.infos) emitEvent(context, ProcessingEvent.DiagnosticAdded(message))
     }
 
     private fun emitEvent(context: ProcessingContext, event: ProcessingEvent) {
@@ -292,14 +272,22 @@ public class ProcessingPipeline(
             if (sorted.isEmpty()) return emptyList()
 
             val groups = mutableListOf<ProcessorGroup>()
+            var currentMode: ExecutionMode? = null
+            var currentProcessors = mutableListOf<EffectiveMetadataProcessor>()
+
             for (processor in sorted) {
                 val mode = processor.phase.executionMode
-                val last = groups.lastOrNull()
-                if (last != null && last.executionMode == mode) {
-                    groups[groups.lastIndex] = last.copy(processors = last.processors + processor)
-                } else {
-                    groups.add(ProcessorGroup(mode, listOf(processor)))
+                if (mode != currentMode) {
+                    if (currentProcessors.isNotEmpty()) {
+                        groups.add(ProcessorGroup(currentMode!!, currentProcessors))
+                    }
+                    currentMode = mode
+                    currentProcessors = mutableListOf()
                 }
+                currentProcessors.add(processor)
+            }
+            if (currentProcessors.isNotEmpty()) {
+                groups.add(ProcessorGroup(currentMode!!, currentProcessors))
             }
             return groups
         }

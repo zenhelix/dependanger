@@ -32,8 +32,8 @@ class MetadataSerializationBehaviorTest {
             val result = Dependanger.fromMetadata(deserialized).build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("ktor-core")
-            assertThat(result.effective!!.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
         }
 
         @Test
@@ -127,8 +127,8 @@ class MetadataSerializationBehaviorTest {
             val result = Dependanger.fromMetadata(readBack).build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
         }
     }
 
@@ -148,8 +148,8 @@ class MetadataSerializationBehaviorTest {
             val result = Dependanger.fromJson(json).build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("assertj-core")
-            assertThat(result.effective!!.libraries["assertj-core"]!!.version!!.value).isEqualTo("3.27.3")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj-core")
+            assertThat((result as DependangerResult.Success).effective.libraries["assertj-core"]!!.version!!.value).isEqualTo("3.27.3")
         }
 
         @Test
@@ -170,8 +170,8 @@ class MetadataSerializationBehaviorTest {
             val result = Dependanger.fromJson(json).build().process(distribution = "android")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("android-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("server-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("android-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("server-lib")
         }
     }
 

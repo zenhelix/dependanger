@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.features.resolver.DownloadResult
-import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.DownloadResult
+import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject

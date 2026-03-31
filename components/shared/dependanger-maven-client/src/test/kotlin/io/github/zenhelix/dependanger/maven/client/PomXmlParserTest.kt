@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.resolver
+package io.github.zenhelix.dependanger.maven.client
 
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
 import org.assertj.core.api.Assertions.assertThat
@@ -6,7 +6,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-class BomParsingTest {
+class PomXmlParserTest {
 
     private val parser = PomXmlParser()
 
@@ -319,18 +319,9 @@ class BomParsingTest {
 
         @Test
         fun `self-referencing property throws on resolution`() {
-            // PropertyResolver does simple regex replacement, so a self-reference
-            // like ${a} -> ${a} would fail because "a" maps to "${a}" which after
-            // one pass would still contain ${a} but the resolver does single-pass
-            // replacement, so it will try to resolve the inner ${a} and fail.
-            // Actually, the PropertyResolver does a single regex replace pass,
-            // so ${a} mapping to "${a}" would cause the replacement to look up "a"
-            // which returns "${a}" - no infinite loop, just unresolved in output.
             val properties = mapOf("a" to "\${b}", "b" to "\${a}")
 
-            // First pass resolves ${a} -> ${b}, which is the final value from single-pass
             val resolved = parser.resolveProperty("\${a}", properties)
-            // Single regex pass: ${a} -> ${b} (the value of property "a")
             assertThat(resolved).isEqualTo("\${b}")
         }
 
@@ -338,11 +329,9 @@ class BomParsingTest {
         fun `unresolved property after substitution throws on second resolve attempt`() {
             val properties = mapOf("a" to "\${nonexistent}")
 
-            // First resolve: ${a} -> ${nonexistent}
             val firstPass = parser.resolveProperty("\${a}", properties)
             assertThat(firstPass).isEqualTo("\${nonexistent}")
 
-            // If we try to resolve the result again, it will fail
             assertThatThrownBy {
                 parser.resolveProperty(firstPass, properties)
             }.isInstanceOf(IllegalStateException::class.java)

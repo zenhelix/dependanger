@@ -33,7 +33,7 @@ public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
             val conflicts = result.versionConflicts
 
             logger.lifecycle("Dependanger: Resolved transitive dependencies:")
-            logger.lifecycle("  Direct dependencies: ${result.effective?.libraries?.size ?: 0}")
+            logger.lifecycle("  Direct dependencies: ${result.effectiveOrNull()?.libraries?.size ?: 0}")
             logger.lifecycle("  Dependency trees: ${trees.size}")
             logger.lifecycle("  Version conflicts: ${conflicts.size}")
 

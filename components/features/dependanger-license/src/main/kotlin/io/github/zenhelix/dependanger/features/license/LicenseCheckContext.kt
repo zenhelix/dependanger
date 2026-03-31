@@ -6,9 +6,9 @@ import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
-import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.createDefault
+import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
 import io.ktor.client.HttpClient
 import kotlinx.serialization.builtins.ListSerializer
 

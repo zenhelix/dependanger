@@ -20,6 +20,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory

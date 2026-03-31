@@ -24,6 +24,10 @@ import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.http.client.createDefault
+import io.github.zenhelix.dependanger.maven.client.DownloadResult
+import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.PomXmlParser
+import io.github.zenhelix.dependanger.maven.client.RawBomDependency
 import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}

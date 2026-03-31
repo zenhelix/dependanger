@@ -4,9 +4,9 @@ import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.VersionConstraintType
-import io.github.zenhelix.dependanger.features.license.licenseCheck
-import io.github.zenhelix.dependanger.features.security.securityCheck
-import io.github.zenhelix.dependanger.features.updates.updateCheck
+import io.github.zenhelix.dependanger.feature.model.settings.license.licenseCheck
+import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
+import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
 
 /**
  * Pre-built DSL catalogs for different integration test scenarios.

@@ -11,11 +11,11 @@ import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettings
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutionStrategy
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
-import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettings
-import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettingsKey
 import kotlinx.serialization.Serializable
 import java.nio.file.Path
 import kotlin.io.path.writeText

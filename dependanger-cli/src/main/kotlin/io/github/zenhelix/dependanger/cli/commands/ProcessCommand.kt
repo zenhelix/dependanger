@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import java.nio.file.Path
@@ -44,13 +45,13 @@ public class ProcessCommand : CliktCommand(name = "process") {
                 dependanger.process(distribution)
             }
 
-            if (!result.isSuccess) {
+            if (result !is DependangerResult.Success) {
                 formatter.renderDiagnostics(result.diagnostics)
                 throw CliException.ValidationFailed(result.diagnostics)
             }
 
             val outputPath = Path.of(output)
-            val jsonString = CliDefaults.CLI_JSON.encodeToString(EffectiveMetadata.serializer(), result.effective!!)
+            val jsonString = CliDefaults.CLI_JSON.encodeToString(EffectiveMetadata.serializer(), result.effective)
             outputPath.writeText(jsonString)
 
             formatter.success("Processed metadata written to $outputPath")

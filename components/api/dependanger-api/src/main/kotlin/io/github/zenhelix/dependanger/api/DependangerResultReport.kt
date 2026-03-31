@@ -1,9 +1,9 @@
 package io.github.zenhelix.dependanger.api
 
-import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.GeneratedReport
 import io.github.zenhelix.dependanger.effective.spi.ReportProvider
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import java.util.ServiceLoader
 
 private val reportProvider: ReportProvider by lazy {
@@ -16,7 +16,7 @@ private val reportProvider: ReportProvider by lazy {
 private inline fun DependangerResult.withReport(
     block: ReportProvider.(EffectiveMetadata) -> GeneratedReport,
 ): GeneratedReport {
-    val eff = effective
+    val eff = effectiveOrNull()
         ?: throw DependangerProcessingException("Cannot generate report: no effective metadata", null, null)
     return wrapNonDependangerException({ e ->
                                            DependangerGenerationException("Report generation failed: ${e.message}", reportProvider.providerId, e)

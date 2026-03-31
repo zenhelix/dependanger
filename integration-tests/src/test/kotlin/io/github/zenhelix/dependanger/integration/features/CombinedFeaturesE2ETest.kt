@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.integration.features
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.api.toBom
 import io.github.zenhelix.dependanger.api.toToml
@@ -9,10 +10,10 @@ import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.features.license.licenseCheck
-import io.github.zenhelix.dependanger.features.security.securityCheck
-import io.github.zenhelix.dependanger.features.transitive.transitiveResolution
-import io.github.zenhelix.dependanger.features.updates.updateCheck
+import io.github.zenhelix.dependanger.feature.model.settings.license.licenseCheck
+import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.transitiveResolution
+import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.MavenResponses
 import io.github.zenhelix.dependanger.integration.support.OsvVulnResponse
@@ -84,11 +85,11 @@ class CombinedFeaturesE2ETest : IntegrationTestBase() {
             }
         }.process()
 
-        assertThat(result.isSuccess).isTrue()
-        assertThat(result.effective).isNotNull
-        assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-        assertThat(result.effective!!.plugins).containsKey("kotlin-jvm")
-        assertThat(result.effective!!.bundles).containsKey("kotlin")
+        assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+        val success = result as DependangerResult.Success
+        assertThat(success.effective.libraries).containsKey("kotlin-stdlib")
+        assertThat(success.effective.plugins).containsKey("kotlin-jvm")
+        assertThat(success.effective.bundles).containsKey("kotlin")
 
         // Updates available
         assertThat(result.updates).isNotEmpty()
@@ -236,7 +237,7 @@ class CombinedFeaturesE2ETest : IntegrationTestBase() {
             }
         }.process()
 
-        assertThat(result.effective).isNotNull
+        assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
 
         // UPDATE_CHECK (PARALLEL_IO) produced data
         assertThat(result.updates).isNotEmpty()

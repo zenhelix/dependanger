@@ -1,9 +1,13 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.api.DependangerResult
-import io.github.zenhelix.dependanger.api.writeBomTo
 import io.github.zenhelix.dependanger.generators.bom.BomConfig
+import io.github.zenhelix.dependanger.generators.bom.BomGenerator
 import org.gradle.api.GradleException
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 public abstract class GenerateBomTask : AbstractDependangerTask() {
@@ -11,15 +15,20 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
         description = "Generate Maven BOM from effective metadata"
     }
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    public val effectiveFile: RegularFileProperty = project.objects.fileProperty().convention(
+        extension.outputDirectory.file(DependangerTaskHelper.EFFECTIVE_FILE)
+    )
+
+    @get:OutputFile
+    public val bomFile: RegularFileProperty = project.objects.fileProperty().convention(
+        extension.outputDirectory.file(BomConfig.DEFAULT_FILENAME)
+    )
+
     @TaskAction
     public fun execute() {
-        val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
-        val effective = DependangerTaskHelper.readEffective(outputDir, logger)
-
-        val result = DependangerResult(
-            effective = effective,
-            diagnostics = effective.diagnostics,
-        )
+        val effective = DependangerTaskHelper.readEffective(effectiveFile.get().asFile, logger)
 
         val groupId = project.group.toString().takeIf { it.isNotBlank() }
             ?: throw GradleException("BOM groupId not configured. Set project.group.")
@@ -39,8 +48,13 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
             includeDeprecationComments = true,
         )
 
-        result.writeBomTo(outputDir.toPath(), bomConfig)
+        val generator = BomGenerator(bomConfig)
+        val artifact = generator.generate(effective)
 
-        logger.lifecycle("Dependanger: Generated ${bomConfig.filename} -> ${outputDir.resolve(bomConfig.filename)}")
+        val outputFile = bomFile.get().asFile
+        outputFile.parentFile?.mkdirs()
+        generator.write(artifact, outputFile.parentFile.toPath())
+
+        logger.lifecycle("Dependanger: Generated ${bomConfig.filename} -> $outputFile")
     }
 }

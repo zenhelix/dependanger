@@ -4,7 +4,7 @@ import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.features.transitive.transitiveResolution
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.transitiveResolution
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.MavenResponses
 import io.github.zenhelix.dependanger.integration.support.PomDep

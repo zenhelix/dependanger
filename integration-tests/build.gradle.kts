@@ -20,6 +20,7 @@ dependencies {
     testImplementation(projects.components.shared.dependangerFeatureModel)
     testImplementation(projects.components.shared.dependangerHttpClient)
     testImplementation(projects.components.shared.dependangerMavenPom)
+    testImplementation(projects.components.shared.dependangerMavenClient)
     testImplementation(projects.components.shared.dependangerCache)
 
     testImplementation(projects.components.generators.dependangerGeneratorToml)

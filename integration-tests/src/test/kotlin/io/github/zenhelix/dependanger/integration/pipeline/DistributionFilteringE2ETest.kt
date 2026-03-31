@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.integration.pipeline
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
@@ -57,7 +58,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val libraries = result.effective!!.libraries
+            val success = result as DependangerResult.Success
+            val libraries = success.effective.libraries
             assertThat(libraries.keys).contains("kotlin-stdlib", "android-core")
             assertThat(libraries.keys).doesNotContain("ios-foundation")
         }
@@ -90,7 +92,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val libraries = result.effective!!.libraries
+            val success = result as DependangerResult.Success
+            val libraries = success.effective.libraries
             assertThat(libraries.keys).containsExactlyInAnyOrder("lib-a", "lib-c")
         }
     }
@@ -122,7 +125,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val libraries = result.effective!!.libraries
+            val success = result as DependangerResult.Success
+            val libraries = success.effective.libraries
             assertThat(libraries.keys).containsExactly("kotlin-stdlib")
         }
     }
@@ -136,7 +140,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val libraries = result.effective!!.libraries
+            val success = result as DependangerResult.Success
+            val libraries = success.effective.libraries
             assertThat(libraries).hasSize(3)
         }
     }
@@ -176,10 +181,10 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
-            assertThat(effective.libraries.keys).containsExactly("lib-a")
+            val success = result as DependangerResult.Success
+            assertThat(success.effective.libraries.keys).containsExactly("lib-a")
 
-            val bundle = effective.bundles["mixed"]
+            val bundle = success.effective.bundles["mixed"]
             if (bundle != null) {
                 assertThat(bundle.libraries).doesNotContain("lib-b")
             }
@@ -213,7 +218,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val versions = result.effective!!.versions
+            val success = result as DependangerResult.Success
+            val versions = success.effective.versions
             assertThat(versions.keys).contains("used-ver")
             assertThat(versions.keys).doesNotContain("unused-ver")
         }
@@ -232,8 +238,8 @@ class DistributionFilteringE2ETest : IntegrationTestBase() {
             assertResult(androidResult).isSuccessful()
             assertResult(iosResult).isSuccessful()
 
-            val androidLibs = androidResult.effective!!.libraries.keys
-            val iosLibs = iosResult.effective!!.libraries.keys
+            val androidLibs = (androidResult as DependangerResult.Success).effective.libraries.keys
+            val iosLibs = (iosResult as DependangerResult.Success).effective.libraries.keys
 
             assertThat(androidLibs).contains("android-core")
             assertThat(androidLibs).doesNotContain("ios-foundation")

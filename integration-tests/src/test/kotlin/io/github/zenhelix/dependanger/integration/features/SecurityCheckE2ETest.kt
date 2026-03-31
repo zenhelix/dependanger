@@ -1,12 +1,13 @@
 package io.github.zenhelix.dependanger.integration.features
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.security.securityCheck
-import io.github.zenhelix.dependanger.features.updates.updateCheck
+import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
+import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.OsvVulnResponse
 import kotlinx.coroutines.test.runTest
@@ -45,7 +46,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             assertThat(result.vulnerabilities).isNotEmpty()
             assertThat(result.vulnerabilities).anyMatch { it.id == "GHSA-abc-123" }
             assertThat(result.vulnerabilities.first().summary).isEqualTo("Remote code execution")
@@ -104,7 +105,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             assertThat(result.vulnerabilities).hasSize(2)
             assertThat(result.vulnerabilities.map { it.id })
                 .containsExactlyInAnyOrder("GHSA-first", "GHSA-second")
@@ -149,7 +150,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             val byId = result.vulnerabilities.associateBy { it.id }
             assertThat(byId["CRITICAL-1"]!!.severity).isEqualTo(VulnerabilitySeverity.CRITICAL)
             assertThat(byId["HIGH-1"]!!.severity).isEqualTo(VulnerabilitySeverity.HIGH)
@@ -183,7 +184,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             assertThat(result.vulnerabilities).hasSize(1)
             assertThat(result.vulnerabilities.first().fixedVersion).isEqualTo("1.5.0")
         }
@@ -228,7 +229,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             assertThat(result.updates).isNotEmpty()
             assertThat(result.vulnerabilities).isNotEmpty()
             assertThat(result.updates.first().latestVersion).isEqualTo("2.0.0")

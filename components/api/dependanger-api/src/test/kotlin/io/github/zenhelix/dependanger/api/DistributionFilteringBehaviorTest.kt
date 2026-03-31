@@ -33,9 +33,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "spring-only")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("spring-core", "spring-context")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-core")
         }
 
         @Test
@@ -54,9 +54,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "all-spring")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("spring-core", "spring-boot")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-core")
         }
 
         @Test
@@ -75,9 +75,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "no-legacy")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("modern-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("legacy-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("legacy-util")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("modern-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("legacy-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("legacy-util")
         }
 
         @Test
@@ -102,10 +102,10 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "spring-public")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("spring-core", "spring-boot")
-            assertThat(result.effective!!.libraries).doesNotContainKey("spring-internal")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("spring-internal")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-core")
         }
     }
 
@@ -132,9 +132,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "web-only")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio", "ktor-json")
-            assertThat(result.effective!!.libraries).doesNotContainKey("unrelated-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("unrelated-lib")
         }
 
         @Test
@@ -156,9 +156,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "no-ktor")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("keep-me")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-core")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-cio")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("keep-me")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-cio")
         }
 
         @Test
@@ -185,9 +185,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "full-ktor")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio", "ktor-auth")
-            assertThat(result.effective!!.libraries).doesNotContainKey("unrelated")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("unrelated")
         }
     }
 
@@ -212,9 +212,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "no-deprecated")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("active-lib", "another-active")
-            assertThat(result.effective!!.libraries).doesNotContainKey("old-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("old-lib")
         }
 
         @Test
@@ -235,7 +235,7 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "with-deprecated")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("active-lib", "another-active", "old-lib")
         }
     }
@@ -262,9 +262,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "spring-backend")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("spring-web")
-            assertThat(result.effective!!.libraries).doesNotContainKey("spring-test")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-server")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("spring-web")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("spring-test")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-server")
         }
 
         @Test
@@ -286,9 +286,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "backend-no-b")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("lib-a")
-            assertThat(result.effective!!.libraries).doesNotContainKey("lib-b")
-            assertThat(result.effective!!.libraries).doesNotContainKey("lib-c")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("lib-a")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("lib-b")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("lib-c")
         }
 
         @Test
@@ -320,11 +320,11 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "strict")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("spring-web")
-            assertThat(result.effective!!.libraries).doesNotContainKey("spring-internal")
-            assertThat(result.effective!!.libraries).doesNotContainKey("legacy-spring")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-server")
-            assertThat(result.effective!!.libraries).doesNotContainKey("excluded-alias")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("spring-web")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("spring-internal")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("legacy-spring")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-server")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("excluded-alias")
         }
     }
 
@@ -347,9 +347,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "backend-java")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys).containsExactly("both-tags")
-            assertThat(result.effective!!.libraries).doesNotContainKey("only-backend")
-            assertThat(result.effective!!.libraries).doesNotContainKey("only-java")
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactly("both-tags")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("only-backend")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("only-java")
         }
 
         @Test
@@ -374,10 +374,10 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "complex-tags")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("lib-a", "lib-bc")
-            assertThat(result.effective!!.libraries).doesNotContainKey("lib-b-only")
-            assertThat(result.effective!!.libraries).doesNotContainKey("lib-none")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("lib-b-only")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("lib-none")
         }
     }
 
@@ -400,9 +400,9 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "jvm-only")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.plugins.keys)
+            assertThat((result as DependangerResult.Success).effective.plugins.keys)
                 .containsExactlyInAnyOrder("kotlin-jvm", "shadow")
-            assertThat(result.effective!!.plugins).doesNotContainKey("kotlin-multiplatform")
+            assertThat((result as DependangerResult.Success).effective.plugins).doesNotContainKey("kotlin-multiplatform")
         }
 
         @Test
@@ -420,8 +420,8 @@ class DistributionFilteringBehaviorTest {
             }.process(distribution = "tagged-only")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.plugins.keys).containsExactly("kotlin-jvm")
-            assertThat(result.effective!!.plugins).doesNotContainKey("untagged-plugin")
+            assertThat((result as DependangerResult.Success).effective.plugins.keys).containsExactly("kotlin-jvm")
+            assertThat((result as DependangerResult.Success).effective.plugins).doesNotContainKey("untagged-plugin")
         }
     }
 }

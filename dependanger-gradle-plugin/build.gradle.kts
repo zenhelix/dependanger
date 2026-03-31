@@ -12,6 +12,7 @@ description = "Dependanger Gradle Plugin - Gradle integration"
 dependencies {
     implementation(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.api.dependangerApi)
+    implementation(projects.components.core.dependangerMetadataJson)
 
     compileOnly(libs.kotlin.gradle.plugin)
 }

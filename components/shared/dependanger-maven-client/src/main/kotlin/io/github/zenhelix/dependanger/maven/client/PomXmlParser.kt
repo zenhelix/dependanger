@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.resolver
+package io.github.zenhelix.dependanger.maven.client
 
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParser

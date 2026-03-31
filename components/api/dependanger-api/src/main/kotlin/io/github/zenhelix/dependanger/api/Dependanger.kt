@@ -55,6 +55,10 @@ public class Dependanger internal constructor(
     private val pipelineCustomizer: (PipelineBuilder.() -> Unit)?,
     private val contextProperties: Map<ProcessingContextKey<*>, Any>,
 ) {
+    private val featureSettingsProviders: List<FeatureSettingsProvider> by lazy {
+        ServiceLoader.load(FeatureSettingsProvider::class.java).toList()
+    }
+
     public suspend fun process(
         distribution: String? = null,
         callback: ProcessingCallback? = null,
@@ -67,7 +71,7 @@ public class Dependanger internal constructor(
 
         val effective = pipeline.process(context)
 
-        DependangerResult(
+        DependangerResult.Success(
             effective = effective,
             diagnostics = effective.diagnostics,
         )
@@ -85,7 +89,7 @@ public class Dependanger internal constructor(
 
         val effective = pipeline.process(baseContext())
 
-        DependangerResult(
+        DependangerResult.Success(
             effective = effective,
             diagnostics = effective.diagnostics,
         )
@@ -129,7 +133,7 @@ public class Dependanger internal constructor(
         distribution: String? = null,
         callback: ProcessingCallback? = null,
     ): ProcessingContext {
-        val settingsProviders = ServiceLoader.load(FeatureSettingsProvider::class.java)
+        val settingsProviders = featureSettingsProviders
         val resolvedProperties = buildMap<ProcessingContextKey<*>, Any> {
             for (provider in settingsProviders) {
                 val json = metadata.settings.customSettings[provider.settingsKey]

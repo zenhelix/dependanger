@@ -25,7 +25,7 @@ public abstract class ReportTask : AbstractDependangerTask() {
 
             val result = runBlocking { dependanger.process() }
 
-            if (result.effective == null) {
+            if (!result.isSuccess) {
                 DependangerTaskHelper.logDiagnostics(result, logger)
                 logger.error("Dependanger: Cannot generate report -- processing failed")
                 return@runWithErrorHandling

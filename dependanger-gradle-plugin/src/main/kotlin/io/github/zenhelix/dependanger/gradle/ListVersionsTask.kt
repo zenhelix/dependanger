@@ -1,5 +1,9 @@
 package io.github.zenhelix.dependanger.gradle
 
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 public abstract class ListVersionsTask : AbstractDependangerTask() {
@@ -7,10 +11,15 @@ public abstract class ListVersionsTask : AbstractDependangerTask() {
         description = "List all resolved versions from effective metadata"
     }
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    public val effectiveFile: RegularFileProperty = project.objects.fileProperty().convention(
+        extension.outputDirectory.file(DependangerTaskHelper.EFFECTIVE_FILE)
+    )
+
     @TaskAction
     public fun execute() {
-        val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
-        val effective = DependangerTaskHelper.readEffective(outputDir, logger)
+        val effective = DependangerTaskHelper.readEffective(effectiveFile.get().asFile, logger)
 
         val versions = effective.versions
 

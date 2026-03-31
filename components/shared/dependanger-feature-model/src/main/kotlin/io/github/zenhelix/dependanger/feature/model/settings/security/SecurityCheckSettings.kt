@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.security
+package io.github.zenhelix.dependanger.feature.model.settings.security
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl

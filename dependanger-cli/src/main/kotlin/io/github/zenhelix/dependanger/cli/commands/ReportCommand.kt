@@ -12,8 +12,8 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.effective.spi.ReportSection
 import io.github.zenhelix.dependanger.effective.spi.ReportSettings
-import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettings
-import io.github.zenhelix.dependanger.features.transitive.TransitiveResolutionSettingsKey
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettings
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import java.nio.file.Path
 
 public class ReportCommand : CliktCommand(name = "report") {
@@ -41,13 +41,13 @@ public class ReportCommand : CliktCommand(name = "report") {
             }
 
             val reportSections = if (sections != null) {
-                sections!!.split(",").map { sectionName ->
-                    val trimmed = sectionName.trim().uppercase()
+                parseCommaSeparated(sections).map { sectionName ->
+                    val name = sectionName.uppercase()
                     try {
-                        ReportSection.valueOf(trimmed)
+                        ReportSection.valueOf(name)
                     } catch (_: IllegalArgumentException) {
                         throw CliException.InvalidArgument(
-                            "Unknown report section '$trimmed'. Available: ${ReportSection.entries.joinToString { it.name }}"
+                            "Unknown report section '$name'. Available: ${ReportSection.entries.joinToString { it.name }}"
                         )
                     }
                 }

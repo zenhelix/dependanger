@@ -34,8 +34,8 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
         }
 
         @Test
@@ -69,10 +69,10 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions).containsKey("ktor")
-            assertThat(result.effective!!.versions).doesNotContainKey("unused")
-            assertThat(result.effective!!.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
-            assertThat(result.effective!!.libraries["ktor-cio"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("ktor")
+            assertThat((result as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-cio"]!!.version!!.value).isEqualTo("3.1.1")
         }
     }
 
@@ -88,8 +88,8 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective).isNotNull()
-            assertThat(result.effective!!.libraries).containsKey("lib")
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib")
         }
 
         @Test
@@ -122,9 +122,9 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries).containsKey("assertj")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj")
         }
     }
 
@@ -185,7 +185,7 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(1)
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(1)
         }
 
         @Test
@@ -203,8 +203,8 @@ class PresetBehaviorTest {
             }.process(distribution = "android")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("android-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("server-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("android-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("server-lib")
         }
 
         @Test
@@ -224,10 +224,10 @@ class PresetBehaviorTest {
             }.process(distribution = "jvm")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-js")
-            assertThat(result.effective!!.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-js")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
         }
     }
 
@@ -257,8 +257,8 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            val extensionValue = result.effective!!.extensions[testExtensionKey]
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            val extensionValue = (result as DependangerResult.Success).effective.extensions[testExtensionKey]
             assertThat(extensionValue).isEqualTo("processed 2 libraries")
         }
 
@@ -277,7 +277,7 @@ class PresetBehaviorTest {
             val defaultResult = dependanger(ProcessingPreset.DEFAULT, dslBlock).process()
 
             assertThat(defaultResult.isSuccess).isTrue()
-            assertThat(defaultResult.effective!!.versions).doesNotContainKey("unused")
+            assertThat((defaultResult as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
 
             val disabledResult = Dependanger(dslBlock) {
                 preset(ProcessingPreset.DEFAULT)
@@ -285,7 +285,7 @@ class PresetBehaviorTest {
             }.process()
 
             assertThat(disabledResult.isSuccess).isTrue()
-            assertThat(disabledResult.effective!!.versions).containsKey("unused")
+            assertThat((disabledResult as DependangerResult.Success).effective.versions).containsKey("unused")
         }
     }
 
@@ -310,8 +310,8 @@ class PresetBehaviorTest {
             assertThat(defaultResult.isSuccess).isTrue()
             assertThat(minimalResult.isSuccess).isTrue()
 
-            assertThat(defaultResult.effective!!.versions).doesNotContainKey("unused")
-            assertThat(minimalResult.effective!!.versions).containsKey("unused")
+            assertThat((defaultResult as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
+            assertThat((minimalResult as DependangerResult.Success).effective.versions).containsKey("unused")
         }
     }
 }

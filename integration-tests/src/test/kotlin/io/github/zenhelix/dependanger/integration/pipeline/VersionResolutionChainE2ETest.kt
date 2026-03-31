@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.integration.pipeline
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
@@ -26,7 +27,8 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val lib = result.effective!!.libraries["guava"]
+            val success = result as DependangerResult.Success
+            val lib = success.effective.libraries["guava"]
             assertThat(lib).isNotNull
             assertThat(lib!!.version).isNotNull
             assertThat(lib.version!!.value).isEqualTo("33.0.0")
@@ -49,7 +51,8 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val lib = result.effective!!.libraries["kotlin-stdlib"]
+            val success = result as DependangerResult.Success
+            val lib = success.effective.libraries["kotlin-stdlib"]
             assertThat(lib).isNotNull
             assertThat(lib!!.version).isNotNull
             assertThat(lib.version!!.value).isEqualTo("2.1.20")
@@ -69,9 +72,9 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
+            val success = result as DependangerResult.Success
             // Literal versions may be extracted into the versions map
-            val hasVersion = effective.versions.values.any { it.value == "33.0.0" }
+            val hasVersion = success.effective.versions.values.any { it.value == "33.0.0" }
             assertThat(hasVersion).isTrue()
         }
     }
@@ -111,7 +114,7 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val version = result.effective!!.versions["lib-ver"]
+            val version = (result as DependangerResult.Success).effective.versions["lib-ver"]
             assertThat(version).isNotNull
             assertThat(version!!.value).isEqualTo("1.0.0")
         }
@@ -131,7 +134,7 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val version = result.effective!!.versions["lib-ver"]
+            val version = (result as DependangerResult.Success).effective.versions["lib-ver"]
             assertThat(version).isNotNull
             assertThat(version!!.value).isEqualTo("2.0.0")
         }
@@ -152,7 +155,7 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
             assertResult(result).isSuccessful()
 
             // Without kotlin version set, fallback condition should not match
-            val version = result.effective!!.versions["lib-ver"]
+            val version = (result as DependangerResult.Success).effective.versions["lib-ver"]
             assertThat(version).isNotNull
             assertThat(version!!.value).isEqualTo("3.0.0")
         }
@@ -173,7 +176,7 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val version = result.effective!!.versions["lib-ver"]
+            val version = (result as DependangerResult.Success).effective.versions["lib-ver"]
             assertThat(version).isNotNull
             // JDK 8 < 9, so first fallback should win
             assertThat(version!!.value).isEqualTo("1.0.0")
@@ -198,7 +201,8 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val versions = result.effective!!.versions
+            val success = result as DependangerResult.Success
+            val versions = success.effective.versions
             assertThat(versions.keys).contains("used")
             assertThat(versions.keys).doesNotContain("unused-1", "unused-2")
         }
@@ -232,13 +236,13 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
+            val success = result as DependangerResult.Success
             // Library should be filtered out (has "server" tag, not "client")
-            assertThat(effective.libraries.keys).doesNotContain("kotlin-stdlib")
+            assertThat(success.effective.libraries.keys).doesNotContain("kotlin-stdlib")
             // Plugin survives because it has "client" tag
-            assertThat(effective.plugins.keys).contains("kotlin-jvm")
+            assertThat(success.effective.plugins.keys).contains("kotlin-jvm")
             // Version should survive because plugin uses it
-            assertThat(effective.versions.keys).contains("kotlin")
+            assertThat(success.effective.versions.keys).contains("kotlin")
         }
     }
 }

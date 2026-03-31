@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.integration.pipeline
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.toBom
 import io.github.zenhelix.dependanger.api.toToml
 import io.github.zenhelix.dependanger.core.dsl.versionRef
@@ -30,11 +31,11 @@ class FullPipelineE2ETest : IntegrationTestBase() {
                 .isSuccessful()
                 .hasLibraryCount(2)
 
-            val effective = result.effective!!
-            assertThat(effective.versions).isNotEmpty
-            assertThat(effective.libraries).hasSize(2)
-            assertThat(effective.plugins).hasSize(1)
-            assertThat(effective.bundles).hasSize(1)
+            val success = result as DependangerResult.Success
+            assertThat(success.effective.versions).isNotEmpty
+            assertThat(success.effective.libraries).hasSize(2)
+            assertThat(success.effective.plugins).hasSize(1)
+            assertThat(success.effective.bundles).hasSize(1)
         }
     }
 
@@ -95,9 +96,9 @@ class FullPipelineE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
-            assertThat(effective.libraries).isNotEmpty
-            assertThat(effective.versions).isNotEmpty
+            val success = result as DependangerResult.Success
+            assertThat(success.effective.libraries).isNotEmpty
+            assertThat(success.effective.versions).isNotEmpty
         }
     }
 
@@ -110,11 +111,11 @@ class FullPipelineE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
-            assertThat(effective.libraries).isEmpty()
-            assertThat(effective.versions).isEmpty()
-            assertThat(effective.plugins).isEmpty()
-            assertThat(effective.bundles).isEmpty()
+            val success = result as DependangerResult.Success
+            assertThat(success.effective.libraries).isEmpty()
+            assertThat(success.effective.versions).isEmpty()
+            assertThat(success.effective.plugins).isEmpty()
+            assertThat(success.effective.bundles).isEmpty()
         }
     }
 
@@ -127,7 +128,8 @@ class FullPipelineE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val processingInfo = result.effective!!.processingInfo
+            val success = result as DependangerResult.Success
+            val processingInfo = success.effective.processingInfo
             assertThat(processingInfo).isNotNull
             assertThat(processingInfo!!.processorIds).isNotEmpty
             assertThat(processingInfo.processedAt).isNotBlank()

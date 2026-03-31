@@ -10,7 +10,7 @@ dependencies {
     api(projects.components.shared.dependangerFeatureModel)
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
-    api(projects.components.core.dependangerMetadataJson)
+    implementation(projects.components.core.dependangerMetadataJson)
     api(projects.components.generators.dependangerGeneratorToml)
     api(projects.components.generators.dependangerGeneratorBom)
 

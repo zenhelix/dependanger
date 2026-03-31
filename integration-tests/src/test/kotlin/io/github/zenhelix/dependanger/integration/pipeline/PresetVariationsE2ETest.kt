@@ -1,15 +1,16 @@
 package io.github.zenhelix.dependanger.integration.pipeline
 
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.features.license.licenseCheck
-import io.github.zenhelix.dependanger.features.security.securityCheck
-import io.github.zenhelix.dependanger.features.updates.updateCheck
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.feature.model.settings.license.licenseCheck
+import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
+import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.TestCatalogs
 import io.github.zenhelix.dependanger.integration.support.assertResult
@@ -53,9 +54,9 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
+            val success = result as DependangerResult.Success
             // MINIMAL skips library filtering, so all libraries should be present
-            assertThat(effective.libraries).hasSize(2)
+            assertThat(success.effective.libraries).hasSize(2)
         }
 
         @Test
@@ -72,7 +73,8 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val versions = result.effective!!.versions
+            val success = result as DependangerResult.Success
+            val versions = success.effective.versions
             // MINIMAL disables used-versions processor, so unused should remain
             assertThat(versions.keys).contains("used", "unused")
         }
@@ -108,8 +110,8 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val effective = result.effective!!
-            assertThat(effective.libraries.keys).containsExactly("lib-a")
+            val success = result as DependangerResult.Success
+            assertThat(success.effective.libraries.keys).containsExactly("lib-a")
         }
     }
 
@@ -161,7 +163,8 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
 
             assertResult(result).isSuccessful()
 
-            val processingInfo = result.effective!!.processingInfo
+            val success = result as DependangerResult.Success
+            val processingInfo = success.effective.processingInfo
             assertThat(processingInfo).isNotNull
             // STRICT enables update-check, security-check, license-check, transitive-resolver
             assertThat(processingInfo!!.processorIds).containsAnyOf(

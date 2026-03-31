@@ -82,18 +82,17 @@ public class DependangerDsl : DependangerDslApi {
     public fun allExtensions(): Map<DslExtensionKey<*>, Any> = extensions.toMap()
 
     public fun applyPreset(name: String) {
-        // bundles и distributions — строковые ссылки на определённые в DSL сущности.
-        // Доступны через metadata.presets для потребителей (API, CLI, Gradle Plugin),
-        // которые используют их для определения scope обработки.
+        // Presets reference bundles/distributions by name rather than embedding them,
+        // so consumers (API, CLI, Gradle Plugin) can resolve scope independently.
 
         val presetDsl = presetsDsl.findDslByName(name)
         if (presetDsl != null) {
-            // DSL-путь: точный merge через Trackable — применяются только явно установленные поля
+            // DSL-defined preset: precise merge via Trackable — only explicitly set fields are applied.
             presetDsl.settingsDsl?.applyTo(settingsDsl)
             return
         }
 
-        // JSON-путь (fallback): preset загружен из файла, DSL-объекта нет
+        // Fallback for JSON-loaded presets that have no DSL object (e.g., imported from file).
         val preset = presetsDsl.findByName(name)
             ?: throw IllegalArgumentException(
                 "Preset '$name' not found. Available presets: ${presetsDsl.availableNames()}"

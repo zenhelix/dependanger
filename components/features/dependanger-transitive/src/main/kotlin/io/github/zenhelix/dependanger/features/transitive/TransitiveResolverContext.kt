@@ -5,9 +5,9 @@ import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
-import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.createDefault
+import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
 import io.ktor.client.HttpClient
 
 private const val DEFAULT_TTL_HOURS = 24L

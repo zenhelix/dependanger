@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependenciesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey

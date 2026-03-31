@@ -15,19 +15,19 @@ import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 
 public val DependangerResult.updates: List<UpdateAvailableInfo>
-    get() = effective?.getExtension(UpdatesExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(UpdatesExtensionKey) ?: emptyList()
 
 public val DependangerResult.vulnerabilities: List<VulnerabilityInfo>
-    get() = effective?.getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(VulnerabilitiesExtensionKey) ?: emptyList()
 
 public val DependangerResult.licenseViolations: List<LicenseViolation>
-    get() = effective?.getExtension(LicenseViolationsExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(LicenseViolationsExtensionKey) ?: emptyList()
 
 public val DependangerResult.transitives: List<TransitiveTree>
-    get() = effective?.getExtension(TransitivesExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(TransitivesExtensionKey) ?: emptyList()
 
 public val DependangerResult.compatibilityIssues: List<CompatibilityIssue>
-    get() = effective?.getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(CompatibilityIssuesExtensionKey) ?: emptyList()
 
 public val DependangerResult.versionConflicts: List<VersionConflict>
-    get() = effective?.getExtension(VersionConflictsExtensionKey) ?: emptyList()
+    get() = effectiveOrNull()?.getExtension(VersionConflictsExtensionKey) ?: emptyList()

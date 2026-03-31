@@ -7,6 +7,8 @@ import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.feature.model.license.isCopyleft
+import io.github.zenhelix.dependanger.feature.model.settings.license.DualLicensePolicy
+import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 

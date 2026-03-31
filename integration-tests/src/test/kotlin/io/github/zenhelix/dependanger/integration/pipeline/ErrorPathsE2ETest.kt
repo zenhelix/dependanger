@@ -3,6 +3,7 @@ package io.github.zenhelix.dependanger.integration.pipeline
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.DependangerConfigurationException
 import io.github.zenhelix.dependanger.api.DependangerProcessingException
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.toBom
 import io.github.zenhelix.dependanger.api.toToml
 import io.github.zenhelix.dependanger.core.dsl.versionRef
@@ -113,7 +114,7 @@ class ErrorPathsE2ETest : IntegrationTestBase() {
 
             // Either the duplicate is flagged or the result has exactly one library
             if (!hasDuplicateDiagnostic) {
-                assertThat(result.effective?.libraries).isNotNull
+                assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
             }
         }
     }
@@ -149,7 +150,7 @@ class ErrorPathsE2ETest : IntegrationTestBase() {
             }
 
             // If no circular diagnostic, the result should at least not crash
-            assertThat(result.effective != null || hasCircularDiagnostic).isTrue()
+            assertThat(result.isSuccess || hasCircularDiagnostic).isTrue()
         }
     }
 
@@ -193,12 +194,14 @@ class ErrorPathsE2ETest : IntegrationTestBase() {
 
             assertResult(roundTripResult).isSuccessful()
 
-            val originalLibs = originalResult.effective!!.libraries.keys
-            val roundTripLibs = roundTripResult.effective!!.libraries.keys
+            val originalSuccess = originalResult as DependangerResult.Success
+            val roundTripSuccess = roundTripResult as DependangerResult.Success
+            val originalLibs = originalSuccess.effective.libraries.keys
+            val roundTripLibs = roundTripSuccess.effective.libraries.keys
             assertThat(roundTripLibs).containsExactlyInAnyOrderElementsOf(originalLibs)
 
-            val originalVersions = originalResult.effective!!.versions.mapValues { it.value.value }
-            val roundTripVersions = roundTripResult.effective!!.versions.mapValues { it.value.value }
+            val originalVersions = originalSuccess.effective.versions.mapValues { it.value.value }
+            val roundTripVersions = roundTripSuccess.effective.versions.mapValues { it.value.value }
             assertThat(roundTripVersions).containsAllEntriesOf(originalVersions)
         }
     }

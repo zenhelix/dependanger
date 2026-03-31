@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.transitive
+package io.github.zenhelix.dependanger.feature.model.settings.transitive
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl

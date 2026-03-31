@@ -1,11 +1,14 @@
 package io.github.zenhelix.dependanger.api
 
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
@@ -34,20 +37,56 @@ internal class FakeProcessor<T : Any>(
         metadata.withExtension(extensionKey, provider(metadata))
 }
 
+internal class FakeParallelProcessor<T : Any>(
+    override val id: String,
+    override val phase: ProcessingPhase,
+    override val constraints: Set<OrderConstraint> = emptySet(),
+    private val extensionKey: ExtensionKey<T>,
+    private val provider: (EffectiveMetadata) -> T,
+) : ParallelMetadataProcessor {
+    override val isOptional: Boolean = false
+    override val description: String = "Fake parallel $id for tests"
+    override fun supports(context: ProcessingContext): Boolean = true
+
+    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult =
+        ParallelResult(
+            diagnostics = Diagnostics.EMPTY,
+            extensions = mapOf(extensionKey to provider(metadata)),
+        )
+}
+
 internal fun fakeUpdateCheck(
     provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>,
-): FakeProcessor<List<UpdateAvailableInfo>> =
-    FakeProcessor("fake-update-check", ProcessingPhase.UPDATE_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = UpdatesExtensionKey, provider = provider)
+): FakeParallelProcessor<List<UpdateAvailableInfo>> =
+    FakeParallelProcessor(
+        "fake-update-check",
+        ProcessingPhase.UPDATE_CHECK,
+        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        extensionKey = UpdatesExtensionKey,
+        provider = provider
+    )
 
 internal fun fakeSecurityCheck(
     provider: (EffectiveMetadata) -> List<VulnerabilityInfo>,
-): FakeProcessor<List<VulnerabilityInfo>> =
-    FakeProcessor("fake-security-check", ProcessingPhase.SECURITY_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = VulnerabilitiesExtensionKey, provider = provider)
+): FakeParallelProcessor<List<VulnerabilityInfo>> =
+    FakeParallelProcessor(
+        "fake-security-check",
+        ProcessingPhase.SECURITY_CHECK,
+        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        extensionKey = VulnerabilitiesExtensionKey,
+        provider = provider
+    )
 
 internal fun fakeLicenseCheck(
     provider: (EffectiveMetadata) -> List<LicenseViolation>,
-): FakeProcessor<List<LicenseViolation>> =
-    FakeProcessor("fake-license-check", ProcessingPhase.LICENSE_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = LicenseViolationsExtensionKey, provider = provider)
+): FakeParallelProcessor<List<LicenseViolation>> =
+    FakeParallelProcessor(
+        "fake-license-check",
+        ProcessingPhase.LICENSE_CHECK,
+        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        extensionKey = LicenseViolationsExtensionKey,
+        provider = provider
+    )
 
 internal fun fakeTransitiveResolver(
     provider: (EffectiveMetadata) -> List<TransitiveTree>,

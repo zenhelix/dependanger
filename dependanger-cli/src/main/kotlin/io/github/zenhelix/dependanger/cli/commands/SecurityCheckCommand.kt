@@ -14,8 +14,8 @@ import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.security.SecurityCheckSettings
-import io.github.zenhelix.dependanger.features.security.SecurityCheckSettingsKey
+import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettings
+import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText

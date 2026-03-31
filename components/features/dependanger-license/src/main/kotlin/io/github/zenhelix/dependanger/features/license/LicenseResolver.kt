@@ -7,8 +7,8 @@ import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
-import io.github.zenhelix.dependanger.features.resolver.DownloadResult
-import io.github.zenhelix.dependanger.features.resolver.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.DownloadResult
+import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParser
 
 private val logger = KotlinLogging.logger {}

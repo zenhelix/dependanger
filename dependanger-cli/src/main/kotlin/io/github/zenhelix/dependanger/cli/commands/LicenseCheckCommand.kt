@@ -12,8 +12,8 @@ import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.LicenseCheckSettings
-import io.github.zenhelix.dependanger.features.license.LicenseCheckSettingsKey
+import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettings
+import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
@@ -38,8 +38,8 @@ public class LicenseCheckCommand : CliktCommand(name = "license-check") {
         withErrorHandling(formatter) {
             val metadata = metadataService.read(Path.of(input))
 
-            val allowedLicenses = allow?.split(",")?.map { it.trim() } ?: LicenseCheckSettings.DEFAULT.allowedLicenses
-            val deniedLicenses = deny?.split(",")?.map { it.trim() } ?: LicenseCheckSettings.DEFAULT.deniedLicenses
+            val allowedLicenses = allow?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.allowedLicenses
+            val deniedLicenses = deny?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.deniedLicenses
 
             val dependanger = Dependanger.fromMetadata(metadata)
                 .preset(ProcessingPreset.STRICT)

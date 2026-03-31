@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.features.transitive
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
-import io.github.zenhelix.dependanger.features.resolver.DownloadResult
+import io.github.zenhelix.dependanger.maven.client.DownloadResult
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParser
 import kotlinx.coroutines.async

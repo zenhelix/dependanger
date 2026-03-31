@@ -5,7 +5,6 @@ import io.github.zenhelix.dependanger.core.model.filter.AliasFilter
 import io.github.zenhelix.dependanger.core.model.filter.BundleFilter
 import io.github.zenhelix.dependanger.core.model.filter.DeprecatedFilter
 import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
-import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -48,7 +47,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
 
         val filtered = metadata.libraries.filter { (alias, lib) ->
             val passesSpec = spec == null || (
-                passesTagFilter(lib, spec.byTags)
+                    (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
                 && passesGroupFilter(lib, spec.byGroups)
                 && passesAliasFilter(alias, spec.byAliases)
                 && passesBundleFilter(alias, bundleIndex, spec.byBundles)
@@ -69,24 +68,6 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
         }
 
         return metadata.copy(libraries = filtered, diagnostics = diagnostics)
-    }
-
-    private fun passesTagFilter(lib: EffectiveLibrary, filter: TagFilter?): Boolean {
-        if (filter == null) return true
-        val tags = lib.tags
-
-        val passesIncludes = if (filter.includes.isEmpty()) true
-        else filter.includes.any { include ->
-            val anyOfOk = include.anyOf.isEmpty() || (tags intersect include.anyOf).isNotEmpty()
-            val allOfOk = include.allOf.isEmpty() || tags.containsAll(include.allOf)
-            anyOfOk && allOfOk
-        }
-
-        val passesExcludes = filter.excludes.all { exclude ->
-            exclude.anyOf.isEmpty() || (tags intersect exclude.anyOf).isEmpty()
-        }
-
-        return passesIncludes && passesExcludes
     }
 
     private fun passesGroupFilter(lib: EffectiveLibrary, filter: GroupFilter?): Boolean {

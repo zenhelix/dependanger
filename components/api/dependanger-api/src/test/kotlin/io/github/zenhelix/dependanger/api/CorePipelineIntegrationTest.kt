@@ -42,9 +42,9 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions).containsKey("kotlin")
-            assertThat(result.effective!!.versions["kotlin"]!!.value).isEqualTo("2.1.20")
-            assertThat(result.effective!!.versions["kotlin"]!!.source).isEqualTo(VersionSource.DECLARED)
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("kotlin")
+            assertThat((result as DependangerResult.Success).effective.versions["kotlin"]!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.versions["kotlin"]!!.source).isEqualTo(VersionSource.DECLARED)
         }
 
         @Test
@@ -55,7 +55,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["ktor-core"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["ktor-core"]!!
             assertThat(lib.version!!.value).isEqualTo("3.1.1")
         }
 
@@ -76,7 +76,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["assertj"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["assertj"]!!
             assertThat(lib.version!!.value).isEqualTo("3.27.3")
         }
 
@@ -92,7 +92,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["guava"]!!.version!!.value).isEqualTo("33.0-android")
+            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version!!.value).isEqualTo("33.0-android")
         }
 
         @Test
@@ -107,7 +107,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["guava"]!!.version!!.value).isEqualTo("33.0-jre")
+            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version!!.value).isEqualTo("33.0-jre")
         }
     }
 
@@ -124,9 +124,9 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries).containsKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("ktor-core")
         }
 
         @Test
@@ -140,7 +140,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["assertj"]!!.tags)
+            assertThat((result as DependangerResult.Success).effective.libraries["assertj"]!!.tags)
                 .containsExactlyInAnyOrder("test", "assertion")
         }
 
@@ -155,7 +155,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["old-lib"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["old-lib"]!!
             assertThat(lib.isDeprecated).isTrue()
             assertThat(lib.deprecation!!.replacedBy).isEqualTo("new-lib")
         }
@@ -180,9 +180,9 @@ class CorePipelineIntegrationTest {
             }.process(distribution = "android")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("android-lib")
-            assertThat(result.effective!!.libraries).containsKey("common-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("server-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("android-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("common-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("server-lib")
         }
 
         @Test
@@ -200,7 +200,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
         }
 
         @Test
@@ -218,8 +218,8 @@ class CorePipelineIntegrationTest {
             }.process(distribution = "minimal")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("keep-me")
-            assertThat(result.effective!!.libraries).doesNotContainKey("drop-me")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("keep-me")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("drop-me")
         }
 
         @Test
@@ -247,7 +247,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.bundles["ktor"]!!.libraries)
+            assertThat((result as DependangerResult.Success).effective.bundles["ktor"]!!.libraries)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio", "ktor-json")
         }
 
@@ -269,7 +269,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.bundles["ktor-full"]!!.libraries)
+            assertThat((result as DependangerResult.Success).effective.bundles["ktor-full"]!!.libraries)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio", "ktor-auth")
         }
 
@@ -289,7 +289,7 @@ class CorePipelineIntegrationTest {
             }.process(distribution = "filtered")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.bundles["mixed"]!!.libraries).containsExactly("lib-a")
+            assertThat((result as DependangerResult.Success).effective.bundles["mixed"]!!.libraries).containsExactly("lib-a")
         }
     }
 
@@ -304,7 +304,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val plugin = result.effective!!.plugins["kotlin-jvm"]!!
+            val plugin = (result as DependangerResult.Success).effective.plugins["kotlin-jvm"]!!
             assertThat(plugin.id).isEqualTo("org.jetbrains.kotlin.jvm")
             assertThat(plugin.version!!.value).isEqualTo("2.1.20")
         }
@@ -343,7 +343,7 @@ class CorePipelineIntegrationTest {
             }.build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib")
         }
 
         @Test
@@ -356,7 +356,7 @@ class CorePipelineIntegrationTest {
             val result = Dependanger.fromJson(json).build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib")
         }
 
         @Test
@@ -371,9 +371,9 @@ class CorePipelineIntegrationTest {
             val result = dependanger {}.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).isEmpty()
-            assertThat(result.effective!!.plugins).isEmpty()
-            assertThat(result.effective!!.bundles).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.libraries).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.plugins).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.bundles).isEmpty()
         }
     }
 
@@ -467,7 +467,7 @@ class CorePipelineIntegrationTest {
 
         @Test
         fun `extension properties are safe on failed result`() {
-            val result = DependangerResult(effective = null, diagnostics = Diagnostics.EMPTY)
+            val result = DependangerResult.Failure(diagnostics = Diagnostics.EMPTY)
 
             assertThat(result.updates).isEmpty()
             assertThat(result.vulnerabilities).isEmpty()
@@ -492,8 +492,8 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions).containsKey("used")
-            assertThat(result.effective!!.versions).doesNotContainKey("unused")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("used")
+            assertThat((result as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
         }
     }
 }

@@ -19,6 +19,7 @@ import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationsExtensionKey
 import io.github.zenhelix.dependanger.feature.model.license.isCopyleft
+import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult

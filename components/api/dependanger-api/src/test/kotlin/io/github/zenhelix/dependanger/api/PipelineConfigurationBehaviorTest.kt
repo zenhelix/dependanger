@@ -42,8 +42,8 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions).containsKey("used")
-            assertThat(result.effective!!.versions).containsKey("unused")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("used")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("unused")
         }
 
         @Test
@@ -101,7 +101,7 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib")
         }
 
         @Test
@@ -125,7 +125,7 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions).containsKey("unused")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("unused")
 
             val validationDiagnostics = result.diagnostics.warnings.filter {
                 it.code == DiagnosticCodes.Validation.BUNDLE_REF_MISSING
@@ -193,7 +193,7 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val extensionValue = result.effective!!.extensions[testExtensionKey]
+            val extensionValue = (result as DependangerResult.Success).effective.extensions[testExtensionKey]
             assertThat(extensionValue).isEqualTo("found 3 libraries")
         }
 
@@ -202,7 +202,7 @@ class PipelineConfigurationBehaviorTest {
             val key1 = ExtensionKey("test-key-phase-transform", String.serializer())
             val key2 = ExtensionKey("test-key-phase-validation", String.serializer())
 
-            val processor1 = FakeProcessor(
+            val processor1 = FakeParallelProcessor(
                 id = "custom-enrichment",
                 phase = ProcessingPhase.UPDATE_CHECK,
                 constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
@@ -210,7 +210,7 @@ class PipelineConfigurationBehaviorTest {
                 provider = { "transform-done" },
             )
 
-            val processor2 = FakeProcessor(
+            val processor2 = FakeParallelProcessor(
                 id = "custom-validate",
                 phase = ProcessingPhase.SECURITY_CHECK,
                 constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
@@ -227,8 +227,8 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.extensions[key1]).isEqualTo("transform-done")
-            assertThat(result.effective!!.extensions[key2]).isEqualTo("validation-done")
+            assertThat((result as DependangerResult.Success).effective.extensions[key1]).isEqualTo("transform-done")
+            assertThat((result as DependangerResult.Success).effective.extensions[key2]).isEqualTo("validation-done")
         }
 
         @Test
@@ -255,9 +255,9 @@ class PipelineConfigurationBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.extensions[testExtensionKey]).isEqualTo("ran")
-            assertThat(result.effective!!.versions).containsKey("used")
-            assertThat(result.effective!!.versions).doesNotContainKey("unused")
+            assertThat((result as DependangerResult.Success).effective.extensions[testExtensionKey]).isEqualTo("ran")
+            assertThat((result as DependangerResult.Success).effective.versions).containsKey("used")
+            assertThat((result as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
         }
     }
 
@@ -274,9 +274,9 @@ class PipelineConfigurationBehaviorTest {
             }.build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries).containsKey("assertj")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj")
         }
 
         @Test
@@ -296,11 +296,11 @@ class PipelineConfigurationBehaviorTest {
 
             assertThat(dslResult.isSuccess).isTrue()
             assertThat(metadataResult.isSuccess).isTrue()
-            assertThat(metadataResult.effective!!.libraries.keys)
-                .containsExactlyInAnyOrderElementsOf(dslResult.effective!!.libraries.keys)
+            assertThat((metadataResult as DependangerResult.Success).effective.libraries.keys)
+                .containsExactlyInAnyOrderElementsOf((dslResult as DependangerResult.Success).effective.libraries.keys)
 
-            dslResult.effective!!.libraries.forEach { (alias, dslLib) ->
-                val metaLib = metadataResult.effective!!.libraries[alias]!!
+            (dslResult as DependangerResult.Success).effective.libraries.forEach { (alias, dslLib) ->
+                val metaLib = (metadataResult as DependangerResult.Success).effective.libraries[alias]!!
                 assertThat(metaLib.group).isEqualTo(dslLib.group)
                 assertThat(metaLib.artifact).isEqualTo(dslLib.artifact)
                 assertThat(metaLib.version?.value).isEqualTo(dslLib.version?.value)
@@ -327,10 +327,10 @@ class PipelineConfigurationBehaviorTest {
             val result = Dependanger.fromJson(json).build().process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
-            assertThat(result.effective!!.plugins).containsKey("kotlin-jvm")
-            assertThat(result.effective!!.bundles).containsKey("kotlin")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.plugins).containsKey("kotlin-jvm")
+            assertThat((result as DependangerResult.Success).effective.bundles).containsKey("kotlin")
         }
 
         @Test
@@ -356,10 +356,10 @@ class PipelineConfigurationBehaviorTest {
 
             assertThat(explicitDefaultResult.isSuccess).isTrue()
             assertThat(implicitDefaultResult.isSuccess).isTrue()
-            assertThat(implicitDefaultResult.effective!!.versions.keys)
-                .containsExactlyInAnyOrderElementsOf(explicitDefaultResult.effective!!.versions.keys)
-            assertThat(implicitDefaultResult.effective!!.libraries.keys)
-                .containsExactlyInAnyOrderElementsOf(explicitDefaultResult.effective!!.libraries.keys)
+            assertThat((implicitDefaultResult as DependangerResult.Success).effective.versions.keys)
+                .containsExactlyInAnyOrderElementsOf((explicitDefaultResult as DependangerResult.Success).effective.versions.keys)
+            assertThat((implicitDefaultResult as DependangerResult.Success).effective.libraries.keys)
+                .containsExactlyInAnyOrderElementsOf((explicitDefaultResult as DependangerResult.Success).effective.libraries.keys)
         }
     }
 
@@ -378,8 +378,8 @@ class PipelineConfigurationBehaviorTest {
             assertThat(result.diagnostics.errors).anyMatch {
                 it.code == DiagnosticCodes.Version.UNRESOLVED
             }
-            assertThat(result.effective).isNotNull()
-            assertThat(result.effective!!.libraries).containsKey("good-lib")
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("good-lib")
         }
 
         @Test
@@ -393,7 +393,7 @@ class PipelineConfigurationBehaviorTest {
                 }
             }.process()
 
-            assertThat(result.effective).isNotNull()
+            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
 
             val bundleDiagnostics = result.diagnostics.warnings.filter {
                 it.code == DiagnosticCodes.Bundle.LIBRARY_MISSING ||

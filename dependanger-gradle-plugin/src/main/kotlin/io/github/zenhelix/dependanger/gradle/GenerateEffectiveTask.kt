@@ -1,8 +1,16 @@
 package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.effective.serialization.EffectiveJsonFormat
+import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
 import kotlinx.coroutines.runBlocking
+import org.gradle.api.GradleException
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
@@ -10,10 +18,26 @@ public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
         description = "Generate effective metadata from DSL through processing pipeline"
     }
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    public val metadataFile: RegularFileProperty = project.objects.fileProperty().convention(
+        extension.outputDirectory.file(DependangerTaskHelper.METADATA_FILE)
+    )
+
+    @get:OutputFile
+    public val effectiveFile: RegularFileProperty = project.objects.fileProperty().convention(
+        extension.outputDirectory.file(DependangerTaskHelper.EFFECTIVE_FILE)
+    )
+
     @TaskAction
     public fun execute() {
-        val metadata = extension.dsl.toMetadata()
-        val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
+        val inputFile = metadataFile.get().asFile
+        if (!inputFile.exists()) {
+            throw GradleException("metadata.json not found at $inputFile. Ensure dependangerGenerateMetadata has been executed.")
+        }
+
+        val format = JsonSerializationFormat()
+        val metadata = format.read(inputFile.toPath())
         val failOnError = extension.failOnError.get()
 
         runWithErrorHandling(failOnError) {
@@ -22,14 +46,18 @@ public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
 
             DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
 
-            val effective = result.effective
-            if (effective != null) {
-                val effectiveFormat = EffectiveJsonFormat()
-                val outputFile = outputDir.resolve(DependangerTaskHelper.EFFECTIVE_FILE)
-                effectiveFormat.write(effective, outputFile.toPath())
-                logger.lifecycle("Dependanger: Generated ${DependangerTaskHelper.EFFECTIVE_FILE} -> $outputFile")
-            } else {
-                logger.warn("Dependanger: Processing completed but no effective metadata produced — skipping ${DependangerTaskHelper.EFFECTIVE_FILE} write")
+            when (result) {
+                is DependangerResult.Success -> {
+                    val outputFile = effectiveFile.get().asFile
+                    outputFile.parentFile?.mkdirs()
+                    val effectiveFormat = EffectiveJsonFormat()
+                    effectiveFormat.write(result.effective, outputFile.toPath())
+                    logger.lifecycle("Dependanger: Generated ${DependangerTaskHelper.EFFECTIVE_FILE} -> $outputFile")
+                }
+
+                is DependangerResult.Failure -> {
+                    logger.warn("Dependanger: Processing failed — skipping ${DependangerTaskHelper.EFFECTIVE_FILE} write")
+                }
             }
         }
     }

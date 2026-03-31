@@ -88,13 +88,13 @@ class ComplexCatalogBehaviorTest {
             val result = dependanger(dslBlock = realisticCatalogDsl()).process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(8)
-            assertThat(result.effective!!.libraries.keys).containsExactlyInAnyOrder(
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(8)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactlyInAnyOrder(
                 "kotlin-stdlib", "ktor-core", "ktor-cio", "ktor-json",
                 "spring-core", "spring-web", "junit-jupiter", "assertj-core",
             )
-            assertThat(result.effective!!.bundles).hasSize(3)
-            assertThat(result.effective!!.bundles.keys)
+            assertThat((result as DependangerResult.Success).effective.bundles).hasSize(3)
+            assertThat((result as DependangerResult.Success).effective.bundles.keys)
                 .containsExactlyInAnyOrder("ktor", "spring", "testing")
         }
 
@@ -104,13 +104,13 @@ class ComplexCatalogBehaviorTest {
                 .process(distribution = "backend")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(6)
-            assertThat(result.effective!!.libraries.keys).containsExactlyInAnyOrder(
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(6)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys).containsExactlyInAnyOrder(
                 "kotlin-stdlib", "ktor-core", "ktor-cio", "ktor-json",
                 "spring-core", "spring-web",
             )
-            assertThat(result.effective!!.libraries).doesNotContainKey("junit-jupiter")
-            assertThat(result.effective!!.libraries).doesNotContainKey("assertj-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("junit-jupiter")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("assertj-core")
         }
 
         @Test
@@ -119,12 +119,12 @@ class ComplexCatalogBehaviorTest {
                 .process(distribution = "testing")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries.keys)
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("junit-jupiter", "assertj-core")
-            assertThat(result.effective!!.libraries).doesNotContainKey("kotlin-stdlib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("ktor-core")
-            assertThat(result.effective!!.libraries).doesNotContainKey("spring-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-core")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("spring-core")
         }
     }
 
@@ -142,8 +142,8 @@ class ComplexCatalogBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("kotlin-bom")
-            assertThat(result.effective!!.libraries["kotlin-bom"]!!.isPlatform).isTrue()
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-bom")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-bom"]!!.isPlatform).isTrue()
 
             val toml = result.toToml()
             assertThat(toml).contains("[libraries]")
@@ -184,7 +184,7 @@ class ComplexCatalogBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.bundles["full-bundle"]!!.libraries)
+            assertThat((result as DependangerResult.Success).effective.bundles["full-bundle"]!!.libraries)
                 .containsExactlyInAnyOrder("lib-a", "lib-b", "lib-c", "lib-d")
         }
 
@@ -213,7 +213,7 @@ class ComplexCatalogBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val allLibraries = result.effective!!.bundles["all"]!!.libraries
+            val allLibraries = (result as DependangerResult.Success).effective.bundles["all"]!!.libraries
             assertThat(allLibraries).containsExactlyInAnyOrder("lib-base", "lib-a", "lib-b")
             assertThat(allLibraries.size).isEqualTo(allLibraries.toSet().size)
         }
@@ -355,7 +355,7 @@ class ComplexCatalogBehaviorTest {
 
             val result = instance.process()
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("kotlin-stdlib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
         }
 
         @Test
@@ -389,12 +389,12 @@ class ComplexCatalogBehaviorTest {
 
             assertThat(result1.isSuccess).isTrue()
             assertThat(result2.isSuccess).isTrue()
-            assertThat(result1.effective!!.libraries.keys)
-                .isEqualTo(result2.effective!!.libraries.keys)
-            assertThat(result1.effective!!.libraries["kotlin-stdlib"]!!.version!!.value)
-                .isEqualTo(result2.effective!!.libraries["kotlin-stdlib"]!!.version!!.value)
-            assertThat(result1.effective!!.libraries["ktor-core"]!!.version!!.value)
-                .isEqualTo(result2.effective!!.libraries["ktor-core"]!!.version!!.value)
+            assertThat((result1 as DependangerResult.Success).effective.libraries.keys)
+                .isEqualTo((result2 as DependangerResult.Success).effective.libraries.keys)
+            assertThat((result1 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value)
+                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value)
+            assertThat((result1 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value)
+                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value)
         }
     }
 
@@ -415,10 +415,10 @@ class ComplexCatalogBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(50)
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(50)
             (1..50).forEach { i ->
-                assertThat(result.effective!!.libraries).containsKey("lib-$i")
-                assertThat(result.effective!!.libraries["lib-$i"]!!.version!!.value)
+                assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib-$i")
+                assertThat((result as DependangerResult.Success).effective.libraries["lib-$i"]!!.version!!.value)
                     .isEqualTo("$i.0.0")
             }
         }

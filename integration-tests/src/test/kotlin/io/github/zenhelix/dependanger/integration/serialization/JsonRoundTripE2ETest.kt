@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.integration.serialization
 
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
@@ -34,10 +35,12 @@ class JsonRoundTripE2ETest : IntegrationTestBase() {
         val roundTripResult = Dependanger.fromMetadata(deserialized).build().process()
         assertThat(roundTripResult.isSuccess).isTrue()
 
-        assertThat(roundTripResult.effective!!.libraries.keys)
-            .isEqualTo(originalResult.effective!!.libraries.keys)
-        assertThat(roundTripResult.effective!!.libraries["kotlin-stdlib"]!!.version!!.value)
-            .isEqualTo(originalResult.effective!!.libraries["kotlin-stdlib"]!!.version!!.value)
+        val originalSuccess = originalResult as DependangerResult.Success
+        val roundTripSuccess = roundTripResult as DependangerResult.Success
+        assertThat(roundTripSuccess.effective.libraries.keys)
+            .isEqualTo(originalSuccess.effective.libraries.keys)
+        assertThat(roundTripSuccess.effective.libraries["kotlin-stdlib"]!!.version!!.value)
+            .isEqualTo(originalSuccess.effective.libraries["kotlin-stdlib"]!!.version!!.value)
     }
 
     @Test
@@ -82,9 +85,10 @@ class JsonRoundTripE2ETest : IntegrationTestBase() {
 
         val result = Dependanger.fromMetadata(deserialized).build().process()
         assertThat(result.isSuccess).isTrue()
-        assertThat(result.effective!!.libraries).hasSize(5)
-        assertThat(result.effective!!.plugins).hasSize(1)
-        assertThat(result.effective!!.bundles).hasSize(1)
+        val success = result as DependangerResult.Success
+        assertThat(success.effective.libraries).hasSize(5)
+        assertThat(success.effective.plugins).hasSize(1)
+        assertThat(success.effective.bundles).hasSize(1)
     }
 
     @Test
@@ -111,16 +115,18 @@ class JsonRoundTripE2ETest : IntegrationTestBase() {
         val jsonResult = Dependanger.fromJson(json).build().process()
         assertThat(jsonResult.isSuccess).isTrue()
 
-        assertThat(jsonResult.effective!!.libraries.keys)
-            .isEqualTo(dslResult.effective!!.libraries.keys)
-        assertThat(jsonResult.effective!!.bundles.keys)
-            .isEqualTo(dslResult.effective!!.bundles.keys)
-        assertThat(jsonResult.effective!!.versions.keys)
-            .isEqualTo(dslResult.effective!!.versions.keys)
+        val dslSuccess = dslResult as DependangerResult.Success
+        val jsonSuccess = jsonResult as DependangerResult.Success
+        assertThat(jsonSuccess.effective.libraries.keys)
+            .isEqualTo(dslSuccess.effective.libraries.keys)
+        assertThat(jsonSuccess.effective.bundles.keys)
+            .isEqualTo(dslSuccess.effective.bundles.keys)
+        assertThat(jsonSuccess.effective.versions.keys)
+            .isEqualTo(dslSuccess.effective.versions.keys)
 
-        for (alias in dslResult.effective!!.libraries.keys) {
-            assertThat(jsonResult.effective!!.libraries[alias]!!.version?.value)
-                .isEqualTo(dslResult.effective!!.libraries[alias]!!.version?.value)
+        for (alias in dslSuccess.effective.libraries.keys) {
+            assertThat(jsonSuccess.effective.libraries[alias]!!.version?.value)
+                .isEqualTo(dslSuccess.effective.libraries[alias]!!.version?.value)
         }
     }
 

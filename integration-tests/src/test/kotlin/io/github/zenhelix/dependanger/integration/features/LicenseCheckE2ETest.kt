@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.integration.features
 import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
-import io.github.zenhelix.dependanger.features.license.licenseCheck
+import io.github.zenhelix.dependanger.feature.model.settings.license.licenseCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat

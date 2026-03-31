@@ -16,6 +16,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsKey
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey

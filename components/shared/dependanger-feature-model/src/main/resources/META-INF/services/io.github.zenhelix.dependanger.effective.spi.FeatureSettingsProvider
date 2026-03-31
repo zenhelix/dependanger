@@ -1,0 +1,5 @@
+io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsProvider
+io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsProvider
+io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsProvider
+io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsProvider
+io.github.zenhelix.dependanger.feature.model.settings.analysis.CompatibilityAnalysisSettingsProvider

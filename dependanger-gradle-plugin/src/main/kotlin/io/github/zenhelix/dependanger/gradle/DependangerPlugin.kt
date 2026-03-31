@@ -16,22 +16,28 @@ public class DependangerPlugin : Plugin<Project> {
     }
 
     private fun registerTasks(project: Project) {
-        // Category 1: Generative tasks (file chain)
+        // Category 1: Generative tasks (file chain with incremental inputs/outputs)
         val generateMetadata = project.tasks.register("dependangerGenerateMetadata", GenerateMetadataTask::class.java)
+
         val generateEffective = project.tasks.register("dependangerGenerateEffective", GenerateEffectiveTask::class.java) {
             it.dependsOn(generateMetadata)
+            it.metadataFile.set(generateMetadata.flatMap { task -> task.metadataFile })
         }
+
         val generateToml = project.tasks.register("dependangerGenerateToml", GenerateTomlTask::class.java) {
             it.dependsOn(generateEffective)
+            it.effectiveFile.set(generateEffective.flatMap { task -> task.effectiveFile })
         }
         val generateBom = project.tasks.register("dependangerGenerateBom", GenerateBomTask::class.java) {
             it.dependsOn(generateEffective)
+            it.effectiveFile.set(generateEffective.flatMap { task -> task.effectiveFile })
         }
         project.tasks.register("dependangerGenerate", GenerateAllTask::class.java) {
             it.dependsOn(generateToml, generateBom)
         }
         project.tasks.register("dependangerListVersions", ListVersionsTask::class.java) {
             it.dependsOn(generateEffective)
+            it.effectiveFile.set(generateEffective.flatMap { task -> task.effectiveFile })
         }
 
         // Category 2: Analytical tasks (standalone, no dependsOn)

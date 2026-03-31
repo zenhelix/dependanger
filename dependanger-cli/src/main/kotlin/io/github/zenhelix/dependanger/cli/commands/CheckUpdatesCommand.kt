@@ -11,9 +11,9 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettings
+import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
-import io.github.zenhelix.dependanger.features.updates.UpdateCheckSettings
-import io.github.zenhelix.dependanger.features.updates.UpdateCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
@@ -60,7 +60,7 @@ public class CheckUpdatesCommand : CliktCommand(name = "check-updates") {
             val updates = result.updates
 
             val filteredUpdates = type?.let { typeFilter ->
-                val allowedTypes = typeFilter.split(",").map { it.trim().uppercase() }.toSet()
+                val allowedTypes = parseCommaSeparated(typeFilter).map { it.uppercase() }.toSet()
                 updates.filter { it.updateType.name in allowedTypes }
             } ?: updates
 

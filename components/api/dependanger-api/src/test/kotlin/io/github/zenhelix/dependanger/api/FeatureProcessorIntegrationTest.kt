@@ -19,11 +19,23 @@ import org.junit.jupiter.api.Test
 
 class FeatureProcessorIntegrationTest {
 
-    private fun fakeUpdateCheck(provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>): FakeProcessor<List<UpdateAvailableInfo>> =
-        FakeProcessor("fake-update-check", ProcessingPhase.UPDATE_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = UpdatesExtensionKey, provider = provider)
+    private fun fakeUpdateCheck(provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>): FakeParallelProcessor<List<UpdateAvailableInfo>> =
+        FakeParallelProcessor(
+            "fake-update-check",
+            ProcessingPhase.UPDATE_CHECK,
+            constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+            extensionKey = UpdatesExtensionKey,
+            provider = provider
+        )
 
-    private fun fakeSecurityCheck(provider: (EffectiveMetadata) -> List<VulnerabilityInfo>): FakeProcessor<List<VulnerabilityInfo>> =
-        FakeProcessor("fake-security-check", ProcessingPhase.SECURITY_CHECK, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = VulnerabilitiesExtensionKey, provider = provider)
+    private fun fakeSecurityCheck(provider: (EffectiveMetadata) -> List<VulnerabilityInfo>): FakeParallelProcessor<List<VulnerabilityInfo>> =
+        FakeParallelProcessor(
+            "fake-security-check",
+            ProcessingPhase.SECURITY_CHECK,
+            constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+            extensionKey = VulnerabilitiesExtensionKey,
+            provider = provider
+        )
 
     @Nested
     inner class UpdateCheckFlow {

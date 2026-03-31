@@ -41,7 +41,7 @@ class ResultAssert(actual: DependangerResult) :
 
     fun hasLibraryCount(expected: Int): ResultAssert = apply {
         isNotNull
-        val count = actual.effective?.libraries?.size ?: 0
+        val count = actual.effectiveOrNull()?.libraries?.size ?: 0
         if (count != expected) {
             failWithMessage("Expected %d libraries, but found %d", expected, count)
         }
@@ -49,7 +49,7 @@ class ResultAssert(actual: DependangerResult) :
 
     fun hasVersion(alias: String, value: String): ResultAssert = apply {
         isNotNull
-        val versions = actual.effective?.versions ?: emptyMap()
+        val versions = actual.effectiveOrNull()?.versions ?: emptyMap()
         val resolved = versions[alias]
         if (resolved == null) {
             failWithMessage("Expected version '%s' to exist, but it was not found. Available: %s", alias, versions.keys)
@@ -60,7 +60,7 @@ class ResultAssert(actual: DependangerResult) :
 
     fun hasLibrary(alias: String): ResultAssert = apply {
         isNotNull
-        val libraries = actual.effective?.libraries ?: emptyMap()
+        val libraries = actual.effectiveOrNull()?.libraries ?: emptyMap()
         if (alias !in libraries) {
             failWithMessage("Expected library '%s' to exist, but it was not found. Available: %s", alias, libraries.keys)
         }
@@ -68,7 +68,7 @@ class ResultAssert(actual: DependangerResult) :
 
     fun hasPlugin(alias: String): ResultAssert = apply {
         isNotNull
-        val plugins = actual.effective?.plugins ?: emptyMap()
+        val plugins = actual.effectiveOrNull()?.plugins ?: emptyMap()
         if (alias !in plugins) {
             failWithMessage("Expected plugin '%s' to exist, but it was not found. Available: %s", alias, plugins.keys)
         }
@@ -76,7 +76,7 @@ class ResultAssert(actual: DependangerResult) :
 
     fun hasBundle(alias: String): ResultAssert = apply {
         isNotNull
-        val bundles = actual.effective?.bundles ?: emptyMap()
+        val bundles = actual.effectiveOrNull()?.bundles ?: emptyMap()
         if (alias !in bundles) {
             failWithMessage("Expected bundle '%s' to exist, but it was not found. Available: %s", alias, bundles.keys)
         }

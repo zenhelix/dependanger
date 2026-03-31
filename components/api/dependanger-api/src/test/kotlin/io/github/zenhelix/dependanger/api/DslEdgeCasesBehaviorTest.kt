@@ -51,8 +51,8 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.versions["kotlin"]!!.value).isEqualTo("2.1.20")
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.versions["kotlin"]!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
         }
 
         @Test
@@ -65,10 +65,10 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(1)
-            assertThat(result.effective!!.libraries).containsKey("my-lib")
-            assertThat(result.effective!!.libraries["my-lib"]!!.group).isEqualTo("com.new")
-            assertThat(result.effective!!.libraries["my-lib"]!!.artifact).isEqualTo("new-artifact")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(1)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("my-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries["my-lib"]!!.group).isEqualTo("com.new")
+            assertThat((result as DependangerResult.Success).effective.libraries["my-lib"]!!.artifact).isEqualTo("new-artifact")
         }
 
         @Test
@@ -86,9 +86,9 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.bundles).hasSize(1)
-            assertThat(result.effective!!.bundles).containsKey("my-bundle")
-            assertThat(result.effective!!.bundles["my-bundle"]!!.libraries)
+            assertThat((result as DependangerResult.Success).effective.bundles).hasSize(1)
+            assertThat((result as DependangerResult.Success).effective.bundles).containsKey("my-bundle")
+            assertThat((result as DependangerResult.Success).effective.bundles["my-bundle"]!!.libraries)
                 .containsExactlyInAnyOrder("lib-b", "lib-c")
         }
 
@@ -106,10 +106,10 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.plugins).hasSize(1)
-            assertThat(result.effective!!.plugins).containsKey("my-plugin")
-            assertThat(result.effective!!.plugins["my-plugin"]!!.id).isEqualTo("com.new.plugin")
-            assertThat(result.effective!!.plugins["my-plugin"]!!.version!!.value).isEqualTo("2.0.0")
+            assertThat((result as DependangerResult.Success).effective.plugins).hasSize(1)
+            assertThat((result as DependangerResult.Success).effective.plugins).containsKey("my-plugin")
+            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.id).isEqualTo("com.new.plugin")
+            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.version!!.value).isEqualTo("2.0.0")
         }
     }
 
@@ -121,10 +121,10 @@ class DslEdgeCasesBehaviorTest {
             val result = dependanger {}.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).isEmpty()
-            assertThat(result.effective!!.versions).isEmpty()
-            assertThat(result.effective!!.bundles).isEmpty()
-            assertThat(result.effective!!.plugins).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.libraries).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.versions).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.bundles).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.plugins).isEmpty()
         }
 
         @Test
@@ -138,10 +138,10 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries).containsKey("assertj")
-            assertThat(result.effective!!.libraries).containsKey("guava")
-            assertThat(result.effective!!.libraries["assertj"]!!.version!!.value).isEqualTo("3.27.3")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("guava")
+            assertThat((result as DependangerResult.Success).effective.libraries["assertj"]!!.version!!.value).isEqualTo("3.27.3")
         }
 
         @Test
@@ -153,8 +153,8 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).isEmpty()
-            assertThat(result.effective!!.bundles).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.libraries).isEmpty()
+            assertThat((result as DependangerResult.Success).effective.bundles).isEmpty()
         }
     }
 
@@ -168,10 +168,10 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).containsKey("bom-managed")
-            assertThat(result.effective!!.libraries["bom-managed"]!!.version).isNull()
-            assertThat(result.effective!!.libraries["bom-managed"]!!.group).isEqualTo("com.example")
-            assertThat(result.effective!!.libraries["bom-managed"]!!.artifact).isEqualTo("bom-managed")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("bom-managed")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version).isNull()
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.group).isEqualTo("com.example")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.artifact).isEqualTo("bom-managed")
         }
 
         @Test
@@ -199,9 +199,9 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
-            assertThat(result.effective!!.libraries["bom-managed"]!!.version).isNull()
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version).isNull()
         }
     }
 
@@ -215,7 +215,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["assertj"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["assertj"]!!
             assertThat(lib.group).isEqualTo("org.assertj")
             assertThat(lib.artifact).isEqualTo("assertj-core")
             assertThat(lib.version!!.value).isEqualTo("3.27.3")
@@ -228,7 +228,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["managed-lib"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["managed-lib"]!!
             assertThat(lib.group).isEqualTo("com.example")
             assertThat(lib.artifact).isEqualTo("managed-lib")
             assertThat(lib.version).isNull()
@@ -242,7 +242,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["ktor-core"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["ktor-core"]!!
             assertThat(lib.group).isEqualTo("io.ktor")
             assertThat(lib.artifact).isEqualTo("ktor-client-core")
             assertThat(lib.version!!.value).isEqualTo("3.1.1")
@@ -262,7 +262,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["kotlin-bom"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["kotlin-bom"]!!
             assertThat(lib.isPlatform).isTrue()
             assertThat(lib.group).isEqualTo("org.jetbrains.kotlin")
             assertThat(lib.artifact).isEqualTo("kotlin-bom")
@@ -298,9 +298,9 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries["kotlin-bom"]!!.isPlatform).isTrue()
-            assertThat(result.effective!!.libraries["kotlin-stdlib"]!!.isPlatform).isFalse()
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-bom"]!!.isPlatform).isTrue()
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.isPlatform).isFalse()
 
             val bom = result.toBom(bomConfig())
             assertThat(bom).contains("<type>pom</type>")
@@ -322,7 +322,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["multi-tagged"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["multi-tagged"]!!
             assertThat(lib.tags).hasSize(4)
             assertThat(lib.tags).containsExactlyInAnyOrder("backend", "jvm", "production", "core")
         }
@@ -343,10 +343,10 @@ class DslEdgeCasesBehaviorTest {
             }.process(distribution = "backend")
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries).hasSize(2)
-            assertThat(result.effective!!.libraries).containsKey("backend-lib")
-            assertThat(result.effective!!.libraries).containsKey("shared-lib")
-            assertThat(result.effective!!.libraries).doesNotContainKey("frontend-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("backend-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("shared-lib")
+            assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("frontend-lib")
         }
 
         @Test
@@ -358,7 +358,7 @@ class DslEdgeCasesBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["no-tags"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["no-tags"]!!
             assertThat(lib.tags).isEmpty()
             assertThat(lib.group).isEqualTo("com.example")
             assertThat(lib.artifact).isEqualTo("no-tags")

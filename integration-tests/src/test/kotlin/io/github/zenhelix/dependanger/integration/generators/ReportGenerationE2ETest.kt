@@ -9,8 +9,8 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.effective.spi.ReportSection
 import io.github.zenhelix.dependanger.effective.spi.ReportSettings
-import io.github.zenhelix.dependanger.features.security.securityCheck
-import io.github.zenhelix.dependanger.features.updates.updateCheck
+import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
+import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.OsvVulnResponse
 import kotlinx.coroutines.test.runTest

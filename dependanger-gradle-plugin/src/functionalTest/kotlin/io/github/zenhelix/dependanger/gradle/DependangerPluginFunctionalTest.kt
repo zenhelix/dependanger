@@ -27,6 +27,12 @@ class DependangerPluginFunctionalTest {
         .withPluginClasspath()
         .build()
 
+    private fun runTaskAndFail(vararg args: String) = GradleRunner.create()
+        .withProjectDir(projectDir)
+        .withArguments(*args, "--stacktrace")
+        .withPluginClasspath()
+        .buildAndFail()
+
     @Test
     fun `empty DSL generates empty metadata`() {
         buildFile.writeText(
@@ -136,16 +142,11 @@ class DependangerPluginFunctionalTest {
             plugins {
                 id("io.github.zenhelix.dependanger")
             }
+            group = "com.example"
+            version = "1.0.0"
             dependanger {
                 libraries {
                     library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
-                }
-                settings {
-                    bom {
-                        groupId = "com.example"
-                        artifactId = "test-bom"
-                        version = "1.0.0"
-                    }
                 }
             }
         """.trimIndent()
@@ -158,7 +159,7 @@ class DependangerPluginFunctionalTest {
         assertThat(bomFile).exists()
         val content = bomFile.readText()
         assertThat(content).contains("com.example")
-        assertThat(content).contains("test-bom")
+        assertThat(content).contains("test-project-bom")
     }
 
     @Test
@@ -168,16 +169,11 @@ class DependangerPluginFunctionalTest {
             plugins {
                 id("io.github.zenhelix.dependanger")
             }
+            group = "com.example"
+            version = "1.0.0"
             dependanger {
                 libraries {
                     library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
-                }
-                settings {
-                    bom {
-                        groupId = "com.example"
-                        artifactId = "test-bom"
-                        version = "1.0.0"
-                    }
                 }
             }
         """.trimIndent()
@@ -287,6 +283,8 @@ class DependangerPluginFunctionalTest {
             plugins {
                 id("io.github.zenhelix.dependanger")
             }
+            group = "com.example"
+            version = "1.0.0"
             dependanger {
                 versions {
                     version("kotlin", "2.1.20")
@@ -299,13 +297,6 @@ class DependangerPluginFunctionalTest {
                 bundles {
                     bundle("core") {
                         libraries("kotlin-stdlib", "spring-web")
-                    }
-                }
-                settings {
-                    bom {
-                        groupId = "com.example"
-                        artifactId = "test-bom"
-                        version = "1.0.0"
                     }
                 }
             }
@@ -330,5 +321,108 @@ class DependangerPluginFunctionalTest {
         val bom = projectDir.resolve("build/dependanger/bom.pom.xml")
         assertThat(bom).exists()
         assertThat(bom.readText()).contains("com.example")
+    }
+
+    @Test
+    fun `generateEffective reads from metadata json not from DSL directly`() {
+        buildFile.writeText(
+            """
+            plugins {
+                id("io.github.zenhelix.dependanger")
+            }
+            dependanger {
+                versions {
+                    version("kotlin", "2.1.20")
+                }
+                libraries {
+                    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
+                }
+            }
+        """.trimIndent()
+        )
+
+        // Step 1: Generate metadata.json
+        runTask("dependangerGenerateMetadata")
+        val metadataFile = projectDir.resolve("build/dependanger/metadata.json")
+        assertThat(metadataFile).exists()
+
+        // Step 2: Modify metadata.json to inject a marker version that does NOT exist in DSL
+        val originalContent = metadataFile.readText()
+        assertThat(originalContent).contains("kotlin")
+        val modifiedContent = originalContent.replace("2.1.20", "9.9.99-marker")
+        metadataFile.writeText(modifiedContent)
+
+        // Step 3: Run generateEffective (skipping generateMetadata via -x)
+        // If generateEffective reads from the file, effective.json will contain the marker version.
+        // If it re-evaluates the DSL, effective.json will contain the original 2.1.20.
+        val result = runTask("dependangerGenerateEffective", "-x", "dependangerGenerateMetadata")
+
+        assertThat(result.task(":dependangerGenerateEffective")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+        val effectiveContent = projectDir.resolve("build/dependanger/effective.json").readText()
+        assertThat(effectiveContent)
+            .describedAs("GenerateEffectiveTask should read from metadata.json, not re-evaluate DSL")
+            .contains("9.9.99-marker")
+        assertThat(effectiveContent).doesNotContain("2.1.20")
+    }
+
+    @Test
+    fun `generateEffective fails when metadata json is missing`() {
+        buildFile.writeText(
+            """
+            plugins {
+                id("io.github.zenhelix.dependanger")
+            }
+            dependanger {
+                versions {
+                    version("kotlin", "2.1.20")
+                }
+            }
+        """.trimIndent()
+        )
+
+        // Run generateEffective without generateMetadata — metadata.json does not exist
+        // Gradle validates @InputFile and fails before the task action executes
+        val result = runTaskAndFail("dependangerGenerateEffective", "-x", "dependangerGenerateMetadata")
+
+        assertThat(result.output).contains("metadata.json")
+        assertThat(result.output).contains("doesn't exist")
+    }
+
+    @Test
+    fun `downstream tasks are UP-TO-DATE on second run when inputs unchanged`() {
+        buildFile.writeText(
+            """
+            plugins {
+                id("io.github.zenhelix.dependanger")
+            }
+            dependanger {
+                versions {
+                    version("kotlin", "2.1.20")
+                }
+                libraries {
+                    library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
+                }
+            }
+        """.trimIndent()
+        )
+
+        // First run — all tasks execute
+        val firstRun = runTask("dependangerGenerateToml")
+        assertThat(firstRun.task(":dependangerGenerateMetadata")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+        assertThat(firstRun.task(":dependangerGenerateEffective")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+        assertThat(firstRun.task(":dependangerGenerateToml")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
+
+        // Second run — GenerateMetadata always runs (DSL not trackable),
+        // but Effective and Toml should be UP-TO-DATE since metadata.json content didn't change
+        val secondRun = runTask("dependangerGenerateToml")
+        assertThat(secondRun.task(":dependangerGenerateMetadata")?.outcome)
+            .describedAs("GenerateMetadata always re-executes (DSL is not trackable)")
+            .isEqualTo(TaskOutcome.SUCCESS)
+        assertThat(secondRun.task(":dependangerGenerateEffective")?.outcome)
+            .describedAs("GenerateEffective should be UP-TO-DATE when metadata.json unchanged")
+            .isEqualTo(TaskOutcome.UP_TO_DATE)
+        assertThat(secondRun.task(":dependangerGenerateToml")?.outcome)
+            .describedAs("GenerateToml should be UP-TO-DATE when effective.json unchanged")
+            .isEqualTo(TaskOutcome.UP_TO_DATE)
     }
 }

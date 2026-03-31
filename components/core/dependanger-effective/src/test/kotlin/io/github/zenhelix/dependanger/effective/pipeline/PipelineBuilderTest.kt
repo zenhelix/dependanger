@@ -107,11 +107,11 @@ class PipelineBuilderTest {
         @Test
         fun `processors without constraints are sorted alphabetically`() = runTest {
             val pipeline = ProcessingPipeline {
-                addProcessor(FakeProcessor("p1", ProcessingPhase.UPDATE_CHECK))
-                addProcessor(FakeProcessor("p2", ProcessingPhase.SECURITY_CHECK))
+                addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION))
+                addProcessor(FakeProcessor("p1", ProcessingPhase.VALIDATION))
             }
             val ids = runPipelineAndGetProcessorIds(pipeline)
-            assertThat(ids).containsExactlyInAnyOrder("p1", "p2")
+            assertThat(ids).containsExactly("p1", "p2")
         }
 
         @Test

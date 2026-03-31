@@ -38,7 +38,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("1.5")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("1.5")
         }
 
         @Test
@@ -53,7 +53,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("2.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("2.0")
         }
     }
 
@@ -72,7 +72,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("8.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("8.0")
         }
 
         @Test
@@ -87,7 +87,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("9.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("9.0")
         }
     }
 
@@ -107,7 +107,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("android")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("android")
         }
 
         @Test
@@ -123,7 +123,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("for-jdk-11")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("for-jdk-11")
         }
     }
 
@@ -142,7 +142,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("2.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("2.0")
         }
 
         @Test
@@ -157,7 +157,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("1.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("1.0")
         }
 
         @Test
@@ -172,7 +172,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("compat")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("compat")
         }
 
         @Test
@@ -187,7 +187,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("non-lts")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("non-lts")
         }
 
         @Test
@@ -202,7 +202,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["lib"]!!.version!!.value).isEqualTo("1.0")
+            assertThat((result as DependangerResult.Success).effective.libraries["lib"]!!.version!!.value).isEqualTo("1.0")
         }
     }
 
@@ -221,7 +221,7 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            val lib = result.effective!!.libraries["guava"]!!
+            val lib = (result as DependangerResult.Success).effective.libraries["guava"]!!
             assertThat(lib.version!!.value).isEqualTo("33.0-android")
         }
 
@@ -240,9 +240,9 @@ class VersionFallbackBehaviorTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.effective!!.libraries["guava-core"]!!.version!!.value)
+            assertThat((result as DependangerResult.Success).effective.libraries["guava-core"]!!.version!!.value)
                 .isEqualTo("33.0-android")
-            assertThat(result.effective!!.libraries["guava-testlib"]!!.version!!.value)
+            assertThat((result as DependangerResult.Success).effective.libraries["guava-testlib"]!!.version!!.value)
                 .isEqualTo("33.0-android")
         }
     }

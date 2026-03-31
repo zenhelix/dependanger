@@ -23,7 +23,7 @@ import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseChec
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
-import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
+import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvidersKey
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import kotlinx.coroutines.async
@@ -31,7 +31,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import java.util.ServiceLoader
 
 private val logger = KotlinLogging.logger {}
 
@@ -50,9 +49,9 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         val repositories = context.resolveMavenRepositories()
         val credentialsProvider = context[CredentialsProviderKey]
         val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
-        val customProviders = ServiceLoader.load(LicenseSourceProvider::class.java).toList()
+        val customProviders = context[LicenseSourceProvidersKey] ?: emptyList()
         if (customProviders.isNotEmpty()) {
-            logger.info { "Loaded ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
+            logger.info { "Using ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
         }
 
         var diagnostics = Diagnostics.EMPTY

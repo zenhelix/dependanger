@@ -33,7 +33,7 @@ public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
     public fun execute() {
         val inputFile = metadataFile.get().asFile
         if (!inputFile.exists()) {
-            throw GradleException("metadata.json not found at $inputFile. Ensure dependangerGenerateMetadata has been executed.")
+            throw GradleException("${DependangerTaskHelper.METADATA_FILE} not found at $inputFile. Ensure dependangerGenerateMetadata has been executed.")
         }
 
         val format = JsonSerializationFormat()
@@ -47,11 +47,12 @@ public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
             DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
 
             when (result) {
-                is DependangerResult.Success -> {
+                is DependangerResult.Success, is DependangerResult.CompletedWithErrors -> {
+                    val effective = result.effectiveOrNull()!!
                     val outputFile = effectiveFile.get().asFile
                     outputFile.parentFile?.mkdirs()
                     val effectiveFormat = EffectiveJsonFormat()
-                    effectiveFormat.write(result.effective, outputFile.toPath())
+                    effectiveFormat.write(effective, outputFile.toPath())
                     logger.lifecycle("Dependanger: Generated ${DependangerTaskHelper.EFFECTIVE_FILE} -> $outputFile")
                 }
 

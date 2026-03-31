@@ -116,11 +116,7 @@ class CombinedFeaturesE2ETest : IntegrationTestBase() {
                 )
             }
             osv {
-                vulnerabilities(
-                    "com.example:lib", listOf(
-                        OsvVulnResponse(id = "GHSA-toml-test", summary = "Test vuln", cvssScore = 5.0)
-                    )
-                )
+                noVulnerabilities("com.example:lib")
             }
             clearlyDefined {
                 license("com.example", "lib", "1.0.0", "MIT")
@@ -237,7 +233,7 @@ class CombinedFeaturesE2ETest : IntegrationTestBase() {
             }
         }.process()
 
-        assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+        assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
 
         // UPDATE_CHECK (PARALLEL_IO) produced data
         assertThat(result.updates).isNotEmpty()

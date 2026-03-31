@@ -227,18 +227,16 @@ class ProcessingPipelineTest {
         }
 
         @Test
-        fun `non-parallel processor in parallel phase throws PipelineConfigurationException`() = runTest {
-            val pipeline = ProcessingPipeline {
-                addProcessor(
-                    VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK)
-                )
-                addProcessor(
-                    VersionModifyingProcessor("mod-2", ProcessingPhase.SECURITY_CHECK)
-                )
-            }
-
+        fun `non-parallel processor in parallel phase throws PipelineConfigurationException at build time`() {
             val thrown = assertThrows<PipelineConfigurationException> {
-                pipeline.process(context())
+                ProcessingPipeline {
+                    addProcessor(
+                        VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK)
+                    )
+                    addProcessor(
+                        VersionModifyingProcessor("mod-2", ProcessingPhase.SECURITY_CHECK)
+                    )
+                }
             }
             assertThat(thrown.message).contains("ParallelMetadataProcessor")
         }

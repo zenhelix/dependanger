@@ -26,7 +26,7 @@ class PluginManagementTest {
         @Test
         fun `adds plugin with literal version`() {
             val result = CliTestSupport.runCli(
-                "add-plugin", "ksp", "com.google.devtools.ksp",
+                "add", "plugin", "ksp", "com.google.devtools.ksp",
                 "-v", "2.1.20-1.0.29",
                 "-i", metadataFile.toString(),
             )
@@ -41,7 +41,7 @@ class PluginManagementTest {
         @Test
         fun `adds plugin with version ref`() {
             val result = CliTestSupport.runCli(
-                "add-plugin", "kotlin-serialization", "org.jetbrains.kotlin.plugin.serialization",
+                "add", "plugin", "kotlin-serialization", "org.jetbrains.kotlin.plugin.serialization",
                 "-v", "ref:kotlin",
                 "-i", metadataFile.toString(),
             )
@@ -54,7 +54,7 @@ class PluginManagementTest {
         @Test
         fun `adds plugin with tags`() {
             val result = CliTestSupport.runCli(
-                "add-plugin", "ksp", "com.google.devtools.ksp",
+                "add", "plugin", "ksp", "com.google.devtools.ksp",
                 "-v", "2.1.20-1.0.29", "-t", "codegen,kotlin",
                 "-i", metadataFile.toString(),
             )
@@ -69,7 +69,7 @@ class PluginManagementTest {
             val pluginsBefore = CliTestSupport.readMetadata(metadataFile).plugins
 
             val result = CliTestSupport.runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString(),
             )
@@ -84,7 +84,7 @@ class PluginManagementTest {
 
         @Test
         fun `removes existing plugin`() {
-            val result = CliTestSupport.runCli("remove-plugin", "kotlin-jvm", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "plugin", "kotlin-jvm", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).plugins).isEmpty()
@@ -94,7 +94,7 @@ class PluginManagementTest {
         fun `fails for nonexistent plugin`() {
             val pluginsBefore = CliTestSupport.readMetadata(metadataFile).plugins
 
-            val result = CliTestSupport.runCli("remove-plugin", "nonexistent", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "plugin", "nonexistent", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isNotEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).plugins).isEqualTo(pluginsBefore)

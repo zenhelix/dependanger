@@ -26,7 +26,7 @@ class BomManagementTest {
         @Test
         fun `adds bom with version from coordinates`() {
             val result = CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -40,7 +40,7 @@ class BomManagementTest {
         @Test
         fun `adds bom with custom alias`() {
             val result = CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
                 "--alias", "spring-bom",
                 "-i", metadataFile.toString(),
             )
@@ -50,9 +50,9 @@ class BomManagementTest {
 
         @Test
         fun `adds bom with version ref`() {
-            CliTestSupport.runCli("add-version", "spring", "3.4.0", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "version", "spring", "3.4.0", "-i", metadataFile.toString())
             val result = CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies",
                 "-v", "ref:spring",
                 "-i", metadataFile.toString(),
             )
@@ -64,7 +64,7 @@ class BomManagementTest {
         @Test
         fun `fails without version`() {
             val result = CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
@@ -73,11 +73,11 @@ class BomManagementTest {
         @Test
         fun `rejects duplicate bom alias`() {
             CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
                 "-i", metadataFile.toString(),
             )
             val result = CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.5.0",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.5.0",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
@@ -90,17 +90,17 @@ class BomManagementTest {
         @Test
         fun `removes existing bom`() {
             CliTestSupport.runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.4.0",
                 "-i", metadataFile.toString(),
             )
-            val result = CliTestSupport.runCli("remove-bom", "spring-boot-dependencies", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "bom", "spring-boot-dependencies", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).bomImports).isEmpty()
         }
 
         @Test
         fun `fails for nonexistent bom`() {
-            val result = CliTestSupport.runCli("remove-bom", "nonexistent", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "bom", "nonexistent", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(1)
         }
     }

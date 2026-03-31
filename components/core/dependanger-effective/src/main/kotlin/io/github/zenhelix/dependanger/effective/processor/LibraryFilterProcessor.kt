@@ -15,8 +15,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.effective.spi.LibraryFilter
-import java.util.ServiceLoader
+import io.github.zenhelix.dependanger.effective.spi.LibraryFiltersKey
 
 public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.LIBRARY_FILTER
@@ -37,7 +36,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
         val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
         val spec = distribution?.spec
 
-        val customFilters = ServiceLoader.load(LibraryFilter::class.java).toList()
+        val customFilters = context[LibraryFiltersKey] ?: emptyList()
 
         // Nothing to filter
         if (spec == null && customFilters.isEmpty()) return metadata

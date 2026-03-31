@@ -46,7 +46,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "-i", metadataFile.toString(),
+                "check", "security", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -59,7 +59,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "-i", metadataFile.toString(),
+                "check", "security", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -83,7 +83,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "--format", "sarif", "-i", metadataFile.toString(),
+                "check", "security", "--format", "sarif", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -111,7 +111,7 @@ class SecurityCheckBehaviorTest {
 
             val outputFile = tempDir.resolve("report.json")
             val result = CliTestSupport.runCli(
-                "security-check", "-i", metadataFile.toString(), "-o", outputFile.toString(),
+                "check", "security", "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -131,7 +131,7 @@ class SecurityCheckBehaviorTest {
 
             val outputFile = tempDir.resolve("report.sarif.json")
             val result = CliTestSupport.runCli(
-                "security-check", "--format", "sarif",
+                "check", "security", "--format", "sarif",
                 "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 
@@ -158,7 +158,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "--fail-on", "HIGH", "-i", metadataFile.toString(),
+                "check", "security", "--fail-on", "HIGH", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)
@@ -175,7 +175,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "--fail-on", "HIGH", "-i", metadataFile.toString(),
+                "check", "security", "--fail-on", "HIGH", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -188,7 +188,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "security-check", "--fail-on", "INVALID", "-i", metadataFile.toString(),
+                "check", "security", "--fail-on", "INVALID", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)
@@ -201,7 +201,7 @@ class SecurityCheckBehaviorTest {
         @Test
         fun `fails when input file not found`() {
             val result = CliTestSupport.runCli(
-                "security-check", "-i", tempDir.resolve("nonexistent.json").toString(),
+                "check", "security", "-i", tempDir.resolve("nonexistent.json").toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)

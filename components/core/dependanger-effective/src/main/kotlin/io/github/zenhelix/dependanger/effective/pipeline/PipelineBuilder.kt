@@ -49,6 +49,19 @@ public class PipelineBuilder {
 
     private fun validate(processors: List<EffectiveMetadataProcessor>) {
         validateDuplicateIds(processors)
+        validateParallelProcessors(processors)
+    }
+
+    private fun validateParallelProcessors(processors: List<EffectiveMetadataProcessor>) {
+        val invalid = processors.filter { processor ->
+            processor.phase.executionMode != ExecutionMode.SEQUENTIAL && processor !is ParallelMetadataProcessor
+        }
+        if (invalid.isNotEmpty()) {
+            val details = invalid.joinToString { "'${it.id}' (phase: ${it.phase.name})" }
+            throw PipelineConfigurationException(
+                "Processors assigned to parallel phases must implement ParallelMetadataProcessor: $details"
+            )
+        }
     }
 
     private fun validateDuplicateIds(processors: List<EffectiveMetadataProcessor>) {

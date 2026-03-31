@@ -10,7 +10,7 @@ import io.github.zenhelix.dependanger.core.model.BomImport
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import java.nio.file.Path
 
-public class AddBomCommand : CliktCommand(name = "add-bom") {
+public class AddBomCommand : CliktCommand(name = "bom") {
     override fun help(context: Context): String = "Add a BOM import to metadata.json"
 
     public val coordinates: String by argument(help = "Maven BOM coordinates (group:artifact[:version])")

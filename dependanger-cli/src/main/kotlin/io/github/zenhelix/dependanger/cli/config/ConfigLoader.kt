@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.cli.config
 
 import com.charleskorn.kaml.Yaml
+import io.github.zenhelix.dependanger.cli.CliException
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -12,7 +13,7 @@ public class ConfigLoader {
     public fun load(configPath: Path? = null): CliConfig {
         val path = configPath ?: try {
             findConfigFile()
-        } catch (_: IllegalStateException) {
+        } catch (_: CliException.FileNotFound) {
             return CliConfig()
         }
 
@@ -20,7 +21,7 @@ public class ConfigLoader {
         return try {
             yaml.decodeFromString(CliConfig.serializer(), content)
         } catch (e: Exception) {
-            throw IllegalStateException("Failed to parse config file '$path': ${e.message}", e)
+            throw CliException.ParseError("Failed to parse config file '$path': ${e.message}", e)
         }
     }
 
@@ -39,7 +40,7 @@ public class ConfigLoader {
             return homeCandidate
         }
 
-        throw IllegalStateException(
+        throw CliException.FileNotFound(
             "Config file '$DEFAULT_CONFIG_FILENAME' not found in current directory hierarchy or user home directory"
         )
     }

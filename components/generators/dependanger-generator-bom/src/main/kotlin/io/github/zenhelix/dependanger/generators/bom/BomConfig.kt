@@ -11,6 +11,12 @@ public data class BomConfig(
     val prettyPrint: Boolean,
     val includeDeprecationComments: Boolean,
 ) {
+    init {
+        require(groupId.isNotBlank()) { "BomConfig.groupId must not be blank" }
+        require(artifactId.isNotBlank()) { "BomConfig.artifactId must not be blank" }
+        require(version.isNotBlank()) { "BomConfig.version must not be blank" }
+    }
+
     public companion object {
         public const val DEFAULT_FILENAME: String = "bom.pom.xml"
     }

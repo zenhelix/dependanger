@@ -4,6 +4,6 @@ import io.github.zenhelix.dependanger.generators.toml.TomlConfig
 import io.github.zenhelix.dependanger.generators.toml.TomlGenerator
 import java.nio.file.Path
 
-public fun DependangerResult.toToml(config: TomlConfig = TomlConfig.DEFAULT): String = generate(TomlGenerator(config))
+public fun DependangerResult.toToml(config: TomlConfig = TomlConfig.DEFAULT): String = generation.generate(TomlGenerator(config))
 
-public fun DependangerResult.writeTomlTo(path: Path, config: TomlConfig = TomlConfig.DEFAULT): Path = writeTo(TomlGenerator(config), path)
+public fun DependangerResult.writeTomlTo(path: Path, config: TomlConfig = TomlConfig.DEFAULT): Path = generation.writeTo(TomlGenerator(config), path)

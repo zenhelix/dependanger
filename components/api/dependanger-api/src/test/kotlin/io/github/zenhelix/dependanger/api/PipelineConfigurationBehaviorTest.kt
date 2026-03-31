@@ -378,8 +378,8 @@ class PipelineConfigurationBehaviorTest {
             assertThat(result.diagnostics.errors).anyMatch {
                 it.code == DiagnosticCodes.Version.UNRESOLVED
             }
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
-            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("good-lib")
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
+            assertThat((result as DependangerResult.CompletedWithErrors).effective.libraries).containsKey("good-lib")
         }
 
         @Test

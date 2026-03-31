@@ -20,7 +20,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
-public class SecurityCheckCommand : CliktCommand(name = "security-check") {
+public class SecurityCheckCommand : CliktCommand(name = "security") {
     override fun help(context: Context): String = "Check libraries for known vulnerabilities"
 
     public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)

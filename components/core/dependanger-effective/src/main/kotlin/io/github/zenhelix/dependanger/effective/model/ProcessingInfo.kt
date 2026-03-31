@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 public data class ProcessingInfo(
     val processedAt: String,
     val processorIds: List<String>,
+    val registeredProcessorIds: List<String>,
+    val skippedProcessorIds: List<String>,
     val environment: ProcessingEnvironmentSnapshot,
 )
 

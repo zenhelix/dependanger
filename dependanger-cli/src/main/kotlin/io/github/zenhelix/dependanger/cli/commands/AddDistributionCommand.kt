@@ -14,7 +14,7 @@ import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 import io.github.zenhelix.dependanger.core.model.filter.TagInclude
 import java.nio.file.Path
 
-public class AddDistributionCommand : CliktCommand(name = "add-distribution") {
+public class AddDistributionCommand : CliktCommand(name = "distribution") {
     override fun help(context: Context): String = "Add a distribution to metadata.json"
 
     public val name: String by argument(help = "Distribution name")

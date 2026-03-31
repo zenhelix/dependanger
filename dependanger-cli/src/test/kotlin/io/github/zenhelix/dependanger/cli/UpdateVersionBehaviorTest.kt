@@ -25,7 +25,7 @@ class UpdateVersionBehaviorTest {
 
         @Test
         fun `updates version value`() {
-            val result = CliTestSupport.runCli("update-version", "kotlin", "2.2.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "kotlin", "2.2.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -39,7 +39,7 @@ class UpdateVersionBehaviorTest {
             val outputFile = tempDir.resolve("output.json")
 
             val result = CliTestSupport.runCli(
-                "update-version", "kotlin", "2.2.0",
+                "update", "version", "kotlin", "2.2.0",
                 "-i", metadataFile.toString(),
                 "-o", outputFile.toString(),
             )
@@ -55,7 +55,7 @@ class UpdateVersionBehaviorTest {
 
         @Test
         fun `updates in place by default`() {
-            val result = CliTestSupport.runCli("update-version", "coroutines", "1.11.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "coroutines", "1.11.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -69,7 +69,7 @@ class UpdateVersionBehaviorTest {
         @Test
         fun `updates library version with flag`() {
             val result = CliTestSupport.runCli(
-                "update-version", "stdlib", "3.0.0", "-l",
+                "update", "version", "stdlib", "3.0.0", "-l",
                 "-i", metadataFile.toString(),
             )
 
@@ -85,7 +85,7 @@ class UpdateVersionBehaviorTest {
 
         @Test
         fun `fails for nonexistent version alias`() {
-            val result = CliTestSupport.runCli("update-version", "nonexistent", "1.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "nonexistent", "1.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(1)
         }
@@ -93,7 +93,7 @@ class UpdateVersionBehaviorTest {
         @Test
         fun `fails for nonexistent library alias`() {
             val result = CliTestSupport.runCli(
-                "update-version", "nonexistent", "1.0", "-l",
+                "update", "version", "nonexistent", "1.0", "-l",
                 "-i", metadataFile.toString(),
             )
 
@@ -103,7 +103,7 @@ class UpdateVersionBehaviorTest {
         @Test
         fun `fails when input file not found`() {
             val result = CliTestSupport.runCli(
-                "update-version", "kotlin", "2.2.0",
+                "update", "version", "kotlin", "2.2.0",
                 "-i", tempDir.resolve("nonexistent.json").toString(),
             )
 

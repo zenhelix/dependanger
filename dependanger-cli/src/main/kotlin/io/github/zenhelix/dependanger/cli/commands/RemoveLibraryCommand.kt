@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import java.nio.file.Path
 
-public class RemoveLibraryCommand : CliktCommand(name = "remove-library") {
+public class RemoveLibraryCommand : CliktCommand(name = "library") {
     override fun help(context: Context): String = "Remove a library from metadata.json"
 
     public val alias: String by argument(help = "Library alias to remove")

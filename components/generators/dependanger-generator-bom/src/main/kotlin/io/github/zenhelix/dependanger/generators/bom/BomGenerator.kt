@@ -21,8 +21,6 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     private val logger = KotlinLogging.logger {}
 
     override fun generate(effective: EffectiveMetadata): String {
-        validateConfig()
-
         logger.info { "Generating Maven BOM (generatorId=$generatorId) for ${config.groupId}:${config.artifactId}:${config.version}" }
 
         val dependencies = prepareDependencies(effective)
@@ -37,12 +35,6 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
         logger.info { "Writing BOM to: $targetFile" }
         writeStringArtifact(artifact, output, config.filename)
         logger.info { "BOM written successfully: $targetFile (${artifact.length} chars)" }
-    }
-
-    private fun validateConfig() {
-        require(config.groupId.isNotBlank()) { "BomConfig.groupId must not be blank" }
-        require(config.artifactId.isNotBlank()) { "BomConfig.artifactId must not be blank" }
-        require(config.version.isNotBlank()) { "BomConfig.version must not be blank" }
     }
 
     private fun prepareDependencies(effective: EffectiveMetadata): List<EffectiveLibrary> {

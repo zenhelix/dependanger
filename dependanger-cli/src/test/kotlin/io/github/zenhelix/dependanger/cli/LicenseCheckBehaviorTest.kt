@@ -40,7 +40,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(),
+                "check", "license", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -61,7 +61,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(),
+                "check", "license", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -87,7 +87,7 @@ class LicenseCheckBehaviorTest {
 
             val outputFile = tempDir.resolve("license-report.json")
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(), "-o", outputFile.toString(),
+                "check", "license", "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -114,7 +114,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(),
+                "check", "license", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)
@@ -135,7 +135,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(),
+                "check", "license", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -160,7 +160,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(), "--fail-on-unknown",
+                "check", "license", "-i", metadataFile.toString(), "--fail-on-unknown",
             )
 
             assertThat(result.statusCode).isEqualTo(1)
@@ -181,7 +181,7 @@ class LicenseCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "license-check", "-i", metadataFile.toString(),
+                "check", "license", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -194,7 +194,7 @@ class LicenseCheckBehaviorTest {
         @Test
         fun `fails when input file not found`() {
             val result = CliTestSupport.runCli(
-                "license-check", "-i", tempDir.resolve("nonexistent.json").toString(),
+                "check", "license", "-i", tempDir.resolve("nonexistent.json").toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)

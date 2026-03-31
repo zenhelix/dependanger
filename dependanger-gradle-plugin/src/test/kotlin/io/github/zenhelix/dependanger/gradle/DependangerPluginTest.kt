@@ -68,6 +68,93 @@ class DependangerPluginTest {
     }
 
     @Test
+    fun `toml config has default values`() {
+        val extension = project.extensions.getByType(DependangerExtension::class.java)
+
+        assertEquals("libs.versions.toml", extension.toml.filename.get())
+        assertEquals(true, extension.toml.includeComments.get())
+        assertEquals(true, extension.toml.sortSections.get())
+        assertEquals(false, extension.toml.useInlineVersions.get())
+        assertEquals(true, extension.toml.includeDeprecationComments.get())
+    }
+
+    @Test
+    fun `toml config is customizable via DSL`() {
+        val extension = project.extensions.getByType(DependangerExtension::class.java)
+
+        extension.toml {
+            it.filename.set("custom-catalog.toml")
+            it.includeComments.set(false)
+            it.sortSections.set(false)
+            it.useInlineVersions.set(true)
+            it.includeDeprecationComments.set(false)
+        }
+
+        val config = extension.toml.toConfig()
+        assertEquals("custom-catalog.toml", config.filename)
+        assertEquals(false, config.includeComments)
+        assertEquals(false, config.sortSections)
+        assertEquals(true, config.useInlineVersions)
+        assertEquals(false, config.includeDeprecationComments)
+    }
+
+    @Test
+    fun `bom config has default values`() {
+        val extension = project.extensions.getByType(DependangerExtension::class.java)
+
+        assertEquals("bom.pom.xml", extension.bom.filename.get())
+        assertEquals(false, extension.bom.includeOptionalDependencies.get())
+        assertEquals(true, extension.bom.prettyPrint.get())
+        assertEquals(true, extension.bom.includeDeprecationComments.get())
+    }
+
+    @Test
+    fun `bom config is customizable via DSL`() {
+        val extension = project.extensions.getByType(DependangerExtension::class.java)
+
+        extension.bom {
+            it.groupId.set("com.example")
+            it.artifactId.set("my-bom")
+            it.version.set("2.0.0")
+            it.name.set("My BOM")
+            it.description.set("Custom BOM")
+            it.filename.set("custom-bom.xml")
+            it.includeOptionalDependencies.set(true)
+            it.prettyPrint.set(false)
+            it.includeDeprecationComments.set(false)
+        }
+
+        val config = extension.bom.toConfig(
+            fallbackGroupId = "fallback.group",
+            fallbackArtifactId = "fallback-artifact",
+            fallbackVersion = "0.0.0",
+        )
+        assertEquals("com.example", config.groupId)
+        assertEquals("my-bom", config.artifactId)
+        assertEquals("2.0.0", config.version)
+        assertEquals("My BOM", config.name)
+        assertEquals("Custom BOM", config.description)
+        assertEquals("custom-bom.xml", config.filename)
+        assertEquals(true, config.includeOptionalDependencies)
+        assertEquals(false, config.prettyPrint)
+        assertEquals(false, config.includeDeprecationComments)
+    }
+
+    @Test
+    fun `bom config falls back to project values when not set`() {
+        val extension = project.extensions.getByType(DependangerExtension::class.java)
+
+        val config = extension.bom.toConfig(
+            fallbackGroupId = "org.example",
+            fallbackArtifactId = "project-bom",
+            fallbackVersion = "1.0.0",
+        )
+        assertEquals("org.example", config.groupId)
+        assertEquals("project-bom", config.artifactId)
+        assertEquals("1.0.0", config.version)
+    }
+
+    @Test
     fun `all tasks registered with correct group`() {
         for (taskName in ALL_TASK_NAMES) {
             val task = project.tasks.getByName(taskName)

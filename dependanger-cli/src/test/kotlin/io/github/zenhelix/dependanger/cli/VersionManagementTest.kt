@@ -25,7 +25,7 @@ class VersionManagementTest {
 
         @Test
         fun `adds a new version`() {
-            val result = CliTestSupport.runCli("add-version", "ktor", "3.1.1", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("add", "version", "ktor", "3.1.1", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -36,7 +36,7 @@ class VersionManagementTest {
 
         @Test
         fun `rejects duplicate version alias`() {
-            val result = CliTestSupport.runCli("add-version", "kotlin", "2.2.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("add", "version", "kotlin", "2.2.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(1)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -50,9 +50,9 @@ class VersionManagementTest {
 
         @Test
         fun `removes an unreferenced version`() {
-            CliTestSupport.runCli("add-version", "ktor", "3.1.1", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "version", "ktor", "3.1.1", "-i", metadataFile.toString())
 
-            val result = CliTestSupport.runCli("remove-version", "ktor", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "version", "ktor", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -61,7 +61,7 @@ class VersionManagementTest {
 
         @Test
         fun `fails to remove version referenced by library`() {
-            val result = CliTestSupport.runCli("remove-version", "kotlin", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "version", "kotlin", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(1)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -70,7 +70,7 @@ class VersionManagementTest {
 
         @Test
         fun `force removes version despite references`() {
-            val result = CliTestSupport.runCli("remove-version", "kotlin", "--force", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "version", "kotlin", "--force", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -79,7 +79,7 @@ class VersionManagementTest {
 
         @Test
         fun `fails when version does not exist`() {
-            val result = CliTestSupport.runCli("remove-version", "nonexistent", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "version", "nonexistent", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(1)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -92,7 +92,7 @@ class VersionManagementTest {
 
         @Test
         fun `updates version value`() {
-            val result = CliTestSupport.runCli("update-version", "kotlin", "2.2.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "kotlin", "2.2.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -101,7 +101,7 @@ class VersionManagementTest {
 
         @Test
         fun `updates library version directly`() {
-            val result = CliTestSupport.runCli("update-version", "stdlib", "2.2.0", "--library", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "stdlib", "2.2.0", "--library", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             val metadata = CliTestSupport.readMetadata(metadataFile)
@@ -111,7 +111,7 @@ class VersionManagementTest {
 
         @Test
         fun `fails when version alias does not exist`() {
-            val result = CliTestSupport.runCli("update-version", "nonexistent", "1.0", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("update", "version", "nonexistent", "1.0", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(1)
             val metadata = CliTestSupport.readMetadata(metadataFile)

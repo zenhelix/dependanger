@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.Plugin
 import java.nio.file.Path
 
-public class AddPluginCommand : CliktCommand(name = "add-plugin") {
+public class AddPluginCommand : CliktCommand(name = "plugin") {
     override fun help(context: Context): String = "Add a Gradle plugin to metadata.json"
 
     public val alias: String by argument(help = "Plugin alias")

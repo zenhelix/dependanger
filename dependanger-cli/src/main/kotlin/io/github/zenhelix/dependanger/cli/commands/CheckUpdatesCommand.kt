@@ -18,7 +18,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
-public class CheckUpdatesCommand : CliktCommand(name = "check-updates") {
+public class CheckUpdatesCommand : CliktCommand(name = "updates") {
     override fun help(context: Context): String = "Check for available library updates"
 
     public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)

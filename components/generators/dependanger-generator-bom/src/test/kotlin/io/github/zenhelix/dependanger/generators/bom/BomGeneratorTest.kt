@@ -70,31 +70,22 @@ class BomGeneratorTest {
     @Nested
     inner class ConfigValidation {
         @Test
-        fun `blank groupId throws IllegalArgumentException`() {
-            val config = defaultConfig.copy(groupId = "")
-            val generator = BomGenerator(config)
-
-            assertThatThrownBy { generator.generate(emptyMetadata()) }
+        fun `blank groupId throws IllegalArgumentException at config creation`() {
+            assertThatThrownBy { defaultConfig.copy(groupId = "") }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("groupId")
         }
 
         @Test
-        fun `blank artifactId throws IllegalArgumentException`() {
-            val config = defaultConfig.copy(artifactId = " ")
-            val generator = BomGenerator(config)
-
-            assertThatThrownBy { generator.generate(emptyMetadata()) }
+        fun `blank artifactId throws IllegalArgumentException at config creation`() {
+            assertThatThrownBy { defaultConfig.copy(artifactId = " ") }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("artifactId")
         }
 
         @Test
-        fun `blank version throws IllegalArgumentException`() {
-            val config = defaultConfig.copy(version = "")
-            val generator = BomGenerator(config)
-
-            assertThatThrownBy { generator.generate(emptyMetadata()) }
+        fun `blank version throws IllegalArgumentException at config creation`() {
+            assertThatThrownBy { defaultConfig.copy(version = "") }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("version")
         }

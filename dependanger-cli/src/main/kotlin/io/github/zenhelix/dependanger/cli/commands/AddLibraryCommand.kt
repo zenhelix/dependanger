@@ -10,7 +10,7 @@ import io.github.zenhelix.dependanger.core.model.Library
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import java.nio.file.Path
 
-public class AddLibraryCommand : CliktCommand(name = "add-library") {
+public class AddLibraryCommand : CliktCommand(name = "library") {
     override fun help(context: Context): String = "Add a library to metadata.json"
 
     public val alias: String by argument(help = "Library alias")

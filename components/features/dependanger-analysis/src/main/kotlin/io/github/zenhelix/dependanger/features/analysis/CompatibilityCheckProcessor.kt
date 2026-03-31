@@ -17,7 +17,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler
-import java.util.ServiceLoader
+import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandlersKey
 
 private val logger = KotlinLogging.logger {}
 
@@ -48,8 +48,7 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
             )
         }
 
-        val handlers: Map<String, CustomRuleHandler> = ServiceLoader.load(CustomRuleHandler::class.java)
-            .associateBy { it.ruleType }
+        val handlers: Map<String, CustomRuleHandler> = context[CustomRuleHandlersKey] ?: emptyMap()
 
         logger.debug { "Loaded ${handlers.size} custom rule handlers: ${handlers.keys}" }
 

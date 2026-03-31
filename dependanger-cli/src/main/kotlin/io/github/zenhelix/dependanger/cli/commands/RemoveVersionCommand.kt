@@ -10,7 +10,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import java.nio.file.Path
 
-public class RemoveVersionCommand : CliktCommand(name = "remove-version") {
+public class RemoveVersionCommand : CliktCommand(name = "version") {
     override fun help(context: Context): String = "Remove a version alias from metadata.json"
 
     public val alias: String by argument(help = "Version alias to remove")

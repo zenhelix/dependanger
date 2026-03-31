@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.ProcessorIds
+import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
@@ -13,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline
 import io.github.zenhelix.dependanger.effective.pipeline.configure
+import io.github.zenhelix.dependanger.effective.spi.ContextContributor
 import io.github.zenhelix.dependanger.effective.spi.FeatureSettingsProvider
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
 import kotlinx.coroutines.async
@@ -20,6 +22,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.util.ServiceLoader
+
+private fun EffectiveMetadata.toResult(): DependangerResult =
+    if (diagnostics.hasErrors) {
+        DependangerResult.CompletedWithErrors(effective = this, diagnostics = diagnostics)
+    } else {
+        DependangerResult.Success(effective = this, diagnostics = diagnostics)
+    }
 
 private val PREVIEW_EXCLUDED_PROCESSORS: Set<String> = setOf(
     ProcessorIds.VALIDATION,
@@ -59,47 +68,39 @@ public class Dependanger internal constructor(
         ServiceLoader.load(FeatureSettingsProvider::class.java).toList()
     }
 
+    private val contextContributors: List<ContextContributor> by lazy {
+        ServiceLoader.load(ContextContributor::class.java).toList()
+    }
+
     public suspend fun process(
         distribution: String? = null,
         callback: ProcessingCallback? = null,
-    ): DependangerResult = try {
+    ): DependangerResult = runPipeline("Processing") {
         val pipeline = buildPipeline()
         val context = baseContext(
             distribution = distribution ?: metadata.settings.defaultDistribution,
             callback = callback,
         )
-
-        val effective = pipeline.process(context)
-
-        DependangerResult.Success(
-            effective = effective,
-            diagnostics = effective.diagnostics,
-        )
-    } catch (e: DependangerException) {
-        throw e
-    } catch (e: PipelineConfigurationException) {
-        throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
-    } catch (e: Exception) {
-        currentCoroutineContext().ensureActive()
-        throw DependangerProcessingException("Processing failed: ${e.message}", phase = null, cause = e)
+        pipeline.process(context).toResult()
     }
 
-    public suspend fun validate(): DependangerResult = try {
+    public suspend fun validate(): DependangerResult = runPipeline("Validation") {
         val pipeline = buildValidationPipeline()
+        pipeline.process(baseContext()).toResult()
+    }
 
-        val effective = pipeline.process(baseContext())
-
-        DependangerResult.Success(
-            effective = effective,
-            diagnostics = effective.diagnostics,
-        )
+    private suspend fun runPipeline(
+        operationName: String,
+        block: suspend () -> DependangerResult,
+    ): DependangerResult = try {
+        block()
     } catch (e: DependangerException) {
         throw e
     } catch (e: PipelineConfigurationException) {
         throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
     } catch (e: Exception) {
         currentCoroutineContext().ensureActive()
-        throw DependangerProcessingException("Validation failed: ${e.message}", phase = null, cause = e)
+        throw DependangerProcessingException("$operationName failed: ${e.message}", phase = null, cause = e)
     }
 
     public suspend fun previewFilter(distribution: String): FilterPreview {
@@ -135,6 +136,9 @@ public class Dependanger internal constructor(
     ): ProcessingContext {
         val settingsProviders = featureSettingsProviders
         val resolvedProperties = buildMap<ProcessingContextKey<*>, Any> {
+            for (contributor in contextContributors) {
+                putAll(contributor.contribute())
+            }
             for (provider in settingsProviders) {
                 val json = metadata.settings.customSettings[provider.settingsKey]
                 if (json != null) {

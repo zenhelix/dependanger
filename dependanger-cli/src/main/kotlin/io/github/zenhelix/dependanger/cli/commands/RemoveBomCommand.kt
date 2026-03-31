@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import java.nio.file.Path
 
-public class RemoveBomCommand : CliktCommand(name = "remove-bom") {
+public class RemoveBomCommand : CliktCommand(name = "bom") {
     override fun help(context: Context): String = "Remove a BOM import from metadata.json"
 
     public val alias: String by argument(help = "BOM alias to remove")

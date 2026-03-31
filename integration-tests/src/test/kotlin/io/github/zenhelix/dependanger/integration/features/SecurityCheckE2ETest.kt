@@ -46,7 +46,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
             assertThat(result.vulnerabilities).isNotEmpty()
             assertThat(result.vulnerabilities).anyMatch { it.id == "GHSA-abc-123" }
             assertThat(result.vulnerabilities.first().summary).isEqualTo("Remote code execution")
@@ -105,7 +105,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
             assertThat(result.vulnerabilities).hasSize(2)
             assertThat(result.vulnerabilities.map { it.id })
                 .containsExactlyInAnyOrder("GHSA-first", "GHSA-second")
@@ -150,7 +150,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
             val byId = result.vulnerabilities.associateBy { it.id }
             assertThat(byId["CRITICAL-1"]!!.severity).isEqualTo(VulnerabilitySeverity.CRITICAL)
             assertThat(byId["HIGH-1"]!!.severity).isEqualTo(VulnerabilitySeverity.HIGH)
@@ -184,7 +184,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
             assertThat(result.vulnerabilities).hasSize(1)
             assertThat(result.vulnerabilities.first().fixedVersion).isEqualTo("1.5.0")
         }
@@ -229,7 +229,7 @@ class SecurityCheckE2ETest : IntegrationTestBase() {
                 }
             }.process()
 
-            assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
+            assertThat(result).isInstanceOf(DependangerResult.CompletedWithErrors::class.java)
             assertThat(result.updates).isNotEmpty()
             assertThat(result.vulnerabilities).isNotEmpty()
             assertThat(result.updates.first().latestVersion).isEqualTo("2.0.0")

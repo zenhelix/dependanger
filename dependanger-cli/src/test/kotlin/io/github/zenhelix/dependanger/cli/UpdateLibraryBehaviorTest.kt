@@ -26,7 +26,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `updates to literal version`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "3.0.0",
+                "update", "library", "stdlib", "-v", "3.0.0",
                 "-i", metadataFile.toString(),
             )
 
@@ -39,7 +39,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `updates to version reference`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "ref:coroutines",
+                "update", "library", "stdlib", "-v", "ref:coroutines",
                 "-i", metadataFile.toString(),
             )
 
@@ -56,7 +56,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `replaces tags`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-t", "new-tag,another",
+                "update", "library", "stdlib", "-t", "new-tag,another",
                 "-i", metadataFile.toString(),
             )
 
@@ -73,7 +73,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `sets requires-jdk`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "--requires-jdk", "21",
+                "update", "library", "stdlib", "--requires-jdk", "21",
                 "-i", metadataFile.toString(),
             )
 
@@ -92,7 +92,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `updates version and tags together`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "3.0.0", "-t", "updated",
+                "update", "library", "stdlib", "-v", "3.0.0", "-t", "updated",
                 "-i", metadataFile.toString(),
             )
 
@@ -110,7 +110,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `no changes when no options specified`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib",
+                "update", "library", "stdlib",
                 "-i", metadataFile.toString(),
             )
 
@@ -128,7 +128,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `fails for nonexistent library`() {
             val result = CliTestSupport.runCli(
-                "update-library", "nonexistent", "-v", "1.0",
+                "update", "library", "nonexistent", "-v", "1.0",
                 "-i", metadataFile.toString(),
             )
 
@@ -138,7 +138,7 @@ class UpdateLibraryBehaviorTest {
         @Test
         fun `fails when input file not found`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "1.0",
+                "update", "library", "stdlib", "-v", "1.0",
                 "-i", tempDir.resolve("nonexistent.json").toString(),
             )
 

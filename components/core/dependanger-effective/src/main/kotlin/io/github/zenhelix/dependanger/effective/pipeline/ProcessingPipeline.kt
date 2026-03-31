@@ -16,6 +16,8 @@ public class ProcessingPipeline(
     processors: List<EffectiveMetadataProcessor>,
 ) {
     private val sortedProcessors: List<EffectiveMetadataProcessor> = topologicalSort(processors)
+    private val processorGroups: List<ProcessorGroup> = groupByExecutionMode(sortedProcessors)
+    private val registeredIds: List<String> = sortedProcessors.map { it.id }
 
     public suspend fun process(context: ProcessingContext): EffectiveMetadata {
         val initial = EffectiveMetadata(
@@ -29,7 +31,7 @@ public class ProcessingPipeline(
             processingInfo = null,
         )
 
-        val groups = groupByExecutionMode(sortedProcessors)
+        val groups = processorGroups
 
         var currentMetadata = initial
         val allExecutedIds = mutableListOf<String>()
@@ -46,10 +48,14 @@ public class ProcessingPipeline(
             allExecutedIds.addAll(result.executedProcessorIds)
         }
 
+        val skippedIds = registeredIds - allExecutedIds.toSet()
+
         return currentMetadata.copy(
             processingInfo = ProcessingInfo(
                 processedAt = Instant.now().toString(),
                 processorIds = allExecutedIds,
+                registeredProcessorIds = registeredIds,
+                skippedProcessorIds = skippedIds,
                 environment = context.environment.toSnapshot(),
             )
         )
@@ -104,14 +110,8 @@ public class ProcessingPipeline(
         emitEvent(context, ProcessingEvent.PhaseStarted(processor.phase))
         val mark = TimeSource.Monotonic.markNow()
         return try {
-            if (processor !is ParallelMetadataProcessor) {
-                throw PipelineConfigurationException(
-                    "Processor '${processor.id}' is assigned to parallel phase '${processor.phase.name}' " +
-                            "but does not implement ParallelMetadataProcessor. " +
-                            "Parallel processors must implement ParallelMetadataProcessor to ensure thread safety."
-                )
-            }
-            val result = processor.processParallel(metadata, context)
+            // ParallelMetadataProcessor check is enforced at build time by PipelineBuilder.validateParallelProcessors
+            val result = (processor as ParallelMetadataProcessor).processParallel(metadata, context)
             emitNewDiagnostics(context, Diagnostics.EMPTY, result.diagnostics)
             emitEvent(context, ProcessingEvent.PhaseCompleted(processor.phase, mark.elapsedNow()))
             ParallelProcessorOutput(result, executedId = processor.id)

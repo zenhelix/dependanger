@@ -25,7 +25,7 @@ class BundleManagementTest {
         @Test
         fun `adds bundle with libraries`() {
             val result = CliTestSupport.runCli(
-                "add-bundle", "networking", "--libraries", "stdlib",
+                "add", "bundle", "networking", "--libraries", "stdlib",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -37,7 +37,7 @@ class BundleManagementTest {
         @Test
         fun `adds bundle with extends`() {
             val result = CliTestSupport.runCli(
-                "add-bundle", "kotlin-full", "--extends", "kotlin-essentials",
+                "add", "bundle", "kotlin-full", "--extends", "kotlin-essentials",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -48,7 +48,7 @@ class BundleManagementTest {
         @Test
         fun `rejects duplicate bundle name`() {
             val result = CliTestSupport.runCli(
-                "add-bundle", "kotlin-essentials", "--libraries", "stdlib",
+                "add", "bundle", "kotlin-essentials", "--libraries", "stdlib",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
@@ -60,22 +60,22 @@ class BundleManagementTest {
 
         @Test
         fun `removes bundle not extended by others`() {
-            val result = CliTestSupport.runCli("remove-bundle", "kotlin-essentials", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "bundle", "kotlin-essentials", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).bundles).isEmpty()
         }
 
         @Test
         fun `fails to remove bundle extended by another`() {
-            CliTestSupport.runCli("add-bundle", "kotlin-full", "--extends", "kotlin-essentials", "-i", metadataFile.toString())
-            val result = CliTestSupport.runCli("remove-bundle", "kotlin-essentials", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "bundle", "kotlin-full", "--extends", "kotlin-essentials", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "bundle", "kotlin-essentials", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(1)
         }
 
         @Test
         fun `force removes extended bundle`() {
-            CliTestSupport.runCli("add-bundle", "kotlin-full", "--extends", "kotlin-essentials", "-i", metadataFile.toString())
-            val result = CliTestSupport.runCli("remove-bundle", "kotlin-essentials", "--force", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "bundle", "kotlin-full", "--extends", "kotlin-essentials", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "bundle", "kotlin-essentials", "--force", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(0)
         }
     }

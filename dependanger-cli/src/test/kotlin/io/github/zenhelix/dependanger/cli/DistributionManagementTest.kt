@@ -25,7 +25,7 @@ class DistributionManagementTest {
         @Test
         fun `adds distribution with include tags`() {
             val result = CliTestSupport.runCli(
-                "add-distribution", "android", "--include-tags", "android,core",
+                "add", "distribution", "android", "--include-tags", "android,core",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -38,7 +38,7 @@ class DistributionManagementTest {
         @Test
         fun `adds distribution with exclude tags`() {
             val result = CliTestSupport.runCli(
-                "add-distribution", "server", "--exclude-tags", "android",
+                "add", "distribution", "server", "--exclude-tags", "android",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -49,7 +49,7 @@ class DistributionManagementTest {
         @Test
         fun `adds distribution with include bundles`() {
             val result = CliTestSupport.runCli(
-                "add-distribution", "minimal", "--include-bundles", "kotlin-essentials",
+                "add", "distribution", "minimal", "--include-bundles", "kotlin-essentials",
                 "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -60,7 +60,7 @@ class DistributionManagementTest {
         @Test
         fun `adds distribution without filters`() {
             val result = CliTestSupport.runCli(
-                "add-distribution", "all", "-i", metadataFile.toString(),
+                "add", "distribution", "all", "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(0)
             val dist = CliTestSupport.readMetadata(metadataFile).distributions.find { it.name == "all" }
@@ -69,8 +69,8 @@ class DistributionManagementTest {
 
         @Test
         fun `rejects duplicate distribution`() {
-            CliTestSupport.runCli("add-distribution", "android", "-i", metadataFile.toString())
-            val result = CliTestSupport.runCli("add-distribution", "android", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "distribution", "android", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("add", "distribution", "android", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(1)
         }
     }
@@ -80,15 +80,15 @@ class DistributionManagementTest {
 
         @Test
         fun `removes existing distribution`() {
-            CliTestSupport.runCli("add-distribution", "android", "-i", metadataFile.toString())
-            val result = CliTestSupport.runCli("remove-distribution", "android", "-i", metadataFile.toString())
+            CliTestSupport.runCli("add", "distribution", "android", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "distribution", "android", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).distributions).isEmpty()
         }
 
         @Test
         fun `fails for nonexistent distribution`() {
-            val result = CliTestSupport.runCli("remove-distribution", "nonexistent", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "distribution", "nonexistent", "-i", metadataFile.toString())
             assertThat(result.statusCode).isEqualTo(1)
         }
     }

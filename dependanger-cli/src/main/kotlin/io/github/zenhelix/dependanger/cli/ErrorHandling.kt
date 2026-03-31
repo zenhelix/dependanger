@@ -18,5 +18,11 @@ public fun withErrorHandling(formatter: OutputFormatter, block: () -> Unit) {
             formatter.error("Caused by: ${e.cause?.message}")
         }
         throw ProgramResult(1)
+    } catch (e: Exception) {
+        formatter.error("Unexpected error: ${e.message ?: "Unknown error"}")
+        if (e.cause != null) {
+            formatter.error("Caused by: ${e.cause?.message}")
+        }
+        throw ProgramResult(1)
     }
 }

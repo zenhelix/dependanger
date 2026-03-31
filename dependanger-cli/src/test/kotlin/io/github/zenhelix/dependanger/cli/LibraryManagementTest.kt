@@ -26,7 +26,7 @@ class LibraryManagementTest {
         @Test
         fun `adds library with inline version from coordinates`() {
             val result = CliTestSupport.runCli(
-                "add-library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
+                "add", "library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
                 "-i", metadataFile.toString(),
             )
 
@@ -41,7 +41,7 @@ class LibraryManagementTest {
         @Test
         fun `adds library with version ref`() {
             val result = CliTestSupport.runCli(
-                "add-library", "reflect", "org.jetbrains.kotlin:kotlin-reflect",
+                "add", "library", "reflect", "org.jetbrains.kotlin:kotlin-reflect",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString(),
             )
@@ -54,7 +54,7 @@ class LibraryManagementTest {
         @Test
         fun `adds library with explicit version flag`() {
             val result = CliTestSupport.runCli(
-                "add-library", "ktor-core", "io.ktor:ktor-client-core",
+                "add", "library", "ktor-core", "io.ktor:ktor-client-core",
                 "-v", "3.1.1",
                 "-i", metadataFile.toString(),
             )
@@ -67,7 +67,7 @@ class LibraryManagementTest {
         @Test
         fun `adds library with tags`() {
             val result = CliTestSupport.runCli(
-                "add-library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
+                "add", "library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
                 "-t", "networking,ktor",
                 "-i", metadataFile.toString(),
             )
@@ -80,7 +80,7 @@ class LibraryManagementTest {
         @Test
         fun `rejects duplicate library alias`() {
             val result = CliTestSupport.runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib:2.1.20",
                 "-i", metadataFile.toString(),
             )
 
@@ -94,11 +94,11 @@ class LibraryManagementTest {
         @Test
         fun `removes an unreferenced library`() {
             CliTestSupport.runCli(
-                "add-library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
+                "add", "library", "ktor-core", "io.ktor:ktor-client-core:3.1.1",
                 "-i", metadataFile.toString(),
             )
 
-            val result = CliTestSupport.runCli("remove-library", "ktor-core", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "library", "ktor-core", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).libraries.none { it.alias == "ktor-core" }).isTrue()
@@ -106,14 +106,14 @@ class LibraryManagementTest {
 
         @Test
         fun `fails to remove library referenced by bundle`() {
-            val result = CliTestSupport.runCli("remove-library", "stdlib", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "library", "stdlib", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isNotEqualTo(0)
         }
 
         @Test
         fun `force removes library despite bundle reference`() {
-            val result = CliTestSupport.runCli("remove-library", "stdlib", "--force", "-i", metadataFile.toString())
+            val result = CliTestSupport.runCli("remove", "library", "stdlib", "--force", "-i", metadataFile.toString())
 
             assertThat(result.statusCode).isEqualTo(0)
             assertThat(CliTestSupport.readMetadata(metadataFile).libraries.none { it.alias == "stdlib" }).isTrue()
@@ -126,7 +126,7 @@ class LibraryManagementTest {
         @Test
         fun `updates library version`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "2.2.0",
+                "update", "library", "stdlib", "-v", "2.2.0",
                 "-i", metadataFile.toString(),
             )
 
@@ -138,7 +138,7 @@ class LibraryManagementTest {
         @Test
         fun `updates library version to ref`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-v", "ref:coroutines",
+                "update", "library", "stdlib", "-v", "ref:coroutines",
                 "-i", metadataFile.toString(),
             )
 
@@ -150,7 +150,7 @@ class LibraryManagementTest {
         @Test
         fun `updates library tags`() {
             val result = CliTestSupport.runCli(
-                "update-library", "stdlib", "-t", "new-tag,updated",
+                "update", "library", "stdlib", "-t", "new-tag,updated",
                 "-i", metadataFile.toString(),
             )
 
@@ -162,7 +162,7 @@ class LibraryManagementTest {
         @Test
         fun `fails for nonexistent library`() {
             val result = CliTestSupport.runCli(
-                "update-library", "nonexistent", "-v", "1.0",
+                "update", "library", "nonexistent", "-v", "1.0",
                 "-i", metadataFile.toString(),
             )
 

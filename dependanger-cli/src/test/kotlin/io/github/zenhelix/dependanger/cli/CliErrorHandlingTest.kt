@@ -17,7 +17,7 @@ class CliErrorHandlingTest {
         @Test
         fun `add-version fails with missing file`() {
             val result = CliTestSupport.runCli(
-                "add-version", "v", "1.0", "-i", tempDir.resolve("nonexistent.json").toString(),
+                "add", "version", "v", "1.0", "-i", tempDir.resolve("nonexistent.json").toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
         }
@@ -25,7 +25,7 @@ class CliErrorHandlingTest {
         @Test
         fun `remove-library fails with missing file`() {
             val result = CliTestSupport.runCli(
-                "remove-library", "lib", "-i", tempDir.resolve("nonexistent.json").toString(),
+                "remove", "library", "lib", "-i", tempDir.resolve("nonexistent.json").toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
         }
@@ -46,7 +46,7 @@ class CliErrorHandlingTest {
         fun `invalid maven coordinates`() {
             val metadataFile = CliTestSupport.writeMetadata(tempDir, CliTestSupport.emptyMetadata())
             val result = CliTestSupport.runCli(
-                "add-library", "bad", "invalid-no-colon", "-i", metadataFile.toString(),
+                "add", "library", "bad", "invalid-no-colon", "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
         }
@@ -55,7 +55,7 @@ class CliErrorHandlingTest {
         fun `too many coordinate parts`() {
             val metadataFile = CliTestSupport.writeMetadata(tempDir, CliTestSupport.emptyMetadata())
             val result = CliTestSupport.runCli(
-                "add-library", "bad", "a:b:c:d", "-i", metadataFile.toString(),
+                "add", "library", "bad", "a:b:c:d", "-i", metadataFile.toString(),
             )
             assertThat(result.statusCode).isEqualTo(1)
         }
@@ -71,7 +71,7 @@ class CliErrorHandlingTest {
             val originalContent = metadataFile.toFile().readText()
 
             CliTestSupport.runCli(
-                "add-version", "new-ver", "1.0",
+                "add", "version", "new-ver", "1.0",
                 "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 

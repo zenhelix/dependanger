@@ -37,27 +37,27 @@ class CliFullFlowE2ETest {
             assertThat(metadataFile).exists()
 
             val addVersion = runCli(
-                "add-version", "kotlin", "2.1.20",
+                "add", "version", "kotlin", "2.1.20",
                 "-i", metadataFile.toString()
             )
             assertThat(addVersion.statusCode).isEqualTo(0)
 
             val addLibrary = runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
             assertThat(addLibrary.statusCode).isEqualTo(0)
 
             val addPlugin = runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "ref:kotlin",
                 "-i", metadataFile.toString()
             )
             assertThat(addPlugin.statusCode).isEqualTo(0)
 
             val addBundle = runCli(
-                "add-bundle", "kotlin-essentials",
+                "add", "bundle", "kotlin-essentials",
                 "--libraries", "stdlib",
                 "-i", metadataFile.toString()
             )
@@ -81,7 +81,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataFile).exists()
 
             runCli(
-                "add-version", "kotlin", "2.1.20",
+                "add", "version", "kotlin", "2.1.20",
                 "-i", metadataFile.toString()
             )
             val metadataBefore = CliTestSupport.readMetadata(metadataFile)
@@ -107,16 +107,16 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             runCli(
-                "add-version", "kotlin", "2.1.20",
+                "add", "version", "kotlin", "2.1.20",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "ref:kotlin",
                 "-i", metadataFile.toString()
             )
@@ -149,7 +149,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-version", "kotlin", "2.1.20",
+                "add", "version", "kotlin", "2.1.20",
                 "-i", metadataFile.toString()
             )
             assertThat(add.statusCode).isEqualTo(0)
@@ -158,7 +158,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.versions).hasSize(1)
 
             val remove = runCli(
-                "remove-version", "kotlin",
+                "remove", "version", "kotlin",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -172,7 +172,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
@@ -182,7 +182,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.libraries).hasSize(1)
 
             val remove = runCli(
-                "remove-library", "stdlib",
+                "remove", "library", "stdlib",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -196,7 +196,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
@@ -206,7 +206,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.plugins).hasSize(1)
 
             val remove = runCli(
-                "remove-plugin", "kotlin-jvm",
+                "remove", "plugin", "kotlin-jvm",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -220,7 +220,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-bundle", "my-bundle",
+                "add", "bundle", "my-bundle",
                 "--libraries", "lib-a,lib-b",
                 "-i", metadataFile.toString()
             )
@@ -231,7 +231,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.bundles.first().libraries).containsExactly("lib-a", "lib-b")
 
             val remove = runCli(
-                "remove-bundle", "my-bundle",
+                "remove", "bundle", "my-bundle",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -245,7 +245,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies:3.4.3",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies:3.4.3",
                 "--alias", "spring-boot-bom",
                 "-i", metadataFile.toString()
             )
@@ -256,7 +256,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.bomImports.first().alias).isEqualTo("spring-boot-bom")
 
             val remove = runCli(
-                "remove-bom", "spring-boot-bom",
+                "remove", "bom", "spring-boot-bom",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -270,7 +270,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-distribution", "server",
+                "add", "distribution", "server",
                 "--include-bundles", "kotlin-essentials,ktor-server",
                 "-i", metadataFile.toString()
             )
@@ -281,7 +281,7 @@ class CliFullFlowE2ETest {
             assertThat(metadataAfterAdd.distributions.first().name).isEqualTo("server")
 
             val remove = runCli(
-                "remove-distribution", "server",
+                "remove", "distribution", "server",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isEqualTo(0)
@@ -293,10 +293,10 @@ class CliFullFlowE2ETest {
         @Test
         fun `update version value`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.0.0", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.0.0", "-i", metadataFile.toString())
 
             val update = runCli(
-                "update-version", "kotlin", "2.1.20",
+                "update", "version", "kotlin", "2.1.20",
                 "-i", metadataFile.toString()
             )
             assertThat(update.statusCode).isEqualTo(0)
@@ -309,13 +309,13 @@ class CliFullFlowE2ETest {
         fun `update library version via update-version with library flag`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.0.0",
                 "-i", metadataFile.toString()
             )
 
             val update = runCli(
-                "update-version", "stdlib", "2.1.20",
+                "update", "version", "stdlib", "2.1.20",
                 "--library",
                 "-i", metadataFile.toString()
             )
@@ -329,13 +329,13 @@ class CliFullFlowE2ETest {
         fun `update library tags and version via update-library`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.0.0",
                 "-i", metadataFile.toString()
             )
 
             val update = runCli(
-                "update-library", "stdlib",
+                "update", "library", "stdlib",
                 "-v", "2.1.20",
                 "-t", "kotlin,core",
                 "-i", metadataFile.toString()
@@ -352,7 +352,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-library", "assertj", "org.assertj:assertj-core:3.27.3",
+                "add", "library", "assertj", "org.assertj:assertj-core:3.27.3",
                 "-i", metadataFile.toString()
             )
             assertThat(add.statusCode).isEqualTo(0)
@@ -366,7 +366,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val add = runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-t", "kotlin,core,essential",
                 "-i", metadataFile.toString()
@@ -385,9 +385,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `add duplicate version returns error`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
 
-            val duplicate = runCli("add-version", "kotlin", "2.2.0", "-i", metadataFile.toString())
+            val duplicate = runCli("add", "version", "kotlin", "2.2.0", "-i", metadataFile.toString())
             assertThat(duplicate.statusCode).isNotEqualTo(0)
             assertThat(duplicate.output).contains("already exists")
         }
@@ -396,13 +396,13 @@ class CliFullFlowE2ETest {
         fun `add duplicate library returns error`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
 
             val duplicate = runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.2.0",
                 "-i", metadataFile.toString()
             )
@@ -414,13 +414,13 @@ class CliFullFlowE2ETest {
         fun `add duplicate plugin returns error`() {
             initMetadata()
             runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
 
             val duplicate = runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "2.2.0",
                 "-i", metadataFile.toString()
             )
@@ -433,7 +433,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val remove = runCli(
-                "remove-version", "nonexistent",
+                "remove", "version", "nonexistent",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -445,7 +445,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val remove = runCli(
-                "remove-library", "nonexistent",
+                "remove", "library", "nonexistent",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -457,7 +457,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val remove = runCli(
-                "remove-plugin", "nonexistent",
+                "remove", "plugin", "nonexistent",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -469,7 +469,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val remove = runCli(
-                "remove-bundle", "nonexistent",
+                "remove", "bundle", "nonexistent",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -481,7 +481,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val update = runCli(
-                "update-version", "nonexistent", "1.0.0",
+                "update", "version", "nonexistent", "1.0.0",
                 "-i", metadataFile.toString()
             )
             assertThat(update.statusCode).isNotEqualTo(0)
@@ -493,7 +493,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val update = runCli(
-                "update-library", "nonexistent",
+                "update", "library", "nonexistent",
                 "-v", "1.0.0",
                 "-i", metadataFile.toString()
             )
@@ -509,15 +509,15 @@ class CliFullFlowE2ETest {
         @Test
         fun `remove version referenced by library fails without force`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
 
             val remove = runCli(
-                "remove-version", "kotlin",
+                "remove", "version", "kotlin",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -527,15 +527,15 @@ class CliFullFlowE2ETest {
         @Test
         fun `remove version referenced by library succeeds with force`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
 
             val remove = runCli(
-                "remove-version", "kotlin",
+                "remove", "version", "kotlin",
                 "--force",
                 "-i", metadataFile.toString()
             )
@@ -550,18 +550,18 @@ class CliFullFlowE2ETest {
         fun `remove library referenced by bundle fails without force`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-bundle", "essentials",
+                "add", "bundle", "essentials",
                 "--libraries", "stdlib",
                 "-i", metadataFile.toString()
             )
 
             val remove = runCli(
-                "remove-library", "stdlib",
+                "remove", "library", "stdlib",
                 "-i", metadataFile.toString()
             )
             assertThat(remove.statusCode).isNotEqualTo(0)
@@ -572,18 +572,18 @@ class CliFullFlowE2ETest {
         fun `remove library referenced by bundle succeeds with force`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-bundle", "essentials",
+                "add", "bundle", "essentials",
                 "--libraries", "stdlib",
                 "-i", metadataFile.toString()
             )
 
             val remove = runCli(
-                "remove-library", "stdlib",
+                "remove", "library", "stdlib",
                 "--force",
                 "-i", metadataFile.toString()
             )
@@ -599,7 +599,7 @@ class CliFullFlowE2ETest {
         fun `command on missing metadata file returns error`() {
             val nonexistentFile = tempDir.resolve("nonexistent.json")
             val result = runCli(
-                "add-version", "kotlin", "2.1.20",
+                "add", "version", "kotlin", "2.1.20",
                 "-i", nonexistentFile.toString()
             )
             assertThat(result.statusCode).isNotEqualTo(0)
@@ -610,7 +610,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val result = runCli(
-                "add-library", "bad", "invalid-coordinates",
+                "add", "library", "bad", "invalid-coordinates",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isNotEqualTo(0)
@@ -622,7 +622,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val result = runCli(
-                "add-library", "bad", "a:b:c:d",
+                "add", "library", "bad", "a:b:c:d",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isNotEqualTo(0)
@@ -634,7 +634,7 @@ class CliFullFlowE2ETest {
             initMetadata()
 
             val result = runCli(
-                "add-bom", "org.springframework.boot:spring-boot-dependencies",
+                "add", "bom", "org.springframework.boot:spring-boot-dependencies",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isNotEqualTo(0)
@@ -650,7 +650,7 @@ class CliFullFlowE2ETest {
         fun `migrate-deprecated dry-run shows plan without modifying file`() {
             initMetadata()
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "-v", "2.1.20",
                 "-i", metadataFile.toString()
             )
@@ -677,9 +677,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `generate TOML from metadata with versions and libraries`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -707,9 +707,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `generate TOML with custom filename`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -733,9 +733,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `generate BOM from metadata`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -759,9 +759,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `generate both TOML and BOM`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -787,9 +787,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `generate BOM without required group fails`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -817,9 +817,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `process writes effective metadata to output file`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -881,9 +881,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `check-updates with no updates available`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -891,7 +891,7 @@ class CliFullFlowE2ETest {
             dependangerMockCleanup = mockDependangerProcessing()
 
             val result = runCli(
-                "check-updates",
+                "check", "updates",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -901,9 +901,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `security-check with no vulnerabilities`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -911,7 +911,7 @@ class CliFullFlowE2ETest {
             dependangerMockCleanup = mockDependangerProcessing()
 
             val result = runCli(
-                "security-check",
+                "check", "security",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -921,9 +921,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `license-check with no violations`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -931,7 +931,7 @@ class CliFullFlowE2ETest {
             dependangerMockCleanup = mockDependangerProcessing()
 
             val result = runCli(
-                "license-check",
+                "check", "license",
                 "-i", metadataFile.toString()
             )
             assertThat(result.statusCode).isEqualTo(0)
@@ -941,9 +941,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `analyze with no compatibility issues`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -961,9 +961,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `resolve-transitives with no transitives`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -981,9 +981,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `check-updates with json output format`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -991,7 +991,7 @@ class CliFullFlowE2ETest {
             dependangerMockCleanup = mockDependangerProcessing()
 
             val result = runCli(
-                "check-updates",
+                "check", "updates",
                 "-i", metadataFile.toString(),
                 "--format", "json"
             )
@@ -1002,9 +1002,9 @@ class CliFullFlowE2ETest {
         @Test
         fun `check-updates writes report to file`() {
             initMetadata()
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
@@ -1013,7 +1013,7 @@ class CliFullFlowE2ETest {
 
             val reportFile = tempDir.resolve("updates-report.json")
             val result = runCli(
-                "check-updates",
+                "check", "updates",
                 "-i", metadataFile.toString(),
                 "-o", reportFile.toString()
             )
@@ -1030,34 +1030,34 @@ class CliFullFlowE2ETest {
         fun `add multiple versions and libraries then verify metadata integrity`() {
             initMetadata()
 
-            runCli("add-version", "kotlin", "2.1.20", "-i", metadataFile.toString())
-            runCli("add-version", "ktor", "3.1.1", "-i", metadataFile.toString())
-            runCli("add-version", "coroutines", "1.10.1", "-i", metadataFile.toString())
+            runCli("add", "version", "kotlin", "2.1.20", "-i", metadataFile.toString())
+            runCli("add", "version", "ktor", "3.1.1", "-i", metadataFile.toString())
+            runCli("add", "version", "coroutines", "1.10.1", "-i", metadataFile.toString())
 
             runCli(
-                "add-library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
+                "add", "library", "stdlib", "org.jetbrains.kotlin:kotlin-stdlib",
                 "--version-ref", "kotlin",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-library", "ktor-core", "io.ktor:ktor-client-core",
+                "add", "library", "ktor-core", "io.ktor:ktor-client-core",
                 "--version-ref", "ktor",
                 "-i", metadataFile.toString()
             )
             runCli(
-                "add-library", "coroutines-core", "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+                "add", "library", "coroutines-core", "org.jetbrains.kotlinx:kotlinx-coroutines-core",
                 "--version-ref", "coroutines",
                 "-i", metadataFile.toString()
             )
 
             runCli(
-                "add-plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
+                "add", "plugin", "kotlin-jvm", "org.jetbrains.kotlin.jvm",
                 "-v", "ref:kotlin",
                 "-i", metadataFile.toString()
             )
 
             runCli(
-                "add-bundle", "kotlin-essentials",
+                "add", "bundle", "kotlin-essentials",
                 "--libraries", "stdlib,coroutines-core",
                 "-i", metadataFile.toString()
             )
@@ -1074,11 +1074,11 @@ class CliFullFlowE2ETest {
         fun `sequential add and remove operations maintain consistency`() {
             initMetadata()
 
-            runCli("add-version", "v1", "1.0.0", "-i", metadataFile.toString())
-            runCli("add-version", "v2", "2.0.0", "-i", metadataFile.toString())
-            runCli("add-version", "v3", "3.0.0", "-i", metadataFile.toString())
+            runCli("add", "version", "v1", "1.0.0", "-i", metadataFile.toString())
+            runCli("add", "version", "v2", "2.0.0", "-i", metadataFile.toString())
+            runCli("add", "version", "v3", "3.0.0", "-i", metadataFile.toString())
 
-            runCli("remove-version", "v2", "-i", metadataFile.toString())
+            runCli("remove", "version", "v2", "-i", metadataFile.toString())
 
             val metadata = CliTestSupport.readMetadata(metadataFile)
             assertThat(metadata.versions).hasSize(2)

@@ -10,7 +10,7 @@ import io.github.zenhelix.dependanger.core.model.JdkConstraints
 import io.github.zenhelix.dependanger.core.model.Requirements
 import java.nio.file.Path
 
-public class UpdateLibraryCommand : CliktCommand(name = "update-library") {
+public class UpdateLibraryCommand : CliktCommand(name = "library") {
     override fun help(context: Context): String = "Update a library in metadata.json"
 
     public val alias: String by argument(help = "Library alias to update")

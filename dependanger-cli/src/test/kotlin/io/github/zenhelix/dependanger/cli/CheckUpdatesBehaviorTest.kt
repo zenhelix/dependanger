@@ -51,7 +51,7 @@ class CheckUpdatesBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "check-updates", "-i", metadataFile.toString(),
+                "check", "updates", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -64,7 +64,7 @@ class CheckUpdatesBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "check-updates", "-i", metadataFile.toString(),
+                "check", "updates", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -92,7 +92,7 @@ class CheckUpdatesBehaviorTest {
 
             val outputFile = tempDir.resolve("updates.json")
             val result = CliTestSupport.runCli(
-                "check-updates", "-i", metadataFile.toString(), "-o", outputFile.toString(),
+                "check", "updates", "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -138,7 +138,7 @@ class CheckUpdatesBehaviorTest {
 
             val outputFile = tempDir.resolve("filtered.json")
             val result = CliTestSupport.runCli(
-                "check-updates", "--type", "MAJOR",
+                "check", "updates", "--type", "MAJOR",
                 "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 
@@ -162,7 +162,7 @@ class CheckUpdatesBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "check-updates", "--fail-on-updates", "-i", metadataFile.toString(),
+                "check", "updates", "--fail-on-updates", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)
@@ -175,7 +175,7 @@ class CheckUpdatesBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "check-updates", "--fail-on-updates", "-i", metadataFile.toString(),
+                "check", "updates", "--fail-on-updates", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -188,7 +188,7 @@ class CheckUpdatesBehaviorTest {
         @Test
         fun `fails when input file not found`() {
             val result = CliTestSupport.runCli(
-                "check-updates", "-i", tempDir.resolve("nonexistent.json").toString(),
+                "check", "updates", "-i", tempDir.resolve("nonexistent.json").toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(1)

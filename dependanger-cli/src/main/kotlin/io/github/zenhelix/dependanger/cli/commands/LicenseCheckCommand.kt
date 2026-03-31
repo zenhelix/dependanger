@@ -18,7 +18,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
-public class LicenseCheckCommand : CliktCommand(name = "license-check") {
+public class LicenseCheckCommand : CliktCommand(name = "license") {
     override fun help(context: Context): String = "Check library licenses for compliance"
 
     public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)

@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.Bundle
 import java.nio.file.Path
 
-public class AddBundleCommand : CliktCommand(name = "add-bundle") {
+public class AddBundleCommand : CliktCommand(name = "bundle") {
     override fun help(context: Context): String = "Add a bundle to metadata.json"
 
     public val name: String by argument(help = "Bundle name")

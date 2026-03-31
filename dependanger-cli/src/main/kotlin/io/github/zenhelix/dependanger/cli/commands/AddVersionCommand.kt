@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.Version
 import java.nio.file.Path
 
-public class AddVersionCommand : CliktCommand(name = "add-version") {
+public class AddVersionCommand : CliktCommand(name = "version") {
     override fun help(context: Context): String = "Add a version alias to metadata.json"
 
     public val alias: String by argument(help = "Version alias name")

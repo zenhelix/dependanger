@@ -9,7 +9,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import java.nio.file.Path
 
-public class RemoveBundleCommand : CliktCommand(name = "remove-bundle") {
+public class RemoveBundleCommand : CliktCommand(name = "bundle") {
     override fun help(context: Context): String = "Remove a bundle from metadata.json"
 
     public val name: String by argument(help = "Bundle name to remove")

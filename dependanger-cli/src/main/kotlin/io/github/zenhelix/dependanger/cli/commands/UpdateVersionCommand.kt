@@ -10,7 +10,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import java.nio.file.Path
 
-public class UpdateVersionCommand : CliktCommand(name = "update-version") {
+public class UpdateVersionCommand : CliktCommand(name = "version") {
     override fun help(context: Context): String = "Update a version in metadata.json"
 
     public val alias: String by argument(help = "Version or library alias")

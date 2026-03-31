@@ -8,8 +8,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.effective.spi.PluginFilter
-import java.util.ServiceLoader
+import io.github.zenhelix.dependanger.effective.spi.PluginFiltersKey
 
 public class PluginFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PLUGIN_FILTER
@@ -27,7 +26,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
         val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
         val tagFilter = distribution?.spec?.byTags
 
-        val customFilters = ServiceLoader.load(PluginFilter::class.java).toList()
+        val customFilters = context[PluginFiltersKey] ?: emptyList()
 
         // Nothing to filter
         if (tagFilter == null && customFilters.isEmpty()) return metadata

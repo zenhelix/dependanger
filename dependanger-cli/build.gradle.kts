@@ -9,14 +9,10 @@ description = "Dependanger CLI - Command-line interface"
 
 dependencies {
     implementation(projects.components.shared.dependangerFeatureModel)
+    // Feature processors are discovered via ServiceLoader at runtime.
+    // They are transitively available through dependanger-api (implementation scope).
     implementation(projects.components.api.dependangerApi)
     implementation(projects.components.core.dependangerMetadataJson)
-    runtimeOnly(projects.components.features.dependangerUpdates)
-    runtimeOnly(projects.components.features.dependangerSecurity)
-    runtimeOnly(projects.components.features.dependangerLicense)
-    runtimeOnly(projects.components.features.dependangerTransitive)
-    runtimeOnly(projects.components.features.dependangerAnalysis)
-    runtimeOnly(projects.components.features.dependangerReport)
     implementation(libs.clikt)
     implementation(libs.mordant)
     implementation(libs.kotlinx.coroutines.core)

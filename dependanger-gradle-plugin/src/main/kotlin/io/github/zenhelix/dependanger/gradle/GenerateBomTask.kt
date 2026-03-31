@@ -1,6 +1,5 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.generators.bom.BomConfig
 import io.github.zenhelix.dependanger.generators.bom.BomGenerator
 import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
@@ -23,30 +22,20 @@ public abstract class GenerateBomTask : AbstractDependangerTask() {
 
     @get:OutputFile
     public val bomFile: RegularFileProperty = project.objects.fileProperty().convention(
-        extension.outputDirectory.file(BomConfig.DEFAULT_FILENAME)
+        extension.outputDirectory.file(extension.bom.filename)
     )
 
     @TaskAction
     public fun execute() {
         val effective = DependangerTaskHelper.readEffective(effectiveFile.get().asFile, logger)
 
-        val groupId = project.group.toString().takeIf { it.isNotBlank() }
-            ?: throw GradleException("BOM groupId not configured. Set project.group.")
-        val artifactId = "${project.name}-bom"
-        val version = project.version.toString().takeIf { it != "unspecified" && it.isNotBlank() }
-            ?: throw GradleException("BOM version not configured. Set project.version.")
+        val fallbackGroupId = project.group.toString().takeIf { it.isNotBlank() }
+            ?: throw GradleException("BOM groupId not configured. Set project.group or dependanger { bom { groupId.set(...) } }.")
+        val fallbackArtifactId = "${project.name}-bom"
+        val fallbackVersion = project.version.toString().takeIf { it != "unspecified" && it.isNotBlank() }
+            ?: throw GradleException("BOM version not configured. Set project.version or dependanger { bom { version.set(...) } }.")
 
-        val bomConfig = BomConfig(
-            groupId = groupId,
-            artifactId = artifactId,
-            version = version,
-            name = null,
-            description = null,
-            filename = BomConfig.DEFAULT_FILENAME,
-            includeOptionalDependencies = false,
-            prettyPrint = true,
-            includeDeprecationComments = true,
-        )
+        val bomConfig = extension.bom.toConfig(fallbackGroupId, fallbackArtifactId, fallbackVersion)
 
         val generator = BomGenerator(bomConfig)
         val artifact = generator.generate(effective)

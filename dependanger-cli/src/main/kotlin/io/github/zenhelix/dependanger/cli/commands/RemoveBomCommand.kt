@@ -5,7 +5,6 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import java.nio.file.Path
 
@@ -15,7 +14,6 @@ public class RemoveBomCommand : CliktCommand(name = "bom") {
     public val alias: String by argument(help = "BOM alias to remove")
     public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
     public val output: String? by option("-o", "--output", help = "Output file")
-    public val force: Boolean by option("-f", "--force", help = "Skip dependency checks").flag()
 
     override fun run() {
         val formatter = OutputFormatter(terminal = terminal)

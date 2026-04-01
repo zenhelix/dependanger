@@ -45,7 +45,7 @@ public class BundleFilterProcessor : EffectiveMetadataProcessor {
         val distName = metadata.distribution
         if (distName != null) {
             val distribution = context.originalMetadata.distributions.find { it.name == distName }
-            val bundleFilter = distribution?.spec?.byBundles
+            val bundleFilter = distribution?.librarySpec?.byBundles
             if (bundleFilter != null) {
                 cleanedBundles = cleanedBundles.filter { (alias, _) ->
                     val passesIncludes = bundleFilter.includes.isEmpty() || alias in bundleFilter.includes

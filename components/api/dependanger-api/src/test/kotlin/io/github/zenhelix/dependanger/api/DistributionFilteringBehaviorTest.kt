@@ -394,7 +394,7 @@ class DistributionFilteringBehaviorTest {
                 }
                 distributions {
                     distribution("jvm-only") {
-                        spec { byTags { include { anyOf("jvm") } } }
+                        pluginSpec { byTags { include { anyOf("jvm") } } }
                     }
                 }
             }.process(distribution = "jvm-only")
@@ -414,7 +414,7 @@ class DistributionFilteringBehaviorTest {
                 }
                 distributions {
                     distribution("tagged-only") {
-                        spec { byTags { include { anyOf("jvm") } } }
+                        pluginSpec { byTags { include { anyOf("jvm") } } }
                     }
                 }
             }.process(distribution = "tagged-only")

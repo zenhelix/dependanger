@@ -14,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
@@ -37,11 +38,16 @@ import kotlinx.coroutines.sync.withPermit
 private val logger = KotlinLogging.logger {}
 
 public class UpdateCheckProcessor : ParallelMetadataProcessor {
-    override val id: String = ProcessorIds.UPDATE_CHECK
-    override val phase: ProcessingPhase = ProcessingPhase.UPDATE_CHECK
+    override val id: String = PROCESSOR_ID
+    override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks for available library updates"
+
+    public companion object {
+        public const val PROCESSOR_ID: String = "update-check"
+        public val PHASE: ProcessingPhase = ProcessingPhase("UPDATE_CHECK", ExecutionMode.PARALLEL_IO)
+    }
 
     override fun supports(context: ProcessingContext): Boolean =
         context[UpdateCheckSettingsKey]?.enabled == true

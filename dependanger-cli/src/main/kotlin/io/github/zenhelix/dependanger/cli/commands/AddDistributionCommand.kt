@@ -8,7 +8,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.core.model.Distribution
 import io.github.zenhelix.dependanger.core.model.filter.BundleFilter
-import io.github.zenhelix.dependanger.core.model.filter.FilterSpec
+import io.github.zenhelix.dependanger.core.model.filter.LibraryFilterSpec
 import io.github.zenhelix.dependanger.core.model.filter.TagExclude
 import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 import io.github.zenhelix.dependanger.core.model.filter.TagInclude
@@ -62,8 +62,8 @@ public class AddDistributionCommand : CliktCommand(name = "distribution") {
                 null
             }
 
-            val spec = if (tagFilter != null || bundleFilter != null) {
-                FilterSpec(
+            val librarySpec = if (tagFilter != null || bundleFilter != null) {
+                LibraryFilterSpec(
                     byTags = tagFilter,
                     byGroups = null,
                     byAliases = null,
@@ -75,7 +75,7 @@ public class AddDistributionCommand : CliktCommand(name = "distribution") {
                 null
             }
 
-            val newDistribution = Distribution(name = name, spec = spec)
+            val newDistribution = Distribution(name = name, librarySpec = librarySpec, pluginSpec = null)
             val updated = metadata.copy(distributions = metadata.distributions + newDistribution)
 
             metadataService.write(updated, outputPath)

@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ProcessingInfo
+import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPipeline.Companion.groupByExecutionMode
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -15,7 +16,11 @@ private val logger = KotlinLogging.logger {}
 public class ProcessingPipeline(
     processors: List<EffectiveMetadataProcessor>,
 ) {
-    private val sortedProcessors: List<EffectiveMetadataProcessor> = topologicalSort(processors)
+    private val sortedProcessors: List<EffectiveMetadataProcessor> = run {
+        val edges = buildDependencyGraph(processors)
+        val sorted = topologicalSort(processors, edges)
+        consolidateParallelProcessors(sorted, edges)
+    }
     private val processorGroups: List<ProcessorGroup> = groupByExecutionMode(sortedProcessors)
     private val registeredIds: List<String> = sortedProcessors.map { it.id }
 
@@ -209,34 +214,52 @@ public class ProcessingPipeline(
     )
 
     private companion object {
-        fun topologicalSort(processors: List<EffectiveMetadataProcessor>): List<EffectiveMetadataProcessor> {
-            val byId = processors.associateBy { it.id }
 
-            // Build adjacency: edges[A] contains B means A must run before B
+        /**
+         * Builds the dependency graph from processor constraints.
+         * Returns adjacency map: edges[A] contains B means A must run before B.
+         */
+        fun buildDependencyGraph(
+            processors: List<EffectiveMetadataProcessor>,
+        ): Map<String, Set<String>> {
+            val byId = processors.map { it.id }.toSet()
             val edges = mutableMapOf<String, MutableSet<String>>()
-            val inDegree = mutableMapOf<String, Int>()
             for (p in processors) {
                 edges.getOrPut(p.id) { mutableSetOf() }
-                inDegree.getOrPut(p.id) { 0 }
             }
 
             for (p in processors) {
                 for (c in p.constraints) {
                     when (c) {
                         is OrderConstraint.RunsAfter -> {
-                            // p runs after c.processorId -> edge from c.processorId to p.id
                             if (c.processorId in byId) {
                                 edges.getOrPut(c.processorId) { mutableSetOf() }.add(p.id)
-                                inDegree[p.id] = (inDegree[p.id] ?: 0) + 1
                             }
                         }
                         is OrderConstraint.RunsBefore -> {
-                            // p runs before c.processorId -> edge from p.id to c.processorId
                             if (c.processorId in byId) {
                                 edges.getOrPut(p.id) { mutableSetOf() }.add(c.processorId)
-                                inDegree[c.processorId] = (inDegree[c.processorId] ?: 0) + 1
                             }
                         }
+                    }
+                }
+            }
+            return edges
+        }
+
+        fun topologicalSort(
+            processors: List<EffectiveMetadataProcessor>,
+            edges: Map<String, Set<String>>,
+        ): List<EffectiveMetadataProcessor> {
+            val byId = processors.associateBy { it.id }
+            val inDegree = mutableMapOf<String, Int>()
+            for (p in processors) {
+                inDegree[p.id] = 0
+            }
+            for ((_, neighbors) in edges) {
+                for (neighbor in neighbors) {
+                    if (neighbor in inDegree) {
+                        inDegree[neighbor] = (inDegree[neighbor] ?: 0) + 1
                     }
                 }
             }
@@ -266,6 +289,99 @@ public class ProcessingPipeline(
             }
 
             return result
+        }
+
+        /**
+         * Consolidates non-adjacent parallel processors into contiguous blocks
+         * so that [groupByExecutionMode] can form proper parallel groups.
+         *
+         * For each parallel [ExecutionMode], all processors with that mode are
+         * moved to the position of the last one in topological order — provided
+         * no intervening sequential processor transitively depends on any of
+         * the parallel processors being moved. When consolidation is unsafe,
+         * the original order is preserved and a warning is logged.
+         */
+        fun consolidateParallelProcessors(
+            sorted: List<EffectiveMetadataProcessor>,
+            edges: Map<String, Set<String>>,
+        ): List<EffectiveMetadataProcessor> {
+            val parallelByMode = sorted
+                .filter { it.phase.executionMode != ExecutionMode.SEQUENTIAL }
+                .groupBy { it.phase.executionMode }
+
+            // Nothing to consolidate if every parallel mode has at most 1 processor
+            if (parallelByMode.values.none { it.size > 1 }) return sorted
+
+            // Compute reachability only from parallel processors (the only sources we check)
+            val allParallelIds = parallelByMode.values.flatten().map { it.id }
+            val reachableFrom = computeReachability(edges, allParallelIds)
+
+            val result = sorted.toMutableList()
+
+            for ((mode, parallelProcessors) in parallelByMode) {
+                if (parallelProcessors.size <= 1) continue
+
+                val parallelIds = parallelProcessors.map { it.id }.toSet()
+                val idToIndex = result.withIndex().associate { (i, p) -> p.id to i }
+                val indices = parallelProcessors.map { idToIndex[it.id]!! }.sorted()
+                val firstIdx = indices.first()
+                val lastIdx = indices.last()
+
+                // Already adjacent — nothing to do
+                if (lastIdx - firstIdx + 1 == parallelProcessors.size) continue
+
+                // Check safety: no sequential processor between first and last parallel
+                // is downstream of any parallel processor (i.e., parallel processor can reach it)
+                val canMerge = (firstIdx..lastIdx).all { idx ->
+                    val proc = result[idx]
+                    if (proc.id in parallelIds) {
+                        true
+                    } else {
+                        parallelIds.none { parId -> proc.id in (reachableFrom[parId] ?: emptySet()) }
+                    }
+                }
+
+                if (canMerge) {
+                    val lastProcId = result[lastIdx].id
+                    val toMove = parallelProcessors.filter { it.id != lastProcId }
+                    result.removeAll(toMove.toSet())
+                    val insertPos = result.indexOfFirst { it.id == lastProcId }
+                    result.addAll(insertPos, toMove)
+                } else {
+                    logger.warn {
+                        "Parallel processors with mode $mode are split into multiple groups " +
+                                "due to ordering constraints: ${parallelIds.sorted().joinToString(", ")}"
+                    }
+                }
+            }
+
+            return result
+        }
+
+        /**
+         * Computes transitive reachability for each source node via BFS.
+         * Returns map: nodeId -> set of all transitively reachable node IDs.
+         */
+        private fun computeReachability(
+            edges: Map<String, Set<String>>,
+            sourceIds: List<String>,
+        ): Map<String, Set<String>> = buildMap {
+            for (startId in sourceIds) {
+                val visited = mutableSetOf<String>()
+                val queue = ArrayDeque<String>()
+                for (neighbor in edges[startId].orEmpty()) {
+                    queue.add(neighbor)
+                }
+                while (queue.isNotEmpty()) {
+                    val current = queue.removeFirst()
+                    if (visited.add(current)) {
+                        for (neighbor in edges[current].orEmpty()) {
+                            queue.add(neighbor)
+                        }
+                    }
+                }
+                put(startId, visited)
+            }
         }
 
         fun groupByExecutionMode(sorted: List<EffectiveMetadataProcessor>): List<ProcessorGroup> {

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
-public data class FilterSpec(
+public data class LibraryFilterSpec(
     val byTags: TagFilter?,
     val byGroups: GroupFilter?,
     val byAliases: AliasFilter?,

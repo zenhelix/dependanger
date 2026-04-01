@@ -15,6 +15,9 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
+private val TEST_PARALLEL_PHASE_1 = ProcessingPhase("TEST_PARALLEL_1", ExecutionMode.PARALLEL_IO)
+private val TEST_PARALLEL_PHASE_2 = ProcessingPhase("TEST_PARALLEL_2", ExecutionMode.PARALLEL_IO)
+
 private class ParallelDiagnosticProcessor(
     override val id: String,
     override val phase: ProcessingPhase,
@@ -193,10 +196,10 @@ class ProcessingPipelineTest {
         fun `parallel processors can add diagnostics`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    ParallelDiagnosticProcessor("update-check", ProcessingPhase.UPDATE_CHECK, diagnosticMessage = "update-diag")
+                    ParallelDiagnosticProcessor("update-check", TEST_PARALLEL_PHASE_1, diagnosticMessage = "update-diag")
                 )
                 addProcessor(
-                    ParallelDiagnosticProcessor("security-check", ProcessingPhase.SECURITY_CHECK, diagnosticMessage = "security-diag")
+                    ParallelDiagnosticProcessor("security-check", TEST_PARALLEL_PHASE_2, diagnosticMessage = "security-diag")
                 )
             }
 
@@ -214,10 +217,10 @@ class ProcessingPipelineTest {
 
             val pipeline = ProcessingPipeline {
                 addProcessor(
-                    ParallelExtensionAddingProcessor("ext-proc-1", ProcessingPhase.UPDATE_CHECK, extensionKey = key1, extensionValue = "value1")
+                    ParallelExtensionAddingProcessor("ext-proc-1", TEST_PARALLEL_PHASE_1, extensionKey = key1, extensionValue = "value1")
                 )
                 addProcessor(
-                    ParallelExtensionAddingProcessor("ext-proc-2", ProcessingPhase.SECURITY_CHECK, extensionKey = key2, extensionValue = "value2")
+                    ParallelExtensionAddingProcessor("ext-proc-2", TEST_PARALLEL_PHASE_2, extensionKey = key2, extensionValue = "value2")
                 )
             }
 
@@ -227,14 +230,56 @@ class ProcessingPipelineTest {
         }
 
         @Test
+        fun `non-adjacent parallel processors are consolidated into one group`() = runTest {
+            // Setup: seq -> par1 -> seq2 -> par2, where seq2 does NOT depend on par1
+            // par1 and par2 should be consolidated into one parallel group
+            val seqPhase1 = ProcessingPhase("SEQ1", ExecutionMode.SEQUENTIAL)
+            val seqPhase2 = ProcessingPhase("SEQ2", ExecutionMode.SEQUENTIAL)
+
+            val pipeline = ProcessingPipeline {
+                addProcessor(DiagnosticProcessor("seq1", seqPhase1, diagnosticMessage = "seq1"))
+                addProcessor(
+                    ParallelDiagnosticProcessor(
+                        "par1", TEST_PARALLEL_PHASE_1,
+                        constraints = setOf(OrderConstraint.runsAfter("seq1")),
+                        diagnosticMessage = "par1"
+                    )
+                )
+                // seq2 depends on seq1 but NOT on par1
+                addProcessor(
+                    DiagnosticProcessor(
+                        "seq2", seqPhase2,
+                        constraints = setOf(OrderConstraint.runsAfter("seq1")),
+                        diagnosticMessage = "seq2"
+                    )
+                )
+                addProcessor(
+                    ParallelDiagnosticProcessor(
+                        "par2", TEST_PARALLEL_PHASE_2,
+                        constraints = setOf(OrderConstraint.runsAfter("seq1")),
+                        diagnosticMessage = "par2"
+                    )
+                )
+            }
+
+            val result = pipeline.process(context())
+
+            // Both parallel processors should have executed
+            val messages = result.diagnostics.infos.map { it.message }
+            assertThat(messages).containsAll(listOf("par1", "par2"))
+            assertThat(result.processingInfo!!.processorIds).contains("par1")
+            assertThat(result.processingInfo!!.processorIds).contains("par2")
+        }
+
+        @Test
         fun `non-parallel processor in parallel phase throws PipelineConfigurationException at build time`() {
             val thrown = assertThrows<PipelineConfigurationException> {
                 ProcessingPipeline {
                     addProcessor(
-                        VersionModifyingProcessor("mod-1", ProcessingPhase.UPDATE_CHECK)
+                        VersionModifyingProcessor("mod-1", TEST_PARALLEL_PHASE_1)
                     )
                     addProcessor(
-                        VersionModifyingProcessor("mod-2", ProcessingPhase.SECURITY_CHECK)
+                        VersionModifyingProcessor("mod-2", TEST_PARALLEL_PHASE_2)
                     )
                 }
             }

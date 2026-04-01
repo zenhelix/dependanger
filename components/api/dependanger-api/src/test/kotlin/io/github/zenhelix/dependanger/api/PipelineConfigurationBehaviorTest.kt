@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
@@ -15,6 +16,9 @@ import kotlinx.serialization.builtins.serializer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+
+private val TEST_PHASE_A = ProcessingPhase("TEST_PHASE_A", ExecutionMode.PARALLEL_IO)
+private val TEST_PHASE_B = ProcessingPhase("TEST_PHASE_B", ExecutionMode.PARALLEL_IO)
 
 class PipelineConfigurationBehaviorTest {
 
@@ -204,7 +208,7 @@ class PipelineConfigurationBehaviorTest {
 
             val processor1 = FakeParallelProcessor(
                 id = "custom-enrichment",
-                phase = ProcessingPhase.UPDATE_CHECK,
+                phase = TEST_PHASE_A,
                 constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = key1,
                 provider = { "transform-done" },
@@ -212,7 +216,7 @@ class PipelineConfigurationBehaviorTest {
 
             val processor2 = FakeParallelProcessor(
                 id = "custom-validate",
-                phase = ProcessingPhase.SECURITY_CHECK,
+                phase = TEST_PHASE_B,
                 constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
                 extensionKey = key2,
                 provider = { "validation-done" },

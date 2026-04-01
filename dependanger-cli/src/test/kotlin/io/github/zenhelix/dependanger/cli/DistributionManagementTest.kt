@@ -31,8 +31,8 @@ class DistributionManagementTest {
             assertThat(result.statusCode).isEqualTo(0)
             val dist = CliTestSupport.readMetadata(metadataFile).distributions.find { it.name == "android" }
             assertThat(dist).isNotNull
-            assertThat(dist!!.spec).isNotNull
-            assertThat(dist.spec!!.byTags).isNotNull
+            assertThat(dist!!.librarySpec).isNotNull
+            assertThat(dist.librarySpec!!.byTags).isNotNull
         }
 
         @Test
@@ -43,7 +43,7 @@ class DistributionManagementTest {
             )
             assertThat(result.statusCode).isEqualTo(0)
             val dist = CliTestSupport.readMetadata(metadataFile).distributions.find { it.name == "server" }
-            assertThat(dist!!.spec!!.byTags!!.excludes).isNotEmpty
+            assertThat(dist!!.librarySpec!!.byTags!!.excludes).isNotEmpty
         }
 
         @Test
@@ -54,7 +54,7 @@ class DistributionManagementTest {
             )
             assertThat(result.statusCode).isEqualTo(0)
             val dist = CliTestSupport.readMetadata(metadataFile).distributions.find { it.name == "minimal" }
-            assertThat(dist!!.spec!!.byBundles!!.includes).containsExactly("kotlin-essentials")
+            assertThat(dist!!.librarySpec!!.byBundles!!.includes).containsExactly("kotlin-essentials")
         }
 
         @Test
@@ -64,7 +64,8 @@ class DistributionManagementTest {
             )
             assertThat(result.statusCode).isEqualTo(0)
             val dist = CliTestSupport.readMetadata(metadataFile).distributions.find { it.name == "all" }
-            assertThat(dist!!.spec).isNull()
+            assertThat(dist!!.librarySpec).isNull()
+            assertThat(dist.pluginSpec).isNull()
         }
 
         @Test

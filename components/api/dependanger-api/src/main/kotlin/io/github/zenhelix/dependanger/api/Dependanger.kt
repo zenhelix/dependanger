@@ -159,12 +159,9 @@ public class Dependanger internal constructor(
         )
     }
 
-    private fun buildValidationPipeline(): ProcessingPipeline = buildPipeline {
-        disable(ProcessorIds.UPDATE_CHECK)
-        disable(ProcessorIds.SECURITY_CHECK)
-        disable(ProcessorIds.LICENSE_CHECK)
-        disable(ProcessorIds.TRANSITIVE_RESOLVER)
-        disable(ProcessorIds.COMPATIBILITY_ANALYSIS)
+    private fun buildValidationPipeline(): ProcessingPipeline = ProcessingPipeline {
+        addCoreProcessors()
+        preset.configure(this)
         enableOptional(ProcessorIds.VALIDATION)
     }
 

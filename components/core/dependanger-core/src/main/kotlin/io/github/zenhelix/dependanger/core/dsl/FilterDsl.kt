@@ -3,8 +3,9 @@ package io.github.zenhelix.dependanger.core.dsl
 import io.github.zenhelix.dependanger.core.model.filter.AliasFilter
 import io.github.zenhelix.dependanger.core.model.filter.BundleFilter
 import io.github.zenhelix.dependanger.core.model.filter.DeprecatedFilter
-import io.github.zenhelix.dependanger.core.model.filter.FilterSpec
 import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
+import io.github.zenhelix.dependanger.core.model.filter.LibraryFilterSpec
+import io.github.zenhelix.dependanger.core.model.filter.PluginFilterSpec
 import io.github.zenhelix.dependanger.core.model.filter.TagExclude
 import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 import io.github.zenhelix.dependanger.core.model.filter.TagInclude
@@ -46,7 +47,7 @@ public class FilterDsl {
         deprecatedFilter = dsl.toDeprecatedFilter()
     }
 
-    public fun toFilterSpec(): FilterSpec = FilterSpec(
+    public fun toLibraryFilterSpec(): LibraryFilterSpec = LibraryFilterSpec(
         byTags = tagFilter,
         byGroups = groupFilter,
         byAliases = aliasFilter,
@@ -182,4 +183,25 @@ public class DeprecatedFilterDsl {
     }
 
     public fun toDeprecatedFilter(): DeprecatedFilter = DeprecatedFilter(include = includeDeprecated)
+}
+
+@DependangerDslMarker
+public class PluginFilterDsl {
+    public var tagFilter: TagFilter? = null
+    public var aliasFilter: AliasFilter? = null
+
+    public fun byTags(block: TagFilterDsl.() -> Unit) {
+        val dsl = TagFilterDsl().apply(block)
+        tagFilter = dsl.toTagFilter()
+    }
+
+    public fun byAliases(block: AliasFilterDsl.() -> Unit) {
+        val dsl = AliasFilterDsl().apply(block)
+        aliasFilter = dsl.toAliasFilter()
+    }
+
+    public fun toPluginFilterSpec(): PluginFilterSpec = PluginFilterSpec(
+        byTags = tagFilter,
+        byAliases = aliasFilter,
+    )
 }

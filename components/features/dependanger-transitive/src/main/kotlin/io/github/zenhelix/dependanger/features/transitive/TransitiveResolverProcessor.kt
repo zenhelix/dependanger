@@ -9,6 +9,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withDiagnostic
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -28,11 +29,16 @@ private const val DEFAULT_READ_TIMEOUT_MS = 30_000L
 private const val LARGE_TREE_THRESHOLD = 5_000
 
 public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
-    override val id: String = ProcessorIds.TRANSITIVE_RESOLVER
-    override val phase: ProcessingPhase = ProcessingPhase.TRANSITIVE_RESOLVER
+    override val id: String = PROCESSOR_ID
+    override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Resolves transitive dependency tree"
+
+    public companion object {
+        public const val PROCESSOR_ID: String = "transitive-resolver"
+        public val PHASE: ProcessingPhase = ProcessingPhase("TRANSITIVE_RESOLVER", ExecutionMode.SEQUENTIAL)
+    }
 
     override fun supports(context: ProcessingContext): Boolean =
         context[TransitiveResolutionSettingsKey]?.enabled == true

@@ -1,6 +1,5 @@
 package io.github.zenhelix.dependanger.cli
 
-import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.testing.CliktCommandTestResult
 import com.github.ajalt.clikt.testing.test
 import io.github.zenhelix.dependanger.api.Dependanger
@@ -38,42 +37,7 @@ import java.nio.file.Path
 object CliTestSupport {
 
     fun runCli(vararg args: String): CliktCommandTestResult {
-        val cli = DependangerCli().subcommands(
-            InitCommand(),
-            AddCommand().subcommands(
-                AddVersionCommand(),
-                AddLibraryCommand(),
-                AddPluginCommand(),
-                AddBundleCommand(),
-                AddBomCommand(),
-                AddDistributionCommand(),
-            ),
-            RemoveCommand().subcommands(
-                RemoveVersionCommand(),
-                RemoveLibraryCommand(),
-                RemovePluginCommand(),
-                RemoveBundleCommand(),
-                RemoveBomCommand(),
-                RemoveDistributionCommand(),
-            ),
-            UpdateCommand().subcommands(
-                UpdateVersionCommand(),
-                UpdateLibraryCommand(),
-            ),
-            MigrateDeprecatedCommand(),
-            ValidateCommand(),
-            ProcessCommand(),
-            GenerateCommand(),
-            CheckCommand().subcommands(
-                CheckUpdatesCommand(),
-                SecurityCheckCommand(),
-                LicenseCheckCommand(),
-            ),
-            AnalyzeCommand(),
-            ResolveTransitivesCommand(),
-            ReportCommand(),
-        )
-        return cli.test(argv = args.toList())
+        return buildCli().test(argv = args.toList())
     }
 
     private val format = JsonSerializationFormat()

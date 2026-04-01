@@ -28,10 +28,5 @@ public open class ProcessingPhase(
         public val USED_VERSIONS: ProcessingPhase = ProcessingPhase("USED_VERSIONS", ExecutionMode.SEQUENTIAL)
         public val VALIDATION: ProcessingPhase = ProcessingPhase("VALIDATION", ExecutionMode.SEQUENTIAL)
         public val COMPAT_RULES: ProcessingPhase = ProcessingPhase("COMPAT_RULES", ExecutionMode.SEQUENTIAL)
-        public val UPDATE_CHECK: ProcessingPhase = ProcessingPhase("UPDATE_CHECK", ExecutionMode.PARALLEL_IO)
-        public val TRANSITIVE_RESOLVER: ProcessingPhase = ProcessingPhase("TRANSITIVE_RESOLVER", ExecutionMode.SEQUENTIAL)
-        public val COMPATIBILITY_ANALYSIS: ProcessingPhase = ProcessingPhase("COMPATIBILITY_ANALYSIS", ExecutionMode.SEQUENTIAL)
-        public val SECURITY_CHECK: ProcessingPhase = ProcessingPhase("SECURITY_CHECK", ExecutionMode.PARALLEL_IO)
-        public val LICENSE_CHECK: ProcessingPhase = ProcessingPhase("LICENSE_CHECK", ExecutionMode.PARALLEL_IO)
     }
 }

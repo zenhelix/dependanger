@@ -1,7 +1,8 @@
 package io.github.zenhelix.dependanger.core.dsl
 
 import io.github.zenhelix.dependanger.core.model.Distribution
-import io.github.zenhelix.dependanger.core.model.filter.FilterSpec
+import io.github.zenhelix.dependanger.core.model.filter.LibraryFilterSpec
+import io.github.zenhelix.dependanger.core.model.filter.PluginFilterSpec
 
 @DependangerDslMarker
 public class DistributionsDsl {
@@ -10,16 +11,22 @@ public class DistributionsDsl {
 
     public fun distribution(name: String, block: DistributionDsl.() -> Unit = {}) {
         val dsl = DistributionDsl().apply(block)
-        _distributions.add(Distribution(name = name, spec = dsl.filterSpec))
+        _distributions.add(Distribution(name = name, librarySpec = dsl.libraryFilterSpec, pluginSpec = dsl.pluginFilterSpec))
     }
 }
 
 @DependangerDslMarker
 public class DistributionDsl {
-    public var filterSpec: FilterSpec? = null
+    public var libraryFilterSpec: LibraryFilterSpec? = null
+    public var pluginFilterSpec: PluginFilterSpec? = null
 
     public fun spec(block: FilterDsl.() -> Unit) {
         val dsl = FilterDsl().apply(block)
-        filterSpec = dsl.toFilterSpec()
+        libraryFilterSpec = dsl.toLibraryFilterSpec()
+    }
+
+    public fun pluginSpec(block: PluginFilterDsl.() -> Unit) {
+        val dsl = PluginFilterDsl().apply(block)
+        pluginFilterSpec = dsl.toPluginFilterSpec()
     }
 }

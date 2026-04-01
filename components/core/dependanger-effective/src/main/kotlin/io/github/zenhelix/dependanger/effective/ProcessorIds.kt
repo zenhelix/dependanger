@@ -17,9 +17,4 @@ public object ProcessorIds {
     public const val USED_VERSIONS: String = "used-versions"
     public const val VALIDATION: String = "validation"
     public const val COMPAT_RULES: String = "compat-rules"
-    public const val UPDATE_CHECK: String = "update-check"
-    public const val COMPATIBILITY_ANALYSIS: String = "compatibility-analysis"
-    public const val SECURITY_CHECK: String = "security-check"
-    public const val LICENSE_CHECK: String = "license-check"
-    public const val TRANSITIVE_RESOLVER: String = "transitive-resolver"
 }

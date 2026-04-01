@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.processor
 
+import io.github.zenhelix.dependanger.core.model.filter.AliasFilter
 import io.github.zenhelix.dependanger.core.model.filter.TagFilter
 
 internal fun passesTagFilter(tags: Set<String>, filter: TagFilter): Boolean {
@@ -14,5 +15,11 @@ internal fun passesTagFilter(tags: Set<String>, filter: TagFilter): Boolean {
         exclude.anyOf.isEmpty() || (tags intersect exclude.anyOf).isEmpty()
     }
 
+    return passesIncludes && passesExcludes
+}
+
+internal fun passesAliasFilter(alias: String, filter: AliasFilter): Boolean {
+    val passesIncludes = filter.includes.isEmpty() || alias in filter.includes
+    val passesExcludes = filter.excludes.isEmpty() || alias !in filter.excludes
     return passesIncludes && passesExcludes
 }

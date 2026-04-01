@@ -13,6 +13,11 @@ dependencies {
     implementation(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.api.dependangerApi)
     implementation(projects.components.core.dependangerMetadataJson)
+    implementation(projects.components.features.dependangerUpdates)
+    implementation(projects.components.features.dependangerSecurity)
+    implementation(projects.components.features.dependangerLicense)
+    implementation(projects.components.features.dependangerTransitive)
+    implementation(projects.components.features.dependangerAnalysis)
 
     compileOnly(libs.kotlin.gradle.plugin)
 }

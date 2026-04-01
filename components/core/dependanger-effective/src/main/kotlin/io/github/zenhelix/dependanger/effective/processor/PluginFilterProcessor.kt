@@ -24,22 +24,26 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
     ): EffectiveMetadata {
         val distName = metadata.distribution
         val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
-        val tagFilter = distribution?.spec?.byTags
+        val pluginSpec = distribution?.pluginSpec
 
         val customFilters = context[PluginFiltersKey] ?: emptyList()
 
         // Nothing to filter
-        if (tagFilter == null && customFilters.isEmpty()) return metadata
+        if (pluginSpec == null && customFilters.isEmpty()) return metadata
 
         val originalPluginsIndex = context.originalMetadata.plugins.associateBy { it.alias }
         var diagnostics = metadata.diagnostics
+
+        val tagFilter = pluginSpec?.byTags
+        val aliasFilter = pluginSpec?.byAliases
 
         val filtered = metadata.plugins.filter { (alias, plugin) ->
             val tags = originalPluginsIndex[alias]?.tags ?: emptySet()
 
             val passesTagFilter = tagFilter == null || passesTagFilter(tags, tagFilter)
+            val passesAliasFilter = aliasFilter == null || passesAliasFilter(alias, aliasFilter)
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, plugin, context) }
-            val passes = passesTagFilter && passesCustom
+            val passes = passesTagFilter && passesAliasFilter && passesCustom
 
             if (!passes) {
                 diagnostics += Diagnostics.info(

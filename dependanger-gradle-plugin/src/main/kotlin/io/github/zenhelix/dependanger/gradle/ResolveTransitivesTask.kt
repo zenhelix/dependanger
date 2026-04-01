@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.gradle
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
-import io.github.zenhelix.dependanger.effective.ProcessorIds
+import io.github.zenhelix.dependanger.features.transitive.TransitiveResolverProcessor
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
@@ -19,7 +19,7 @@ public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
 
         runWithErrorHandling(failOnError) {
             val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(ProcessorIds.TRANSITIVE_RESOLVER) }
+                .configureProcessing { enableOptional(TransitiveResolverProcessor.PROCESSOR_ID) }
                 .build()
 
             val result = runBlocking { dependanger.process() }

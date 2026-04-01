@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
 import io.github.zenhelix.dependanger.effective.model.toDiagnostics
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -22,11 +23,16 @@ import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandlersKey
 private val logger = KotlinLogging.logger {}
 
 public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
-    override val id: String = ProcessorIds.COMPATIBILITY_ANALYSIS
-    override val phase: ProcessingPhase = ProcessingPhase.COMPATIBILITY_ANALYSIS
+    override val id: String = PROCESSOR_ID
+    override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Performs advanced compatibility analysis between libraries"
+
+    public companion object {
+        public const val PROCESSOR_ID: String = "compatibility-analysis"
+        public val PHASE: ProcessingPhase = ProcessingPhase("COMPATIBILITY_ANALYSIS", ExecutionMode.SEQUENTIAL)
+    }
     override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(
@@ -101,7 +107,7 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
     } catch (e: Exception) {
         logger.error(e) { "Custom rule '${rule.ruleId}' failed" }
         val errorIssue = CompatibilityIssue(
-            ruleId = rule.name,
+            ruleId = rule.ruleId,
             message = "Custom rule evaluation failed: ${e.message}",
             severity = Severity.ERROR,
             affectedLibraries = emptyList(),

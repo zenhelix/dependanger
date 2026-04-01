@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
 import io.github.zenhelix.dependanger.effective.model.withExtension
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
@@ -21,6 +22,11 @@ import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
+
+private val TEST_UPDATE_PHASE = ProcessingPhase("TEST_UPDATE", ExecutionMode.PARALLEL_IO)
+private val TEST_SECURITY_PHASE = ProcessingPhase("TEST_SECURITY", ExecutionMode.PARALLEL_IO)
+private val TEST_LICENSE_PHASE = ProcessingPhase("TEST_LICENSE", ExecutionMode.PARALLEL_IO)
+private val TEST_TRANSITIVE_PHASE = ProcessingPhase("TEST_TRANSITIVE", ExecutionMode.SEQUENTIAL)
 
 internal class FakeProcessor<T : Any>(
     override val id: String,
@@ -55,13 +61,15 @@ internal class FakeParallelProcessor<T : Any>(
         )
 }
 
+private val VERSION_RESOLVER_CONSTRAINT = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
+
 internal fun fakeUpdateCheck(
     provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>,
 ): FakeParallelProcessor<List<UpdateAvailableInfo>> =
     FakeParallelProcessor(
         "fake-update-check",
-        ProcessingPhase.UPDATE_CHECK,
-        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        TEST_UPDATE_PHASE,
+        constraints = VERSION_RESOLVER_CONSTRAINT,
         extensionKey = UpdatesExtensionKey,
         provider = provider
     )
@@ -71,8 +79,8 @@ internal fun fakeSecurityCheck(
 ): FakeParallelProcessor<List<VulnerabilityInfo>> =
     FakeParallelProcessor(
         "fake-security-check",
-        ProcessingPhase.SECURITY_CHECK,
-        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        TEST_SECURITY_PHASE,
+        constraints = VERSION_RESOLVER_CONSTRAINT,
         extensionKey = VulnerabilitiesExtensionKey,
         provider = provider
     )
@@ -82,8 +90,8 @@ internal fun fakeLicenseCheck(
 ): FakeParallelProcessor<List<LicenseViolation>> =
     FakeParallelProcessor(
         "fake-license-check",
-        ProcessingPhase.LICENSE_CHECK,
-        constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
+        TEST_LICENSE_PHASE,
+        constraints = VERSION_RESOLVER_CONSTRAINT,
         extensionKey = LicenseViolationsExtensionKey,
         provider = provider
     )
@@ -91,9 +99,21 @@ internal fun fakeLicenseCheck(
 internal fun fakeTransitiveResolver(
     provider: (EffectiveMetadata) -> List<TransitiveTree>,
 ): FakeProcessor<List<TransitiveTree>> =
-    FakeProcessor("fake-transitive", ProcessingPhase.TRANSITIVE_RESOLVER, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = TransitivesExtensionKey, provider = provider)
+    FakeProcessor(
+        "fake-transitive",
+        TEST_TRANSITIVE_PHASE,
+        constraints = VERSION_RESOLVER_CONSTRAINT,
+        extensionKey = TransitivesExtensionKey,
+        provider = provider
+    )
 
 internal fun fakeConflictDetector(
     provider: (EffectiveMetadata) -> List<VersionConflict>,
 ): FakeProcessor<List<VersionConflict>> =
-    FakeProcessor("fake-conflicts", ProcessingPhase.TRANSITIVE_RESOLVER, constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)), extensionKey = VersionConflictsExtensionKey, provider = provider)
+    FakeProcessor(
+        "fake-conflicts",
+        TEST_TRANSITIVE_PHASE,
+        constraints = VERSION_RESOLVER_CONSTRAINT,
+        extensionKey = VersionConflictsExtensionKey,
+        provider = provider
+    )

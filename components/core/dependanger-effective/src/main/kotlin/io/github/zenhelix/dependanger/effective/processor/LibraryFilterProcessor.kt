@@ -1,7 +1,6 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.filter.AliasFilter
 import io.github.zenhelix.dependanger.core.model.filter.BundleFilter
 import io.github.zenhelix.dependanger.core.model.filter.DeprecatedFilter
 import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
@@ -34,7 +33,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
     ): EffectiveMetadata {
         val distName = metadata.distribution
         val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
-        val spec = distribution?.spec
+        val spec = distribution?.librarySpec
 
         val customFilters = context[LibraryFiltersKey] ?: emptyList()
 
@@ -48,7 +47,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
             val passesSpec = spec == null || (
                     (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
                 && passesGroupFilter(lib, spec.byGroups)
-                && passesAliasFilter(alias, spec.byAliases)
+                            && (spec.byAliases?.let { passesAliasFilter(alias, it) } != false)
                 && passesBundleFilter(alias, bundleIndex, spec.byBundles)
                 && passesDeprecatedFilter(lib, spec.byDeprecated)
             )
@@ -79,13 +78,6 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
         val passesExcludes = filter.excludes.isEmpty()
                 || filter.excludes.none { pattern -> GlobMatcher.matchesCoordinate(pattern, coordinate) }
 
-        return passesIncludes && passesExcludes
-    }
-
-    private fun passesAliasFilter(alias: String, filter: AliasFilter?): Boolean {
-        if (filter == null) return true
-        val passesIncludes = filter.includes.isEmpty() || alias in filter.includes
-        val passesExcludes = filter.excludes.isEmpty() || alias !in filter.excludes
         return passesIncludes && passesExcludes
     }
 

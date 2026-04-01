@@ -2,6 +2,12 @@ package io.github.zenhelix.dependanger.effective.pipeline
 
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.ProcessorIds
+import io.github.zenhelix.dependanger.effective.spi.PresetContributor
+import java.util.ServiceLoader
+
+private val presetContributors: List<PresetContributor> by lazy {
+    ServiceLoader.load(PresetContributor::class.java).toList()
+}
 
 public fun ProcessingPreset.configure(builder: PipelineBuilder) {
     when (this) {
@@ -10,6 +16,7 @@ public fun ProcessingPreset.configure(builder: PipelineBuilder) {
         ProcessingPreset.STRICT       -> configureStrict(builder)
         ProcessingPreset.DISTRIBUTION -> configureDistribution(builder)
     }
+    presetContributors.forEach { it.configure(this, builder) }
 }
 
 private fun configureDefault(builder: PipelineBuilder) {
@@ -29,13 +36,8 @@ private fun configureMinimal(builder: PipelineBuilder) {
 }
 
 private fun configureStrict(builder: PipelineBuilder) {
-    // STRICT: all mandatory + all checks enabled
+    // STRICT: all mandatory + bom-import enabled; feature processors contribute via SPI
     builder.enableOptional(ProcessorIds.BOM_IMPORT)
-    builder.enableOptional(ProcessorIds.UPDATE_CHECK)
-    builder.enableOptional(ProcessorIds.COMPATIBILITY_ANALYSIS)
-    builder.enableOptional(ProcessorIds.SECURITY_CHECK)
-    builder.enableOptional(ProcessorIds.LICENSE_CHECK)
-    builder.enableOptional(ProcessorIds.TRANSITIVE_RESOLVER)
 }
 
 private fun configureDistribution(builder: PipelineBuilder) {

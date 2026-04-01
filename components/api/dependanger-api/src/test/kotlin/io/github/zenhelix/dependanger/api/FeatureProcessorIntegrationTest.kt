@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
@@ -17,12 +18,15 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
+private val TEST_UPDATE_PHASE = ProcessingPhase("TEST_UPDATE", ExecutionMode.PARALLEL_IO)
+private val TEST_SECURITY_PHASE = ProcessingPhase("TEST_SECURITY", ExecutionMode.PARALLEL_IO)
+
 class FeatureProcessorIntegrationTest {
 
     private fun fakeUpdateCheck(provider: (EffectiveMetadata) -> List<UpdateAvailableInfo>): FakeParallelProcessor<List<UpdateAvailableInfo>> =
         FakeParallelProcessor(
             "fake-update-check",
-            ProcessingPhase.UPDATE_CHECK,
+            TEST_UPDATE_PHASE,
             constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
             extensionKey = UpdatesExtensionKey,
             provider = provider
@@ -31,7 +35,7 @@ class FeatureProcessorIntegrationTest {
     private fun fakeSecurityCheck(provider: (EffectiveMetadata) -> List<VulnerabilityInfo>): FakeParallelProcessor<List<VulnerabilityInfo>> =
         FakeParallelProcessor(
             "fake-security-check",
-            ProcessingPhase.SECURITY_CHECK,
+            TEST_SECURITY_PHASE,
             constraints = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER)),
             extensionKey = VulnerabilitiesExtensionKey,
             provider = provider

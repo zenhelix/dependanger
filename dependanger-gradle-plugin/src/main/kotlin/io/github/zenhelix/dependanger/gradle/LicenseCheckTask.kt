@@ -2,8 +2,8 @@ package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.licenseViolations
-import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.features.license.LicenseCheckProcessor
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
@@ -20,7 +20,7 @@ public abstract class LicenseCheckTask : AbstractDependangerTask() {
 
         runWithErrorHandling(failOnError) {
             val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(ProcessorIds.LICENSE_CHECK) }
+                .configureProcessing { enableOptional(LicenseCheckProcessor.PROCESSOR_ID) }
                 .build()
 
             val result = runBlocking { dependanger.process() }

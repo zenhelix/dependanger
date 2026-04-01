@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.effective.model.compatibilityIssues
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler
+import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandlersKey
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -23,6 +24,15 @@ import org.junit.jupiter.api.Test
 class CompatibilityAnalysisTest {
 
     private val processor = CompatibilityCheckProcessor()
+
+    private fun noopHandler(ruleType: String): CustomRuleHandler = object : CustomRuleHandler {
+        override val ruleType: String = ruleType
+        override fun evaluate(
+            rule: CompatibilityRule.CustomRule,
+            libraries: Map<String, EffectiveLibrary>,
+            context: ProcessingContext,
+        ): List<CompatibilityIssue> = emptyList()
+    }
 
     private fun buildMetadata(
         compatibility: List<CompatibilityRule> = emptyList(),
@@ -58,13 +68,14 @@ class CompatibilityAnalysisTest {
 
     private fun buildContext(
         original: DependangerMetadata,
+        handlers: Map<String, CustomRuleHandler> = emptyMap(),
     ): ProcessingContext = ProcessingContext(
         originalMetadata = original,
         settings = Settings.DEFAULT,
         environment = ProcessingEnvironment.DEFAULT,
         activeDistribution = null,
         callback = null,
-        properties = emptyMap(),
+        properties = if (handlers.isNotEmpty()) mapOf(CustomRuleHandlersKey to handlers) else emptyMap(),
     )
 
     private fun customRule(
@@ -135,7 +146,6 @@ class CompatibilityAnalysisTest {
                 every { artifact } returns "lib-a"
             }
             val metadata = buildEffectiveMetadata(libraries = mapOf("lib-a" to library))
-            val context = buildContext(original)
 
             val expectedIssue = CompatibilityIssue(
                 ruleId = "Found Rule",
@@ -154,16 +164,31 @@ class CompatibilityAnalysisTest {
                 ): List<CompatibilityIssue> = listOf(expectedIssue)
             }
 
-            // The processor uses ServiceLoader, so we need to test via the full flow.
-            // Since ServiceLoader won't find our handler in tests, the handler-not-found path
-            // will be exercised. We test the evaluateRule logic indirectly by verifying the
-            // warning diagnostic for missing handler.
+            val context = buildContext(original, handlers = mapOf("found-handler" to handler))
             val result = processor.process(metadata, context)
 
-            assertThat(result.diagnostics.warnings).anyMatch { diag ->
-                diag.code == DiagnosticCodes.Compatibility.CUSTOM_HANDLER_NOT_FOUND &&
-                        diag.message.contains("found-handler")
+            assertThat(result.compatibilityIssues).hasSize(1)
+            assertThat(result.compatibilityIssues.first().message).isEqualTo("Version conflict detected")
+        }
+    }
+
+    @Nested
+    inner class `when no handlers registered` {
+
+        @Test
+        fun `returns info diagnostic and skips custom rules`() = runTest {
+            val rule = customRule(ruleId = "some-handler", name = "Some Rule")
+            val original = buildMetadata(compatibility = listOf(rule))
+            val metadata = buildEffectiveMetadata()
+            val context = buildContext(original)
+
+            val result = processor.process(metadata, context)
+
+            assertThat(result.diagnostics.infos).anyMatch { diag ->
+                diag.code == DiagnosticCodes.Compatibility.NO_CUSTOM_HANDLERS
             }
+            assertThat(result.diagnostics.warnings).isEmpty()
+            assertThat(result.compatibilityIssues).isEmpty()
         }
     }
 
@@ -175,7 +200,7 @@ class CompatibilityAnalysisTest {
             val rule = customRule(ruleId = "nonexistent-handler", name = "Missing Handler Rule")
             val original = buildMetadata(compatibility = listOf(rule))
             val metadata = buildEffectiveMetadata()
-            val context = buildContext(original)
+            val context = buildContext(original, handlers = mapOf("other-handler" to noopHandler("other-handler")))
 
             val result = processor.process(metadata, context)
 
@@ -191,7 +216,7 @@ class CompatibilityAnalysisTest {
             val rule = customRule(ruleId = "missing-handler")
             val original = buildMetadata(compatibility = listOf(rule))
             val metadata = buildEffectiveMetadata()
-            val context = buildContext(original)
+            val context = buildContext(original, handlers = mapOf("other-handler" to noopHandler("other-handler")))
 
             val result = processor.process(metadata, context)
 
@@ -210,7 +235,7 @@ class CompatibilityAnalysisTest {
             val rule3 = customRule(ruleId = "handler-c", name = "Rule C")
             val original = buildMetadata(compatibility = listOf(rule1, rule2, rule3))
             val metadata = buildEffectiveMetadata()
-            val context = buildContext(original)
+            val context = buildContext(original, handlers = mapOf("dummy" to noopHandler("dummy")))
 
             val result = processor.process(metadata, context)
 
@@ -231,7 +256,7 @@ class CompatibilityAnalysisTest {
             val rule2 = customRule(ruleId = "y")
             val original = buildMetadata(compatibility = listOf(rule1, rule2))
             val metadata = buildEffectiveMetadata(diagnostics = existingDiag)
-            val context = buildContext(original)
+            val context = buildContext(original, handlers = mapOf("dummy" to noopHandler("dummy")))
 
             val result = processor.process(metadata, context)
 

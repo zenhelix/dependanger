@@ -12,6 +12,8 @@ dependencies {
     // Feature processors are discovered via ServiceLoader at runtime.
     // They are transitively available through dependanger-api (implementation scope).
     implementation(projects.components.api.dependangerApi)
+    implementation(projects.components.generators.dependangerGeneratorToml)
+    implementation(projects.components.generators.dependangerGeneratorBom)
     implementation(projects.components.core.dependangerMetadataJson)
     implementation(libs.clikt)
     implementation(libs.mordant)

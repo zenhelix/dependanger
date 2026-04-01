@@ -14,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependenciesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
@@ -36,7 +37,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override val description: String = "Resolves transitive dependency tree"
 
     public companion object {
-        public const val PROCESSOR_ID: String = "transitive-resolver"
+        public const val PROCESSOR_ID: String = FeatureProcessorIds.TRANSITIVE_RESOLVER
         public val PHASE: ProcessingPhase = ProcessingPhase("TRANSITIVE_RESOLVER", ExecutionMode.SEQUENTIAL)
     }
 

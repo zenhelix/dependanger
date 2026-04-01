@@ -11,8 +11,8 @@ dependencies {
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
     implementation(projects.components.core.dependangerMetadataJson)
-    api(projects.components.generators.dependangerGeneratorToml)
-    api(projects.components.generators.dependangerGeneratorBom)
+    implementation(projects.components.generators.dependangerGeneratorToml)
+    implementation(projects.components.generators.dependangerGeneratorBom)
 
     implementation(projects.components.features.dependangerMavenResolver)
     implementation(projects.components.features.dependangerUpdates)

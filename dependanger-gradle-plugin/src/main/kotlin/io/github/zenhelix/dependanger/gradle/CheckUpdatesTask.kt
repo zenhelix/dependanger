@@ -2,7 +2,7 @@ package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.updates
-import io.github.zenhelix.dependanger.features.updates.UpdateCheckProcessor
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
@@ -18,7 +18,7 @@ public abstract class CheckUpdatesTask : AbstractDependangerTask() {
 
         runWithErrorHandling(failOnError) {
             val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(UpdateCheckProcessor.PROCESSOR_ID) }
+                .configureProcessing { enableOptional(FeatureProcessorIds.UPDATE_CHECK) }
                 .build()
 
             val result = runBlocking { dependanger.process() }

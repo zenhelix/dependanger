@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public enum class ProcessingPreset {
-    DEFAULT, MINIMAL, STRICT, DISTRIBUTION
+    DEFAULT, MINIMAL, STRICT
 }

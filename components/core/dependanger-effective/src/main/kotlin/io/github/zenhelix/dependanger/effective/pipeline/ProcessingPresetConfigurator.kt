@@ -14,7 +14,6 @@ public fun ProcessingPreset.configure(builder: PipelineBuilder) {
         ProcessingPreset.DEFAULT      -> configureDefault(builder)
         ProcessingPreset.MINIMAL      -> configureMinimal(builder)
         ProcessingPreset.STRICT       -> configureStrict(builder)
-        ProcessingPreset.DISTRIBUTION -> configureDistribution(builder)
     }
     presetContributors.forEach { it.configure(this, builder) }
 }
@@ -40,7 +39,3 @@ private fun configureStrict(builder: PipelineBuilder) {
     builder.enableOptional(ProcessorIds.BOM_IMPORT)
 }
 
-private fun configureDistribution(builder: PipelineBuilder) {
-    // DISTRIBUTION: same as DEFAULT + profile filtering (profile processor is mandatory anyway)
-    builder.enableOptional(ProcessorIds.BOM_IMPORT)
-}

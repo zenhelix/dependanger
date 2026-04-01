@@ -8,12 +8,10 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.settings.license.licenseCheck
 import io.github.zenhelix.dependanger.feature.model.settings.security.securityCheck
 import io.github.zenhelix.dependanger.feature.model.settings.updates.updateCheck
-import io.github.zenhelix.dependanger.features.license.LicenseCheckProcessor
-import io.github.zenhelix.dependanger.features.security.SecurityCheckProcessor
-import io.github.zenhelix.dependanger.features.updates.UpdateCheckProcessor
 import io.github.zenhelix.dependanger.integration.support.IntegrationTestBase
 import io.github.zenhelix.dependanger.integration.support.TestCatalogs
 import io.github.zenhelix.dependanger.integration.support.assertResult
@@ -171,9 +169,9 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
             assertThat(processingInfo).isNotNull
             // STRICT enables update-check, security-check, license-check, transitive-resolver
             assertThat(processingInfo!!.processorIds).containsAnyOf(
-                UpdateCheckProcessor.PROCESSOR_ID,
-                SecurityCheckProcessor.PROCESSOR_ID,
-                LicenseCheckProcessor.PROCESSOR_ID,
+                FeatureProcessorIds.UPDATE_CHECK,
+                FeatureProcessorIds.SECURITY_CHECK,
+                FeatureProcessorIds.LICENSE_CHECK,
             )
         }
     }

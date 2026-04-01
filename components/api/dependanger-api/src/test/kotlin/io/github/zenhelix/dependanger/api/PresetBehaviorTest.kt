@@ -169,11 +169,11 @@ class PresetBehaviorTest {
     }
 
     @Nested
-    inner class `DISTRIBUTION preset` {
+    inner class `Distribution filtering` {
 
         @Test
-        fun `distribution preset without distribution parameter processes all libraries`() = runTest {
-            val result = dependanger(ProcessingPreset.DISTRIBUTION) {
+        fun `without distribution parameter processes all libraries`() = runTest {
+            val result = dependanger {
                 libraries {
                     library("lib", "com.example:lib:1.0.0") { tags("server") }
                 }
@@ -189,8 +189,8 @@ class PresetBehaviorTest {
         }
 
         @Test
-        fun `distribution preset with distribution processes normally`() = runTest {
-            val result = dependanger(ProcessingPreset.DISTRIBUTION) {
+        fun `with distribution parameter filters libraries`() = runTest {
+            val result = dependanger {
                 libraries {
                     library("android-lib", "com.android:lib:1.0") { tags("android") }
                     library("server-lib", "com.server:lib:2.0") { tags("server") }
@@ -208,8 +208,8 @@ class PresetBehaviorTest {
         }
 
         @Test
-        fun `distribution preset filters libraries by distribution`() = runTest {
-            val result = dependanger(ProcessingPreset.DISTRIBUTION) {
+        fun `filters libraries by distribution tags`() = runTest {
+            val result = dependanger {
                 versions { version("ktor", "3.1.1") }
                 libraries {
                     library("ktor-core", "io.ktor:ktor-client-core", versionRef("ktor")) { tags("jvm") }

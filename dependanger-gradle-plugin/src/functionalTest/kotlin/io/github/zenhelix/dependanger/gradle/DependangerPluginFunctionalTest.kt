@@ -412,12 +412,11 @@ class DependangerPluginFunctionalTest {
         assertThat(firstRun.task(":dependangerGenerateEffective")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
         assertThat(firstRun.task(":dependangerGenerateToml")?.outcome).isEqualTo(TaskOutcome.SUCCESS)
 
-        // Second run — GenerateMetadata always runs (DSL not trackable),
-        // but Effective and Toml should be UP-TO-DATE since metadata.json content didn't change
+        // Second run — all tasks should be UP-TO-DATE since DSL didn't change (tracked via metadata hash)
         val secondRun = runTask("dependangerGenerateToml")
         assertThat(secondRun.task(":dependangerGenerateMetadata")?.outcome)
-            .describedAs("GenerateMetadata always re-executes (DSL is not trackable)")
-            .isEqualTo(TaskOutcome.SUCCESS)
+            .describedAs("GenerateMetadata should be UP-TO-DATE when DSL unchanged (tracked via metadata hash)")
+            .isEqualTo(TaskOutcome.UP_TO_DATE)
         assertThat(secondRun.task(":dependangerGenerateEffective")?.outcome)
             .describedAs("GenerateEffective should be UP-TO-DATE when metadata.json unchanged")
             .isEqualTo(TaskOutcome.UP_TO_DATE)

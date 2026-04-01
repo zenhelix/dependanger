@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
-import io.github.zenhelix.dependanger.features.analysis.CompatibilityCheckProcessor
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
@@ -19,7 +19,7 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
         runWithErrorHandling(failOnError) {
             val dependanger = Dependanger.fromMetadata(metadata)
                 .jdkVersion(Runtime.version().feature())
-                .configureProcessing { enableOptional(CompatibilityCheckProcessor.PROCESSOR_ID) }
+                .configureProcessing { enableOptional(FeatureProcessorIds.COMPATIBILITY_ANALYSIS) }
                 .build()
 
             val result = runBlocking { dependanger.process() }

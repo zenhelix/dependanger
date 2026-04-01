@@ -19,6 +19,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandler
 import io.github.zenhelix.dependanger.effective.spi.CustomRuleHandlersKey
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,7 +31,7 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
     override val description: String = "Performs advanced compatibility analysis between libraries"
 
     public companion object {
-        public const val PROCESSOR_ID: String = "compatibility-analysis"
+        public const val PROCESSOR_ID: String = FeatureProcessorIds.COMPATIBILITY_ANALYSIS
         public val PHASE: ProcessingPhase = ProcessingPhase("COMPATIBILITY_ANALYSIS", ExecutionMode.SEQUENTIAL)
     }
     override fun supports(context: ProcessingContext): Boolean = true
@@ -58,15 +59,28 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
 
         logger.debug { "Loaded ${handlers.size} custom rule handlers: ${handlers.keys}" }
 
+        if (handlers.isEmpty()) {
+            logger.info { "No custom rule handlers registered — skipping ${customRules.size} custom rule(s)" }
+            return metadata.copy(
+                diagnostics = metadata.diagnostics + Diagnostics.info(
+                    code = DiagnosticCodes.Compatibility.NO_CUSTOM_HANDLERS,
+                    message = "No custom rule handlers registered — ${customRules.size} custom rule(s) skipped. " +
+                            "Register CustomRuleHandler implementations via META-INF/services to evaluate custom rules.",
+                    processorId = id,
+                    context = mapOf("skippedRules" to customRules.map { it.ruleId }.joinToString()),
+                )
+            )
+        }
+
         val (newIssues, rulesDiagnostics) = customRules.fold(
             emptyList<CompatibilityIssue>() to metadata.diagnostics
         ) { (accIssues, accDiag), rule ->
             val handler = handlers[rule.ruleId]
             if (handler == null) {
-                logger.warn { "Custom rule handler not found for '${rule.ruleId}'" }
+                logger.warn { "Custom rule handler not found for '${rule.ruleId}'. Available handlers: ${handlers.keys}" }
                 accIssues to (accDiag + Diagnostics.warning(
                     code = DiagnosticCodes.Compatibility.CUSTOM_HANDLER_NOT_FOUND,
-                    message = "Custom rule handler not found for '${rule.ruleId}'",
+                    message = "Custom rule handler not found for '${rule.ruleId}'. Available handlers: ${handlers.keys.joinToString()}",
                     processorId = id,
                     context = mapOf(
                         "ruleId" to rule.ruleId,

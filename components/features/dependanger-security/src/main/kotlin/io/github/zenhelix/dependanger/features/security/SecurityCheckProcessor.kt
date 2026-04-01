@@ -14,6 +14,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcess
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
@@ -38,7 +39,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
     override val description: String = "Checks for known security vulnerabilities"
 
     public companion object {
-        public const val PROCESSOR_ID: String = "security-check"
+        public const val PROCESSOR_ID: String = FeatureProcessorIds.SECURITY_CHECK
         public val PHASE: ProcessingPhase = ProcessingPhase("SECURITY_CHECK", ExecutionMode.PARALLEL_IO)
     }
 

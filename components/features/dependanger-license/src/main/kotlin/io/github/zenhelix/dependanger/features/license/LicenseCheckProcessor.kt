@@ -15,6 +15,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
@@ -43,7 +44,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
     override val description: String = "Checks library license compliance"
 
     public companion object {
-        public const val PROCESSOR_ID: String = "license-check"
+        public const val PROCESSOR_ID: String = FeatureProcessorIds.LICENSE_CHECK
         public val PHASE: ProcessingPhase = ProcessingPhase("LICENSE_CHECK", ExecutionMode.PARALLEL_IO)
     }
 

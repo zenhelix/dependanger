@@ -3,14 +3,23 @@ package io.github.zenhelix.dependanger.gradle
 import io.github.zenhelix.dependanger.metadata.JsonSerializationFormat
 import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import java.security.MessageDigest
 
 public abstract class GenerateMetadataTask : AbstractDependangerTask() {
     init {
         description = "Generate metadata.json from DSL"
-        // DSL configuration is not trackable as an input — task always re-executes
-        outputs.upToDateWhen { false }
+    }
+
+    @get:Input
+    public val metadataHash: Provider<String> = project.provider {
+        val json = JsonSerializationFormat().serialize(extension.dsl.toMetadata())
+        MessageDigest.getInstance("SHA-256")
+            .digest(json.toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 
     @get:OutputFile
@@ -30,8 +39,7 @@ public abstract class GenerateMetadataTask : AbstractDependangerTask() {
 
         try {
             outputFile.parentFile?.mkdirs()
-            val format = JsonSerializationFormat()
-            format.write(metadata, outputFile.toPath())
+            JsonSerializationFormat().write(metadata, outputFile.toPath())
 
             logger.lifecycle("Dependanger: Generated ${DependangerTaskHelper.METADATA_FILE} -> $outputFile")
             logger.lifecycle("  Versions: ${metadata.versions.size}")

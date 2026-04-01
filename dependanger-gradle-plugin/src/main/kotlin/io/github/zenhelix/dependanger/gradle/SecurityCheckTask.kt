@@ -2,8 +2,8 @@ package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.vulnerabilities
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.features.security.SecurityCheckProcessor
 import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
@@ -20,7 +20,7 @@ public abstract class SecurityCheckTask : AbstractDependangerTask() {
 
         runWithErrorHandling(failOnError) {
             val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(SecurityCheckProcessor.PROCESSOR_ID) }
+                .configureProcessing { enableOptional(FeatureProcessorIds.SECURITY_CHECK) }
                 .build()
 
             val result = runBlocking { dependanger.process() }

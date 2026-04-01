@@ -21,6 +21,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
+import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
@@ -45,7 +46,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
     override val description: String = "Checks for available library updates"
 
     public companion object {
-        public const val PROCESSOR_ID: String = "update-check"
+        public const val PROCESSOR_ID: String = FeatureProcessorIds.UPDATE_CHECK
         public val PHASE: ProcessingPhase = ProcessingPhase("UPDATE_CHECK", ExecutionMode.PARALLEL_IO)
     }
 

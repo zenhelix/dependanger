@@ -51,7 +51,6 @@ class ReportGenerationTest {
             group = "com.example",
             artifact = "old-lib",
             version = "1.0.0",
-            isDeprecated = true,
             deprecation = DeprecationInfo(
                 replacedBy = "new-lib",
                 message = "Use new-lib instead",

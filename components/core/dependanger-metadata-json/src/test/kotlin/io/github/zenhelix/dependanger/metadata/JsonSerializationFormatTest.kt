@@ -28,7 +28,6 @@ class JsonSerializationFormatTest {
         compatibility = emptyList(),
         settings = Settings.DEFAULT,
         presets = emptyList(),
-        extensions = emptyMap(),
     )
 
     private fun metadataWithVersions() = emptyMetadata().copy(

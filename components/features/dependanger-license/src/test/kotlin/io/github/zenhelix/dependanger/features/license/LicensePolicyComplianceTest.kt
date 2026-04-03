@@ -33,7 +33,6 @@ class LicensePolicyComplianceTest {
         description = null,
         tags = emptySet(),
         requires = null,
-        isDeprecated = false,
         deprecation = null,
         license = null,
         constraints = emptyList(),

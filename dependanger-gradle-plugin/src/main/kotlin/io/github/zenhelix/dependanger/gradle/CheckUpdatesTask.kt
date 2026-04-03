@@ -13,7 +13,7 @@ public abstract class CheckUpdatesTask : AbstractDependangerTask() {
 
     @TaskAction
     public fun execute() {
-        val metadata = extension.dsl.toMetadata()
+        val metadata = extension.toMetadata()
         val failOnError = extension.failOnError.get()
 
         runWithErrorHandling(failOnError) {

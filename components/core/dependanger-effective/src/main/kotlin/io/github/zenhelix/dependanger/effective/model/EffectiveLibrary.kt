@@ -15,11 +15,11 @@ public data class EffectiveLibrary(
     val description: String?,
     val tags: Set<String>,
     val requires: Requirements?,
-    /** Derived from [deprecation] != null. Kept as a constructor parameter to preserve JSON serialization round-trip. */
-    val isDeprecated: Boolean,
     val deprecation: DeprecationInfo?,
     val license: LicenseInfo?,
     val constraints: List<Constraint>,
     val isPlatform: Boolean,
     val ignoreUpdates: Boolean = false,
-)
+) {
+    val isDeprecated: Boolean get() = deprecation != null
+}

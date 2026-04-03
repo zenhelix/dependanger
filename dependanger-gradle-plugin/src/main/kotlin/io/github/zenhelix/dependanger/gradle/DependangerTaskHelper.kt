@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.DependangerResult
+import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.serialization.EffectiveJsonFormat
 import org.gradle.api.GradleException
@@ -34,12 +35,40 @@ internal object DependangerTaskHelper {
         result: DependangerResult,
         failOnError: Boolean,
         logger: Logger,
+        errorMessage: String = "Dependanger processing failed with ${result.diagnostics.errors.size} error(s). Set dependanger { failOnError = false } to continue despite errors.",
     ) {
         logDiagnostics(result, logger)
 
         if (result.diagnostics.hasErrors && failOnError) {
-            throw GradleException("Dependanger processing failed with ${result.diagnostics.errors.size} error(s). Set dependanger { failOnError = false } to continue despite errors.")
+            throw GradleException(errorMessage)
         }
+    }
+
+    internal fun handleFilteredDiagnostics(
+        result: DependangerResult,
+        failOnError: Boolean,
+        logger: Logger,
+        predicate: (DiagnosticMessage) -> Boolean,
+        summaryMessage: (errors: Int, warnings: Int) -> String,
+        errorMessage: (Int) -> String,
+    ): Boolean {
+        val filteredErrors = result.diagnostics.errors.filter(predicate)
+        val filteredWarnings = result.diagnostics.warnings.filter(predicate)
+
+        filteredErrors.forEach { logger.error("Dependanger ERROR: ${it.message}") }
+        filteredWarnings.forEach { logger.warn("Dependanger WARN: ${it.message}") }
+        result.diagnostics.infos.filter(predicate).forEach { logger.info("Dependanger INFO: ${it.message}") }
+
+        if (filteredErrors.isEmpty() && filteredWarnings.isEmpty()) {
+            return false
+        }
+
+        logger.lifecycle(summaryMessage(filteredErrors.size, filteredWarnings.size))
+
+        if (filteredErrors.isNotEmpty() && failOnError) {
+            throw GradleException(errorMessage(filteredErrors.size))
+        }
+        return true
     }
 
     internal fun ensureOutputDir(extension: DependangerExtension): File {

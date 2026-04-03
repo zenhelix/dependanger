@@ -1,12 +1,6 @@
 package io.github.zenhelix.dependanger.core.dsl
 
-import io.github.zenhelix.dependanger.core.model.TypedKey
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-
-public class DslExtensionKey<T : Any>(name: String, serializer: KSerializer<T>) : TypedKey<T>(name, serializer)
 
 @DependangerDslMarker
 public class DependangerDsl : DependangerDslApi {
@@ -22,7 +16,6 @@ public class DependangerDsl : DependangerDslApi {
     private val settingsDsl: SettingsDsl = SettingsDsl()
     private val presetsDsl: PresetsDsl = PresetsDsl()
     private val processingDsl: ProcessingDsl = ProcessingDsl()
-    private val extensions: MutableMap<DslExtensionKey<*>, Any> = mutableMapOf()
 
     public override fun versions(block: VersionsDsl.() -> Unit) {
         versionsDsl.apply(block)
@@ -72,15 +65,6 @@ public class DependangerDsl : DependangerDslApi {
         processingDsl.apply(block)
     }
 
-    public fun <T : Any> registerExtension(key: DslExtensionKey<T>, extension: T) {
-        extensions[key] = extension
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    public fun <T : Any> extension(key: DslExtensionKey<T>): T? = extensions[key] as? T
-
-    public fun allExtensions(): Map<DslExtensionKey<*>, Any> = extensions.toMap()
-
     public fun applyPreset(name: String) {
         // Presets reference bundles/distributions by name rather than embedding them,
         // so consumers (API, CLI, Gradle Plugin) can resolve scope independently.
@@ -115,24 +99,7 @@ public class DependangerDsl : DependangerDslApi {
         compatibility = compatibilityDsl.rules.toList(),
         settings = settingsDsl.toSettings(),
         presets = presetsDsl.presets.toList(),
-        extensions = buildExtensionsMap(),
     )
-
-    @Suppress("UNCHECKED_CAST")
-    private fun buildExtensionsMap(): Map<String, JsonElement> {
-        val json = Json { encodeDefaults = true }
-        return buildMap {
-            for ((key, value) in extensions) {
-                val serializer = (key as DslExtensionKey<Any>).serializer
-                put(key.name, json.encodeToJsonElement(serializer, value))
-            }
-        }
-    }
-}
-
-public fun <T : Any> DependangerDsl.configure(key: DslExtensionKey<T>, block: T.() -> Unit) {
-    val ext = extension(key) ?: error("DSL extension '${key.name}' is not registered. Call registerExtension() first.")
-    ext.block()
 }
 
 public fun dependanger(block: DependangerDsl.() -> Unit): DependangerDsl =

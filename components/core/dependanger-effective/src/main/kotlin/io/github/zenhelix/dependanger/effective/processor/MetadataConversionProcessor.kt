@@ -46,7 +46,6 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
                 description = lib.description,
                 tags = lib.tags,
                 requires = lib.requires,
-                isDeprecated = lib.deprecation != null,
                 deprecation = lib.deprecation,
                 license = lib.license,
                 constraints = lib.constraints,

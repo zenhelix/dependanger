@@ -41,7 +41,6 @@ class TomlGeneratorTest {
         group: String,
         artifact: String,
         version: ResolvedVersion? = null,
-        isDeprecated: Boolean = false,
         deprecation: DeprecationInfo? = null,
         isPlatform: Boolean = false,
     ): EffectiveLibrary = EffectiveLibrary(
@@ -52,7 +51,6 @@ class TomlGeneratorTest {
         description = null,
         tags = emptySet(),
         requires = null,
-        isDeprecated = isDeprecated,
         deprecation = deprecation,
         license = null,
         constraints = emptyList(),
@@ -216,7 +214,6 @@ class TomlGeneratorTest {
                 group = "org.springframework.boot",
                 artifact = "spring-boot-starter",
                 version = v,
-                isDeprecated = true,
                 deprecation = DeprecationInfo(
                     message = "Legacy starter",
                     replacedBy = "spring-boot-starter-web",
@@ -235,14 +232,13 @@ class TomlGeneratorTest {
         }
 
         @Test
-        fun `deprecated library with partial info - no deprecation object`() {
+        fun `deprecated library with minimal deprecation info`() {
             val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
             val lib = library(
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
-                isDeprecated = true,
-                deprecation = null,
+                deprecation = DeprecationInfo(message = null, replacedBy = null, since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
 
@@ -256,7 +252,6 @@ class TomlGeneratorTest {
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = "No longer maintained", replacedBy = null, since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -271,7 +266,6 @@ class TomlGeneratorTest {
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = null, replacedBy = "new-lib", since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -287,7 +281,6 @@ class TomlGeneratorTest {
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = "Deprecated", replacedBy = "new-lib", since = null, removalVersion = "2.0"),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -497,7 +490,6 @@ class TomlGeneratorTest {
                         group = "org.springframework.boot",
                         artifact = "spring-boot-starter",
                         version = springBootVersion,
-                        isDeprecated = true,
                         deprecation = DeprecationInfo(
                             message = "Legacy starter",
                             replacedBy = "spring-boot-starter-web",

@@ -227,7 +227,6 @@ class ReportContentTest {
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
-                isDeprecated = true,
                 deprecation = DeprecationInfo(
                     replacedBy = "new-lib",
                     message = "Superseded by new-lib",

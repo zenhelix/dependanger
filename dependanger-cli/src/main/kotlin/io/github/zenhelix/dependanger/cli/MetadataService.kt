@@ -41,6 +41,5 @@ public class MetadataService {
         compatibility = emptyList(),
         settings = Settings.DEFAULT,
         presets = emptyList(),
-        extensions = emptyMap(),
     )
 }

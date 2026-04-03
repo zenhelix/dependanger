@@ -1,9 +1,9 @@
 package io.github.zenhelix.dependanger.gradle
 
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import kotlinx.coroutines.runBlocking
-import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
 public abstract class AnalyzeTask : AbstractDependangerTask() {
@@ -13,7 +13,7 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
 
     @TaskAction
     public fun execute() {
-        val metadata = extension.dsl.toMetadata()
+        val metadata = extension.toMetadata()
         val failOnError = extension.failOnError.get()
 
         runWithErrorHandling(failOnError) {
@@ -24,19 +24,17 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
 
             val result = runBlocking { dependanger.process() }
 
-            val errors = result.diagnostics.errors.filter { it.code.startsWith("COMPAT") }
-            val warnings = result.diagnostics.warnings.filter { it.code.startsWith("COMPAT") }
+            val compatPredicate = { msg: DiagnosticMessage -> msg.code.startsWith("COMPAT") }
 
-            if (errors.isEmpty() && warnings.isEmpty()) {
+            val hadIssues = DependangerTaskHelper.handleFilteredDiagnostics(
+                result, failOnError, logger,
+                predicate = compatPredicate,
+                summaryMessage = { e, w -> "Dependanger: Analysis complete: $e errors, $w warnings" },
+                errorMessage = { count -> "Dependanger: Compatibility analysis found $count error(s)." },
+            )
+
+            if (!hadIssues) {
                 logger.lifecycle("Dependanger: No compatibility issues found.")
-            } else {
-                logger.error("Dependanger COMPAT ERROR: ${errors.joinToString("\n") { it.message }}")
-                logger.warn("Dependanger COMPAT WARN: ${warnings.joinToString("\n") { it.message }}")
-                logger.lifecycle("Dependanger: Analysis complete: ${errors.size} errors, ${warnings.size} warnings")
-            }
-
-            if (errors.isNotEmpty() && failOnError) {
-                throw GradleException("Dependanger: Compatibility analysis found ${errors.size} error(s).")
             }
         }
     }

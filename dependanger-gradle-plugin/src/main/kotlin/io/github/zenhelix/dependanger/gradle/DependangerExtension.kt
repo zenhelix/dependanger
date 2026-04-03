@@ -9,11 +9,13 @@ import org.gradle.api.provider.Property
 
 public open class DependangerExtension private constructor(
     private val project: Project,
-    public val dsl: DependangerDsl,
+    private val dsl: DependangerDsl,
 ) : DependangerDslApi by dsl {
 
     @Suppress("unused") // Gradle instantiation
     public constructor(project: Project) : this(project, DependangerDsl())
+
+    internal fun toMetadata() = dsl.toMetadata()
 
     public val outputDirectory: DirectoryProperty = project.objects.directoryProperty().convention(
         project.layout.buildDirectory.dir("dependanger")

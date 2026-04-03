@@ -23,7 +23,6 @@ class PipelineBuilderTest {
         compatibility = emptyList(),
         settings = Settings.DEFAULT,
         presets = emptyList(),
-        extensions = emptyMap(),
     )
 
     private fun context(): ProcessingContext {

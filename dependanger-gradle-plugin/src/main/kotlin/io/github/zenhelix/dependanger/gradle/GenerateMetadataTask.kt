@@ -16,7 +16,7 @@ public abstract class GenerateMetadataTask : AbstractDependangerTask() {
 
     @get:Input
     public val metadataHash: Provider<String> = project.provider {
-        val json = JsonSerializationFormat().serialize(extension.dsl.toMetadata())
+        val json = JsonSerializationFormat().serialize(extension.toMetadata())
         MessageDigest.getInstance("SHA-256")
             .digest(json.toByteArray())
             .joinToString("") { "%02x".format(it) }
@@ -30,7 +30,7 @@ public abstract class GenerateMetadataTask : AbstractDependangerTask() {
     @TaskAction
     public fun execute() {
         val metadata = try {
-            extension.dsl.toMetadata()
+            extension.toMetadata()
         } catch (e: Exception) {
             throw GradleException("Dependanger: Failed to evaluate DSL configuration: ${e.message}", e)
         }

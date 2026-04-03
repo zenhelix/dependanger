@@ -13,7 +13,7 @@ public abstract class ReportTask : AbstractDependangerTask() {
 
     @TaskAction
     public fun execute() {
-        val metadata = extension.dsl.toMetadata()
+        val metadata = extension.toMetadata()
         val outputDir = DependangerTaskHelper.ensureOutputDir(extension)
         val failOnError = extension.failOnError.get()
 

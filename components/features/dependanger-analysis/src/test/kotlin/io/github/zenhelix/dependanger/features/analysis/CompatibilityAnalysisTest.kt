@@ -49,7 +49,6 @@ class CompatibilityAnalysisTest {
         compatibility = compatibility,
         settings = Settings.DEFAULT,
         presets = emptyList(),
-        extensions = emptyMap(),
     )
 
     private fun buildEffectiveMetadata(

@@ -66,7 +66,6 @@ private fun emptyMetadata(): DependangerMetadata = DependangerMetadata(
     compatibility = emptyList(),
     settings = Settings.DEFAULT,
     presets = emptyList(),
-    extensions = emptyMap(),
 )
 
 private fun context(metadata: DependangerMetadata = emptyMetadata()): ProcessingContext = ProcessingContext(

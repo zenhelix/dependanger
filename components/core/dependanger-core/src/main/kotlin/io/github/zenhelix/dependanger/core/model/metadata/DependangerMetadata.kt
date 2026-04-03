@@ -12,7 +12,6 @@ import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.TargetPlatform
 import io.github.zenhelix.dependanger.core.model.Version
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 @Serializable
 public data class DependangerMetadata(
@@ -28,7 +27,6 @@ public data class DependangerMetadata(
     val compatibility: List<CompatibilityRule>,
     val settings: Settings,
     val presets: List<Preset>,
-    val extensions: Map<String, JsonElement>,
 ) {
     public companion object {
         public const val SCHEMA_VERSION: String = "1.0"

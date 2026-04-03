@@ -49,7 +49,6 @@ class BomGeneratorTest {
         group: String,
         artifact: String,
         version: ResolvedVersion? = null,
-        isDeprecated: Boolean = false,
         deprecation: DeprecationInfo? = null,
         isPlatform: Boolean = false,
     ): EffectiveLibrary = EffectiveLibrary(
@@ -60,7 +59,6 @@ class BomGeneratorTest {
         description = null,
         tags = emptySet(),
         requires = null,
-        isDeprecated = isDeprecated,
         deprecation = deprecation,
         license = null,
         constraints = emptyList(),
@@ -231,7 +229,6 @@ class BomGeneratorTest {
                 group = "org.springframework.boot",
                 artifact = "spring-boot-starter",
                 version = v,
-                isDeprecated = true,
                 deprecation = DeprecationInfo(
                     message = "Legacy starter",
                     replacedBy = "spring-boot-starter-web",
@@ -245,15 +242,14 @@ class BomGeneratorTest {
         }
 
         @Test
-        fun `deprecated library with no deprecation object`() {
+        fun `deprecated library with minimal deprecation info`() {
             val generator = BomGenerator(defaultConfig)
             val lib = library(
                 alias = "old-lib",
                 group = "com.example",
                 artifact = "old-lib",
                 version = version("v", "1.0.0"),
-                isDeprecated = true,
-                deprecation = null,
+                deprecation = DeprecationInfo(message = null, replacedBy = null, since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
 
@@ -268,7 +264,6 @@ class BomGeneratorTest {
                 group = "com.example",
                 artifact = "old-lib",
                 version = version("v", "1.0.0"),
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = "No longer maintained", replacedBy = null, since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -284,7 +279,6 @@ class BomGeneratorTest {
                 group = "com.example",
                 artifact = "old-lib",
                 version = version("v", "1.0.0"),
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = null, replacedBy = "new-lib", since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -301,7 +295,6 @@ class BomGeneratorTest {
                 group = "com.example",
                 artifact = "old-lib",
                 version = version("v", "1.0.0"),
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = "Deprecated", replacedBy = "new-lib", since = null, removalVersion = "2.0"),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -318,7 +311,6 @@ class BomGeneratorTest {
                 group = "com.example",
                 artifact = "old-lib",
                 version = version("v", "1.0.0"),
-                isDeprecated = true,
                 deprecation = DeprecationInfo(message = "Use new--improved lib", replacedBy = null, since = null, removalVersion = null),
             )
             val result = generator.generate(emptyMetadata(libraries = mapOf("old-lib" to lib)))
@@ -668,7 +660,6 @@ class BomGeneratorTest {
                         group = "org.springframework.boot",
                         artifact = "spring-boot-starter",
                         version = springBootVersion,
-                        isDeprecated = true,
                         deprecation = DeprecationInfo(
                             message = "Legacy starter",
                             replacedBy = "spring-boot-starter-web",

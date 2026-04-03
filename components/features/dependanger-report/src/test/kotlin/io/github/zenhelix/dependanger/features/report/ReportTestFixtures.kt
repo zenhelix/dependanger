@@ -2,13 +2,13 @@ package io.github.zenhelix.dependanger.features.report
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.effective.spi.ReportFormat
-import io.github.zenhelix.dependanger.effective.spi.ReportSection
-import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
+import io.github.zenhelix.dependanger.effective.spi.ReportSection
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 
 internal fun emptyMetadata(): EffectiveMetadata = EffectiveMetadata(
     schemaVersion = "1.0",
@@ -27,7 +27,6 @@ internal fun sampleLibrary(
     artifact: String = "spring-core",
     version: String = "6.1.0",
     tags: Set<String> = emptySet(),
-    isDeprecated: Boolean = false,
     deprecation: DeprecationInfo? = null,
     isPlatform: Boolean = false,
 ): EffectiveLibrary = EffectiveLibrary(
@@ -38,7 +37,6 @@ internal fun sampleLibrary(
     description = null,
     tags = tags,
     requires = null,
-    isDeprecated = isDeprecated,
     deprecation = deprecation,
     license = null,
     constraints = emptyList(),

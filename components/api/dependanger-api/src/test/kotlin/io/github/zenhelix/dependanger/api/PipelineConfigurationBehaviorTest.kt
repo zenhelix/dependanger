@@ -307,7 +307,7 @@ class PipelineConfigurationBehaviorTest {
                 val metaLib = (metadataResult as DependangerResult.Success).effective.libraries[alias]!!
                 assertThat(metaLib.group).isEqualTo(dslLib.group)
                 assertThat(metaLib.artifact).isEqualTo(dslLib.artifact)
-                assertThat(metaLib.version?.value).isEqualTo(dslLib.version?.value)
+                assertThat(metaLib.version.valueOrNull).isEqualTo(dslLib.version.valueOrNull)
             }
         }
 
@@ -332,7 +332,7 @@ class PipelineConfigurationBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
             assertThat((result as DependangerResult.Success).effective.plugins).containsKey("kotlin-jvm")
             assertThat((result as DependangerResult.Success).effective.bundles).containsKey("kotlin")
         }

@@ -56,7 +56,7 @@ class CorePipelineIntegrationTest {
 
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["ktor-core"]!!
-            assertThat(lib.version!!.value).isEqualTo("3.1.1")
+            assertThat(lib.version.valueOrNull).isEqualTo("3.1.1")
         }
 
         @Test
@@ -77,7 +77,7 @@ class CorePipelineIntegrationTest {
 
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["assertj"]!!
-            assertThat(lib.version!!.value).isEqualTo("3.27.3")
+            assertThat(lib.version.valueOrNull).isEqualTo("3.27.3")
         }
 
         @Test
@@ -92,7 +92,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version!!.value).isEqualTo("33.0-android")
+            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version.valueOrNull).isEqualTo("33.0-android")
         }
 
         @Test
@@ -107,7 +107,7 @@ class CorePipelineIntegrationTest {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version!!.value).isEqualTo("33.0-jre")
+            assertThat((result as DependangerResult.Success).effective.libraries["guava"]!!.version.valueOrNull).isEqualTo("33.0-jre")
         }
     }
 
@@ -306,7 +306,7 @@ class CorePipelineIntegrationTest {
             assertThat(result.isSuccess).isTrue()
             val plugin = (result as DependangerResult.Success).effective.plugins["kotlin-jvm"]!!
             assertThat(plugin.id).isEqualTo("org.jetbrains.kotlin.jvm")
-            assertThat(plugin.version!!.value).isEqualTo("2.1.20")
+            assertThat(plugin.version.valueOrNull).isEqualTo("2.1.20")
         }
     }
 

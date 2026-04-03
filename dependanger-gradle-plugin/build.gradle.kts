@@ -11,13 +11,18 @@ description = "Dependanger Gradle Plugin - Gradle integration"
 
 dependencies {
     implementation(projects.components.api.dependangerApi)
-    // Generators and metadata-json are declared directly because the plugin uses their types
-    // (TomlConfig, BomConfig, TomlGenerator, BomGenerator, JsonSerializationFormat)
-    // for task configuration and file-based pipeline I/O.
-    // These are implementation-scoped in dependanger-api, so not available transitively.
+    // Generators and metadata-json: plugin uses their types for task configuration and I/O
     implementation(projects.components.generators.dependangerGeneratorToml)
     implementation(projects.components.generators.dependangerGeneratorBom)
     implementation(projects.components.core.dependangerMetadataJson)
+    // Feature processors — discovered via ServiceLoader at runtime
+    runtimeOnly(projects.components.features.dependangerMavenResolver)
+    runtimeOnly(projects.components.features.dependangerUpdates)
+    runtimeOnly(projects.components.features.dependangerAnalysis)
+    runtimeOnly(projects.components.features.dependangerReport)
+    runtimeOnly(projects.components.features.dependangerSecurity)
+    runtimeOnly(projects.components.features.dependangerLicense)
+    runtimeOnly(projects.components.features.dependangerTransitive)
 
     compileOnly(libs.kotlin.gradle.plugin)
 }

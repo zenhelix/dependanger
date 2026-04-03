@@ -38,13 +38,13 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     }
 
     private fun prepareDependencies(effective: EffectiveMetadata): List<EffectiveLibrary> {
-        val noVersion = effective.libraries.values.filter { it.version == null }
+        val noVersion = effective.libraries.values.filter { !it.version.isResolved }
         if (noVersion.isNotEmpty()) {
             logger.warn { "Skipping ${noVersion.size} libraries without version: ${noVersion.map { it.alias }}" }
         }
 
         return effective.libraries.values
-            .filter { it.version != null }
+            .filter { it.version.isResolved }
             .sortedWith(compareBy({ it.group }, { it.artifact }))
     }
 
@@ -53,7 +53,7 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
             PomDependency(
                 groupId = lib.group,
                 artifactId = lib.artifact,
-                version = lib.version?.value,
+                version = lib.version.valueOrNull,
                 type = if (lib.isPlatform) "pom" else null,
                 scope = if (lib.isPlatform) "import" else null,
                 optional = config.includeOptionalDependencies,
@@ -86,10 +86,8 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
         return writer.write(project, dependencyComments)
     }
 
-    private fun buildDeprecationComment(lib: EffectiveLibrary): String {
-        val parts = lib.deprecation?.toCommentParts() ?: listOf("DEPRECATED")
-        return parts.joinToString(". ")
-    }
+    private fun buildDeprecationComment(lib: EffectiveLibrary): String =
+        lib.deprecationSummary ?: "DEPRECATED"
 
     public companion object {
         private const val GENERATOR_ID: String = "maven-bom"

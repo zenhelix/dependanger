@@ -1,10 +1,10 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
@@ -27,73 +27,75 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
-        val originalLibraries = context.originalMetadata.libraries.associateBy { it.alias }
-        val originalPlugins = context.originalMetadata.plugins.associateBy { it.alias }
         var diagnostics = metadata.diagnostics
 
         val resolvedLibraries = metadata.libraries.mapValues { (alias, lib) ->
-            if (lib.version != null) return@mapValues lib
-
-            when (val originalRef = originalLibraries[alias]?.version) {
-                is VersionReference.Reference -> {
-                    val resolved = metadata.versions[originalRef.name]
+            when (val version = lib.version) {
+                is EffectiveVersion.Unresolved -> {
+                    val resolved = metadata.versions[version.refName]
                     if (resolved != null) {
                         diagnostics += Diagnostics.info(
                             code = DiagnosticCodes.Version.RESOLVED,
-                            message = "Library '$alias': version ref '${originalRef.name}' -> '${resolved.value}'",
+                            message = "Library '$alias': version ref '${version.refName}' -> '${resolved.value}'",
                             processorId = id,
                             context = emptyMap(),
                         )
                         lib.copy(
-                            version = ResolvedVersion(
-                                alias = originalRef.name,
-                                value = resolved.value,
-                                source = resolved.source,
-                                originalRef = originalRef.name,
+                            version = EffectiveVersion.Resolved(
+                                ResolvedVersion(
+                                    alias = version.refName,
+                                    value = resolved.value,
+                                    source = resolved.source,
+                                    originalRef = version.refName,
+                                )
                             )
                         )
                     } else {
                         diagnostics += Diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
-                            message = "Library '$alias': version ref '${originalRef.name}' not found in versions map",
+                            message = "Library '$alias': version ref '${version.refName}' not found in versions map",
                             processorId = id,
-                            context = mapOf("alias" to alias, "ref" to originalRef.name),
+                            context = mapOf("alias" to alias, "ref" to version.refName),
                         )
                         lib
                     }
                 }
 
-                else                          -> lib
+                is EffectiveVersion.Resolved,
+                is EffectiveVersion.None,
+                                               -> lib
             }
         }
 
         val resolvedPlugins = metadata.plugins.mapValues { (alias, plugin) ->
-            if (plugin.version != null) return@mapValues plugin
-
-            when (val originalRef = originalPlugins[alias]?.version) {
-                is VersionReference.Reference -> {
-                    val resolved = metadata.versions[originalRef.name]
+            when (val version = plugin.version) {
+                is EffectiveVersion.Unresolved -> {
+                    val resolved = metadata.versions[version.refName]
                     if (resolved != null) {
                         plugin.copy(
-                            version = ResolvedVersion(
-                                alias = originalRef.name,
-                                value = resolved.value,
-                                source = resolved.source,
-                                originalRef = originalRef.name,
+                            version = EffectiveVersion.Resolved(
+                                ResolvedVersion(
+                                    alias = version.refName,
+                                    value = resolved.value,
+                                    source = resolved.source,
+                                    originalRef = version.refName,
+                                )
                             )
                         )
                     } else {
                         diagnostics += Diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
-                            message = "Plugin '$alias': version ref '${originalRef.name}' not found",
+                            message = "Plugin '$alias': version ref '${version.refName}' not found",
                             processorId = id,
-                            context = mapOf("alias" to alias, "ref" to originalRef.name),
+                            context = mapOf("alias" to alias, "ref" to version.refName),
                         )
                         plugin
                     }
                 }
 
-                else                          -> plugin
+                is EffectiveVersion.Resolved,
+                is EffectiveVersion.None,
+                                               -> plugin
             }
         }
 

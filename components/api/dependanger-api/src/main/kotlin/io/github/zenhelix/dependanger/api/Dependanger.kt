@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
+import io.github.zenhelix.dependanger.core.exception.DependangerException
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
@@ -8,7 +9,6 @@ import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
-import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingCallback
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
@@ -96,8 +96,6 @@ public class Dependanger internal constructor(
         block()
     } catch (e: DependangerException) {
         throw e
-    } catch (e: PipelineConfigurationException) {
-        throw DependangerConfigurationException("Pipeline configuration error: ${e.message}", e)
     } catch (e: Exception) {
         currentCoroutineContext().ensureActive()
         throw DependangerProcessingException("$operationName failed: ${e.message}", phase = null, cause = e)

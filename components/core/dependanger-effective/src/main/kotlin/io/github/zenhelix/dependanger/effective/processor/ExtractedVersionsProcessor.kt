@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -23,7 +24,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         val usedNames: Set<String>,
         val versions: Map<String, ResolvedVersion>,
         val diagnostics: Diagnostics,
-        val resolvedByAlias: Map<String, ResolvedVersion>,
+        val resolvedByAlias: Map<String, EffectiveVersion.Resolved>,
         val allVersionValues: Map<String, String>,
     )
 
@@ -40,11 +41,11 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         )
 
         val afterLibraries = metadata.libraries.entries.fold(initialAcc) { acc, (alias, lib) ->
-            extractVersion(acc, alias, lib.version, "library")
+            extractVersion(acc, alias, lib.version)
         }
 
         val afterAll = metadata.plugins.entries.fold(afterLibraries) { acc, (alias, plugin) ->
-            extractVersion(acc, alias, plugin.version, "plugin")
+            extractVersion(acc, alias, plugin.version)
         }
 
         val updatedLibraries = metadata.libraries.mapValues { (alias, lib) ->
@@ -70,25 +71,25 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
     private fun extractVersion(
         acc: ExtractionAccumulator,
         alias: String,
-        version: ResolvedVersion?,
-        sourceType: String,
+        version: EffectiveVersion,
     ): ExtractionAccumulator {
-        if (version == null || version.alias.isNotEmpty() || version.value.isEmpty()) return acc
+        val resolved = version.resolvedOrNull ?: return acc
+        if (resolved.alias.isNotEmpty() || resolved.value.isEmpty()) return acc
 
         val nameResult = generateVersionName(alias, acc.usedNames)
-        val resolved = ResolvedVersion(
+        val newResolved = ResolvedVersion(
             alias = nameResult.name,
-            value = version.value,
+            value = resolved.value,
             source = VersionSource.DECLARED,
             originalRef = null,
         )
 
         val conflictDiagnostic = if (nameResult.wasCollision) {
             val existingValue = acc.allVersionValues[nameResult.baseName]
-            if (existingValue != null && existingValue != version.value) {
+            if (existingValue != null && existingValue != resolved.value) {
                 Diagnostics.warning(
                     code = DiagnosticCodes.Version.EXTRACTED_VERSION_CONFLICT,
-                    message = "Extracted version name '${nameResult.baseName}' conflicts with existing version (existing: $existingValue, new: ${version.value}), using '${nameResult.name}'",
+                    message = "Extracted version name '${nameResult.baseName}' conflicts with existing version (existing: $existingValue, new: ${resolved.value}), using '${nameResult.name}'",
                     processorId = id,
                     context = emptyMap(),
                 )
@@ -101,17 +102,17 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
 
         val infoDiagnostic = Diagnostics.info(
             code = DiagnosticCodes.Version.EXTRACTED_CREATED,
-            message = "Extracted version '${nameResult.name}' = '${version.value}' from $sourceType '$alias'",
+            message = "Extracted version '${nameResult.name}' = '${resolved.value}' from '$alias'",
             processorId = id,
             context = emptyMap(),
         )
 
         return ExtractionAccumulator(
             usedNames = acc.usedNames + nameResult.name,
-            versions = acc.versions + (nameResult.name to resolved),
+            versions = acc.versions + (nameResult.name to newResolved),
             diagnostics = acc.diagnostics + conflictDiagnostic + infoDiagnostic,
-            resolvedByAlias = acc.resolvedByAlias + (alias to resolved),
-            allVersionValues = acc.allVersionValues + (nameResult.name to version.value),
+            resolvedByAlias = acc.resolvedByAlias + (alias to EffectiveVersion.Resolved(newResolved)),
+            allVersionValues = acc.allVersionValues + (nameResult.name to resolved.value),
         )
     }
 

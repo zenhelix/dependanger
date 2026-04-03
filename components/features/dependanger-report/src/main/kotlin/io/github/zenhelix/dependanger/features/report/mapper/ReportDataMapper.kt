@@ -226,7 +226,7 @@ internal object ReportDataMapper {
         alias = alias,
         group = group,
         artifact = artifact,
-        version = version?.value,
+        version = version.valueOrNull,
         tags = tags,
         isDeprecated = isDeprecated,
         isPlatform = isPlatform,
@@ -235,7 +235,7 @@ internal object ReportDataMapper {
     private fun EffectivePlugin.toReportPlugin(): ReportPlugin = ReportPlugin(
         alias = alias,
         id = id,
-        version = version?.value,
+        version = version.valueOrNull,
     )
 
     private fun EffectiveLibrary.toReportDeprecated(): ReportDeprecated = ReportDeprecated(

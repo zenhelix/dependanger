@@ -4,11 +4,11 @@ import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.ValidationAction
-import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
@@ -75,19 +75,17 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
 
     private fun validateUnresolvedVersions(
         metadata: EffectiveMetadata,
-        context: ProcessingContext,
+        @Suppress("UNUSED_PARAMETER") context: ProcessingContext,
         action: ValidationAction,
     ): Diagnostics {
         if (action == ValidationAction.IGNORE) return Diagnostics.EMPTY
 
-        val originalLibs = context.originalMetadata.libraries.associateBy { it.alias }
-
         val issues = metadata.libraries.mapNotNull { (alias, lib) ->
-            val originalRef = originalLibs[alias]?.version
-            if (originalRef is VersionReference.Reference && lib.version == null) {
+            val version = lib.version
+            if (version is EffectiveVersion.Unresolved) {
                 DiagnosticMessage(
                     code = DiagnosticCodes.Validation.UNRESOLVED_REF,
-                    message = "Library '$alias': version reference '${originalRef.name}' is not resolved",
+                    message = "Library '$alias': version reference '${version.refName}' is not resolved",
                     severity = action.toSeverity(),
                     processorId = id,
                     context = emptyMap(),

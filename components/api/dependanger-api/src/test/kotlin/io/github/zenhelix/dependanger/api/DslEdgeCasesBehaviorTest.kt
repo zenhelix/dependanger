@@ -52,7 +52,7 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.versions["kotlin"]!!.value).isEqualTo("2.1.20")
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
         }
 
         @Test
@@ -109,7 +109,7 @@ class DslEdgeCasesBehaviorTest {
             assertThat((result as DependangerResult.Success).effective.plugins).hasSize(1)
             assertThat((result as DependangerResult.Success).effective.plugins).containsKey("my-plugin")
             assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.id).isEqualTo("com.new.plugin")
-            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.version!!.value).isEqualTo("2.0.0")
+            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.version.valueOrNull).isEqualTo("2.0.0")
         }
     }
 
@@ -141,7 +141,7 @@ class DslEdgeCasesBehaviorTest {
             assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj")
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("guava")
-            assertThat((result as DependangerResult.Success).effective.libraries["assertj"]!!.version!!.value).isEqualTo("3.27.3")
+            assertThat((result as DependangerResult.Success).effective.libraries["assertj"]!!.version.valueOrNull).isEqualTo("3.27.3")
         }
 
         @Test
@@ -169,7 +169,7 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("bom-managed")
-            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version).isNull()
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version.isResolved).isFalse()
             assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.group).isEqualTo("com.example")
             assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.artifact).isEqualTo("bom-managed")
         }
@@ -200,8 +200,8 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).hasSize(2)
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
-            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version).isNull()
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version.isResolved).isFalse()
         }
     }
 
@@ -218,7 +218,7 @@ class DslEdgeCasesBehaviorTest {
             val lib = (result as DependangerResult.Success).effective.libraries["assertj"]!!
             assertThat(lib.group).isEqualTo("org.assertj")
             assertThat(lib.artifact).isEqualTo("assertj-core")
-            assertThat(lib.version!!.value).isEqualTo("3.27.3")
+            assertThat(lib.version.valueOrNull).isEqualTo("3.27.3")
         }
 
         @Test
@@ -231,7 +231,7 @@ class DslEdgeCasesBehaviorTest {
             val lib = (result as DependangerResult.Success).effective.libraries["managed-lib"]!!
             assertThat(lib.group).isEqualTo("com.example")
             assertThat(lib.artifact).isEqualTo("managed-lib")
-            assertThat(lib.version).isNull()
+            assertThat(lib.version.isResolved).isFalse()
         }
 
         @Test
@@ -245,7 +245,7 @@ class DslEdgeCasesBehaviorTest {
             val lib = (result as DependangerResult.Success).effective.libraries["ktor-core"]!!
             assertThat(lib.group).isEqualTo("io.ktor")
             assertThat(lib.artifact).isEqualTo("ktor-client-core")
-            assertThat(lib.version!!.value).isEqualTo("3.1.1")
+            assertThat(lib.version.valueOrNull).isEqualTo("3.1.1")
         }
     }
 
@@ -266,7 +266,7 @@ class DslEdgeCasesBehaviorTest {
             assertThat(lib.isPlatform).isTrue()
             assertThat(lib.group).isEqualTo("org.jetbrains.kotlin")
             assertThat(lib.artifact).isEqualTo("kotlin-bom")
-            assertThat(lib.version!!.value).isEqualTo("2.1.20")
+            assertThat(lib.version.valueOrNull).isEqualTo("2.1.20")
         }
 
         @Test

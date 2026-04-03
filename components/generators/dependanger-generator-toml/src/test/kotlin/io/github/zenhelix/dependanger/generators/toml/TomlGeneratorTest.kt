@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import org.assertj.core.api.Assertions.assertThat
@@ -47,7 +48,7 @@ class TomlGeneratorTest {
         alias = alias,
         group = group,
         artifact = artifact,
-        version = version,
+        version = version?.let { EffectiveVersion.Resolved(it) } ?: EffectiveVersion.None,
         description = null,
         tags = emptySet(),
         requires = null,
@@ -58,7 +59,7 @@ class TomlGeneratorTest {
     )
 
     private fun plugin(alias: String, id: String, version: ResolvedVersion? = null): EffectivePlugin =
-        EffectivePlugin(alias = alias, id = id, version = version)
+        EffectivePlugin(alias = alias, id = id, version = version?.let { EffectiveVersion.Resolved(it) } ?: EffectiveVersion.None)
 
     private fun bundle(alias: String, libraries: List<String>): EffectiveBundle =
         EffectiveBundle(alias = alias, libraries = libraries)

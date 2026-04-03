@@ -51,7 +51,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         val settings = context.require(SecurityCheckSettingsKey)
         val minSeverity = parseMinSeverity(settings.minSeverity)
 
-        val candidates = metadata.libraries.values.filter { it.version != null }
+        val candidates = metadata.libraries.values.filter { it.version.isResolved }
 
         if (candidates.isEmpty()) {
             return ParallelResult.emptyResult(DiagnosticCodes.Security.NO_VULNS, "No libraries to scan for vulnerabilities", id, VulnerabilitiesExtensionKey)
@@ -68,7 +68,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         val uncachedPackages = mutableListOf<PackageQuery>()
 
         for (lib in candidates) {
-            val version = lib.version!!.value
+            val version = lib.version.valueOrNull!!
             when (val cacheResult = cache.get(lib.group, lib.artifact, version)) {
                 is CacheResult.Hit       -> {
                     cachedVulns.addAll(cacheResult.data)

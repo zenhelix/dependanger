@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.effective.pipeline
 
+import io.github.zenhelix.dependanger.core.exception.DependangerException
 import io.github.zenhelix.dependanger.effective.coreProcessors
 
 public class PipelineBuilder {
@@ -85,4 +86,4 @@ public fun ProcessingPipeline(
 
 public class PipelineConfigurationException(
     message: String,
-) : IllegalStateException(message)
+) : DependangerException(message)

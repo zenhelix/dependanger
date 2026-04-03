@@ -1,9 +1,11 @@
 package io.github.zenhelix.dependanger.metadata
 
+import io.github.zenhelix.dependanger.core.exception.DependangerException
+
 public open class MetadataSerializationException(
     message: String,
     cause: Throwable?,
-) : RuntimeException(message, cause)
+) : DependangerException(message, cause)
 
 public class MetadataDeserializationException(
     message: String,

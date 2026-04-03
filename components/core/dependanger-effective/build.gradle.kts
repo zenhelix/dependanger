@@ -8,7 +8,6 @@ description = "Dependanger Effective - Filtered and enriched metadata model"
 
 dependencies {
     api(projects.components.core.dependangerCore)
-    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlin.logging.jvm)
 

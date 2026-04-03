@@ -11,7 +11,7 @@ public data class EffectiveLibrary(
     val alias: String,
     val group: String,
     val artifact: String,
-    val version: ResolvedVersion?,
+    val version: EffectiveVersion,
     val description: String?,
     val tags: Set<String>,
     val requires: Requirements?,
@@ -22,4 +22,8 @@ public data class EffectiveLibrary(
     val ignoreUpdates: Boolean = false,
 ) {
     val isDeprecated: Boolean get() = deprecation != null
+
+    /** Human-readable deprecation summary, e.g. "DEPRECATED: Use x instead. Removal: 2.0". Null when not deprecated. */
+    val deprecationSummary: String?
+        get() = deprecation?.toCommentParts()?.joinToString(". ")
 }

@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
@@ -24,11 +25,13 @@ class LicensePolicyComplianceTest {
         alias = alias,
         group = group,
         artifact = artifact,
-        version = ResolvedVersion(
+        version = EffectiveVersion.Resolved(
+            ResolvedVersion(
             alias = "test-version",
             value = version,
             source = VersionSource.DECLARED,
             originalRef = null,
+            )
         ),
         description = null,
         tags = emptySet(),

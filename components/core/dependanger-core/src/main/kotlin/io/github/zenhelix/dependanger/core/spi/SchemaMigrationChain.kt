@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.core.spi
 
+import io.github.zenhelix.dependanger.core.exception.DependangerException
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 
 public class SchemaMigrationChain(
@@ -57,4 +58,4 @@ public class SchemaMigrationChain(
 
 public class SchemaMigrationException(
     message: String,
-) : RuntimeException(message)
+) : DependangerException(message)

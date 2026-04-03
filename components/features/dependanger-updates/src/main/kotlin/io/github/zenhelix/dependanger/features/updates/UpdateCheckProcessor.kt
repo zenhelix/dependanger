@@ -61,7 +61,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
 
         val candidates = metadata.libraries.values.filter { lib ->
             !lib.ignoreUpdates
-                    && lib.version != null
+                    && lib.version.isResolved
                     && settings.excludePatterns.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) }
         }
 
@@ -127,7 +127,7 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
         ctx: UpdateCheckContext,
         includePrerelease: Boolean,
     ): UpdateCheckResult {
-        val currentVersionStr = lib.version!!.value
+        val currentVersionStr = lib.version.valueOrNull!!
         val coordinate = "${lib.group}:${lib.artifact}"
 
         val currentVersion = VersionComparator.parse(currentVersionStr)

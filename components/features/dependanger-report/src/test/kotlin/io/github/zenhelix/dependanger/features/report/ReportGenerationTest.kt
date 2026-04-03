@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.model.withExtension
@@ -34,7 +35,7 @@ class ReportGenerationTest {
     ): EffectivePlugin = EffectivePlugin(
         alias = alias,
         id = id,
-        version = ResolvedVersion(alias = "${alias}-version", value = version, source = VersionSource.DECLARED, originalRef = null),
+        version = EffectiveVersion.Resolved(ResolvedVersion(alias = "${alias}-version", value = version, source = VersionSource.DECLARED, originalRef = null)),
     )
 
     private fun richMetadata(): EffectiveMetadata {

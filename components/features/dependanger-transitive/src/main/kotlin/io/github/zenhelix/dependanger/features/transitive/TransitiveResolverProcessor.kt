@@ -54,7 +54,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
         val effectiveMaxTransitives = settings.maxTransitives ?: DEFAULT_MAX_TRANSITIVES
 
         val libraries = metadata.libraries.values
-            .filter { it.version != null }
+            .filter { it.version.isResolved }
 
         if (libraries.isEmpty()) {
             return metadata
@@ -90,7 +90,7 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
                 DirectDependencyInput(
                     group = lib.group,
                     artifact = lib.artifact,
-                    version = lib.version!!.value,
+                    version = lib.version.valueOrNull!!,
                 )
             }
 

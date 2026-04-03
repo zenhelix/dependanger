@@ -92,7 +92,7 @@ class FeatureProcessorIntegrationTest {
                             alias = lib.alias,
                             group = lib.group,
                             artifact = lib.artifact,
-                            currentVersion = lib.version?.value ?: "unknown",
+                            currentVersion = lib.version.valueOrNull ?: "unknown",
                             latestVersion = "3.1.1",
                             updateType = UpdateType.MINOR,
                         )
@@ -139,7 +139,7 @@ class FeatureProcessorIntegrationTest {
                             alias = lib.alias,
                             group = lib.group,
                             artifact = lib.artifact,
-                            currentVersion = lib.version?.value ?: "unknown",
+                            currentVersion = lib.version.valueOrNull ?: "unknown",
                             latestVersion = "9.9.9",
                             updateType = UpdateType.MAJOR,
                         )
@@ -212,7 +212,7 @@ class FeatureProcessorIntegrationTest {
                                 url = null,
                                 affectedGroup = lib.group,
                                 affectedArtifact = lib.artifact,
-                                affectedVersion = lib.version?.value ?: "",
+                                affectedVersion = lib.version.valueOrNull ?: "",
                             )
                         )
                     }
@@ -290,7 +290,7 @@ class FeatureProcessorIntegrationTest {
                     metadata.libraries.values.map { lib ->
                         UpdateAvailableInfo(
                             alias = lib.alias, group = lib.group, artifact = lib.artifact,
-                            currentVersion = lib.version?.value ?: "", latestVersion = "2.2.0",
+                            currentVersion = lib.version.valueOrNull ?: "", latestVersion = "2.2.0",
                             updateType = UpdateType.MINOR,
                         )
                     }

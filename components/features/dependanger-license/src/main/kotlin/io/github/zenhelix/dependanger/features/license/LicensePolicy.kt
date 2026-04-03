@@ -37,7 +37,7 @@ internal object LicensePolicy {
         displayName = lib.alias,
         group = lib.group,
         artifact = lib.artifact,
-        versionDisplay = lib.version?.value,
+        versionDisplay = lib.version.valueOrNull,
         licenses = licenses,
         settings = settings,
     )

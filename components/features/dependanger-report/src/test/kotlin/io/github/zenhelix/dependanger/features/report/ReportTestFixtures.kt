@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
@@ -33,7 +34,7 @@ internal fun sampleLibrary(
     alias = alias,
     group = group,
     artifact = artifact,
-    version = ResolvedVersion(alias = "${alias}-version", value = version, source = VersionSource.DECLARED, originalRef = null),
+    version = EffectiveVersion.Resolved(ResolvedVersion(alias = "${alias}-version", value = version, source = VersionSource.DECLARED, originalRef = null)),
     description = null,
     tags = tags,
     requires = null,

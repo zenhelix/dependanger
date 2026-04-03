@@ -35,7 +35,7 @@ class PresetBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
         }
 
         @Test
@@ -71,8 +71,8 @@ class PresetBehaviorTest {
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.versions).containsKey("ktor")
             assertThat((result as DependangerResult.Success).effective.versions).doesNotContainKey("unused")
-            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
-            assertThat((result as DependangerResult.Success).effective.libraries["ktor-cio"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version.valueOrNull).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-cio"]!!.version.valueOrNull).isEqualTo("3.1.1")
         }
     }
 
@@ -227,7 +227,7 @@ class PresetBehaviorTest {
             assertThat((result as DependangerResult.Success).effective.libraries.keys)
                 .containsExactlyInAnyOrder("ktor-core", "ktor-cio")
             assertThat((result as DependangerResult.Success).effective.libraries).doesNotContainKey("ktor-js")
-            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version.valueOrNull).isEqualTo("3.1.1")
         }
     }
 

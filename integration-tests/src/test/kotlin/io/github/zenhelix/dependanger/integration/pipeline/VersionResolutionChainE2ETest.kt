@@ -30,8 +30,8 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
             val success = result as DependangerResult.Success
             val lib = success.effective.libraries["guava"]
             assertThat(lib).isNotNull
-            assertThat(lib!!.version).isNotNull
-            assertThat(lib.version!!.value).isEqualTo("33.0.0")
+            assertThat(lib!!.version.valueOrNull).isNotNull
+            assertThat(lib.version.valueOrNull).isEqualTo("33.0.0")
         }
     }
 
@@ -54,8 +54,8 @@ class VersionResolutionChainE2ETest : IntegrationTestBase() {
             val success = result as DependangerResult.Success
             val lib = success.effective.libraries["kotlin-stdlib"]
             assertThat(lib).isNotNull
-            assertThat(lib!!.version).isNotNull
-            assertThat(lib.version!!.value).isEqualTo("2.1.20")
+            assertThat(lib!!.version.valueOrNull).isNotNull
+            assertThat(lib.version.valueOrNull).isEqualTo("2.1.20")
         }
     }
 

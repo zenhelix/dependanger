@@ -28,13 +28,13 @@ public class UsedVersionsProcessor : EffectiveMetadataProcessor {
     ): EffectiveMetadata {
         val usedVersionNames = buildSet {
             metadata.libraries.values.forEach { lib ->
-                lib.version?.let { v ->
+                lib.version.resolvedOrNull?.let { v ->
                     if (v.alias.isNotEmpty()) add(v.alias)
                     v.originalRef?.let { add(it) }
                 }
             }
             metadata.plugins.values.forEach { plugin ->
-                plugin.version?.let { v ->
+                plugin.version.resolvedOrNull?.let { v ->
                     if (v.alias.isNotEmpty()) add(v.alias)
                     v.originalRef?.let { add(it) }
                 }

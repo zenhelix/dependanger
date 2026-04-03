@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.ProgramResult
-import io.github.zenhelix.dependanger.api.DependangerException
 import io.github.zenhelix.dependanger.api.DependangerProcessingException
+import io.github.zenhelix.dependanger.core.exception.DependangerException
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.mockk.mockk
 import io.mockk.verify

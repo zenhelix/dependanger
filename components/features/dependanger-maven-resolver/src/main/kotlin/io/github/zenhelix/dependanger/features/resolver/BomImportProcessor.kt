@@ -12,6 +12,7 @@ import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -159,7 +160,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     ): Pair<Map<String, io.github.zenhelix.dependanger.effective.model.EffectiveLibrary>, Diagnostics> {
         var currentDiagnostics = diagnostics
         val updatedLibraries = libraries.mapValues { (_, lib) ->
-            if (lib.version != null) return@mapValues lib
+            if (lib.version.isResolved) return@mapValues lib
             val key = "${lib.group}:${lib.artifact}"
             val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
             currentDiagnostics += Diagnostics.info(
@@ -168,11 +169,13 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                 id, emptyMap()
             )
             lib.copy(
-                version = ResolvedVersion(
-                    alias = lib.alias,
-                    value = version,
-                    source = VersionSource.BOM_IMPORT,
-                    originalRef = bomAlias,
+                version = EffectiveVersion.Resolved(
+                    ResolvedVersion(
+                        alias = lib.alias,
+                        value = version,
+                        source = VersionSource.BOM_IMPORT,
+                        originalRef = bomAlias,
+                    )
                 ),
             )
         }

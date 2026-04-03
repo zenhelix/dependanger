@@ -247,7 +247,7 @@ class TransitiveResolutionBehaviorTest {
                         TransitiveTree(
                             group = lib.group,
                             artifact = lib.artifact,
-                            version = lib.version?.value,
+                            version = lib.version.valueOrNull,
                             scope = "implementation",
                             children = emptyList(),
                             isDuplicate = false,
@@ -355,7 +355,7 @@ class TransitiveResolutionBehaviorTest {
                     metadata.libraries.values.map { lib ->
                         TransitiveTree(
                             group = lib.group, artifact = lib.artifact,
-                            version = lib.version?.value, scope = "implementation",
+                            version = lib.version.valueOrNull, scope = "implementation",
                             children = emptyList(), isDuplicate = false, isCycle = false,
                         )
                     }

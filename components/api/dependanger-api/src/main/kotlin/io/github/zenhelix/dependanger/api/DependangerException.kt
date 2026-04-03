@@ -1,9 +1,6 @@
 package io.github.zenhelix.dependanger.api
 
-public open class DependangerException(
-    message: String,
-    cause: Throwable?,
-) : RuntimeException(message, cause)
+import io.github.zenhelix.dependanger.core.exception.DependangerException
 
 public class DependangerProcessingException(
     message: String,

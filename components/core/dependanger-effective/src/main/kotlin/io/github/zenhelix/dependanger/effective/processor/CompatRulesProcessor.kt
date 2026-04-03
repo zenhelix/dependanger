@@ -129,7 +129,7 @@ public class CompatRulesProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
     ): List<CompatibilityIssue> {
         val libraryVersions = rule.libraries.mapNotNull { alias ->
-            metadata.libraries[alias]?.version?.value?.let { alias to it }
+            metadata.libraries[alias]?.version?.valueOrNull?.let { alias to it }
         }
 
         if (libraryVersions.size < 2) return emptyList()

@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -80,17 +81,19 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
         )
     }
 
-    private fun convertVersionReference(ref: VersionReference?): ResolvedVersion? = when (ref) {
-        is VersionReference.Literal   -> ResolvedVersion(
-            alias = "",
-            value = ref.version,
-            source = VersionSource.DECLARED,
-            originalRef = null,
+    private fun convertVersionReference(ref: VersionReference?): EffectiveVersion = when (ref) {
+        is VersionReference.Literal   -> EffectiveVersion.Resolved(
+            ResolvedVersion(
+                alias = "",
+                value = ref.version,
+                source = VersionSource.DECLARED,
+                originalRef = null,
+            )
         )
 
-        is VersionReference.Reference -> null
-        is VersionReference.Range     -> null
-        null                          -> null
+        is VersionReference.Reference -> EffectiveVersion.Unresolved(ref.name)
+        is VersionReference.Range     -> EffectiveVersion.None
+        null                          -> EffectiveVersion.None
     }
 
     private fun resolveBundleExtends(

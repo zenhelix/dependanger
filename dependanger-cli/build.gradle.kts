@@ -8,15 +8,19 @@ plugins {
 description = "Dependanger CLI - Command-line interface"
 
 dependencies {
-    // Feature processors are discovered via ServiceLoader at runtime.
-    // They are transitively available through dependanger-api (implementation scope).
     implementation(projects.components.api.dependangerApi)
-    // Generators and metadata-json are declared directly because CLI uses their types
-    // (TomlConfig, BomConfig, JsonSerializationFormat) for user-facing configuration and file I/O.
-    // These are implementation-scoped in dependanger-api, so not available transitively.
+    // Generators and metadata-json: CLI uses their types (TomlConfig, BomConfig, JsonSerializationFormat)
     implementation(projects.components.generators.dependangerGeneratorToml)
     implementation(projects.components.generators.dependangerGeneratorBom)
     implementation(projects.components.core.dependangerMetadataJson)
+    // Feature processors — discovered via ServiceLoader at runtime
+    runtimeOnly(projects.components.features.dependangerMavenResolver)
+    runtimeOnly(projects.components.features.dependangerUpdates)
+    runtimeOnly(projects.components.features.dependangerAnalysis)
+    runtimeOnly(projects.components.features.dependangerReport)
+    runtimeOnly(projects.components.features.dependangerSecurity)
+    runtimeOnly(projects.components.features.dependangerLicense)
+    runtimeOnly(projects.components.features.dependangerTransitive)
     implementation(libs.clikt)
     implementation(libs.mordant)
     implementation(libs.kotlinx.coroutines.core)

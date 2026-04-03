@@ -39,8 +39,8 @@ class JsonRoundTripE2ETest : IntegrationTestBase() {
         val roundTripSuccess = roundTripResult as DependangerResult.Success
         assertThat(roundTripSuccess.effective.libraries.keys)
             .isEqualTo(originalSuccess.effective.libraries.keys)
-        assertThat(roundTripSuccess.effective.libraries["kotlin-stdlib"]!!.version!!.value)
-            .isEqualTo(originalSuccess.effective.libraries["kotlin-stdlib"]!!.version!!.value)
+        assertThat(roundTripSuccess.effective.libraries["kotlin-stdlib"]!!.version.valueOrNull)
+            .isEqualTo(originalSuccess.effective.libraries["kotlin-stdlib"]!!.version.valueOrNull)
     }
 
     @Test
@@ -125,8 +125,8 @@ class JsonRoundTripE2ETest : IntegrationTestBase() {
             .isEqualTo(dslSuccess.effective.versions.keys)
 
         for (alias in dslSuccess.effective.libraries.keys) {
-            assertThat(jsonSuccess.effective.libraries[alias]!!.version?.value)
-                .isEqualTo(dslSuccess.effective.libraries[alias]!!.version?.value)
+            assertThat(jsonSuccess.effective.libraries[alias]!!.version.valueOrNull)
+                .isEqualTo(dslSuccess.effective.libraries[alias]!!.version.valueOrNull)
         }
     }
 

@@ -33,7 +33,7 @@ class MetadataSerializationBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("ktor-core")
-            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value).isEqualTo("3.1.1")
+            assertThat((result as DependangerResult.Success).effective.libraries["ktor-core"]!!.version.valueOrNull).isEqualTo("3.1.1")
         }
 
         @Test
@@ -128,7 +128,7 @@ class MetadataSerializationBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("kotlin-stdlib")
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value).isEqualTo("2.1.20")
+            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
         }
     }
 
@@ -149,7 +149,7 @@ class MetadataSerializationBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("assertj-core")
-            assertThat((result as DependangerResult.Success).effective.libraries["assertj-core"]!!.version!!.value).isEqualTo("3.27.3")
+            assertThat((result as DependangerResult.Success).effective.libraries["assertj-core"]!!.version.valueOrNull).isEqualTo("3.27.3")
         }
 
         @Test

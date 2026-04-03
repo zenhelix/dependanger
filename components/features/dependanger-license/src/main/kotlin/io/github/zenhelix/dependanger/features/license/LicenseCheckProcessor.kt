@@ -64,7 +64,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         var diagnostics = Diagnostics.EMPTY
 
         val candidates = metadata.libraries.values.filter { lib ->
-            lib.version != null
+            lib.version.isResolved
                     && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) }
         }
 
@@ -120,7 +120,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
                             val licenses = ctx.resolver.resolve(
                                 group = lib.group,
                                 artifact = lib.artifact,
-                                version = lib.version!!.value,
+                                version = lib.version.valueOrNull!!,
                                 declaredLicenseId = lib.license?.id,
                             )
                             lib to licenses

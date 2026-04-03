@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.model.withExtension
@@ -63,7 +64,7 @@ class ReportContentTest {
             val plugin = EffectivePlugin(
                 alias = "kotlin-jvm",
                 id = "org.jetbrains.kotlin.jvm",
-                version = ResolvedVersion(alias = "kotlin", value = "2.1.20", source = VersionSource.DECLARED, originalRef = null),
+                version = EffectiveVersion.Resolved(ResolvedVersion(alias = "kotlin", value = "2.1.20", source = VersionSource.DECLARED, originalRef = null)),
             )
             val bundle = EffectiveBundle(alias = "spring-web", libraries = listOf("spring-core", "spring-webmvc"))
             val version = ResolvedVersion(alias = "spring", value = "6.1.0", source = VersionSource.DECLARED, originalRef = null)
@@ -111,7 +112,7 @@ class ReportContentTest {
             val plugin = EffectivePlugin(
                 alias = "kotlin-jvm",
                 id = "org.jetbrains.kotlin.jvm",
-                version = ResolvedVersion(alias = "kotlin", value = "2.1.20", source = VersionSource.DECLARED, originalRef = null),
+                version = EffectiveVersion.Resolved(ResolvedVersion(alias = "kotlin", value = "2.1.20", source = VersionSource.DECLARED, originalRef = null)),
             )
             val metadata = emptyMetadata().copy(plugins = mapOf("kotlin-jvm" to plugin))
             val settings = allSectionsSettings(ReportFormat.MARKDOWN)

@@ -73,17 +73,15 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
     ): String {
         val group = escapeTomlValue(lib.group)
         val name = escapeTomlValue(lib.artifact)
-        val versionPart = resolveVersionPart(lib.version, versions) { alias ->
+        val versionPart = resolveVersionPart(lib.version.resolvedOrNull, versions) { alias ->
             logger.warn { "Library '${lib.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
         }
 
         return "${lib.alias} = { group = \"$group\", name = \"$name\"$versionPart }"
     }
 
-    private fun buildDeprecationComment(lib: EffectiveLibrary): String {
-        val parts = lib.deprecation?.toCommentParts() ?: listOf("DEPRECATED")
-        return "# ${parts.joinToString(". ")}."
-    }
+    private fun buildDeprecationComment(lib: EffectiveLibrary): String =
+        "# ${lib.deprecationSummary ?: "DEPRECATED"}."
 
     private fun generateBundlesSection(bundles: Map<String, EffectiveBundle>): String {
         if (bundles.isEmpty()) return ""
@@ -110,7 +108,7 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
         versions: Map<String, ResolvedVersion>,
     ): String {
         val id = escapeTomlValue(plugin.id)
-        val versionPart = resolveVersionPart(plugin.version, versions) { alias ->
+        val versionPart = resolveVersionPart(plugin.version.resolvedOrNull, versions) { alias ->
             logger.warn { "Plugin '${plugin.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
         }
 

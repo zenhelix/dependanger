@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 
 internal fun tree(
@@ -28,7 +29,7 @@ internal fun effectiveLibrary(
     alias = "$group:$artifact",
     group = group,
     artifact = artifact,
-    version = null,
+    version = EffectiveVersion.None,
     description = null,
     tags = emptySet(),
     requires = null,

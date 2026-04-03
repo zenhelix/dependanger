@@ -6,5 +6,5 @@ import kotlinx.serialization.Serializable
 public data class EffectivePlugin(
     val alias: String,
     val id: String,
-    val version: ResolvedVersion?,
+    val version: EffectiveVersion,
 )

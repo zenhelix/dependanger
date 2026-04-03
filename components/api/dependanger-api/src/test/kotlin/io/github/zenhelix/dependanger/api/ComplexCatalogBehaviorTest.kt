@@ -391,10 +391,10 @@ class ComplexCatalogBehaviorTest {
             assertThat(result2.isSuccess).isTrue()
             assertThat((result1 as DependangerResult.Success).effective.libraries.keys)
                 .isEqualTo((result2 as DependangerResult.Success).effective.libraries.keys)
-            assertThat((result1 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value)
-                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version!!.value)
-            assertThat((result1 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value)
-                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version!!.value)
+            assertThat((result1 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull)
+                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull)
+            assertThat((result1 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version.valueOrNull)
+                .isEqualTo((result2 as DependangerResult.Success).effective.libraries["ktor-core"]!!.version.valueOrNull)
         }
     }
 
@@ -418,7 +418,7 @@ class ComplexCatalogBehaviorTest {
             assertThat((result as DependangerResult.Success).effective.libraries).hasSize(50)
             (1..50).forEach { i ->
                 assertThat((result as DependangerResult.Success).effective.libraries).containsKey("lib-$i")
-                assertThat((result as DependangerResult.Success).effective.libraries["lib-$i"]!!.version!!.value)
+                assertThat((result as DependangerResult.Success).effective.libraries["lib-$i"]!!.version.valueOrNull)
                     .isEqualTo("$i.0.0")
             }
         }

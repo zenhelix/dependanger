@@ -62,6 +62,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                 }
 
                 is EffectiveVersion.Resolved,
+                is EffectiveVersion.Range,
                 is EffectiveVersion.None,
                                                -> lib
             }
@@ -94,6 +95,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                 }
 
                 is EffectiveVersion.Resolved,
+                is EffectiveVersion.Range,
                 is EffectiveVersion.None,
                                                -> plugin
             }

@@ -34,6 +34,8 @@ include(":components:shared:dependanger-maven-pom")
 include(":components:shared:dependanger-maven-client")
 include(":components:shared:dependanger-http-client")
 include(":components:shared:dependanger-cache")
+include(":components:shared:dependanger-osv-client")
+include(":components:shared:dependanger-clearlydefined-client")
 
 // API module (API layer)
 include(":components:api:dependanger-api")

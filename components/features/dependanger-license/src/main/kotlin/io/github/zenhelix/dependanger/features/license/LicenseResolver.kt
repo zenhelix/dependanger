@@ -3,19 +3,21 @@ package io.github.zenhelix.dependanger.features.license
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
+import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedClient
+import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedResult
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
 import io.github.zenhelix.dependanger.maven.client.DownloadResult
-import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.MavenPomService
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParser
 
 private val logger = KotlinLogging.logger {}
 
 public class LicenseResolver(
     private val cache: DirBasedCache<List<LicenseResult>>,
-    private val pomDownloader: MavenPomDownloader,
+    private val pomService: MavenPomService,
     private val clearlyDefinedClient: ClearlyDefinedClient,
     private val customProviders: List<LicenseSourceProvider> = emptyList(),
 ) {
@@ -134,7 +136,7 @@ public class LicenseResolver(
     ): List<LicenseResult>? {
         val coordinate = "$group:$artifact:$version"
 
-        return when (val downloadResult = pomDownloader.downloadPom(group, artifact, version)) {
+        return when (val downloadResult = pomService.downloadPom(group, artifact, version)) {
             is DownloadResult.Success      -> {
                 val pomProject = try {
                     PomParser.parse(downloadResult.content)
@@ -181,9 +183,11 @@ public class LicenseResolver(
     ): List<LicenseResult>? {
         val coordinate = "$group:$artifact:$version"
 
-        return when (val result = clearlyDefinedClient.fetchLicenses(group, artifact, version)) {
-            is ClearlyDefinedResult.Success  -> {
-                result.licenseIds.map { licenseId ->
+        return when (val result = clearlyDefinedClient.fetchLicense(group, artifact, version)) {
+            is ClearlyDefinedResult.Found -> {
+                val licenseIds = SpdxExpressionParser.parse(result.declaredExpression)
+                if (licenseIds.isEmpty()) return null
+                licenseIds.map { licenseId ->
                     val spdxId = SpdxLicenseMapper.normalize(licenseId) ?: licenseId
                     val category = SpdxLicenseMapper.categorize(spdxId)
                     createLicenseResult(spdxId = spdxId, licenseName = licenseId, source = LicenseSource.CLEARLY_DEFINED, category = category)

@@ -2,7 +2,7 @@ package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.maven.client.DownloadResult
-import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.MavenPomService
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependency
 import io.github.zenhelix.dependanger.maven.pom.model.PomDependencyManagement
 import io.github.zenhelix.dependanger.maven.pom.model.PomProject
@@ -15,7 +15,7 @@ private val logger = KotlinLogging.logger {}
 private const val MAX_PARENT_DEPTH = 10
 
 internal class ParentPomResolver(
-    private val pomDownloader: MavenPomDownloader,
+    private val pomDownloader: MavenPomService,
 ) {
     private val parentCache = ConcurrentHashMap<String, PomProject?>()
 

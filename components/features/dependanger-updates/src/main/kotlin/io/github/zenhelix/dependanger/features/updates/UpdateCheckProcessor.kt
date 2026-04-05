@@ -28,8 +28,9 @@ import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.http.client.createDefault
-import io.ktor.client.HttpClient
+import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
+import io.github.zenhelix.dependanger.maven.client.MavenMetadataService
+import io.github.zenhelix.dependanger.maven.client.MetadataFetchResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -283,21 +284,21 @@ private class UpdateCheckContext(
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.createDefault(readTimeoutMs)
-
     val cache: VersionCache = VersionCache(
         cacheDirectory = cacheDirectory,
         ttlHours = cacheTtlHours,
     )
 
-    val fetcher: MavenMetadataFetcher = MavenMetadataFetcher(
-        repositories = repositories,
-        httpClient = httpClient,
-        credentialsProvider = credentialsProvider,
-        readTimeoutMs = readTimeoutMs,
+    val fetcher: MavenMetadataService = MavenMetadataService(
+        MavenClientConfig(
+            repositories = repositories,
+            credentialsProvider = credentialsProvider,
+            readTimeoutMs = readTimeoutMs,
+        ),
+        httpClientFactory,
     )
 
     override fun close() {
-        httpClient.close()
+        fetcher.close()
     }
 }

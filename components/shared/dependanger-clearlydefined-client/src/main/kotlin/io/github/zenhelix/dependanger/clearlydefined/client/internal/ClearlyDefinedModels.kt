@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.license.model
+package io.github.zenhelix.dependanger.clearlydefined.client.internal
 
 import kotlinx.serialization.Serializable
 

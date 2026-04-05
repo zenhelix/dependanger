@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.updates
+package io.github.zenhelix.dependanger.maven.client
 
 public sealed interface MetadataFetchResult {
     public data class Success(val versions: List<String>, val repository: String) : MetadataFetchResult

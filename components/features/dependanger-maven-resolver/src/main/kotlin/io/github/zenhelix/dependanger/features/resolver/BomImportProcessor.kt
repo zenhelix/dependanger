@@ -21,15 +21,13 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.http.client.createDefault
 import io.github.zenhelix.dependanger.maven.client.DownloadResult
-import io.github.zenhelix.dependanger.maven.client.MavenPomDownloader
+import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
+import io.github.zenhelix.dependanger.maven.client.MavenPomService
 import io.github.zenhelix.dependanger.maven.client.PomXmlParser
 import io.github.zenhelix.dependanger.maven.client.RawBomDependency
-import io.ktor.client.HttpClient
 
 private val logger = KotlinLogging.logger {}
 
@@ -396,8 +394,6 @@ private class BomResolutionContext(
     ttlSnapshotHours: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.createDefault(HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS)
-
     val cache: DirBasedCache<BomContent> = DirBasedCache(
         cacheDirectory = cacheDirectory,
         ttlHours = ttlHours,
@@ -406,16 +402,17 @@ private class BomResolutionContext(
         contentFileName = "bom-content.json",
     )
 
-    val downloader: MavenPomDownloader = MavenPomDownloader(
-        repositories = repositories,
-        httpClient = httpClient,
-        credentialsProvider = credentialsProvider,
-        readTimeoutMs = HttpClientConfig.DEFAULT_REQUEST_TIMEOUT_MS,
+    val downloader: MavenPomService = MavenPomService(
+        MavenClientConfig(
+            repositories = repositories,
+            credentialsProvider = credentialsProvider,
+        ),
+        httpClientFactory,
     )
 
     val parser: PomXmlParser = PomXmlParser()
 
     override fun close() {
-        httpClient.close()
+        downloader.close()
     }
 }

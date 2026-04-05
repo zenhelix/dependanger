@@ -22,14 +22,13 @@ import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCh
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.http.client.RetryConfig
-import io.github.zenhelix.dependanger.http.client.createDefault
-import io.ktor.client.HttpClient
+import io.github.zenhelix.dependanger.osv.client.OsvBatchResult
+import io.github.zenhelix.dependanger.osv.client.OsvClient
+import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
+import io.github.zenhelix.dependanger.osv.client.OsvPackageQuery
+import io.github.zenhelix.dependanger.osv.client.OsvVulnerabilityData
 
 private val logger = KotlinLogging.logger {}
-
-private const val OSV_API_URL: String = "https://api.osv.dev"
-private const val OSV_BATCH_SIZE: Int = 1000
 
 public class SecurityCheckProcessor : ParallelMetadataProcessor {
     override val id: String = PROCESSOR_ID
@@ -65,7 +64,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         )
 
         val cachedVulns = mutableListOf<VulnerabilityInfo>()
-        val uncachedPackages = mutableListOf<PackageQuery>()
+        val uncachedPackages = mutableListOf<OsvPackageQuery>()
 
         for (lib in candidates) {
             val version = lib.version.valueOrNull!!
@@ -76,11 +75,11 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
 
                 is CacheResult.Corrupted -> {
                     logger.warn { "Corrupted security cache for ${lib.group}:${lib.artifact}:$version" }
-                    uncachedPackages.add(PackageQuery(group = lib.group, artifact = lib.artifact, version = version))
+                    uncachedPackages.add(OsvPackageQuery(group = lib.group, artifact = lib.artifact, version = version))
                 }
 
                 is CacheResult.Miss      -> {
-                    uncachedPackages.add(PackageQuery(group = lib.group, artifact = lib.artifact, version = version))
+                    uncachedPackages.add(OsvPackageQuery(group = lib.group, artifact = lib.artifact, version = version))
                 }
             }
         }
@@ -92,8 +91,9 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
             SecurityCheckContext(httpClientFactory = httpClientFactory, timeoutMs = settings.timeout).use { ctx ->
                 when (val result = ctx.osvClient.queryBatch(uncachedPackages)) {
                     is OsvBatchResult.Success -> {
-                        for ((i, vulns) in result.vulnerabilities.withIndex()) {
+                        for ((i, osvVulns) in result.vulnerabilities.withIndex()) {
                             val pkg = uncachedPackages[i]
+                            val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
                             fetchedVulns.addAll(vulns)
                             try {
                                 cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
@@ -105,8 +105,9 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
 
                     is OsvBatchResult.PartialSuccess -> {
                         // Process the successful results
-                        for ((i, vulns) in result.vulnerabilities.withIndex()) {
+                        for ((i, osvVulns) in result.vulnerabilities.withIndex()) {
                             val pkg = uncachedPackages[i]
+                            val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
                             fetchedVulns.addAll(vulns)
                             try {
                                 cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
@@ -164,7 +165,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
 
     private fun handleApiFailure(
         cache: SecurityCache,
-        failedPackages: List<PackageQuery>,
+        failedPackages: List<OsvPackageQuery>,
         fallbackDiagnosticCode: String,
         fallbackMessage: String,
     ): ApiFailureResult {
@@ -252,22 +253,41 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         }
 }
 
+private fun mapToVulnerabilityInfo(vuln: OsvVulnerabilityData, pkg: OsvPackageQuery): VulnerabilityInfo =
+    VulnerabilityInfo(
+        id = vuln.id,
+        aliases = vuln.aliases,
+        summary = vuln.summary,
+        severity = cvssScoreToSeverity(vuln.cvssScore),
+        cvssScore = vuln.cvssScore,
+        cvssVersion = vuln.cvssVersion,
+        fixedVersion = vuln.fixedVersion,
+        url = vuln.referenceUrl,
+        affectedGroup = pkg.group,
+        affectedArtifact = pkg.artifact,
+        affectedVersion = pkg.version,
+    )
+
+private fun cvssScoreToSeverity(score: Double?): VulnerabilitySeverity = when {
+    score == null -> VulnerabilitySeverity.UNKNOWN
+    score >= 9.0  -> VulnerabilitySeverity.CRITICAL
+    score >= 7.0  -> VulnerabilitySeverity.HIGH
+    score >= 4.0  -> VulnerabilitySeverity.MEDIUM
+    score >= 0.1  -> VulnerabilitySeverity.LOW
+    else          -> VulnerabilitySeverity.NONE
+}
+
 private class SecurityCheckContext(
     httpClientFactory: HttpClientFactory,
     timeoutMs: Long,
 ) : AutoCloseable {
 
-    val httpClient: HttpClient = httpClientFactory.createDefault(timeoutMs)
-
-    val osvClient: OsvApiClient = OsvApiClient(
-        apiUrl = OSV_API_URL,
-        httpClient = httpClient,
-        batchSize = OSV_BATCH_SIZE,
-        retryConfig = RetryConfig(),
-        timeoutMs = timeoutMs,
+    val osvClient: OsvClient = OsvClient(
+        OsvClientConfig(timeoutMs = timeoutMs),
+        httpClientFactory,
     )
 
     override fun close() {
-        httpClient.close()
+        osvClient.close()
     }
 }

@@ -11,7 +11,6 @@ dependencies {
     api(projects.components.core.dependangerEffective)
     implementation(projects.components.shared.dependangerMavenClient)
     implementation(projects.components.shared.dependangerCache)
-    implementation(projects.components.shared.dependangerHttpClient)
     implementation(libs.kotlin.logging.jvm)
     implementation(libs.kotlinx.datetime)
 

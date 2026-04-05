@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.features.security
+package io.github.zenhelix.dependanger.osv.client.internal
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

@@ -1,23 +1,20 @@
 package io.github.zenhelix.dependanger.maven.client
 
-import io.github.zenhelix.dependanger.core.model.CredentialsProvider
-import io.github.zenhelix.dependanger.core.model.MavenRepository
-import io.github.zenhelix.dependanger.http.client.HttpClientConfig
+import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpResult
-import io.github.zenhelix.dependanger.http.client.RetryConfig
+import io.github.zenhelix.dependanger.http.client.createDefault
 import io.github.zenhelix.dependanger.http.client.getWithRetry
-import io.ktor.client.HttpClient
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.basicAuth
 
-public class MavenPomDownloader(
-    private val repositories: List<MavenRepository>,
-    private val httpClient: HttpClient,
-    private val credentialsProvider: CredentialsProvider?,
-    private val connectTimeoutMs: Long = HttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS,
-    private val readTimeoutMs: Long,
-) {
-    public suspend fun downloadPom(
+internal class DefaultMavenPomService(
+    private val config: MavenClientConfig,
+    httpClientFactory: HttpClientFactory,
+) : MavenPomService {
+
+    private val httpClient = httpClientFactory.createDefault(config.readTimeoutMs)
+
+    override suspend fun downloadPom(
         group: String,
         artifact: String,
         version: String,
@@ -29,7 +26,7 @@ public class MavenPomDownloader(
         var lastFailure: DownloadResult.Failed? = null
         var allNotFound = true
 
-        for (repo in repositories) {
+        for (repo in config.repositories) {
             val url = "${repo.url.trimEnd('/')}/$groupPath/$artifact/$version/$pomFileName"
             when (val result = downloadWithRetry(url, repo.url)) {
                 is DownloadResult.Success      -> return result
@@ -57,13 +54,13 @@ public class MavenPomDownloader(
     }
 
     private suspend fun downloadWithRetry(url: String, repoUrl: String): DownloadResult {
-        val httpResult = httpClient.getWithRetry(url, RetryConfig()) {
-            credentialsProvider?.getCredentials(repoUrl)?.let { creds ->
+        val httpResult = httpClient.getWithRetry(url, config.retryConfig) {
+            config.credentialsProvider?.getCredentials(repoUrl)?.let { creds ->
                 basicAuth(creds.username, creds.password)
             }
             timeout {
-                connectTimeoutMillis = connectTimeoutMs
-                requestTimeoutMillis = readTimeoutMs
+                connectTimeoutMillis = config.connectTimeoutMs
+                requestTimeoutMillis = config.readTimeoutMs
             }
         }
 
@@ -74,5 +71,9 @@ public class MavenPomDownloader(
             is HttpResult.RateLimited  -> DownloadResult.Failed("Rate limited for $url, retry after ${httpResult.retryAfterMs}ms")
             is HttpResult.Failed       -> DownloadResult.Failed(httpResult.error)
         }
+    }
+
+    override fun close() {
+        httpClient.close()
     }
 }

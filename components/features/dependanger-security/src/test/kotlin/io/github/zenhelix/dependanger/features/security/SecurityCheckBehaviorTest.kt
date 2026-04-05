@@ -2,6 +2,9 @@ package io.github.zenhelix.dependanger.features.security
 
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.osv.client.OsvBatchResult
+import io.github.zenhelix.dependanger.osv.client.OsvPackageQuery
+import io.github.zenhelix.dependanger.osv.client.OsvVulnerabilityData
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
@@ -349,21 +352,17 @@ class SecurityCheckBehaviorTest {
 
         @Test
         fun `Success contains list of vulnerability lists`() {
-            val vulnLists: List<List<VulnerabilityInfo>> = listOf(
+            val vulnLists: List<List<OsvVulnerabilityData>> = listOf(
                 emptyList(),
                 listOf(
-                    VulnerabilityInfo(
+                    OsvVulnerabilityData(
                         id = "GHSA-test",
                         aliases = emptyList(),
                         summary = "Test",
-                        severity = VulnerabilitySeverity.HIGH,
                         cvssScore = 7.5,
                         cvssVersion = "CVSS_V3",
                         fixedVersion = null,
-                        url = null,
-                        affectedGroup = "com.example",
-                        affectedArtifact = "lib",
-                        affectedVersion = "1.0.0",
+                        referenceUrl = null,
                     ),
                 ),
             )
@@ -405,11 +404,11 @@ class SecurityCheckBehaviorTest {
     }
 
     @Nested
-    inner class `PackageQuery construction` {
+    inner class `OsvPackageQuery construction` {
 
         @Test
         fun `package query holds Maven coordinates`() {
-            val query = PackageQuery(
+            val query = OsvPackageQuery(
                 group = "org.springframework.boot",
                 artifact = "spring-boot-starter",
                 version = "3.4.0",

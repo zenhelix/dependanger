@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.core.util.VersionComparator
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
+import io.github.zenhelix.dependanger.maven.client.MetadataFetchResult
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

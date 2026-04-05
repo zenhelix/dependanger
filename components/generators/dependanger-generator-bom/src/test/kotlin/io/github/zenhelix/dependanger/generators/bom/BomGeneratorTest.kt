@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
@@ -61,6 +62,26 @@ class BomGeneratorTest {
         tags = emptySet(),
         requires = null,
         deprecation = deprecation,
+        license = null,
+        constraints = emptyList(),
+        isPlatform = isPlatform,
+    )
+
+    private fun libraryWithRange(
+        alias: String,
+        group: String,
+        artifact: String,
+        range: VersionRange,
+        isPlatform: Boolean = false,
+    ): EffectiveLibrary = EffectiveLibrary(
+        alias = alias,
+        group = group,
+        artifact = artifact,
+        version = EffectiveVersion.Range(range),
+        description = null,
+        tags = emptySet(),
+        requires = null,
+        deprecation = null,
         license = null,
         constraints = emptyList(),
         isPlatform = isPlatform,
@@ -636,6 +657,89 @@ class BomGeneratorTest {
 
             assertThat(tempDir.resolve("custom.pom.xml")).exists()
             assertThat(tempDir.resolve(BomConfig.DEFAULT_FILENAME)).doesNotExist()
+        }
+    }
+
+    @Nested
+    inner class VersionRangeHandling {
+        @Test
+        fun `library with simple range is included with range notation`() {
+            val generator = BomGenerator(defaultConfig)
+            val lib = libraryWithRange(
+                alias = "guava",
+                group = "com.google.guava",
+                artifact = "guava",
+                range = VersionRange.Simple("[1.0,2.0)"),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("<artifactId>guava</artifactId>")
+            assertThat(result).contains("<version>[1.0,2.0)</version>")
+        }
+
+        @Test
+        fun `library with rich version is excluded from BOM`() {
+            val generator = BomGenerator(defaultConfig)
+            val lib = libraryWithRange(
+                alias = "rich",
+                group = "com.example",
+                artifact = "rich",
+                range = VersionRange.Rich(require = "1.0", strictly = null, prefer = "2.0", reject = emptyList()),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("rich" to lib)))
+
+            assertThat(result).doesNotContain("<artifactId>rich</artifactId>")
+        }
+
+        @Test
+        fun `simple range and resolved versions coexist in BOM`() {
+            val generator = BomGenerator(defaultConfig)
+            val libraries = mapOf(
+                "guava" to libraryWithRange(
+                    alias = "guava",
+                    group = "com.google.guava",
+                    artifact = "guava",
+                    range = VersionRange.Simple("[31.0,32.0)"),
+                ),
+                "kotlin-stdlib" to library(
+                    "kotlin-stdlib", "org.jetbrains.kotlin", "kotlin-stdlib",
+                    version = version("kotlin", "2.1.20"),
+                ),
+            )
+            val result = generator.generate(emptyMetadata(libraries = libraries))
+
+            assertThat(result).contains("<artifactId>guava</artifactId>")
+            assertThat(result).contains("<version>[31.0,32.0)</version>")
+            assertThat(result).contains("<artifactId>kotlin-stdlib</artifactId>")
+            assertThat(result).contains("<version>2.1.20</version>")
+        }
+
+        @Test
+        fun `rich version is excluded while resolved and simple range are included`() {
+            val generator = BomGenerator(defaultConfig)
+            val libraries = mapOf(
+                "resolved-lib" to library(
+                    "resolved-lib", "com.example", "resolved-lib",
+                    version = version("v", "1.0.0"),
+                ),
+                "simple-range-lib" to libraryWithRange(
+                    alias = "simple-range-lib",
+                    group = "com.example",
+                    artifact = "simple-range-lib",
+                    range = VersionRange.Simple("[1.0,2.0)"),
+                ),
+                "rich-lib" to libraryWithRange(
+                    alias = "rich-lib",
+                    group = "com.example",
+                    artifact = "rich-lib",
+                    range = VersionRange.Rich(require = "1.0", strictly = null, prefer = "2.0", reject = emptyList()),
+                ),
+            )
+            val result = generator.generate(emptyMetadata(libraries = libraries))
+
+            assertThat(result).contains("<artifactId>resolved-lib</artifactId>")
+            assertThat(result).contains("<artifactId>simple-range-lib</artifactId>")
+            assertThat(result).doesNotContain("<artifactId>rich-lib</artifactId>")
         }
     }
 

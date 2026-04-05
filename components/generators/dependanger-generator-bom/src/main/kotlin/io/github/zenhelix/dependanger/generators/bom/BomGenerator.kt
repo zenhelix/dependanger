@@ -1,8 +1,10 @@
 package io.github.zenhelix.dependanger.generators.bom
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
+import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
 import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
@@ -38,14 +40,23 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     }
 
     private fun prepareDependencies(effective: EffectiveMetadata): List<EffectiveLibrary> {
-        val noVersion = effective.libraries.values.filter { !it.version.isResolved }
+        val (includable, excluded) = effective.libraries.values.partition { lib ->
+            lib.version.isResolved || lib.version.rangeOrNull is VersionRange.Simple
+        }
+
+        val richVersionLibs = effective.libraries.values.filter { lib ->
+            lib.version.rangeOrNull is VersionRange.Rich
+        }
+        if (richVersionLibs.isNotEmpty()) {
+            logger.warn { "Skipping ${richVersionLibs.size} libraries with rich versions (not supported in Maven BOM): ${richVersionLibs.map { it.alias }}" }
+        }
+
+        val noVersion = excluded - richVersionLibs.toSet()
         if (noVersion.isNotEmpty()) {
             logger.warn { "Skipping ${noVersion.size} libraries without version: ${noVersion.map { it.alias }}" }
         }
 
-        return effective.libraries.values
-            .filter { it.version.isResolved }
-            .sortedWith(compareBy({ it.group }, { it.artifact }))
+        return includable.sortedWith(compareBy({ it.group }, { it.artifact }))
     }
 
     private fun buildXml(dependencies: List<EffectiveLibrary>): String {
@@ -53,7 +64,11 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
             PomDependency(
                 groupId = lib.group,
                 artifactId = lib.artifact,
-                version = lib.version.valueOrNull,
+                version = when (val v = lib.version) {
+                    is EffectiveVersion.Resolved -> v.version.value
+                    is EffectiveVersion.Range -> (v.range as VersionRange.Simple).notation
+                    else -> null
+                },
                 type = if (lib.isPlatform) "pom" else null,
                 scope = if (lib.isPlatform) "import" else null,
                 optional = config.includeOptionalDependencies,

@@ -124,4 +124,8 @@ public object DiagnosticCodes {
         public const val INVALID_CVSS: String = "SECURITY_INVALID_CVSS"
         public const val CVSS_V2: String = "SECURITY_CVSS_V2"
     }
+
+    public object Generation {
+        public const val RICH_VERSION_SKIPPED: String = "GENERATION_RICH_VERSION_SKIPPED"
+    }
 }

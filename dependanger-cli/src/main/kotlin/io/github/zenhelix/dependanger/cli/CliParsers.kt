@@ -36,3 +36,11 @@ public fun parseMavenRepositories(raw: String?): List<MavenRepository>? =
     raw?.split(",")?.mapIndexed { i, url ->
         MavenRepository(url = url.trim(), name = "cli-repo-$i")
     }
+
+public inline fun <reified E : Enum<E>> parseEnum(value: String, label: String): E = try {
+    enumValueOf<E>(value.uppercase())
+} catch (_: IllegalArgumentException) {
+    throw CliException.InvalidArgument(
+        "Unknown $label '$value'. Available: ${enumValues<E>().joinToString { it.name }}"
+    )
+}

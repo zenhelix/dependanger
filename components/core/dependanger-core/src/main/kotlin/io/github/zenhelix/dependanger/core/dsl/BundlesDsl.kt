@@ -5,11 +5,11 @@ import io.github.zenhelix.dependanger.core.model.Bundle
 @DependangerDslMarker
 public class BundlesDsl {
     private val _bundles: MutableList<Bundle> = mutableListOf()
+    private val _aliases: MutableSet<String> = mutableSetOf()
     public val bundles: List<Bundle> get() = _bundles.toList()
 
     public fun bundle(name: String, block: BundleDsl.() -> Unit = {}) {
-        require(name.isNotBlank()) { "Bundle name must not be blank" }
-        require(_bundles.none { it.alias == name }) { "Duplicate bundle name: '$name'" }
+        requireUniqueAlias(name, "Bundle name", _aliases)
         val dsl = BundleDsl().apply(block)
         _bundles.add(Bundle(alias = name, libraries = dsl.libraries.toList(), extends = dsl.extendsList.toList()))
     }

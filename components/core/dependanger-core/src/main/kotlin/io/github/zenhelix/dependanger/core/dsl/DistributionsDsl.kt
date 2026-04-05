@@ -7,11 +7,11 @@ import io.github.zenhelix.dependanger.core.model.filter.PluginFilterSpec
 @DependangerDslMarker
 public class DistributionsDsl {
     private val _distributions: MutableList<Distribution> = mutableListOf()
+    private val _aliases: MutableSet<String> = mutableSetOf()
     public val distributions: List<Distribution> get() = _distributions.toList()
 
     public fun distribution(name: String, block: DistributionDsl.() -> Unit = {}) {
-        require(name.isNotBlank()) { "Distribution name must not be blank" }
-        require(_distributions.none { it.name == name }) { "Duplicate distribution name: '$name'" }
+        requireUniqueAlias(name, "Distribution name", _aliases)
         val dsl = DistributionDsl().apply(block)
         _distributions.add(Distribution(name = name, librarySpec = dsl.libraryFilterSpec, pluginSpec = dsl.pluginFilterSpec))
     }

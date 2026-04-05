@@ -10,11 +10,11 @@ import io.github.zenhelix.dependanger.core.model.VersionReference
 @DependangerDslMarker
 public class LibrariesDsl {
     private val _libraries: MutableList<Library> = mutableListOf()
+    private val _aliases: MutableSet<String> = mutableSetOf()
     public val libraries: List<Library> get() = _libraries.toList()
 
     public fun library(alias: String, coordinates: String) {
-        require(alias.isNotBlank()) { "Library alias must not be blank" }
-        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
+        requireUniqueAlias(alias, "Library alias", _aliases)
         val (group, artifact, version) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -26,8 +26,7 @@ public class LibrariesDsl {
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
-        require(alias.isNotBlank()) { "Library alias must not be blank" }
-        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
+        requireUniqueAlias(alias, "Library alias", _aliases)
         val (group, artifact, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -39,24 +38,21 @@ public class LibrariesDsl {
     }
 
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
-        require(alias.isNotBlank()) { "Library alias must not be blank" }
-        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
+        requireUniqueAlias(alias, "Library alias", _aliases)
         val (group, artifact, version) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
         _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference, block: LibraryDsl.() -> Unit) {
-        require(alias.isNotBlank()) { "Library alias must not be blank" }
-        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
+        requireUniqueAlias(alias, "Library alias", _aliases)
         val (group, artifact, _) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
         _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
-        require(alias.isNotBlank()) { "Library alias must not be blank" }
-        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
+        requireUniqueAlias(alias, "Library alias", _aliases)
         val (group, artifact, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -78,6 +74,7 @@ public class LibrariesDsl {
             3    -> {
                 require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
                 require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
+                require(parts[2].isNotBlank()) { "Version must not be blank in coordinates '$raw'" }
                 Triple(parts[0], parts[1], VersionReference.Literal(parts[2]))
             }
             else -> throw IllegalArgumentException("Invalid coordinates: $raw")

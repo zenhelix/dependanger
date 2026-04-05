@@ -7,17 +7,16 @@ import io.github.zenhelix.dependanger.core.model.VersionFallback
 @DependangerDslMarker
 public class VersionsDsl {
     private val _versions: MutableList<Version> = mutableListOf()
+    private val _aliases: MutableSet<String> = mutableSetOf()
     public val versions: List<Version> get() = _versions.toList()
 
     public fun version(alias: String, value: String) {
-        require(alias.isNotBlank()) { "Version name must not be blank" }
-        require(_versions.none { it.name == alias }) { "Duplicate version name: '$alias'" }
+        requireUniqueAlias(alias, "Version name", _aliases)
         _versions.add(Version(name = alias, value = value, fallbacks = emptyList()))
     }
 
     public fun version(alias: String, value: String, block: VersionDsl.() -> Unit) {
-        require(alias.isNotBlank()) { "Version name must not be blank" }
-        require(_versions.none { it.name == alias }) { "Duplicate version name: '$alias'" }
+        requireUniqueAlias(alias, "Version name", _aliases)
         val dsl = VersionDsl().apply(block)
         _versions.add(Version(name = alias, value = value, fallbacks = dsl.fallbacks))
     }

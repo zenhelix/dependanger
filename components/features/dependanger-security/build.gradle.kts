@@ -10,7 +10,7 @@ dependencies {
     api(projects.components.core.dependangerCore)
     api(projects.components.core.dependangerEffective)
     api(projects.components.shared.dependangerFeatureModel)
-    implementation(projects.components.shared.dependangerOsvClient)
+    implementation(projects.components.shared.integrations.dependangerOsvHttpClient)
     implementation(projects.components.shared.dependangerCache)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)

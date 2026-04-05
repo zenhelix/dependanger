@@ -31,11 +31,13 @@ include(":components:core:dependanger-effective")
 // Shared modules
 include(":components:shared:dependanger-feature-model")
 include(":components:shared:dependanger-maven-pom")
-include(":components:shared:dependanger-maven-client")
 include(":components:shared:dependanger-http-client")
 include(":components:shared:dependanger-cache")
-include(":components:shared:dependanger-osv-client")
-include(":components:shared:dependanger-clearlydefined-client")
+
+// Shared integration client modules
+include(":components:shared:integrations:dependanger-maven-http-client")
+include(":components:shared:integrations:dependanger-osv-http-client")
+include(":components:shared:integrations:dependanger-clearlydefined-http-client")
 
 // API module (API layer)
 include(":components:api:dependanger-api")

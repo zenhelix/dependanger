@@ -43,6 +43,33 @@ class EffectiveVersionTest {
     }
 
     @Nested
+    inner class InlineVariant {
+        @Test
+        fun `Inline isResolved returns false`() {
+            val inline = EffectiveVersion.Inline("1.2.3")
+            assertThat(inline.isResolved).isFalse()
+        }
+
+        @Test
+        fun `Inline valueOrNull returns the value`() {
+            val inline = EffectiveVersion.Inline("1.2.3")
+            assertThat(inline.valueOrNull).isEqualTo("1.2.3")
+        }
+
+        @Test
+        fun `Inline resolvedOrNull returns null`() {
+            val inline = EffectiveVersion.Inline("1.2.3")
+            assertThat(inline.resolvedOrNull).isNull()
+        }
+
+        @Test
+        fun `Inline rangeOrNull returns null`() {
+            val inline = EffectiveVersion.Inline("1.2.3")
+            assertThat(inline.rangeOrNull).isNull()
+        }
+    }
+
+    @Nested
     inner class RangeOrNullOnOtherVariants {
         @Test
         fun `Resolved rangeOrNull returns null`() {
@@ -60,6 +87,11 @@ class EffectiveVersionTest {
         @Test
         fun `Unresolved rangeOrNull returns null`() {
             assertThat(EffectiveVersion.Unresolved("ref").rangeOrNull).isNull()
+        }
+
+        @Test
+        fun `Inline rangeOrNull returns null`() {
+            assertThat(EffectiveVersion.Inline("1.0").rangeOrNull).isNull()
         }
     }
 }

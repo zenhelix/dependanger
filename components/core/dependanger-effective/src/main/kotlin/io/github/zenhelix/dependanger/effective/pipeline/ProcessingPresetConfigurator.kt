@@ -28,7 +28,6 @@ private fun configureMinimal(builder: PipelineBuilder) {
     builder.disable(ProcessorIds.LIBRARY_FILTER)
     builder.disable(ProcessorIds.BUNDLE_FILTER)
     builder.disable(ProcessorIds.PLUGIN_FILTER)
-    builder.disable(ProcessorIds.PLUGIN)
     builder.disable(ProcessorIds.USED_VERSIONS)
     builder.disable(ProcessorIds.VALIDATION)
     builder.disable(ProcessorIds.COMPAT_RULES)

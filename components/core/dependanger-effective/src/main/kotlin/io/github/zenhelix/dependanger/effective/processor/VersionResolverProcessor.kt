@@ -11,7 +11,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class VersionResolverProcessor : EffectiveMetadataProcessor {
+internal class VersionResolverProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.VERSION_RESOLVER
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_RESOLVER
     override val constraints: Set<OrderConstraint> = setOf(
@@ -62,6 +62,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                 }
 
                 is EffectiveVersion.Resolved,
+                is EffectiveVersion.Inline,
                 is EffectiveVersion.Range,
                 is EffectiveVersion.None,
                                                -> lib
@@ -95,6 +96,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                 }
 
                 is EffectiveVersion.Resolved,
+                is EffectiveVersion.Inline,
                 is EffectiveVersion.Range,
                 is EffectiveVersion.None,
                                                -> plugin

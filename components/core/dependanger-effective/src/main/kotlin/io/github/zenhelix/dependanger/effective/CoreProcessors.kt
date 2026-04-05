@@ -7,7 +7,6 @@ import io.github.zenhelix.dependanger.effective.processor.ExtractedVersionsProce
 import io.github.zenhelix.dependanger.effective.processor.LibraryFilterProcessor
 import io.github.zenhelix.dependanger.effective.processor.MetadataConversionProcessor
 import io.github.zenhelix.dependanger.effective.processor.PluginFilterProcessor
-import io.github.zenhelix.dependanger.effective.processor.PluginProcessor
 import io.github.zenhelix.dependanger.effective.processor.ProfileProcessor
 import io.github.zenhelix.dependanger.effective.processor.UsedVersionsProcessor
 import io.github.zenhelix.dependanger.effective.processor.ValidationProcessor
@@ -23,7 +22,6 @@ internal fun coreProcessors(): List<EffectiveMetadataProcessor> = listOf(
     VersionResolverProcessor(),
     BundleFilterProcessor(),
     PluginFilterProcessor(),
-    PluginProcessor(),
     UsedVersionsProcessor(),
     ValidationProcessor(),
     CompatRulesProcessor(),

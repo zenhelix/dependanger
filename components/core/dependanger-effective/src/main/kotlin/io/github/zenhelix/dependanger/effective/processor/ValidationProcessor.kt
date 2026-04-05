@@ -14,7 +14,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class ValidationProcessor : EffectiveMetadataProcessor {
+internal class ValidationProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.VALIDATION
     override val phase: ProcessingPhase = ProcessingPhase.VALIDATION
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
@@ -204,6 +204,6 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         ValidationAction.FAIL   -> Severity.ERROR
         ValidationAction.WARN   -> Severity.WARNING
         ValidationAction.INFO   -> Severity.INFO
-        ValidationAction.IGNORE -> Severity.INFO
+        ValidationAction.IGNORE -> error("IGNORE must be handled before toSeverity()")
     }
 }

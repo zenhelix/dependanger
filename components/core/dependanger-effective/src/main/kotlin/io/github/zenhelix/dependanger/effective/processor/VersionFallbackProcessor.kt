@@ -11,7 +11,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class VersionFallbackProcessor : EffectiveMetadataProcessor {
+internal class VersionFallbackProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.VERSION_FALLBACK
     override val phase: ProcessingPhase = ProcessingPhase.VERSION_FALLBACK
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.LIBRARY_FILTER))

@@ -8,7 +8,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class ProfileProcessor : EffectiveMetadataProcessor {
+internal class ProfileProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PROFILE
     override val phase: ProcessingPhase = ProcessingPhase.PROFILE
     override val isOptional: Boolean = false

@@ -13,7 +13,6 @@ public object ProcessorIds {
     public const val VERSION_RESOLVER: String = "version-resolver"
     public const val BUNDLE_FILTER: String = "bundle-filter"
     public const val PLUGIN_FILTER: String = "plugin-filter"
-    public const val PLUGIN: String = "plugin"
     public const val USED_VERSIONS: String = "used-versions"
     public const val VALIDATION: String = "validation"
     public const val COMPAT_RULES: String = "compat-rules"

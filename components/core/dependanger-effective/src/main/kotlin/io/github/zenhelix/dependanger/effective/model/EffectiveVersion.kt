@@ -23,6 +23,15 @@ public sealed class EffectiveVersion {
     @SerialName("unresolved")
     public data class Unresolved(val refName: String) : EffectiveVersion()
 
+    /**
+     * An inline literal version that has not yet been promoted to a named version entry.
+     * Created by [MetadataConversionProcessor] from [VersionReference.Literal],
+     * then promoted to [Resolved] by [ExtractedVersionsProcessor].
+     */
+    @Serializable
+    @SerialName("inline")
+    public data class Inline(val value: String) : EffectiveVersion()
+
     @Serializable
     @SerialName("range")
     public data class Range(val range: VersionRange) : EffectiveVersion()
@@ -34,10 +43,19 @@ public sealed class EffectiveVersion {
     /** Returns [ResolvedVersion] if this is [Resolved], null otherwise. */
     public val resolvedOrNull: ResolvedVersion? get() = (this as? Resolved)?.version
 
-    /** Returns the version string value if this is [Resolved], null otherwise. */
-    public val valueOrNull: String? get() = (this as? Resolved)?.version?.value
+    /** Returns the version string value if this is [Resolved] or [Inline], null otherwise. */
+    public val valueOrNull: String?
+        get() = when (this) {
+            is Resolved -> version.value
+            is Inline   -> value
+            else        -> null
+        }
 
-    /** True when a concrete version value is available. */
+    /**
+     * True only when the version has been fully resolved into the version catalog (i.e. [Resolved]).
+     * [Inline] versions carry a concrete value but are not yet promoted — use [valueOrNull] to check
+     * for any concrete value regardless of catalog status.
+     */
     public val isResolved: Boolean get() = this is Resolved
 
     /** Returns [VersionRange] if this is [Range], null otherwise. */

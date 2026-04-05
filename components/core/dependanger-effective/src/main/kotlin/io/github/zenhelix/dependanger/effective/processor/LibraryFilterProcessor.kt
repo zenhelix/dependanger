@@ -16,7 +16,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.LibraryFiltersKey
 
-public class LibraryFilterProcessor : EffectiveMetadataProcessor {
+internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.LIBRARY_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.LIBRARY_FILTER
     override val constraints: Set<OrderConstraint> = setOf(

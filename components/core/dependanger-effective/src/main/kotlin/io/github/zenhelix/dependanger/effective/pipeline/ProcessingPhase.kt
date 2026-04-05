@@ -24,7 +24,6 @@ public open class ProcessingPhase(
         public val VERSION_RESOLVER: ProcessingPhase = ProcessingPhase("VERSION_RESOLVER", ExecutionMode.SEQUENTIAL)
         public val BUNDLE_FILTER: ProcessingPhase = ProcessingPhase("BUNDLE_FILTER", ExecutionMode.SEQUENTIAL)
         public val PLUGIN_FILTER: ProcessingPhase = ProcessingPhase("PLUGIN_FILTER", ExecutionMode.SEQUENTIAL)
-        public val PLUGIN: ProcessingPhase = ProcessingPhase("PLUGIN", ExecutionMode.SEQUENTIAL)
         public val USED_VERSIONS: ProcessingPhase = ProcessingPhase("USED_VERSIONS", ExecutionMode.SEQUENTIAL)
         public val VALIDATION: ProcessingPhase = ProcessingPhase("VALIDATION", ExecutionMode.SEQUENTIAL)
         public val COMPAT_RULES: ProcessingPhase = ProcessingPhase("COMPAT_RULES", ExecutionMode.SEQUENTIAL)

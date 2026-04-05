@@ -15,7 +15,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class MetadataConversionProcessor : EffectiveMetadataProcessor {
+internal class MetadataConversionProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.METADATA_CONVERSION
     override val phase: ProcessingPhase = ProcessingPhase.METADATA_CONVERSION
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.PROFILE))
@@ -82,15 +82,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
     }
 
     private fun convertVersionReference(ref: VersionReference?): EffectiveVersion = when (ref) {
-        is VersionReference.Literal   -> EffectiveVersion.Resolved(
-            ResolvedVersion(
-                alias = "",
-                value = ref.version,
-                source = VersionSource.DECLARED,
-                originalRef = null,
-            )
-        )
-
+        is VersionReference.Literal -> EffectiveVersion.Inline(ref.version)
         is VersionReference.Reference -> EffectiveVersion.Unresolved(ref.name)
         is VersionReference.Range     -> EffectiveVersion.Range(ref.range)
         null                          -> EffectiveVersion.None

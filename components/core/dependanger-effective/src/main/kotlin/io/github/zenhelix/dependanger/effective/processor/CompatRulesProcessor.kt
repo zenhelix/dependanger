@@ -19,7 +19,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class CompatRulesProcessor : EffectiveMetadataProcessor {
+internal class CompatRulesProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.COMPAT_RULES
     override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VALIDATION))

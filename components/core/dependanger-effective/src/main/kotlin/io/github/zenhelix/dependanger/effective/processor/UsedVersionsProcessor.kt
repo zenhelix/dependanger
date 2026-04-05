@@ -10,12 +10,12 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class UsedVersionsProcessor : EffectiveMetadataProcessor {
+internal class UsedVersionsProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.USED_VERSIONS
     override val phase: ProcessingPhase = ProcessingPhase.USED_VERSIONS
     override val constraints: Set<OrderConstraint> = setOf(
         OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER),
-        OrderConstraint.runsAfter(ProcessorIds.PLUGIN),
+        OrderConstraint.runsAfter(ProcessorIds.PLUGIN_FILTER),
         OrderConstraint.runsAfter(ProcessorIds.VALIDATION),
     )
     override val isOptional: Boolean = false

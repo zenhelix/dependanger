@@ -10,7 +10,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.spi.PluginFiltersKey
 
-public class PluginFilterProcessor : EffectiveMetadataProcessor {
+internal class PluginFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.PLUGIN_FILTER
     override val phase: ProcessingPhase = ProcessingPhase.PLUGIN_FILTER
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))

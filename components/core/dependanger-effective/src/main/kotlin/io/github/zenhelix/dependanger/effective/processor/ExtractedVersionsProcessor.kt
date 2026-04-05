@@ -12,7 +12,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 
-public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
+internal class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.EXTRACTED_VERSIONS
     override val phase: ProcessingPhase = ProcessingPhase.EXTRACTED_VERSIONS
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))
@@ -73,23 +73,23 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
         alias: String,
         version: EffectiveVersion,
     ): ExtractionAccumulator {
-        val resolved = version.resolvedOrNull ?: return acc
-        if (resolved.alias.isNotEmpty() || resolved.value.isEmpty()) return acc
+        val inlineValue = (version as? EffectiveVersion.Inline)?.value ?: return acc
+        if (inlineValue.isEmpty()) return acc
 
         val nameResult = generateVersionName(alias, acc.usedNames)
         val newResolved = ResolvedVersion(
             alias = nameResult.name,
-            value = resolved.value,
+            value = inlineValue,
             source = VersionSource.DECLARED,
             originalRef = null,
         )
 
         val conflictDiagnostic = if (nameResult.wasCollision) {
             val existingValue = acc.allVersionValues[nameResult.baseName]
-            if (existingValue != null && existingValue != resolved.value) {
+            if (existingValue != null && existingValue != inlineValue) {
                 Diagnostics.warning(
                     code = DiagnosticCodes.Version.EXTRACTED_VERSION_CONFLICT,
-                    message = "Extracted version name '${nameResult.baseName}' conflicts with existing version (existing: $existingValue, new: ${resolved.value}), using '${nameResult.name}'",
+                    message = "Extracted version name '${nameResult.baseName}' conflicts with existing version (existing: $existingValue, new: $inlineValue), using '${nameResult.name}'",
                     processorId = id,
                     context = emptyMap(),
                 )
@@ -102,7 +102,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
 
         val infoDiagnostic = Diagnostics.info(
             code = DiagnosticCodes.Version.EXTRACTED_CREATED,
-            message = "Extracted version '${nameResult.name}' = '${resolved.value}' from '$alias'",
+            message = "Extracted version '${nameResult.name}' = '$inlineValue' from '$alias'",
             processorId = id,
             context = emptyMap(),
         )
@@ -112,7 +112,7 @@ public class ExtractedVersionsProcessor : EffectiveMetadataProcessor {
             versions = acc.versions + (nameResult.name to newResolved),
             diagnostics = acc.diagnostics + conflictDiagnostic + infoDiagnostic,
             resolvedByAlias = acc.resolvedByAlias + (alias to EffectiveVersion.Resolved(newResolved)),
-            allVersionValues = acc.allVersionValues + (nameResult.name to resolved.value),
+            allVersionValues = acc.allVersionValues + (nameResult.name to inlineValue),
         )
     }
 

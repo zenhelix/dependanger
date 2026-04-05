@@ -32,7 +32,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
         if (pluginSpec == null && customFilters.isEmpty()) return metadata
 
         val originalPluginsIndex = context.originalMetadata.plugins.associateBy { it.alias }
-        var diagnostics = metadata.diagnostics
+        val diagnostics = Diagnostics.builder(metadata.diagnostics)
 
         val tagFilter = pluginSpec?.byTags
         val aliasFilter = pluginSpec?.byAliases
@@ -46,7 +46,7 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
             val passes = passesTagFilter && passesAliasFilter && passesCustom
 
             if (!passes) {
-                diagnostics += Diagnostics.info(
+                diagnostics.info(
                     code = DiagnosticCodes.Plugin.FILTERED,
                     message = "Plugin '$alias' filtered out by distribution '${distName ?: "custom"}'",
                     processorId = id,
@@ -56,6 +56,6 @@ public class PluginFilterProcessor : EffectiveMetadataProcessor {
             passes
         }
 
-        return metadata.copy(plugins = filtered, diagnostics = diagnostics)
+        return metadata.copy(plugins = filtered, diagnostics = diagnostics.build())
     }
 }

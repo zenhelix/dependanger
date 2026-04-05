@@ -93,17 +93,17 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
             }
 
             val updates = results.mapNotNull { it.update }
-            var diagnostics = Diagnostics.EMPTY
+            val diagnostics = Diagnostics.builder()
             for (result in results) {
-                diagnostics += result.diagnostics
+                diagnostics.add(result.diagnostics)
             }
 
-            val summary = if (updates.isNotEmpty()) {
+            if (updates.isNotEmpty()) {
                 val typeCounts = updates.groupingBy { it.updateType }.eachCount()
                 val major = typeCounts.getOrDefault(UpdateType.MAJOR, 0)
                 val minor = typeCounts.getOrDefault(UpdateType.MINOR, 0)
                 val patch = typeCounts.getOrDefault(UpdateType.PATCH, 0)
-                Diagnostics.info(
+                diagnostics.info(
                     DiagnosticCodes.Update.UPDATES_AVAILABLE,
                     "Updates available: ${updates.size} ($major major, $minor minor, $patch patch)",
                     id, mapOf(
@@ -114,11 +114,10 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
                     )
                 )
             } else {
-                Diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "All libraries are up to date", id, emptyMap())
+                diagnostics.info(DiagnosticCodes.Update.ALL_UP_TO_DATE, "All libraries are up to date", id, emptyMap())
             }
-            diagnostics += summary
 
-            return ParallelResult(diagnostics, mapOf(UpdatesExtensionKey to updates))
+            return ParallelResult(diagnostics.build(), mapOf(UpdatesExtensionKey to updates))
         }
     }
 

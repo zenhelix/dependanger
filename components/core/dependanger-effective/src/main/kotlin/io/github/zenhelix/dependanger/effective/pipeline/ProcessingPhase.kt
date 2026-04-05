@@ -12,7 +12,7 @@ public open class ProcessingPhase(
 ) {
     override fun equals(other: Any?): Boolean = other is ProcessingPhase && name == other.name
     override fun hashCode(): Int = name.hashCode()
-    override fun toString(): String = "ProcessingPhase($name)"
+    override fun toString(): String = "ProcessingPhase($name, $executionMode)"
 
     public companion object {
         public val PROFILE: ProcessingPhase = ProcessingPhase("PROFILE", ExecutionMode.SEQUENTIAL)

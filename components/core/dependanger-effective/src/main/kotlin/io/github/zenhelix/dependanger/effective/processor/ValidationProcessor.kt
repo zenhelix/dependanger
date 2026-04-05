@@ -27,25 +27,25 @@ public class ValidationProcessor : EffectiveMetadataProcessor {
         context: ProcessingContext,
     ): EffectiveMetadata {
         val validationSettings = context.settings.validation
-        var diagnostics = metadata.diagnostics
+        val diagnostics = Diagnostics.builder(metadata.diagnostics)
 
-        diagnostics += validateDuplicateAliases(metadata)
+        diagnostics.add(validateDuplicateAliases(metadata))
 
-        diagnostics += validateUnresolvedVersions(
+        diagnostics.add(validateUnresolvedVersions(
             metadata, context, validationSettings.onUnresolvedVersion,
-        )
+        ))
 
-        diagnostics += validateBundleReferences(metadata)
+        diagnostics.add(validateBundleReferences(metadata))
 
-        diagnostics += validateCircularExtends(context.originalMetadata)
+        diagnostics.add(validateCircularExtends(context.originalMetadata))
 
-        diagnostics += validateDeprecatedReferences(
+        diagnostics.add(validateDeprecatedReferences(
             metadata, validationSettings.onDeprecatedLibrary,
-        )
+        ))
 
-        diagnostics += validateCoordinates(metadata)
+        diagnostics.add(validateCoordinates(metadata))
 
-        return metadata.copy(diagnostics = diagnostics)
+        return metadata.copy(diagnostics = diagnostics.build())
     }
 
     private fun validateDuplicateAliases(metadata: EffectiveMetadata): Diagnostics {

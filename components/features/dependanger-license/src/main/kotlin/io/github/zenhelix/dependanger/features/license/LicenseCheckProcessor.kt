@@ -61,7 +61,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             logger.info { "Using ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
         }
 
-        var diagnostics = Diagnostics.EMPTY
+        val diagnostics = Diagnostics.builder()
 
         val candidates = metadata.libraries.values.filter { lib ->
             lib.version.isResolved
@@ -72,7 +72,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             val flatDeps = metadata.flatDependencies
             if (flatDeps.isEmpty()) {
                 logger.warn { "includeTransitives is enabled but no transitive dependencies found (enable transitive resolution first)" }
-                diagnostics = diagnostics + Diagnostics.warning(
+                diagnostics.warning(
                     DiagnosticCodes.License.INCLUDE_TRANSITIVES_NOT_SUPPORTED,
                     "includeTransitives is enabled but no transitive dependencies available; ensure transitive resolution is enabled and runs before license check",
                     id, emptyMap(),
@@ -98,7 +98,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
                 "No libraries to check for licenses",
                 id,
                 LicenseViolationsExtensionKey,
-                diagnostics
+                diagnostics.build()
             )
         }
 
@@ -154,26 +154,26 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             for ((lib, licenses) in directResults) {
                 val policyResult = LicensePolicy.checkCompliance(lib, licenses, settings)
                 allViolations.addAll(policyResult.violations)
-                diagnostics = diagnostics + policyResult.diagnostics
+                diagnostics.add(policyResult.diagnostics)
             }
 
             for ((dep, licenses) in transitiveResults) {
                 val policyResult = LicensePolicy.checkTransitiveCompliance(dep, licenses, settings)
                 allViolations.addAll(policyResult.violations)
-                diagnostics = diagnostics + policyResult.diagnostics
+                diagnostics.add(policyResult.diagnostics)
             }
 
             val totalChecked = directResults.size + transitiveResults.size
             val allResults = directResults.map { it.second } + transitiveResults.map { it.second }
 
-            diagnostics = diagnostics + if (allViolations.isEmpty()) {
-                Diagnostics.info(
+            if (allViolations.isEmpty()) {
+                diagnostics.info(
                     DiagnosticCodes.License.ALL_COMPLIANT,
                     "License check completed: $totalChecked libraries (${directResults.size} direct, ${transitiveResults.size} transitive), all compliant",
                     id, mapOf("count" to totalChecked.toString(), "direct" to directResults.size.toString(), "transitive" to transitiveResults.size.toString()),
                 )
             } else {
-                Diagnostics.info(
+                diagnostics.info(
                     DiagnosticCodes.License.CHECK_COMPLETE,
                     "License check completed: $totalChecked libraries (${directResults.size} direct, ${transitiveResults.size} transitive), ${allViolations.size} violation(s)",
                     id, mapOf("count" to totalChecked.toString(), "violations" to allViolations.size.toString()),
@@ -183,7 +183,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             if (settings.failOnDenied) {
                 val deniedCount = allViolations.count { it.violationType == LicenseViolationType.DENIED }
                 if (deniedCount > 0) {
-                    diagnostics = diagnostics + Diagnostics.error(
+                    diagnostics.error(
                         DiagnosticCodes.License.DENIED_FOUND,
                         "Denied licenses found in $deniedCount library(ies)",
                         id, mapOf("count" to deniedCount.toString()),
@@ -194,7 +194,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             if (settings.failOnUnknown) {
                 val unknownCount = allResults.count { licenses -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
                 if (unknownCount > 0) {
-                    diagnostics = diagnostics + Diagnostics.error(
+                    diagnostics.error(
                         DiagnosticCodes.License.UNKNOWN_FOUND,
                         "Unknown licenses found in $unknownCount library(ies)",
                         id, mapOf("count" to unknownCount.toString()),
@@ -205,7 +205,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
             if (settings.failOnCopyleft) {
                 val copyleftCount = allResults.count { licenses -> licenses.any { it.category.isCopyleft } }
                 if (copyleftCount > 0) {
-                    diagnostics = diagnostics + Diagnostics.error(
+                    diagnostics.error(
                         DiagnosticCodes.License.COPYLEFT_FOUND,
                         "Copyleft licenses found in $copyleftCount library(ies)",
                         id, mapOf("count" to copyleftCount.toString()),
@@ -213,7 +213,7 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
                 }
             }
 
-            return ParallelResult(diagnostics, mapOf(LicenseViolationsExtensionKey to allViolations))
+            return ParallelResult(diagnostics.build(), mapOf(LicenseViolationsExtensionKey to allViolations))
         }
     }
 }

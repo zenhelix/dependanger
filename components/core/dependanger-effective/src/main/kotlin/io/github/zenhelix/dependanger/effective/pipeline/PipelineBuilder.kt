@@ -50,7 +50,22 @@ public class PipelineBuilder {
 
     private fun validate(processors: List<EffectiveMetadataProcessor>) {
         validateDuplicateIds(processors)
+        validatePhaseConsistency(processors)
         validateParallelProcessors(processors)
+    }
+
+    private fun validatePhaseConsistency(processors: List<EffectiveMetadataProcessor>) {
+        val conflicts = processors
+            .groupBy { it.phase.name }
+            .filterValues { group -> group.map { it.phase.executionMode }.toSet().size > 1 }
+
+        if (conflicts.isNotEmpty()) {
+            val details = conflicts.entries.joinToString { (name, procs) ->
+                val modes = procs.map { "'${it.id}' -> ${it.phase.executionMode}" }.joinToString(", ")
+                "phase '$name': $modes"
+            }
+            throw PipelineConfigurationException("Conflicting execution modes for phases: $details")
+        }
     }
 
     private fun validateParallelProcessors(processors: List<EffectiveMetadataProcessor>) {

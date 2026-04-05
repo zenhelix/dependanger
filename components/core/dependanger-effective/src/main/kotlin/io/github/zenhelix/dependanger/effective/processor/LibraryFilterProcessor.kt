@@ -40,7 +40,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
         // Nothing to filter
         if (spec == null && customFilters.isEmpty()) return metadata
 
-        var diagnostics = metadata.diagnostics
+        val diagnostics = Diagnostics.builder(metadata.diagnostics)
         val bundleIndex = metadata.bundles
 
         val filtered = metadata.libraries.filter { (alias, lib) ->
@@ -55,7 +55,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
             val passes = passesSpec && passesCustom
 
             if (!passes) {
-                diagnostics += Diagnostics.info(
+                diagnostics.info(
                     code = DiagnosticCodes.Library.FILTERED,
                     message = "Library '$alias' filtered out by distribution '${distName ?: "custom"}'",
                     processorId = id,
@@ -65,7 +65,7 @@ public class LibraryFilterProcessor : EffectiveMetadataProcessor {
             passes
         }
 
-        return metadata.copy(libraries = filtered, diagnostics = diagnostics)
+        return metadata.copy(libraries = filtered, diagnostics = diagnostics.build())
     }
 
     private fun passesGroupFilter(lib: EffectiveLibrary, filter: GroupFilter?): Boolean {

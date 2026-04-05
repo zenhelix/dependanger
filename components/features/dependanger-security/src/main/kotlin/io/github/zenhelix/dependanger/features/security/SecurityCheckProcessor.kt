@@ -85,7 +85,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
             }
         }
 
-        var diagnostics = Diagnostics.EMPTY
+        val diagnostics = Diagnostics.builder()
         val fetchedVulns = mutableListOf<VulnerabilityInfo>()
 
         if (uncachedPackages.isNotEmpty()) {
@@ -118,7 +118,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
                         val failedPackages = uncachedPackages.drop(result.vulnerabilities.size)
                         val failureDiagCode = if (result.isTimeout) DiagnosticCodes.Security.TIMEOUT else DiagnosticCodes.Security.API_UNREACHABLE
                         val failureResult = handleApiFailure(cache, failedPackages, failureDiagCode, "Partial failure: ${result.error}")
-                        diagnostics += failureResult.diagnostics
+                        diagnostics.add(failureResult.diagnostics)
                         fetchedVulns.addAll(failureResult.staleVulns)
                     }
 
@@ -129,7 +129,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
                             DiagnosticCodes.Security.TIMEOUT,
                             "OSV API request timed out after retries: ${result.error}",
                         )
-                        diagnostics += failureResult.diagnostics
+                        diagnostics.add(failureResult.diagnostics)
                         fetchedVulns.addAll(failureResult.staleVulns)
                     }
 
@@ -140,7 +140,7 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
                             DiagnosticCodes.Security.API_UNREACHABLE,
                             "OSV API unavailable and no cached data: ${result.error}",
                         )
-                        diagnostics += failureResult.diagnostics
+                        diagnostics.add(failureResult.diagnostics)
                         fetchedVulns.addAll(failureResult.staleVulns)
                     }
                 }
@@ -152,9 +152,9 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
             vuln.id !in ignoreSet && vuln.aliases.none { it in ignoreSet }
         }
 
-        diagnostics += buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability)
+        diagnostics.add(buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability))
 
-        return ParallelResult(diagnostics, mapOf(VulnerabilitiesExtensionKey to allVulns))
+        return ParallelResult(diagnostics.build(), mapOf(VulnerabilitiesExtensionKey to allVulns))
     }
 
     private data class ApiFailureResult(
@@ -171,19 +171,20 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
         val staleVulns = failedPackages.flatMap { pkg ->
             cache.getStale(pkg.group, pkg.artifact, pkg.version) ?: emptyList()
         }
-        var diagnostics = Diagnostics.warning(
+        val diagnostics = Diagnostics.builder()
+        diagnostics.warning(
             fallbackDiagnosticCode,
             fallbackMessage,
             id, emptyMap(),
         )
         if (staleVulns.isNotEmpty()) {
-            diagnostics += Diagnostics.warning(
+            diagnostics.warning(
                 DiagnosticCodes.Security.STALE_CACHE,
                 "Using stale security cache due to OSV API failure",
                 id, emptyMap(),
             )
         }
-        return ApiFailureResult(diagnostics = diagnostics, staleVulns = staleVulns)
+        return ApiFailureResult(diagnostics = diagnostics.build(), staleVulns = staleVulns)
     }
 
     private fun buildScanDiagnostics(

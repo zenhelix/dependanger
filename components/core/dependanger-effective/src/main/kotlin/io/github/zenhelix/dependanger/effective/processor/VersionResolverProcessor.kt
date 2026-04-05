@@ -27,14 +27,14 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
         metadata: EffectiveMetadata,
         context: ProcessingContext,
     ): EffectiveMetadata {
-        var diagnostics = metadata.diagnostics
+        val diagnostics = Diagnostics.builder(metadata.diagnostics)
 
         val resolvedLibraries = metadata.libraries.mapValues { (alias, lib) ->
             when (val version = lib.version) {
                 is EffectiveVersion.Unresolved -> {
                     val resolved = metadata.versions[version.refName]
                     if (resolved != null) {
-                        diagnostics += Diagnostics.info(
+                        diagnostics.info(
                             code = DiagnosticCodes.Version.RESOLVED,
                             message = "Library '$alias': version ref '${version.refName}' -> '${resolved.value}'",
                             processorId = id,
@@ -51,7 +51,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                             )
                         )
                     } else {
-                        diagnostics += Diagnostics.error(
+                        diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Library '$alias': version ref '${version.refName}' not found in versions map",
                             processorId = id,
@@ -83,7 +83,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
                             )
                         )
                     } else {
-                        diagnostics += Diagnostics.error(
+                        diagnostics.error(
                             code = DiagnosticCodes.Version.UNRESOLVED,
                             message = "Plugin '$alias': version ref '${version.refName}' not found",
                             processorId = id,
@@ -102,7 +102,7 @@ public class VersionResolverProcessor : EffectiveMetadataProcessor {
         return metadata.copy(
             libraries = resolvedLibraries,
             plugins = resolvedPlugins,
-            diagnostics = diagnostics,
+            diagnostics = diagnostics.build(),
         )
     }
 }

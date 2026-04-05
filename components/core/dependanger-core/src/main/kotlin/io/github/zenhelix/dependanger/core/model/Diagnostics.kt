@@ -62,5 +62,43 @@ public data class Diagnostics(
                 warnings = emptyList(),
                 infos = listOf(DiagnosticMessage(code, message, Severity.INFO, processorId, context)),
             )
+
+        public fun builder(): DiagnosticsBuilder = DiagnosticsBuilder()
+
+        public fun builder(base: Diagnostics): DiagnosticsBuilder = DiagnosticsBuilder(base)
     }
+}
+
+/**
+ * Mutable builder for [Diagnostics] that avoids O(n²) list concatenation
+ * when accumulating diagnostics in a loop. Call [build] to produce the immutable result.
+ */
+public class DiagnosticsBuilder(base: Diagnostics = Diagnostics.EMPTY) {
+    private val errors: MutableList<DiagnosticMessage> = base.errors.toMutableList()
+    private val warnings: MutableList<DiagnosticMessage> = base.warnings.toMutableList()
+    private val infos: MutableList<DiagnosticMessage> = base.infos.toMutableList()
+
+    public fun add(diagnostics: Diagnostics): DiagnosticsBuilder = apply {
+        errors.addAll(diagnostics.errors)
+        warnings.addAll(diagnostics.warnings)
+        infos.addAll(diagnostics.infos)
+    }
+
+    public fun error(code: String, message: String, processorId: String?, context: Map<String, String>): DiagnosticsBuilder = apply {
+        errors.add(DiagnosticMessage(code, message, Severity.ERROR, processorId, context))
+    }
+
+    public fun warning(code: String, message: String, processorId: String?, context: Map<String, String>): DiagnosticsBuilder = apply {
+        warnings.add(DiagnosticMessage(code, message, Severity.WARNING, processorId, context))
+    }
+
+    public fun info(code: String, message: String, processorId: String?, context: Map<String, String>): DiagnosticsBuilder = apply {
+        infos.add(DiagnosticMessage(code, message, Severity.INFO, processorId, context))
+    }
+
+    public fun build(): Diagnostics = Diagnostics(
+        errors = errors.toList(),
+        warnings = warnings.toList(),
+        infos = infos.toList(),
+    )
 }

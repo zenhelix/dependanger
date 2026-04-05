@@ -1,14 +1,5 @@
 package io.github.zenhelix.dependanger.features.security
 
-import io.github.zenhelix.dependanger.core.model.ProcessingPreset
-import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
-import io.github.zenhelix.dependanger.effective.spi.PresetContributor
+import io.github.zenhelix.dependanger.effective.spi.StrictOnlyPresetContributor
 
-public class SecurityCheckPresetContributor : PresetContributor {
-    override fun configure(preset: ProcessingPreset, builder: PipelineBuilder) {
-        when (preset) {
-            ProcessingPreset.STRICT -> builder.enableOptional(SecurityCheckProcessor.PROCESSOR_ID)
-            else                    -> {}
-        }
-    }
-}
+public class SecurityCheckPresetContributor : StrictOnlyPresetContributor(SecurityCheckProcessor.PROCESSOR_ID)

@@ -158,12 +158,12 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
         versionMap: Map<String, Pair<String, String>>,
         diagnostics: Diagnostics,
     ): Pair<Map<String, io.github.zenhelix.dependanger.effective.model.EffectiveLibrary>, Diagnostics> {
-        var currentDiagnostics = diagnostics
+        val currentDiagnostics = Diagnostics.builder(diagnostics)
         val updatedLibraries = libraries.mapValues { (_, lib) ->
             if (lib.version.isResolved) return@mapValues lib
             val key = "${lib.group}:${lib.artifact}"
             val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
-            currentDiagnostics += Diagnostics.info(
+            currentDiagnostics.info(
                 DiagnosticCodes.Bom.VERSION_IMPORTED,
                 "Version $version imported from BOM '$bomAlias' for ${lib.group}:${lib.artifact}",
                 id, emptyMap()
@@ -179,7 +179,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                 ),
             )
         }
-        return updatedLibraries to currentDiagnostics
+        return updatedLibraries to currentDiagnostics.build()
     }
 
     private suspend fun resolveBomRecursive(

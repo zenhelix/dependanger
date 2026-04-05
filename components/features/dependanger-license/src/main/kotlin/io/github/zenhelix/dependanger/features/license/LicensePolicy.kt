@@ -83,7 +83,7 @@ internal object LicensePolicy {
         isTransitive: Boolean = false,
     ): PolicyCheckResult {
         val violations = mutableListOf<LicenseViolation>()
-        var diagnostics = Diagnostics.EMPTY
+        val diagnostics = Diagnostics.builder()
 
         val spdxIds = licenses.mapNotNull { it.spdxId }
         val separator = if (settings.dualLicensePolicy == DualLicensePolicy.AND) " AND " else " OR "
@@ -145,7 +145,7 @@ internal object LicensePolicy {
         val copyleftLicenses = licenses.filter { it.category.isCopyleft }
         if (settings.warnOnCopyleft && copyleftLicenses.isNotEmpty()) {
             val copyleftIds = copyleftLicenses.mapNotNull { it.spdxId }.joinToString(", ")
-            diagnostics = diagnostics + Diagnostics.warning(
+            diagnostics.warning(
                 DiagnosticCodes.License.COPYLEFT_WARNING,
                 "${prefix}Library '$displayName' has copyleft license(s): $copyleftIds",
                 PROCESSOR_ID,
@@ -156,7 +156,7 @@ internal object LicensePolicy {
         // 4. Unknown warning
         if (settings.warnOnUnknown && licenses.all { it.category == LicenseCategory.UNKNOWN }) {
             val coordinate = "$group:$artifact:$versionDisplay"
-            diagnostics = diagnostics + Diagnostics.warning(
+            diagnostics.warning(
                 DiagnosticCodes.License.UNKNOWN_WARNING,
                 "${prefix}License for library '$displayName' ($coordinate) is unknown",
                 PROCESSOR_ID,
@@ -166,7 +166,7 @@ internal object LicensePolicy {
 
         return PolicyCheckResult(
             violations = violations,
-            diagnostics = diagnostics,
+            diagnostics = diagnostics.build(),
         )
     }
 

@@ -94,28 +94,19 @@ class ErrorPathsE2ETest : IntegrationTestBase() {
     inner class `duplicate handling` {
 
         @Test
-        fun `duplicate library aliases are handled`() = runTest {
-            val result = dependanger {
-                versions {
-                    version("v1", "1.0.0")
+        fun `duplicate library aliases throw DependangerConfigurationException`() {
+            assertThatThrownBy {
+                dependanger {
+                    versions {
+                        version("v1", "1.0.0")
+                    }
+                    libraries {
+                        library("dup-lib", "com.example:lib-a", versionRef("v1"))
+                        library("dup-lib", "com.example:lib-b", versionRef("v1"))
+                    }
                 }
-                libraries {
-                    library("dup-lib", "com.example:lib-a", versionRef("v1"))
-                    library("dup-lib", "com.example:lib-b", versionRef("v1"))
-                }
-            }.process()
-
-            // Should either succeed with last-wins or produce a validation diagnostic
-            val hasDuplicateDiagnostic = result.diagnostics.errors.any {
-                it.code == DiagnosticCodes.Validation.DUPLICATE_ALIAS
-            } || result.diagnostics.warnings.any {
-                it.code == DiagnosticCodes.Validation.DUPLICATE_ALIAS
-            }
-
-            // Either the duplicate is flagged or the result has exactly one library
-            if (!hasDuplicateDiagnostic) {
-                assertThat(result).isInstanceOf(DependangerResult.Success::class.java)
-            }
+            }.isInstanceOf(DependangerConfigurationException::class.java)
+                .hasMessageContaining("dup-lib")
         }
     }
 

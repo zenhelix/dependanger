@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.generators.bom.BomConfig
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -41,75 +42,64 @@ class DslEdgeCasesBehaviorTest {
     inner class `Duplicate declarations` {
 
         @Test
-        fun `duplicate version alias keeps last declared value`() = runTest {
-            val result = dependanger {
-                versions {
-                    version("kotlin", "2.0.0")
-                    version("kotlin", "2.1.20")
+        fun `duplicate version alias throws DependangerConfigurationException`() {
+            assertThatThrownBy {
+                dependanger {
+                    versions {
+                        version("kotlin", "2.0.0")
+                        version("kotlin", "2.1.20")
+                    }
                 }
-                libraries { library("kotlin-stdlib", "org.jetbrains.kotlin:kotlin-stdlib", versionRef("kotlin")) }
-            }.process()
-
-            assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.versions["kotlin"]!!.value).isEqualTo("2.1.20")
-            assertThat((result as DependangerResult.Success).effective.libraries["kotlin-stdlib"]!!.version.valueOrNull).isEqualTo("2.1.20")
+            }.isInstanceOf(DependangerConfigurationException::class.java)
+                .hasMessageContaining("kotlin")
         }
 
         @Test
-        fun `duplicate library alias keeps last declared value`() = runTest {
-            val result = dependanger {
-                libraries {
-                    library("my-lib", "com.old:old-artifact:1.0.0")
-                    library("my-lib", "com.new:new-artifact:2.0.0")
+        fun `duplicate library alias throws DependangerConfigurationException`() {
+            assertThatThrownBy {
+                dependanger {
+                    libraries {
+                        library("my-lib", "com.old:old-artifact:1.0.0")
+                        library("my-lib", "com.new:new-artifact:2.0.0")
+                    }
                 }
-            }.process()
-
-            assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.libraries).hasSize(1)
-            assertThat((result as DependangerResult.Success).effective.libraries).containsKey("my-lib")
-            assertThat((result as DependangerResult.Success).effective.libraries["my-lib"]!!.group).isEqualTo("com.new")
-            assertThat((result as DependangerResult.Success).effective.libraries["my-lib"]!!.artifact).isEqualTo("new-artifact")
+            }.isInstanceOf(DependangerConfigurationException::class.java)
+                .hasMessageContaining("my-lib")
         }
 
         @Test
-        fun `duplicate bundle alias keeps last declared value`() = runTest {
-            val result = dependanger {
-                libraries {
-                    library("lib-a", "com.a:lib:1.0")
-                    library("lib-b", "com.b:lib:1.0")
-                    library("lib-c", "com.c:lib:1.0")
+        fun `duplicate bundle alias throws DependangerConfigurationException`() {
+            assertThatThrownBy {
+                dependanger {
+                    libraries {
+                        library("lib-a", "com.a:lib:1.0")
+                        library("lib-b", "com.b:lib:1.0")
+                        library("lib-c", "com.c:lib:1.0")
+                    }
+                    bundles {
+                        bundle("my-bundle") { libraries("lib-a") }
+                        bundle("my-bundle") { libraries("lib-b", "lib-c") }
+                    }
                 }
-                bundles {
-                    bundle("my-bundle") { libraries("lib-a") }
-                    bundle("my-bundle") { libraries("lib-b", "lib-c") }
-                }
-            }.process()
-
-            assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.bundles).hasSize(1)
-            assertThat((result as DependangerResult.Success).effective.bundles).containsKey("my-bundle")
-            assertThat((result as DependangerResult.Success).effective.bundles["my-bundle"]!!.libraries)
-                .containsExactlyInAnyOrder("lib-b", "lib-c")
+            }.isInstanceOf(DependangerConfigurationException::class.java)
+                .hasMessageContaining("my-bundle")
         }
 
         @Test
-        fun `duplicate plugin alias keeps last declared value`() = runTest {
-            val result = dependanger {
-                versions {
-                    version("v1", "1.0.0")
-                    version("v2", "2.0.0")
+        fun `duplicate plugin alias throws DependangerConfigurationException`() {
+            assertThatThrownBy {
+                dependanger {
+                    versions {
+                        version("v1", "1.0.0")
+                        version("v2", "2.0.0")
+                    }
+                    plugins {
+                        plugin("my-plugin", "com.old.plugin", versionRef("v1"))
+                        plugin("my-plugin", "com.new.plugin", versionRef("v2"))
+                    }
                 }
-                plugins {
-                    plugin("my-plugin", "com.old.plugin", versionRef("v1"))
-                    plugin("my-plugin", "com.new.plugin", versionRef("v2"))
-                }
-            }.process()
-
-            assertThat(result.isSuccess).isTrue()
-            assertThat((result as DependangerResult.Success).effective.plugins).hasSize(1)
-            assertThat((result as DependangerResult.Success).effective.plugins).containsKey("my-plugin")
-            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.id).isEqualTo("com.new.plugin")
-            assertThat((result as DependangerResult.Success).effective.plugins["my-plugin"]!!.version.valueOrNull).isEqualTo("2.0.0")
+            }.isInstanceOf(DependangerConfigurationException::class.java)
+                .hasMessageContaining("my-plugin")
         }
     }
 

@@ -10,10 +10,14 @@ public class VersionsDsl {
     public val versions: List<Version> get() = _versions.toList()
 
     public fun version(alias: String, value: String) {
+        require(alias.isNotBlank()) { "Version name must not be blank" }
+        require(_versions.none { it.name == alias }) { "Duplicate version name: '$alias'" }
         _versions.add(Version(name = alias, value = value, fallbacks = emptyList()))
     }
 
     public fun version(alias: String, value: String, block: VersionDsl.() -> Unit) {
+        require(alias.isNotBlank()) { "Version name must not be blank" }
+        require(_versions.none { it.name == alias }) { "Duplicate version name: '$alias'" }
         val dsl = VersionDsl().apply(block)
         _versions.add(Version(name = alias, value = value, fallbacks = dsl.fallbacks))
     }

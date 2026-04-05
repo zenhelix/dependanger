@@ -8,6 +8,8 @@ public class BundlesDsl {
     public val bundles: List<Bundle> get() = _bundles.toList()
 
     public fun bundle(name: String, block: BundleDsl.() -> Unit = {}) {
+        require(name.isNotBlank()) { "Bundle name must not be blank" }
+        require(_bundles.none { it.alias == name }) { "Duplicate bundle name: '$name'" }
         val dsl = BundleDsl().apply(block)
         _bundles.add(Bundle(alias = name, libraries = dsl.libraries.toList(), extends = dsl.extendsList.toList()))
     }

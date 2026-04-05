@@ -13,6 +13,8 @@ public class LibrariesDsl {
     public val libraries: List<Library> get() = _libraries.toList()
 
     public fun library(alias: String, coordinates: String) {
+        require(alias.isNotBlank()) { "Library alias must not be blank" }
+        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
         val (group, artifact, version) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -24,6 +26,8 @@ public class LibrariesDsl {
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
+        require(alias.isNotBlank()) { "Library alias must not be blank" }
+        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
         val (group, artifact, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -35,18 +39,24 @@ public class LibrariesDsl {
     }
 
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
+        require(alias.isNotBlank()) { "Library alias must not be blank" }
+        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
         val (group, artifact, version) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
         _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference, block: LibraryDsl.() -> Unit) {
+        require(alias.isNotBlank()) { "Library alias must not be blank" }
+        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
         val (group, artifact, _) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
         _libraries.add(dsl.toLibrary(alias, group, artifact))
     }
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
+        require(alias.isNotBlank()) { "Library alias must not be blank" }
+        require(_libraries.none { it.alias == alias }) { "Duplicate library alias: '$alias'" }
         val (group, artifact, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
@@ -57,12 +67,20 @@ public class LibrariesDsl {
         )
     }
 
-    private fun parseCoordinates(coordinates: String): Triple<String, String, VersionReference?> {
-        val parts = coordinates.split(":")
+    private fun parseCoordinates(raw: String): Triple<String, String, VersionReference?> {
+        val parts = raw.split(":")
         return when (parts.size) {
-            2    -> Triple(parts[0], parts[1], null)
-            3    -> Triple(parts[0], parts[1], VersionReference.Literal(parts[2]))
-            else -> throw IllegalArgumentException("Invalid coordinates: $coordinates")
+            2    -> {
+                require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
+                require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
+                Triple(parts[0], parts[1], null)
+            }
+            3    -> {
+                require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
+                require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
+                Triple(parts[0], parts[1], VersionReference.Literal(parts[2]))
+            }
+            else -> throw IllegalArgumentException("Invalid coordinates: $raw")
         }
     }
 }

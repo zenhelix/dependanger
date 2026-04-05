@@ -32,24 +32,11 @@ public class ReportCommand : CliktCommand(name = "report") {
         withErrorHandling(formatter) {
             val metadata = metadataService.read(Path.of(input))
 
-            val reportFormat = try {
-                ReportFormat.valueOf(format.uppercase())
-            } catch (_: IllegalArgumentException) {
-                throw CliException.InvalidArgument(
-                    "Unknown report format '$format'. Available: ${ReportFormat.entries.joinToString { it.name }}"
-                )
-            }
+            val reportFormat = parseEnum<ReportFormat>(format, "report format")
 
             val reportSections = if (sections != null) {
                 parseCommaSeparated(sections).map { sectionName ->
-                    val name = sectionName.uppercase()
-                    try {
-                        ReportSection.valueOf(name)
-                    } catch (_: IllegalArgumentException) {
-                        throw CliException.InvalidArgument(
-                            "Unknown report section '$name'. Available: ${ReportSection.entries.joinToString { it.name }}"
-                        )
-                    }
+                    parseEnum<ReportSection>(sectionName, "report section")
                 }
             } else {
                 ReportSection.entries

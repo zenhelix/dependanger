@@ -2,35 +2,25 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.option
-import java.nio.file.Path
+import io.github.zenhelix.dependanger.cli.options.MetadataOptions
+import io.github.zenhelix.dependanger.cli.runner.MetadataRunner
 
 public class RemovePluginCommand : CliktCommand(name = "plugin") {
     override fun help(context: Context): String = "Remove a plugin from metadata.json"
 
     public val alias: String by argument(help = "Plugin alias to remove")
-    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
-    public val output: String? by option("-o", "--output", help = "Output file")
+    private val opts by MetadataOptions()
 
-    override fun run() {
-        val formatter = OutputFormatter(terminal = terminal)
-        val metadataService = MetadataService()
-        withErrorHandling(formatter) {
-            val inputPath = Path.of(input)
-            val outputPath = Path.of(output ?: input)
-            val metadata = metadataService.read(inputPath)
-
-            if (metadata.plugins.none { it.alias == alias }) {
-                throw CliException.AliasNotFound("Plugin", alias)
-            }
-
-            val updated = metadata.copy(plugins = metadata.plugins.filter { it.alias != alias })
-
-            metadataService.write(updated, outputPath)
-            formatter.success("Removed plugin '$alias'")
+    override fun run(): Unit = MetadataRunner(this, opts).run { metadata ->
+        if (metadata.plugins.none { it.alias == alias }) {
+            throw CliException.AliasNotFound("Plugin", alias)
         }
+
+        val updated = metadata.copy(plugins = metadata.plugins.filter { it.alias != alias })
+
+        updated to "Removed plugin '$alias'"
     }
 }

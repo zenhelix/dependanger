@@ -2,10 +2,11 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.terminal
-import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import io.github.zenhelix.dependanger.cli.options.MetadataOptions
+import io.github.zenhelix.dependanger.cli.runner.MetadataRunner
 import java.nio.file.Path
 
 public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated") {
@@ -15,23 +16,18 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
     public val replace: Boolean by option("--replace", help = "Replace deprecated with replacedBy in bundles").flag(default = true)
     public val remove: Boolean by option("--remove", help = "Remove deprecated libraries from metadata").flag()
     public val removeFromBundles: Boolean by option("--remove-from-bundles", help = "Remove deprecated from bundles instead of replacing").flag()
-    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
-    public val output: String? by option("-o", "--output", help = "Output file (defaults to input)")
     public val backup: Boolean by option("--backup", help = "Create backup before modifying").flag()
 
-    override fun run() {
-        val formatter = OutputFormatter(terminal = terminal)
-        val metadataService = MetadataService()
-        withErrorHandling(formatter) {
-            val inputPath = Path.of(input)
-            val outputPath = Path.of(output ?: input)
-            val metadata = metadataService.read(inputPath)
+    private val opts by MetadataOptions()
 
+    override fun run() {
+        val runner = MetadataRunner(this, opts)
+        runner.readAndHandle {
             val deprecated = metadata.libraries.filter { it.deprecation != null }
 
             if (deprecated.isEmpty()) {
                 formatter.info("No deprecated libraries found")
-                return@withErrorHandling
+                return@readAndHandle
             }
 
             val headers = listOf("Alias", "Replaced By", "Message")
@@ -46,14 +42,14 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
             if (dryRun) {
                 formatter.info("Migration plan (dry run):")
                 formatter.renderTable(headers, rows)
-                return@withErrorHandling
+                return@readAndHandle
             }
 
             formatter.renderTable(headers, rows)
 
             if (backup) {
-                val backupPath = Path.of("$input.bak")
-                metadataService.write(metadata, backupPath)
+                val backupPath = Path.of("${opts.input}.bak")
+                write(metadata, backupPath)
                 formatter.info("Backup saved to '$backupPath'")
             }
 
@@ -84,7 +80,7 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
                 bundles = updatedBundles,
             )
 
-            metadataService.write(updated, outputPath)
+            write(updated)
 
             val removedCount = if (remove) deprecated.size else 0
             val replacedCount = replacementMap.size

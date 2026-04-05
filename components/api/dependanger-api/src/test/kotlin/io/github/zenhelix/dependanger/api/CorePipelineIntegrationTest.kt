@@ -363,7 +363,7 @@ class CorePipelineIntegrationTest {
         fun `invalid JSON throws DependangerConfigurationException`() {
             assertThatThrownBy { Dependanger.fromJson("not a json") }
                 .isInstanceOf(DependangerConfigurationException::class.java)
-                .hasMessageContaining("Failed to parse metadata from JSON")
+                .hasMessageContaining("Failed to parse metadata")
         }
 
         @Test

@@ -210,7 +210,7 @@ class MetadataSerializationBehaviorTest {
         fun `invalid JSON throws exception`() {
             assertThatThrownBy { Dependanger.fromJson("invalid") }
                 .isInstanceOf(DependangerConfigurationException::class.java)
-                .hasMessageContaining("Failed to parse metadata from JSON")
+                .hasMessageContaining("Failed to parse metadata")
         }
 
         @Test

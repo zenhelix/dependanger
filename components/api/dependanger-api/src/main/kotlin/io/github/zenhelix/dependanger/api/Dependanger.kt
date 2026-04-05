@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
+import io.github.zenhelix.dependanger.core.spi.SerializationFormat
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -184,13 +185,14 @@ public class Dependanger internal constructor(
         public fun fromDsl(block: DependangerDsl.() -> Unit): DependangerBuilder = DependangerBuilder(block)
         public fun fromMetadata(metadata: DependangerMetadata): DependangerBuilder = DependangerBuilder(metadata)
 
-        public fun fromJson(json: String): DependangerBuilder {
-            val format = JsonSerializationFormat()
+        public fun fromJson(json: String): DependangerBuilder = fromSerialized(json, JsonSerializationFormat())
+
+        public fun <T> fromSerialized(input: T, format: SerializationFormat<T>): DependangerBuilder {
             val metadata = try {
-                format.deserialize(json)
+                format.deserialize(input)
             } catch (e: Exception) {
                 throw DependangerConfigurationException(
-                    "Failed to parse metadata from JSON: ${e.message}", e
+                    "Failed to parse metadata (${format.formatId}): ${e.message}", e
                 )
             }
             return DependangerBuilder(metadata)

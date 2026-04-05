@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.maven.client
 
+import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

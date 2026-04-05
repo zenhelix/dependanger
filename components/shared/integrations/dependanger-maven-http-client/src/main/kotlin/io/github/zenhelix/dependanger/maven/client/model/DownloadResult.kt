@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.maven.client
+package io.github.zenhelix.dependanger.maven.client.model
 
 public sealed interface DownloadResult {
     public data class Success(val content: String) : DownloadResult

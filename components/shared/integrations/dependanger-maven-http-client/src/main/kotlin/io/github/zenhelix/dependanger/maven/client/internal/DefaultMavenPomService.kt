@@ -1,9 +1,12 @@
-package io.github.zenhelix.dependanger.maven.client
+package io.github.zenhelix.dependanger.maven.client.internal
 
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.createDefault
 import io.github.zenhelix.dependanger.http.client.getWithRetry
+import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
+import io.github.zenhelix.dependanger.maven.client.MavenPomService
+import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.basicAuth
 

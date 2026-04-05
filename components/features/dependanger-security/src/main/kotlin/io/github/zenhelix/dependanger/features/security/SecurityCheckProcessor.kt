@@ -22,11 +22,11 @@ import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCh
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.osv.client.OsvBatchResult
 import io.github.zenhelix.dependanger.osv.client.OsvClient
 import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
-import io.github.zenhelix.dependanger.osv.client.OsvPackageQuery
-import io.github.zenhelix.dependanger.osv.client.OsvVulnerabilityData
+import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
+import io.github.zenhelix.dependanger.osv.client.model.OsvPackageQuery
+import io.github.zenhelix.dependanger.osv.client.model.OsvVulnerabilityData
 
 private val logger = KotlinLogging.logger {}
 

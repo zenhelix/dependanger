@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.maven.client
+package io.github.zenhelix.dependanger.maven.client.model
 
 public data class PomParseResult(
     val properties: Map<String, String>,

@@ -23,11 +23,11 @@ import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositorie
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.maven.client.DownloadResult
 import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
 import io.github.zenhelix.dependanger.maven.client.MavenPomService
 import io.github.zenhelix.dependanger.maven.client.PomXmlParser
-import io.github.zenhelix.dependanger.maven.client.RawBomDependency
+import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
+import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
 
 private val logger = KotlinLogging.logger {}
 

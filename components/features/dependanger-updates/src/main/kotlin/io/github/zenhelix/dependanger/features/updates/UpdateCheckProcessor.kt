@@ -30,7 +30,7 @@ import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
 import io.github.zenhelix.dependanger.maven.client.MavenMetadataService
-import io.github.zenhelix.dependanger.maven.client.MetadataFetchResult
+import io.github.zenhelix.dependanger.maven.client.model.MetadataFetchResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

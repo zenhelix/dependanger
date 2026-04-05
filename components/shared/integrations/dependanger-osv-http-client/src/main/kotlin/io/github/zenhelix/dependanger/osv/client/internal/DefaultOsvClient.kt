@@ -5,11 +5,11 @@ import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.createDefault
 import io.github.zenhelix.dependanger.http.client.postWithRetry
-import io.github.zenhelix.dependanger.osv.client.OsvBatchResult
 import io.github.zenhelix.dependanger.osv.client.OsvClient
 import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
-import io.github.zenhelix.dependanger.osv.client.OsvPackageQuery
-import io.github.zenhelix.dependanger.osv.client.OsvVulnerabilityData
+import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
+import io.github.zenhelix.dependanger.osv.client.model.OsvPackageQuery
+import io.github.zenhelix.dependanger.osv.client.model.OsvVulnerabilityData
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.setBody

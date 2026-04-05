@@ -2,9 +2,9 @@ package io.github.zenhelix.dependanger.features.security
 
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
-import io.github.zenhelix.dependanger.osv.client.OsvBatchResult
-import io.github.zenhelix.dependanger.osv.client.OsvPackageQuery
-import io.github.zenhelix.dependanger.osv.client.OsvVulnerabilityData
+import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
+import io.github.zenhelix.dependanger.osv.client.model.OsvPackageQuery
+import io.github.zenhelix.dependanger.osv.client.model.OsvVulnerabilityData
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested

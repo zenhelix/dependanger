@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.osv.client
+package io.github.zenhelix.dependanger.osv.client.model
 
 public sealed interface OsvBatchResult {
     public data class Success(val vulnerabilities: List<List<OsvVulnerabilityData>>) : OsvBatchResult

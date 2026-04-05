@@ -3,7 +3,7 @@ package io.github.zenhelix.dependanger.clearlydefined.client.internal
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedClient
 import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedClientConfig
-import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedResult
+import io.github.zenhelix.dependanger.clearlydefined.client.model.ClearlyDefinedResult
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.createDefault

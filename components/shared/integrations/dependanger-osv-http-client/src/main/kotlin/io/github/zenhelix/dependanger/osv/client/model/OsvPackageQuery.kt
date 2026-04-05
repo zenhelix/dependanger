@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.osv.client
+package io.github.zenhelix.dependanger.osv.client.model
 
 public data class OsvPackageQuery(
     val group: String,

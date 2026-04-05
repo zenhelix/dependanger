@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.clearlydefined.client
 
 import io.github.zenhelix.dependanger.clearlydefined.client.internal.DefaultClearlyDefinedClient
+import io.github.zenhelix.dependanger.clearlydefined.client.model.ClearlyDefinedResult
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 
 /**

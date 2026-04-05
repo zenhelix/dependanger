@@ -4,13 +4,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedClient
-import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedResult
+import io.github.zenhelix.dependanger.clearlydefined.client.model.ClearlyDefinedResult
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvider
-import io.github.zenhelix.dependanger.maven.client.DownloadResult
 import io.github.zenhelix.dependanger.maven.client.MavenPomService
+import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParser
 
 private val logger = KotlinLogging.logger {}

@@ -1,4 +1,4 @@
-package io.github.zenhelix.dependanger.clearlydefined.client
+package io.github.zenhelix.dependanger.clearlydefined.client.model
 
 /**
  * Result of a ClearlyDefined API query.

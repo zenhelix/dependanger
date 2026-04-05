@@ -1,5 +1,8 @@
 package io.github.zenhelix.dependanger.maven.client
 
+import io.github.zenhelix.dependanger.maven.client.model.ParentPom
+import io.github.zenhelix.dependanger.maven.client.model.PomParseResult
+import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

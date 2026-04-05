@@ -1,10 +1,13 @@
-package io.github.zenhelix.dependanger.maven.client
+package io.github.zenhelix.dependanger.maven.client.internal
 
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpResult
 import io.github.zenhelix.dependanger.http.client.createDefault
 import io.github.zenhelix.dependanger.http.client.getWithRetry
+import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
+import io.github.zenhelix.dependanger.maven.client.MavenMetadataService
+import io.github.zenhelix.dependanger.maven.client.model.MetadataFetchResult
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.basicAuth

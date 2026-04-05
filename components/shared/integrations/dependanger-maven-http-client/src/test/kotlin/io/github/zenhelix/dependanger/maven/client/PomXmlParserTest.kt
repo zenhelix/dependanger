@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.maven.client
 
+import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

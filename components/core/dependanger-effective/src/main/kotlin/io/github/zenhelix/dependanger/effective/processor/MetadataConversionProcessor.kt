@@ -92,7 +92,7 @@ public class MetadataConversionProcessor : EffectiveMetadataProcessor {
         )
 
         is VersionReference.Reference -> EffectiveVersion.Unresolved(ref.name)
-        is VersionReference.Range     -> EffectiveVersion.None
+        is VersionReference.Range     -> EffectiveVersion.Range(ref.range)
         null                          -> EffectiveVersion.None
     }
 

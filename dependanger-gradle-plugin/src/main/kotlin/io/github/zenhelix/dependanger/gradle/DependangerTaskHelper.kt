@@ -37,6 +37,12 @@ internal object DependangerTaskHelper {
         logger: Logger,
         errorMessage: String = "Dependanger processing failed with ${result.diagnostics.errors.size} error(s). Set dependanger { failOnError = false } to continue despite errors.",
     ) {
+        if (result is DependangerResult.Failure) {
+            val message = result.diagnostics.errors.joinToString("\n") { it.message }
+                .ifEmpty { "Processing failed" }
+            throw GradleException(message)
+        }
+
         logDiagnostics(result, logger)
 
         if (result.diagnostics.hasErrors && failOnError) {

@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.core.model.Diagnostics
@@ -24,6 +25,11 @@ public class ValidateCommand : CliktCommand(name = "validate") {
             val metadata = MetadataService().read(Path.of(opts.input))
             val result = CoroutineRunner.run {
                 Dependanger.fromMetadata(metadata).build().validate()
+            }
+
+            if (result is DependangerResult.Failure) {
+                runner.formatter.renderDiagnostics(result.diagnostics)
+                throw CliException.ProcessingFailed("Validation failed")
             }
 
             val diagnostics = result.diagnostics

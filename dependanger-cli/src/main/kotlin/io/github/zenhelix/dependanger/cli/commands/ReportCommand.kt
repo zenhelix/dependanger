@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.writeReportTo
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
@@ -60,6 +61,11 @@ public class ReportCommand : CliktCommand(name = "report") {
 
             val result = CoroutineRunner.run {
                 dependanger.process()
+            }
+
+            if (result is DependangerResult.Failure) {
+                formatter.renderDiagnostics(result.diagnostics)
+                throw CliException.ProcessingFailed("Processing failed")
             }
 
             val generatedReport = result.writeReportTo(reportSettings)

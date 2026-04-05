@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
@@ -67,6 +68,11 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
 
             val result = CoroutineRunner.run {
                 dependanger.process()
+            }
+
+            if (result is DependangerResult.Failure) {
+                formatter.renderDiagnostics(result.diagnostics)
+                throw CliException.ProcessingFailed("Security check failed")
             }
 
             val vulnerabilities = result.vulnerabilities

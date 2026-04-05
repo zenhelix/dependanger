@@ -1,7 +1,7 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
-import io.github.zenhelix.dependanger.core.exception.DependangerException
+import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
@@ -94,11 +94,16 @@ public class Dependanger internal constructor(
         block: suspend () -> DependangerResult,
     ): DependangerResult = try {
         block()
-    } catch (e: DependangerException) {
-        throw e
     } catch (e: Exception) {
         currentCoroutineContext().ensureActive()
-        throw DependangerProcessingException("$operationName failed: ${e.message}", phase = null, cause = e)
+        DependangerResult.Failure(
+            diagnostics = Diagnostics.error(
+                "PIPELINE_ERROR",
+                "$operationName failed: ${e.message}",
+                null,
+                emptyMap(),
+            )
+        )
     }
 
     public suspend fun previewFilter(distribution: String): FilterPreview {

@@ -6,6 +6,7 @@ import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.DependangerBuilder
 import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.cli.CliDefaults
+import io.github.zenhelix.dependanger.cli.CliException
 import io.github.zenhelix.dependanger.cli.CoroutineRunner
 import io.github.zenhelix.dependanger.cli.MetadataService
 import io.github.zenhelix.dependanger.cli.OutputFormatter
@@ -34,6 +35,10 @@ public class PipelineRunner(
             val dependanger = builder.build()
             val result = CoroutineRunner.run {
                 dependanger.process(opts.distribution)
+            }
+            if (result is DependangerResult.Failure) {
+                formatter.renderDiagnostics(result.diagnostics)
+                throw CliException.ProcessingFailed("Processing pipeline failed")
             }
             PipelineHandlerContext(formatter, opts).handle(result)
         }

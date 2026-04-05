@@ -7,9 +7,9 @@ plugins {
 description = "Dependanger Report - Dependency report generation"
 
 dependencies {
-    api(projects.components.shared.dependangerFeatureModel)
-    api(projects.components.core.dependangerCore)
-    api(projects.components.core.dependangerEffective)
+    implementation(projects.components.shared.dependangerFeatureModel)
+    implementation(projects.components.core.dependangerCore)
+    implementation(projects.components.core.dependangerEffective)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kaml)
     implementation(libs.commonmark)

@@ -7,9 +7,9 @@ plugins {
 description = "Dependanger Security - CVE vulnerability scanning via OSV API"
 
 dependencies {
-    api(projects.components.core.dependangerCore)
-    api(projects.components.core.dependangerEffective)
-    api(projects.components.shared.dependangerFeatureModel)
+    implementation(projects.components.core.dependangerCore)
+    implementation(projects.components.core.dependangerEffective)
+    implementation(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.shared.integrations.dependangerOsvHttpClient)
     implementation(projects.components.shared.dependangerCache)
     implementation(libs.kotlinx.serialization.json)

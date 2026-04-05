@@ -7,9 +7,9 @@ plugins {
 description = "Dependanger License - License compliance checking via Maven POM / ClearlyDefined API"
 
 dependencies {
-    api(projects.components.core.dependangerCore)
-    api(projects.components.core.dependangerEffective)
-    api(projects.components.shared.dependangerFeatureModel)
+    implementation(projects.components.core.dependangerCore)
+    implementation(projects.components.core.dependangerEffective)
+    implementation(projects.components.shared.dependangerFeatureModel)
     implementation(projects.components.shared.integrations.dependangerMavenHttpClient)
     implementation(projects.components.shared.integrations.dependangerClearlydefinedHttpClient)
     implementation(projects.components.shared.dependangerCache)

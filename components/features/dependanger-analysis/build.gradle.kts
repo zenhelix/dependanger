@@ -7,8 +7,8 @@ plugins {
 description = "Dependanger Analysis - Compatibility and JDK analysis"
 
 dependencies {
-    api(projects.components.core.dependangerCore)
-    api(projects.components.core.dependangerEffective)
+    implementation(projects.components.core.dependangerCore)
+    implementation(projects.components.core.dependangerEffective)
     implementation(projects.components.shared.dependangerFeatureModel)
     implementation(libs.asm)
     implementation(libs.kotlinx.coroutines.core)

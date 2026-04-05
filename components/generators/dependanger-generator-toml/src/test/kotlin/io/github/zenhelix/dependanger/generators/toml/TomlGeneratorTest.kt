@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.generators.toml
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -63,6 +64,28 @@ class TomlGeneratorTest {
 
     private fun bundle(alias: String, libraries: List<String>): EffectiveBundle =
         EffectiveBundle(alias = alias, libraries = libraries)
+
+    private fun libraryWithRange(
+        alias: String,
+        group: String,
+        artifact: String,
+        range: VersionRange,
+    ): EffectiveLibrary = EffectiveLibrary(
+        alias = alias,
+        group = group,
+        artifact = artifact,
+        version = EffectiveVersion.Range(range),
+        description = null,
+        tags = emptySet(),
+        requires = null,
+        deprecation = null,
+        license = null,
+        constraints = emptyList(),
+        isPlatform = false,
+    )
+
+    private fun pluginWithRange(alias: String, id: String, range: VersionRange): EffectivePlugin =
+        EffectivePlugin(alias = alias, id = id, version = EffectiveVersion.Range(range))
 
     @Nested
     inner class EmptyMetadata {
@@ -466,6 +489,110 @@ class TomlGeneratorTest {
 
             assertThat(tempDir.resolve("custom.toml")).exists()
             assertThat(tempDir.resolve("libs.versions.toml")).doesNotExist()
+        }
+    }
+
+    @Nested
+    inner class VersionRangeHandling {
+        @Test
+        fun `library with simple range uses inline notation`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val lib = libraryWithRange("guava", "com.google.guava", "guava", VersionRange.Simple("[1.0,2.0)"))
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = \"[1.0,2.0)\" }")
+        }
+
+        @Test
+        fun `library with rich version uses object notation`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val lib = libraryWithRange(
+                "guava", "com.google.guava", "guava",
+                VersionRange.Rich(require = "1.0", strictly = null, prefer = "1.5", reject = emptyList()),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = { require = \"1.0\", prefer = \"1.5\" } }")
+        }
+
+        @Test
+        fun `rich version with strictly field`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val lib = libraryWithRange(
+                "guava", "com.google.guava", "guava",
+                VersionRange.Rich(require = null, strictly = "2.0", prefer = null, reject = emptyList()),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = { strictly = \"2.0\" } }")
+        }
+
+        @Test
+        fun `rich version with reject list`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val lib = libraryWithRange(
+                "guava", "com.google.guava", "guava",
+                VersionRange.Rich(require = "1.0", strictly = null, prefer = null, reject = listOf("1.2", "1.3")),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = { require = \"1.0\", reject = [\"1.2\", \"1.3\"] } }")
+        }
+
+        @Test
+        fun `rich version with all fields`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val lib = libraryWithRange(
+                "guava", "com.google.guava", "guava",
+                VersionRange.Rich(require = "1.0", strictly = "1.5", prefer = "1.3", reject = listOf("1.1")),
+            )
+            val result = generator.generate(emptyMetadata(libraries = mapOf("guava" to lib)))
+
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = { require = \"1.0\", strictly = \"1.5\", prefer = \"1.3\", reject = [\"1.1\"] } }")
+        }
+
+        @Test
+        fun `plugin with simple range uses inline notation`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val p = pluginWithRange("my-plugin", "com.example.plugin", VersionRange.Simple("[1.0,2.0)"))
+            val result = generator.generate(emptyMetadata(plugins = mapOf("my-plugin" to p)))
+
+            assertThat(result).contains("my-plugin = { id = \"com.example.plugin\", version = \"[1.0,2.0)\" }")
+        }
+
+        @Test
+        fun `plugin with rich version uses object notation`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val p = pluginWithRange(
+                "my-plugin", "com.example.plugin",
+                VersionRange.Rich(require = "1.0", strictly = null, prefer = "1.5", reject = emptyList()),
+            )
+            val result = generator.generate(emptyMetadata(plugins = mapOf("my-plugin" to p)))
+
+            assertThat(result).contains("my-plugin = { id = \"com.example.plugin\", version = { require = \"1.0\", prefer = \"1.5\" } }")
+        }
+
+        @Test
+        fun `range version coexists with resolved and no-version libraries`() {
+            val generator = TomlGenerator(TomlConfig.DEFAULT.copy(includeComments = false))
+            val v = version("kotlin", "2.1.20")
+            val resolvedLib = library("kotlin-stdlib", "org.jetbrains.kotlin", "kotlin-stdlib", version = v)
+            val rangeLib = libraryWithRange("guava", "com.google.guava", "guava", VersionRange.Simple("[31.0,32.0)"))
+            val noVersionLib = library("managed-dep", "com.example", "managed")
+            val result = generator.generate(
+                emptyMetadata(
+                    versions = mapOf("kotlin" to v),
+                    libraries = mapOf(
+                        "kotlin-stdlib" to resolvedLib,
+                        "guava" to rangeLib,
+                        "managed-dep" to noVersionLib,
+                    ),
+                )
+            )
+
+            assertThat(result).contains("kotlin-stdlib = { group = \"org.jetbrains.kotlin\", name = \"kotlin-stdlib\", version.ref = \"kotlin\" }")
+            assertThat(result).contains("guava = { group = \"com.google.guava\", name = \"guava\", version = \"[31.0,32.0)\" }")
+            assertThat(result).contains("managed-dep = { group = \"com.example\", name = \"managed\" }")
         }
     }
 

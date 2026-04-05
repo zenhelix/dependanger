@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.generators.toml
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -73,9 +74,10 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
     ): String {
         val group = escapeTomlValue(lib.group)
         val name = escapeTomlValue(lib.artifact)
-        val versionPart = resolveVersionPart(lib.version.resolvedOrNull, versions) { alias ->
-            logger.warn { "Library '${lib.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
-        }
+        val versionPart = lib.version.rangeOrNull?.let { formatRangeVersion(it) }
+            ?: resolveVersionPart(lib.version.resolvedOrNull, versions) { alias ->
+                logger.warn { "Library '${lib.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
+            }
 
         return "${lib.alias} = { group = \"$group\", name = \"$name\"$versionPart }"
     }
@@ -108,12 +110,28 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
         versions: Map<String, ResolvedVersion>,
     ): String {
         val id = escapeTomlValue(plugin.id)
-        val versionPart = resolveVersionPart(plugin.version.resolvedOrNull, versions) { alias ->
-            logger.warn { "Plugin '${plugin.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
-        }
+        val versionPart = plugin.version.rangeOrNull?.let { formatRangeVersion(it) }
+            ?: resolveVersionPart(plugin.version.resolvedOrNull, versions) { alias ->
+                logger.warn { "Plugin '${plugin.alias}' version alias '$alias' not found in [versions], falling back to inline version" }
+            }
 
         return "${plugin.alias} = { id = \"$id\"$versionPart }"
     }
+
+    private fun formatRangeVersion(range: VersionRange): String = when (range) {
+        is VersionRange.Simple -> ", version = \"${escapeTomlValue(range.notation)}\""
+        is VersionRange.Rich   -> ", version = { ${formatRichVersionFields(range)} }"
+    }
+
+    private fun formatRichVersionFields(rich: VersionRange.Rich): String = buildList {
+        rich.require?.let { add("require = \"${escapeTomlValue(it)}\"") }
+        rich.strictly?.let { add("strictly = \"${escapeTomlValue(it)}\"") }
+        rich.prefer?.let { add("prefer = \"${escapeTomlValue(it)}\"") }
+        if (rich.reject.isNotEmpty()) {
+            val rejectList = rich.reject.joinToString(", ") { "\"${escapeTomlValue(it)}\"" }
+            add("reject = [$rejectList]")
+        }
+    }.joinToString(", ")
 
     private fun resolveVersionPart(
         version: ResolvedVersion?,

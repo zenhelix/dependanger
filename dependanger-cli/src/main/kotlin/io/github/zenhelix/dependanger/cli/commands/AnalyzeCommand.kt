@@ -3,12 +3,12 @@ package io.github.zenhelix.dependanger.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.ProgramResult
-import com.github.ajalt.clikt.core.terminal
-import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
-import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.cli.options.PipelineOptions
+import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.api.compatibilityIssues
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.Severity
@@ -22,42 +22,32 @@ import kotlin.io.path.writeText
 public class AnalyzeCommand : CliktCommand(name = "analyze") {
     override fun help(context: Context): String = "Analyze library compatibility"
 
-    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
+    private val opts by PipelineOptions()
     public val output: String? by option("-o", "--output", help = "Output report file")
-    public val format: String by option("--format", help = "Output format").default(CliDefaults.OUTPUT_FORMAT_TEXT)
     public val targetJdk: Int? by option("--target-jdk", help = "Target JDK version").int()
     public val failOnError: Boolean by option("--fail-on-error", help = "Fail on violations").flag()
     public val rules: String? by option("--rules", help = "Rule types to check")
 
-    override fun run() {
-        val jsonMode = format == CliDefaults.OUTPUT_FORMAT_JSON
-        val formatter = OutputFormatter(jsonMode = jsonMode, terminal = terminal)
-        val metadataService = MetadataService()
-
-        withErrorHandling(formatter) {
-            val metadata = metadataService.read(Path.of(input))
-
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .preset(ProcessingPreset.STRICT)
-                .withContextProperty(CompatibilityAnalysisSettingsKey, CompatibilityAnalysisSettings(
-                    enabled = true,
-                    targetJdk = targetJdk,
-                    targetKotlin = CompatibilityAnalysisSettings.DEFAULT.targetKotlin,
-                    minSeverity = CompatibilityAnalysisSettings.DEFAULT.minSeverity,
-                    failOnErrors = CompatibilityAnalysisSettings.DEFAULT.failOnErrors,
-                ))
-                .build()
-
-            val result = CoroutineRunner.run {
-                dependanger.process()
-            }
-
+    override fun run(): Unit = PipelineRunner(this, opts).run(
+        configure = {
+            preset(ProcessingPreset.STRICT)
+            withContextProperty(CompatibilityAnalysisSettingsKey, CompatibilityAnalysisSettings(
+                enabled = true,
+                targetJdk = targetJdk,
+                targetKotlin = CompatibilityAnalysisSettings.DEFAULT.targetKotlin,
+                minSeverity = CompatibilityAnalysisSettings.DEFAULT.minSeverity,
+                failOnErrors = CompatibilityAnalysisSettings.DEFAULT.failOnErrors,
+            ))
+        },
+        handle = { result ->
             val issues = result.compatibilityIssues
 
             val filteredIssues = rules?.let { rulesFilter ->
                 val allowedRules = parseCommaSeparated(rulesFilter).toSet()
                 issues.filter { it.ruleId in allowedRules }
             } ?: issues
+
+            val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
 
             if (jsonMode) {
                 formatter.renderJson(filteredIssues, ListSerializer(CompatibilityIssue.serializer()))
@@ -91,5 +81,5 @@ public class AnalyzeCommand : CliktCommand(name = "analyze") {
                 throw ProgramResult(1)
             }
         }
-    }
+    )
 }

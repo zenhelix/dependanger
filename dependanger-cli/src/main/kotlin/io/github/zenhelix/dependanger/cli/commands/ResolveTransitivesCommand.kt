@@ -2,12 +2,13 @@ package io.github.zenhelix.dependanger.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
-import io.github.zenhelix.dependanger.api.Dependanger
+import io.github.zenhelix.dependanger.cli.options.PipelineOptions
+import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
@@ -29,9 +30,8 @@ public data class TransitiveResolutionOutput(
 public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitives") {
     override fun help(context: Context): String = "Resolve transitive dependencies"
 
-    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
+    private val opts by PipelineOptions()
     public val output: String? by option("-o", "--output", help = "Output file")
-    public val format: String by option("--format", help = "Format: json, text").default(CliDefaults.OUTPUT_FORMAT_TEXT)
     public val depth: Int? by option("--depth", help = "Max resolution depth").int()
     public val includeOptional: Boolean by option("--include-optional", help = "Include optional deps").flag()
     public val repositories: String? by option("--repositories", help = "Maven repos (comma-separated)")
@@ -41,44 +41,28 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
         help = "Strategy: HIGHEST,FIRST,FAIL"
     ).default(CliDefaults.CONFLICT_RESOLUTION_HIGHEST)
 
-    override fun run() {
-        val jsonMode = format == CliDefaults.OUTPUT_FORMAT_JSON
-        val formatter = OutputFormatter(jsonMode = jsonMode, terminal = terminal)
-        val metadataService = MetadataService()
-
-        withErrorHandling(formatter) {
-            val metadata = metadataService.read(Path.of(input))
-
-            val strategy = try {
-                ConflictResolutionStrategy.valueOf(conflictResolution.uppercase())
-            } catch (_: IllegalArgumentException) {
-                throw CliException.InvalidArgument(
-                    "Unknown conflict resolution strategy '$conflictResolution'. Available: ${ConflictResolutionStrategy.entries.joinToString { it.name }}"
-                )
-            }
-
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .preset(ProcessingPreset.STRICT)
-                .withContextProperty(TransitiveResolutionSettingsKey, TransitiveResolutionSettings(
-                    enabled = true,
-                    maxDepth = depth,
-                    includeOptional = includeOptional,
-                    conflictResolution = strategy,
-                    repositories = parseMavenRepositories(repositories) ?: emptyList(),
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else TransitiveResolutionSettings.DEFAULT_CACHE_TTL_HOURS,
-                    maxTransitives = TransitiveResolutionSettings.DEFAULT.maxTransitives,
-                    scopes = TransitiveResolutionSettings.DEFAULT.scopes,
-                    cacheDirectory = null,
-                ))
-                .build()
-
-            val result = CoroutineRunner.run {
-                dependanger.process()
-            }
-
+    override fun run(): Unit = PipelineRunner(this, opts).run(
+        configure = {
+            val strategy = parseEnum<ConflictResolutionStrategy>(conflictResolution, "conflict resolution strategy")
+            preset(ProcessingPreset.STRICT)
+            withContextProperty(TransitiveResolutionSettingsKey, TransitiveResolutionSettings(
+                enabled = true,
+                maxDepth = depth,
+                includeOptional = includeOptional,
+                conflictResolution = strategy,
+                repositories = parseMavenRepositories(repositories) ?: emptyList(),
+                cacheTtlHours = if (offline) Long.MAX_VALUE else TransitiveResolutionSettings.DEFAULT_CACHE_TTL_HOURS,
+                maxTransitives = TransitiveResolutionSettings.DEFAULT.maxTransitives,
+                scopes = TransitiveResolutionSettings.DEFAULT.scopes,
+                cacheDirectory = null,
+            ))
+        },
+        handle = { result ->
             val trees = result.transitives
             val conflicts = result.versionConflicts
             val combined = TransitiveResolutionOutput(transitives = trees, versionConflicts = conflicts)
+
+            val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
 
             if (jsonMode) {
                 formatter.renderJson(combined, TransitiveResolutionOutput.serializer())
@@ -116,7 +100,7 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
                 formatter.success("Report written to $outputPath")
             }
         }
-    }
+    )
 
     private fun renderTree(formatter: OutputFormatter, tree: TransitiveTree, indent: Int) {
         val prefix = "  ".repeat(indent) + if (indent > 0) "+-- " else ""

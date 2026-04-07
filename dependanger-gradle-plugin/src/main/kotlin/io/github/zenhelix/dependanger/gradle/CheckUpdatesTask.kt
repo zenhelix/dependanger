@@ -1,9 +1,7 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
-import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
 public abstract class CheckUpdatesTask : AbstractDependangerTask() {
@@ -12,22 +10,9 @@ public abstract class CheckUpdatesTask : AbstractDependangerTask() {
     }
 
     @TaskAction
-    public fun execute() {
-        val metadata = extension.toMetadata()
-        val failOnError = extension.failOnError.get()
-
-        runWithErrorHandling(failOnError) {
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(FeatureProcessorIds.UPDATE_CHECK) }
-                .build()
-
-            val result = runBlocking { dependanger.process() }
-
-            if (!result.isSuccess) {
-                DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
-                return@runWithErrorHandling
-            }
-
+    public fun execute(): Unit = AnalyticalTaskRunner(extension, logger).run(
+        configure = { configureProcessing { enableOptional(FeatureProcessorIds.UPDATE_CHECK) } },
+        handle = { result ->
             val updates = result.updates
 
             if (updates.isEmpty()) {
@@ -40,5 +25,5 @@ public abstract class CheckUpdatesTask : AbstractDependangerTask() {
                 logger.lifecycle("  Total: ${updates.size} updates available")
             }
         }
-    }
+    )
 }

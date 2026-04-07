@@ -18,8 +18,6 @@ import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutio
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
 import kotlinx.serialization.Serializable
-import java.nio.file.Path
-import kotlin.io.path.writeText
 
 @Serializable
 public data class TransitiveResolutionOutput(
@@ -95,12 +93,7 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
                 }
             }
 
-            output?.let { outputFile ->
-                val outputPath = Path.of(outputFile)
-                val jsonString = CliDefaults.CLI_JSON.encodeToString(TransitiveResolutionOutput.serializer(), combined)
-                outputPath.writeText(jsonString)
-                formatter.success("Report written to $outputPath")
-            }
+            writeOutputIfRequested(output, combined, TransitiveResolutionOutput.serializer())
         }
     )
 

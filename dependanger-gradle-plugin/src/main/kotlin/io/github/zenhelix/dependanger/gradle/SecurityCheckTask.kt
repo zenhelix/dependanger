@@ -1,10 +1,8 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.vulnerabilities
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
-import kotlinx.coroutines.runBlocking
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
@@ -14,22 +12,9 @@ public abstract class SecurityCheckTask : AbstractDependangerTask() {
     }
 
     @TaskAction
-    public fun execute() {
-        val metadata = extension.toMetadata()
-        val failOnError = extension.failOnError.get()
-
-        runWithErrorHandling(failOnError) {
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(FeatureProcessorIds.SECURITY_CHECK) }
-                .build()
-
-            val result = runBlocking { dependanger.process() }
-
-            if (!result.isSuccess) {
-                DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
-                return@runWithErrorHandling
-            }
-
+    public fun execute(): Unit = AnalyticalTaskRunner(extension, logger).run(
+        configure = { configureProcessing { enableOptional(FeatureProcessorIds.SECURITY_CHECK) } },
+        handle = { result ->
             val vulnerabilities = result.vulnerabilities
 
             if (vulnerabilities.isEmpty()) {
@@ -46,5 +31,5 @@ public abstract class SecurityCheckTask : AbstractDependangerTask() {
                 throw GradleException("Dependanger: Found ${critical.size} vulnerabilities with HIGH or CRITICAL severity.")
             }
         }
-    }
+    )
 }

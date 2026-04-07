@@ -12,14 +12,17 @@ import io.github.zenhelix.dependanger.cli.MetadataService
 import io.github.zenhelix.dependanger.cli.OutputFormatter
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.withErrorHandling
+import kotlinx.serialization.KSerializer
 import java.nio.file.Path
+import kotlin.io.path.writeText
 
 public class PipelineRunner(
     command: CliktCommand,
     private val opts: PipelineOptions,
+    jsonMode: Boolean? = null,
 ) {
     public val formatter: OutputFormatter = OutputFormatter(
-        jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON,
+        jsonMode = jsonMode ?: (opts.format == CliDefaults.OUTPUT_FORMAT_JSON),
         terminal = command.terminal,
     )
     private val metadataService: MetadataService = MetadataService()
@@ -48,4 +51,21 @@ public class PipelineRunner(
 public class PipelineHandlerContext(
     public val formatter: OutputFormatter,
     public val opts: PipelineOptions,
-)
+) {
+    public fun <T> writeOutputIfRequested(output: String?, data: T, serializer: KSerializer<T>) {
+        output?.let { outputFile ->
+            val outputPath = Path.of(outputFile)
+            val jsonString = CliDefaults.CLI_JSON.encodeToString(serializer, data)
+            outputPath.writeText(jsonString)
+            formatter.success("Report written to $outputPath")
+        }
+    }
+
+    public fun writeOutputIfRequested(output: String?, content: String) {
+        output?.let { outputFile ->
+            val outputPath = Path.of(outputFile)
+            outputPath.writeText(content)
+            formatter.success("Report written to $outputPath")
+        }
+    }
+}

@@ -5,12 +5,12 @@ import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Severity
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
-import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -18,10 +18,10 @@ import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitiesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsKey
-import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
+import io.github.zenhelix.dependanger.feature.support.AbstractParallelFeatureProcessor
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.osv.client.OsvClient
 import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
 import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
@@ -30,12 +30,14 @@ import io.github.zenhelix.dependanger.osv.client.model.OsvVulnerabilityData
 
 private val logger = KotlinLogging.logger {}
 
-public class SecurityCheckProcessor : ParallelMetadataProcessor {
+public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityCheckSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks for known security vulnerabilities"
+
+    override val settingsKey: ProcessingContextKey<SecurityCheckSettings> = SecurityCheckSettingsKey
 
     public companion object {
         public const val PROCESSOR_ID: String = FeatureProcessorIds.SECURITY_CHECK
@@ -45,9 +47,12 @@ public class SecurityCheckProcessor : ParallelMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[SecurityCheckSettingsKey]?.enabled == true
 
-    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
-        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
-        val settings = context.require(SecurityCheckSettingsKey)
+    override suspend fun executeWithInfrastructure(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+        settings: SecurityCheckSettings,
+        httpClientFactory: HttpClientFactory,
+    ): ParallelResult {
         val minSeverity = parseMinSeverity(settings.minSeverity)
 
         val candidates = metadata.libraries.values.filter { it.version.isResolved }

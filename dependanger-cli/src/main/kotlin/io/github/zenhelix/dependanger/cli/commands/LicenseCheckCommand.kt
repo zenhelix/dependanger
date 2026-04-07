@@ -15,8 +15,6 @@ import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
-import java.nio.file.Path
-import kotlin.io.path.writeText
 
 public class LicenseCheckCommand : CliktCommand(name = "license") {
     override fun help(context: Context): String = "Check library licenses for compliance"
@@ -35,21 +33,22 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
             withContextProperty(
                 LicenseCheckSettingsKey, LicenseCheckSettings(
                     enabled = true,
-                allowedLicenses = allow?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.allowedLicenses,
-                deniedLicenses = deny?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.deniedLicenses,
-                failOnDenied = failOnDenied,
-                failOnUnknown = failOnUnknown,
-                includeTransitives = includeTransitives,
-                dualLicensePolicy = LicenseCheckSettings.DEFAULT.dualLicensePolicy,
-                failOnCopyleft = LicenseCheckSettings.DEFAULT.failOnCopyleft,
-                warnOnCopyleft = LicenseCheckSettings.DEFAULT.warnOnCopyleft,
-                warnOnUnknown = LicenseCheckSettings.DEFAULT.warnOnUnknown,
-                ignoreLibraries = LicenseCheckSettings.DEFAULT.ignoreLibraries,
-                timeout = LicenseCheckSettings.DEFAULT_TIMEOUT_MS,
-                parallelism = LicenseCheckSettings.DEFAULT_PARALLELISM,
-                cacheDirectory = null,
-                cacheTtlHours = LicenseCheckSettings.DEFAULT_CACHE_TTL_HOURS,
-            ))
+                    allowedLicenses = allow?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.allowedLicenses,
+                    deniedLicenses = deny?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.deniedLicenses,
+                    failOnDenied = failOnDenied,
+                    failOnUnknown = failOnUnknown,
+                    includeTransitives = includeTransitives,
+                    dualLicensePolicy = LicenseCheckSettings.DEFAULT.dualLicensePolicy,
+                    failOnCopyleft = LicenseCheckSettings.DEFAULT.failOnCopyleft,
+                    warnOnCopyleft = LicenseCheckSettings.DEFAULT.warnOnCopyleft,
+                    warnOnUnknown = LicenseCheckSettings.DEFAULT.warnOnUnknown,
+                    ignoreLibraries = LicenseCheckSettings.DEFAULT.ignoreLibraries,
+                    timeout = LicenseCheckSettings.DEFAULT_TIMEOUT_MS,
+                    parallelism = LicenseCheckSettings.DEFAULT_PARALLELISM,
+                    cacheDirectory = null,
+                    cacheTtlHours = LicenseCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                )
+            )
         },
         handle = { result ->
             val violations = result.licenseViolations
@@ -78,12 +77,7 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
                 }
             }
 
-            output?.let { outputFile ->
-                val outputPath = Path.of(outputFile)
-                val jsonString = CliDefaults.CLI_JSON.encodeToString(ListSerializer(LicenseViolation.serializer()), violations)
-                outputPath.writeText(jsonString)
-                formatter.success("Report written to $outputPath")
-            }
+            writeOutputIfRequested(output, violations, ListSerializer(LicenseViolation.serializer()))
 
             val hasDenied = violations.any { it.violationType == LicenseViolationType.DENIED }
             val hasNotAllowed = violations.any { it.violationType == LicenseViolationType.NOT_ALLOWED }

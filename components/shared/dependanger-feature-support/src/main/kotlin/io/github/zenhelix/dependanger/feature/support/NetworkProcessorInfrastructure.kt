@@ -19,10 +19,11 @@ public data class NetworkProcessorInfrastructure(
         internal fun resolve(
             context: ProcessingContext,
             featureRepositories: List<Repository>,
+            httpClientFactory: HttpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory,
         ): NetworkProcessorInfrastructure = NetworkProcessorInfrastructure(
             repositories = context.resolveMavenRepositories(featureRepositories),
             credentialsProvider = context[CredentialsProviderKey],
-            httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory,
+            httpClientFactory = httpClientFactory,
         )
     }
 }

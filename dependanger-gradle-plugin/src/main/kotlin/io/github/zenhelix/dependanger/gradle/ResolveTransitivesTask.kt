@@ -1,10 +1,8 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
-import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
 public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
@@ -13,22 +11,9 @@ public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
     }
 
     @TaskAction
-    public fun execute() {
-        val metadata = extension.toMetadata()
-        val failOnError = extension.failOnError.get()
-
-        runWithErrorHandling(failOnError) {
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .configureProcessing { enableOptional(FeatureProcessorIds.TRANSITIVE_RESOLVER) }
-                .build()
-
-            val result = runBlocking { dependanger.process() }
-
-            if (!result.isSuccess) {
-                DependangerTaskHelper.handleProcessingErrors(result, failOnError, logger)
-                return@runWithErrorHandling
-            }
-
+    public fun execute(): Unit = AnalyticalTaskRunner(extension, logger).run(
+        configure = { configureProcessing { enableOptional(FeatureProcessorIds.TRANSITIVE_RESOLVER) } },
+        handle = { result ->
             val trees = result.transitives
             val conflicts = result.versionConflicts
 
@@ -45,5 +30,5 @@ public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
                 }
             }
         }
-    }
+    )
 }

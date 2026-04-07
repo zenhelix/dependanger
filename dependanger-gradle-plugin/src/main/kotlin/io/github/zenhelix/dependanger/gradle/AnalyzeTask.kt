@@ -1,9 +1,7 @@
 package io.github.zenhelix.dependanger.gradle
 
-import io.github.zenhelix.dependanger.api.Dependanger
 import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
-import kotlinx.coroutines.runBlocking
 import org.gradle.api.tasks.TaskAction
 
 public abstract class AnalyzeTask : AbstractDependangerTask() {
@@ -12,18 +10,13 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
     }
 
     @TaskAction
-    public fun execute() {
-        val metadata = extension.toMetadata()
-        val failOnError = extension.failOnError.get()
-
-        runWithErrorHandling(failOnError) {
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .jdkVersion(Runtime.version().feature())
-                .configureProcessing { enableOptional(FeatureProcessorIds.COMPATIBILITY_ANALYSIS) }
-                .build()
-
-            val result = runBlocking { dependanger.process() }
-
+    public fun execute(): Unit = AnalyticalTaskRunner(extension, logger).run(
+        checkSuccess = false,
+        configure = {
+            jdkVersion(Runtime.version().feature())
+            configureProcessing { enableOptional(FeatureProcessorIds.COMPATIBILITY_ANALYSIS) }
+        },
+        handle = { result ->
             val compatPredicate = { msg: DiagnosticMessage -> msg.code.startsWith("COMPAT") }
 
             val hadIssues = DependangerTaskHelper.handleFilteredDiagnostics(
@@ -37,5 +30,5 @@ public abstract class AnalyzeTask : AbstractDependangerTask() {
                 logger.lifecycle("Dependanger: No compatibility issues found.")
             }
         }
-    }
+    )
 }

@@ -25,7 +25,7 @@ import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheck
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
-import io.github.zenhelix.dependanger.feature.support.AbstractParallelNetworkProcessor
+import io.github.zenhelix.dependanger.feature.support.AbstractParallelMavenProcessor
 import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
@@ -39,7 +39,7 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-public class UpdateCheckProcessor : AbstractParallelNetworkProcessor<UpdateCheckSettings>() {
+public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
@@ -58,7 +58,7 @@ public class UpdateCheckProcessor : AbstractParallelNetworkProcessor<UpdateCheck
     override fun supports(context: ProcessingContext): Boolean =
         context[UpdateCheckSettingsKey]?.enabled == true
 
-    override suspend fun executeWithInfrastructure(
+    override suspend fun executeWithMavenInfrastructure(
         metadata: EffectiveMetadata,
         context: ProcessingContext,
         settings: UpdateCheckSettings,

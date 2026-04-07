@@ -15,8 +15,6 @@ import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheck
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import kotlinx.serialization.builtins.ListSerializer
-import java.nio.file.Path
-import kotlin.io.path.writeText
 
 public class CheckUpdatesCommand : CliktCommand(name = "updates") {
     override fun help(context: Context): String = "Check for available library updates"
@@ -77,12 +75,7 @@ public class CheckUpdatesCommand : CliktCommand(name = "updates") {
                 }
             }
 
-            output?.let { outputFile ->
-                val outputPath = Path.of(outputFile)
-                val jsonString = CliDefaults.CLI_JSON.encodeToString(ListSerializer(UpdateAvailableInfo.serializer()), filteredUpdates)
-                outputPath.writeText(jsonString)
-                formatter.success("Report written to $outputPath")
-            }
+            writeOutputIfRequested(output, filteredUpdates, ListSerializer(UpdateAvailableInfo.serializer()))
 
             if (failOnUpdates && filteredUpdates.isNotEmpty()) {
                 throw ProgramResult(1)

@@ -23,7 +23,7 @@ import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseChec
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
-import io.github.zenhelix.dependanger.feature.support.AbstractParallelNetworkProcessor
+import io.github.zenhelix.dependanger.feature.support.AbstractParallelMavenProcessor
 import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvidersKey
@@ -35,7 +35,7 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-public class LicenseCheckProcessor : AbstractParallelNetworkProcessor<LicenseCheckSettings>() {
+public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheckSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
@@ -51,7 +51,7 @@ public class LicenseCheckProcessor : AbstractParallelNetworkProcessor<LicenseChe
     override fun supports(context: ProcessingContext): Boolean =
         context[LicenseCheckSettingsKey]?.enabled == true
 
-    override suspend fun executeWithInfrastructure(
+    override suspend fun executeWithMavenInfrastructure(
         metadata: EffectiveMetadata,
         context: ProcessingContext,
         settings: LicenseCheckSettings,

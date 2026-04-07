@@ -3,14 +3,14 @@ package io.github.zenhelix.dependanger.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.ProgramResult
-import com.github.ajalt.clikt.core.terminal
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
-import io.github.zenhelix.dependanger.api.Dependanger
-import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.api.vulnerabilities
+import io.github.zenhelix.dependanger.cli.options.PipelineOptions
+import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
@@ -18,15 +18,13 @@ import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeveri
 import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
-import java.nio.file.Path
-import kotlin.io.path.writeText
 
 public class SecurityCheckCommand : CliktCommand(name = "security") {
     override fun help(context: Context): String = "Check libraries for known vulnerabilities"
 
-    public val input: String by option("-i", "--input", help = "Input metadata file").default(CliDefaults.METADATA_FILE)
+    private val opts by PipelineOptions()
     public val output: String? by option("-o", "--output", help = "Output report file")
-    public val format: String by option("--format", help = "Output format: text, json, sarif").default(CliDefaults.OUTPUT_FORMAT_TEXT)
+    public val sarif: Boolean by option("--sarif", help = "Use SARIF output format").flag()
     public val failOn: String? by option("--fail-on", help = "Fail on severity: CRITICAL,HIGH,MEDIUM,LOW")
     public val ignore: List<String> by option("--ignore", help = "Ignore CVE IDs").multiple()
     public val osvApi: String by option("--osv-api", help = "OSV API URL").default(CliDefaults.OSV_API_URL)
@@ -34,27 +32,21 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
     public val includeTransitives: Boolean by option("--include-transitives", help = "Check transitives").flag()
 
     override fun run() {
-        val jsonMode = format == CliDefaults.OUTPUT_FORMAT_JSON
-        val sarifMode = format == CliDefaults.OUTPUT_FORMAT_SARIF
-        val formatter = OutputFormatter(jsonMode = jsonMode || sarifMode, terminal = terminal)
-        val metadataService = MetadataService()
+        val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
+        val sarifMode = sarif
 
-        withErrorHandling(formatter) {
-            val metadata = metadataService.read(Path.of(input))
-
-            val failOnSeverity = if (failOn != null) {
-                try {
-                    VulnerabilitySeverity.fromString(failOn!!)
-                } catch (e: IllegalArgumentException) {
-                    throw CliException.InvalidArgument(e.message ?: "Invalid severity: $failOn")
-                }
-            } else {
-                null
+        val failOnSeverity = failOn?.let { value ->
+            try {
+                VulnerabilitySeverity.fromString(value)
+            } catch (e: IllegalArgumentException) {
+                throw CliException.InvalidArgument(e.message ?: "Invalid severity: $value")
             }
+        }
 
-            val dependanger = Dependanger.fromMetadata(metadata)
-                .preset(ProcessingPreset.STRICT)
-                .withContextProperty(
+        PipelineRunner(this, opts, jsonMode = jsonMode || sarifMode).run(
+            configure = {
+                preset(ProcessingPreset.STRICT)
+                withContextProperty(
                     SecurityCheckSettingsKey, SecurityCheckSettings(
                         enabled = true,
                         ignoreVulnerabilities = ignore,
@@ -66,56 +58,45 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
                         cacheDirectory = null,
                     )
                 )
-                .build()
+            },
+            handle = { result ->
+                val vulnerabilities = result.vulnerabilities
 
-            val result = CoroutineRunner.run {
-                dependanger.process()
-            }
+                val sarifOutput = if (sarifMode) renderSarif(vulnerabilities) else null
 
-            if (result is DependangerResult.Failure) {
-                formatter.renderDiagnostics(result.diagnostics)
-                throw CliException.ProcessingFailed("Security check failed")
-            }
-
-            val vulnerabilities = result.vulnerabilities
-
-            if (sarifMode) {
-                echo(renderSarif(vulnerabilities))
-            } else if (jsonMode) {
-                formatter.renderJson(vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
-            } else {
-                if (vulnerabilities.isEmpty()) {
-                    formatter.success("No vulnerabilities found")
+                if (sarifOutput != null) {
+                    formatter.println(sarifOutput)
+                } else if (jsonMode) {
+                    formatter.renderJson(vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
                 } else {
-                    formatter.renderTable(
-                        headers = listOf("Library", "CVE ID", "Severity", "Summary"),
-                        rows = vulnerabilities.map { vuln ->
-                            listOf(
-                                "${vuln.affectedGroup}:${vuln.affectedArtifact}",
-                                vuln.id,
-                                vuln.severity.name,
-                                vuln.summary,
-                            )
-                        }
-                    )
-                    formatter.info("${vulnerabilities.size} vulnerability(ies) found")
+                    if (vulnerabilities.isEmpty()) {
+                        formatter.success("No vulnerabilities found")
+                    } else {
+                        formatter.renderTable(
+                            headers = listOf("Library", "CVE ID", "Severity", "Summary"),
+                            rows = vulnerabilities.map { vuln ->
+                                listOf(
+                                    "${vuln.affectedGroup}:${vuln.affectedArtifact}",
+                                    vuln.id,
+                                    vuln.severity.name,
+                                    vuln.summary,
+                                )
+                            }
+                        )
+                        formatter.info("${vulnerabilities.size} vulnerability(ies) found")
+                    }
+                }
+
+                if (sarifOutput != null) {
+                    writeOutputIfRequested(output, sarifOutput)
+                } else {
+                    writeOutputIfRequested(output, vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
+                }
+
+                if (failOnSeverity != null && vulnerabilities.any { it.severity.meetsThreshold(failOnSeverity) }) {
+                    throw ProgramResult(1)
                 }
             }
-
-            output?.let { outputFile ->
-                val outputPath = Path.of(outputFile)
-                val outputContent = if (sarifMode) {
-                    renderSarif(vulnerabilities)
-                } else {
-                    CliDefaults.CLI_JSON.encodeToString(ListSerializer(VulnerabilityInfo.serializer()), vulnerabilities)
-                }
-                outputPath.writeText(outputContent)
-                formatter.success("Report written to $outputPath")
-            }
-
-            if (failOnSeverity != null && vulnerabilities.any { it.severity.meetsThreshold(failOnSeverity) }) {
-                throw ProgramResult(1)
-            }
-        }
+        )
     }
 }

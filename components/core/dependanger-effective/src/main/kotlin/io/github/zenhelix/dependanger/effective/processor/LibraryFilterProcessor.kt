@@ -7,7 +7,6 @@ import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
-import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
@@ -43,12 +42,20 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
         val diagnostics = Diagnostics.builder(metadata.diagnostics)
         val bundleIndex = metadata.bundles
 
+        val libraryToBundles: Map<String, Set<String>> = buildMap<String, MutableSet<String>> {
+            bundleIndex.forEach { (bundleAlias, bundle) ->
+                bundle.libraries.forEach { libAlias ->
+                    getOrPut(libAlias) { mutableSetOf() }.add(bundleAlias)
+                }
+            }
+        }
+
         val filtered = metadata.libraries.filter { (alias, lib) ->
             val passesSpec = spec == null || (
                     (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
                             && passesGroupFilter(lib, spec.byGroups)
                             && (spec.byAliases?.let { passesAliasFilter(alias, it) } != false)
-                            && passesBundleFilter(alias, bundleIndex, spec.byBundles)
+                            && passesBundleFilter(libraryToBundles[alias] ?: emptySet(), spec.byBundles)
                             && passesDeprecatedFilter(lib, spec.byDeprecated)
                     )
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, lib, context) }
@@ -82,12 +89,10 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
     }
 
     private fun passesBundleFilter(
-        alias: String,
-        bundles: Map<String, EffectiveBundle>,
+        memberOf: Set<String>,
         filter: BundleFilter?,
     ): Boolean {
         if (filter == null) return true
-        val memberOf = bundles.filter { (_, b) -> alias in b.libraries }.keys
 
         val passesIncludes = filter.includes.isEmpty()
                 || (memberOf intersect filter.includes).isNotEmpty()

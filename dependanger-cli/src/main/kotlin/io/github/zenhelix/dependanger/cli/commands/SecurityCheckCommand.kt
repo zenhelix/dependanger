@@ -54,16 +54,18 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
 
             val dependanger = Dependanger.fromMetadata(metadata)
                 .preset(ProcessingPreset.STRICT)
-                .withContextProperty(SecurityCheckSettingsKey, SecurityCheckSettings(
-                    enabled = true,
-                    ignoreVulnerabilities = ignore,
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else SecurityCheckSettings.DEFAULT_CACHE_TTL_HOURS,
-                    failOnVulnerability = SecurityCheckSettings.DEFAULT.failOnVulnerability,
-                    minSeverity = SecurityCheckSettings.DEFAULT.minSeverity,
-                    timeout = SecurityCheckSettings.DEFAULT_TIMEOUT_MS,
-                    parallelism = SecurityCheckSettings.DEFAULT_PARALLELISM,
-                    cacheDirectory = null,
-                ))
+                .withContextProperty(
+                    SecurityCheckSettingsKey, SecurityCheckSettings(
+                        enabled = true,
+                        ignoreVulnerabilities = ignore,
+                        cacheTtlHours = if (offline) Long.MAX_VALUE else SecurityCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                        failOnVulnerability = SecurityCheckSettings.DEFAULT.failOnVulnerability,
+                        minSeverity = SecurityCheckSettings.DEFAULT.minSeverity,
+                        timeout = SecurityCheckSettings.DEFAULT_TIMEOUT_MS,
+                        parallelism = SecurityCheckSettings.DEFAULT_PARALLELISM,
+                        cacheDirectory = null,
+                    )
+                )
                 .build()
 
             val result = CoroutineRunner.run {

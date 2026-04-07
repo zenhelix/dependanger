@@ -71,12 +71,14 @@ public class LibrariesDsl {
                 require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
                 Triple(parts[0], parts[1], null)
             }
+
             3    -> {
                 require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
                 require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
                 require(parts[2].isNotBlank()) { "Version must not be blank in coordinates '$raw'" }
                 Triple(parts[0], parts[1], VersionReference.Literal(parts[2]))
             }
+
             else -> throw IllegalArgumentException("Invalid coordinates: $raw")
         }
     }

@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectivePlugin
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
+import io.github.zenhelix.dependanger.effective.model.deprecationMessage
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
 import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import java.nio.file.Path
@@ -83,7 +84,7 @@ public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<S
     }
 
     private fun buildDeprecationComment(lib: EffectiveLibrary): String =
-        "# ${lib.deprecationSummary ?: "DEPRECATED"}."
+        "# ${lib.deprecationMessage()}."
 
     private fun generateBundlesSection(bundles: Map<String, EffectiveBundle>): String {
         if (bundles.isEmpty()) return ""

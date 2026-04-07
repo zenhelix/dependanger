@@ -1,8 +1,8 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -10,24 +10,23 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
-import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationsExtensionKey
 import io.github.zenhelix.dependanger.feature.model.license.isCopyleft
+import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.feature.model.transitive.flatDependencies
+import io.github.zenhelix.dependanger.feature.support.AbstractParallelNetworkProcessor
+import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.spi.LicenseSourceProvidersKey
-import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -36,12 +35,13 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-public class LicenseCheckProcessor : ParallelMetadataProcessor {
+public class LicenseCheckProcessor : AbstractParallelNetworkProcessor<LicenseCheckSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks library license compliance"
+    override val settingsKey: ProcessingContextKey<LicenseCheckSettings> = LicenseCheckSettingsKey
 
     public companion object {
         public const val PROCESSOR_ID: String = FeatureProcessorIds.LICENSE_CHECK
@@ -51,11 +51,12 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[LicenseCheckSettingsKey]?.enabled == true
 
-    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
-        val settings = context.require(LicenseCheckSettingsKey)
-        val repositories = context.resolveMavenRepositories()
-        val credentialsProvider = context[CredentialsProviderKey]
-        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
+    override suspend fun executeWithInfrastructure(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+        settings: LicenseCheckSettings,
+        infrastructure: NetworkProcessorInfrastructure,
+    ): ParallelResult {
         val customProviders = context[LicenseSourceProvidersKey] ?: emptyList()
         if (customProviders.isNotEmpty()) {
             logger.info { "Using ${customProviders.size} custom license source provider(s): ${customProviders.map { it.sourceId }}" }
@@ -103,9 +104,9 @@ public class LicenseCheckProcessor : ParallelMetadataProcessor {
         }
 
         LicenseCheckContext(
-            repositories = repositories,
-            credentialsProvider = credentialsProvider,
-            httpClientFactory = httpClientFactory,
+            repositories = infrastructure.repositories,
+            credentialsProvider = infrastructure.credentialsProvider,
+            httpClientFactory = infrastructure.httpClientFactory,
             cacheDirectory = settings.cacheDirectory,
             cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = settings.timeout,

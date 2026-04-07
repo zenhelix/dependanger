@@ -33,6 +33,7 @@ include(":components:shared:dependanger-feature-model")
 include(":components:shared:dependanger-maven-pom")
 include(":components:shared:dependanger-http-client")
 include(":components:shared:dependanger-cache")
+include(":components:shared:dependanger-feature-support")
 
 // Shared integration client modules
 include(":components:shared:integrations:dependanger-maven-http-client")

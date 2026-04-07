@@ -4,9 +4,10 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
-import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.MavenRepository
+import io.github.zenhelix.dependanger.core.model.Repository
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.core.util.VersionComparator
@@ -16,18 +17,17 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
-import io.github.zenhelix.dependanger.effective.pipeline.ParallelMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ParallelResult
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
+import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
 import io.github.zenhelix.dependanger.feature.model.updates.UpdatesExtensionKey
-import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
+import io.github.zenhelix.dependanger.feature.support.AbstractParallelNetworkProcessor
+import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
 import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
 import io.github.zenhelix.dependanger.maven.client.MavenMetadataService
 import io.github.zenhelix.dependanger.maven.client.model.MetadataFetchResult
@@ -39,12 +39,16 @@ import kotlinx.coroutines.sync.withPermit
 
 private val logger = KotlinLogging.logger {}
 
-public class UpdateCheckProcessor : ParallelMetadataProcessor {
+public class UpdateCheckProcessor : AbstractParallelNetworkProcessor<UpdateCheckSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Checks for available library updates"
+
+    override val settingsKey: ProcessingContextKey<UpdateCheckSettings> = UpdateCheckSettingsKey
+
+    override fun featureRepositories(settings: UpdateCheckSettings): List<Repository> = settings.repositories
 
     public companion object {
         public const val PROCESSOR_ID: String = FeatureProcessorIds.UPDATE_CHECK
@@ -54,12 +58,12 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[UpdateCheckSettingsKey]?.enabled == true
 
-    override suspend fun processParallel(metadata: EffectiveMetadata, context: ProcessingContext): ParallelResult {
-        val settings = context.require(UpdateCheckSettingsKey)
-        val repositories = context.resolveMavenRepositories(settings.repositories)
-        val credentialsProvider = context[CredentialsProviderKey]
-        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
-
+    override suspend fun executeWithInfrastructure(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+        settings: UpdateCheckSettings,
+        infrastructure: NetworkProcessorInfrastructure,
+    ): ParallelResult {
         val candidates = metadata.libraries.values.filter { lib ->
             !lib.ignoreUpdates
                     && lib.version.isResolved
@@ -74,9 +78,9 @@ public class UpdateCheckProcessor : ParallelMetadataProcessor {
             ?: DependangerPaths.resolveInUserHome(DependangerPaths.VERSIONS_CACHE_DIR)
 
         UpdateCheckContext(
-            repositories = repositories,
-            credentialsProvider = credentialsProvider,
-            httpClientFactory = httpClientFactory,
+            repositories = infrastructure.repositories,
+            credentialsProvider = infrastructure.credentialsProvider,
+            httpClientFactory = infrastructure.httpClientFactory,
             cacheDirectory = cacheDir,
             cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = settings.timeout,

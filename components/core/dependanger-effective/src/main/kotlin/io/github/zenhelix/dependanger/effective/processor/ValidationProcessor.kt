@@ -31,17 +31,21 @@ internal class ValidationProcessor : EffectiveMetadataProcessor {
 
         diagnostics.add(validateDuplicateAliases(metadata))
 
-        diagnostics.add(validateUnresolvedVersions(
-            metadata, context, validationSettings.onUnresolvedVersion,
-        ))
+        diagnostics.add(
+            validateUnresolvedVersions(
+                metadata, context, validationSettings.onUnresolvedVersion,
+            )
+        )
 
         diagnostics.add(validateBundleReferences(metadata))
 
         diagnostics.add(validateCircularExtends(context.originalMetadata))
 
-        diagnostics.add(validateDeprecatedReferences(
-            metadata, validationSettings.onDeprecatedLibrary,
-        ))
+        diagnostics.add(
+            validateDeprecatedReferences(
+                metadata, validationSettings.onDeprecatedLibrary,
+            )
+        )
 
         diagnostics.add(validateCoordinates(metadata))
 

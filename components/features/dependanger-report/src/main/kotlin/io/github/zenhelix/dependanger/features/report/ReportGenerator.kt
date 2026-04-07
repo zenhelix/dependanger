@@ -1,12 +1,12 @@
 package io.github.zenhelix.dependanger.features.report
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.effective.spi.ReportFormat
-import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.spi.GeneratedReport
+import io.github.zenhelix.dependanger.effective.spi.ReportFormat
 import io.github.zenhelix.dependanger.effective.spi.ReportProvider
+import io.github.zenhelix.dependanger.effective.spi.ReportSettings
 import io.github.zenhelix.dependanger.features.report.mapper.ReportDataMapper
 import io.github.zenhelix.dependanger.features.report.renderer.HtmlReportRenderer
 import io.github.zenhelix.dependanger.features.report.renderer.JsonReportRenderer

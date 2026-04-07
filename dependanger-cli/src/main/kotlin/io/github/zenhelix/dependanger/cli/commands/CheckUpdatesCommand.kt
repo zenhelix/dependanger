@@ -7,9 +7,9 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
+import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
-import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
@@ -33,16 +33,18 @@ public class CheckUpdatesCommand : CliktCommand(name = "updates") {
     override fun run(): Unit = PipelineRunner(this, opts).run(
         configure = {
             preset(ProcessingPreset.STRICT)
-            withContextProperty(UpdateCheckSettingsKey, UpdateCheckSettings(
-                enabled = true,
-                includePrerelease = includePrerelease,
-                excludePatterns = exclude,
-                repositories = parseMavenRepositories(repositories) ?: emptyList(),
-                cacheTtlHours = if (offline) Long.MAX_VALUE else UpdateCheckSettings.DEFAULT_CACHE_TTL_HOURS,
-                timeout = UpdateCheckSettings.DEFAULT_TIMEOUT_MS,
-                parallelism = UpdateCheckSettings.DEFAULT_PARALLELISM,
-                cacheDirectory = null,
-            ))
+            withContextProperty(
+                UpdateCheckSettingsKey, UpdateCheckSettings(
+                    enabled = true,
+                    includePrerelease = includePrerelease,
+                    excludePatterns = exclude,
+                    repositories = parseMavenRepositories(repositories) ?: emptyList(),
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else UpdateCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                    timeout = UpdateCheckSettings.DEFAULT_TIMEOUT_MS,
+                    parallelism = UpdateCheckSettings.DEFAULT_PARALLELISM,
+                    cacheDirectory = null,
+                )
+            )
         },
         handle = { result ->
             val updates = result.updates

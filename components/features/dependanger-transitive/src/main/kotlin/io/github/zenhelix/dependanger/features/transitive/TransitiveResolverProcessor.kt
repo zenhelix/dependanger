@@ -1,26 +1,26 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.Repository
+import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.withDiagnostic
 import io.github.zenhelix.dependanger.effective.model.withExtension
-import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
-import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
+import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettings
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependenciesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
-import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
+import io.github.zenhelix.dependanger.feature.support.AbstractSequentialNetworkProcessor
+import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
 
 private val logger = KotlinLogging.logger {}
 
@@ -29,12 +29,16 @@ private const val DEFAULT_MAX_TRANSITIVES = 10_000
 private const val DEFAULT_READ_TIMEOUT_MS = 30_000L
 private const val LARGE_TREE_THRESHOLD = 5_000
 
-public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
+public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<TransitiveResolutionSettings>() {
     override val id: String = PROCESSOR_ID
     override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VERSION_RESOLVER))
     override val isOptional: Boolean = true
     override val description: String = "Resolves transitive dependency tree"
+
+    override val settingsKey: ProcessingContextKey<TransitiveResolutionSettings> = TransitiveResolutionSettingsKey
+
+    override fun featureRepositories(settings: TransitiveResolutionSettings): List<Repository> = settings.repositories
 
     public companion object {
         public const val PROCESSOR_ID: String = FeatureProcessorIds.TRANSITIVE_RESOLVER
@@ -44,11 +48,12 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
     override fun supports(context: ProcessingContext): Boolean =
         context[TransitiveResolutionSettingsKey]?.enabled == true
 
-    override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
-        val settings = context.require(TransitiveResolutionSettingsKey)
-        val repositories = context.resolveMavenRepositories(settings.repositories)
-        val credentialsProvider = context[CredentialsProviderKey]
-        val httpClientFactory = context[HttpClientFactoryKey] ?: DefaultHttpClientFactory
+    override suspend fun executeWithInfrastructure(
+        metadata: EffectiveMetadata,
+        context: ProcessingContext,
+        settings: TransitiveResolutionSettings,
+        infrastructure: NetworkProcessorInfrastructure,
+    ): EffectiveMetadata {
         val constraints = context.originalMetadata.constraints
         val effectiveMaxDepth = settings.maxDepth ?: DEFAULT_MAX_DEPTH
         val effectiveMaxTransitives = settings.maxTransitives ?: DEFAULT_MAX_TRANSITIVES
@@ -71,9 +76,9 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
         }
 
         TransitiveResolverContext(
-            repositories = repositories,
-            credentialsProvider = credentialsProvider,
-            httpClientFactory = httpClientFactory,
+            repositories = infrastructure.repositories,
+            credentialsProvider = infrastructure.credentialsProvider,
+            httpClientFactory = infrastructure.httpClientFactory,
             cacheDirectory = settings.cacheDirectory,
             cacheTtlHours = settings.cacheTtlHours,
             readTimeoutMs = DEFAULT_READ_TIMEOUT_MS,

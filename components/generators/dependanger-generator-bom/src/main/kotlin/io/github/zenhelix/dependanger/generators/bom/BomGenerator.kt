@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
+import io.github.zenhelix.dependanger.effective.model.deprecationMessage
 import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
 import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import io.github.zenhelix.dependanger.maven.pom.model.PomCoordinates
@@ -67,7 +68,7 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
                 version = when (val v = lib.version) {
                     is EffectiveVersion.Resolved -> v.version.value
                     is EffectiveVersion.Range -> (v.range as VersionRange.Simple).notation
-                    else -> null
+                    else                      -> null
                 },
                 type = if (lib.isPlatform) "pom" else null,
                 scope = if (lib.isPlatform) "import" else null,
@@ -102,7 +103,7 @@ public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<Str
     }
 
     private fun buildDeprecationComment(lib: EffectiveLibrary): String =
-        lib.deprecationSummary ?: "DEPRECATED"
+        lib.deprecationMessage()
 
     public companion object {
         private const val GENERATOR_ID: String = "maven-bom"

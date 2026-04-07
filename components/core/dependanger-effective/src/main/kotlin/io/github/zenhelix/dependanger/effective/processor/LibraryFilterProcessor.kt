@@ -46,11 +46,11 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
         val filtered = metadata.libraries.filter { (alias, lib) ->
             val passesSpec = spec == null || (
                     (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
-                && passesGroupFilter(lib, spec.byGroups)
+                            && passesGroupFilter(lib, spec.byGroups)
                             && (spec.byAliases?.let { passesAliasFilter(alias, it) } != false)
-                && passesBundleFilter(alias, bundleIndex, spec.byBundles)
-                && passesDeprecatedFilter(lib, spec.byDeprecated)
-            )
+                            && passesBundleFilter(alias, bundleIndex, spec.byBundles)
+                            && passesDeprecatedFilter(lib, spec.byDeprecated)
+                    )
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, lib, context) }
             val passes = passesSpec && passesCustom
 

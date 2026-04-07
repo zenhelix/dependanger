@@ -7,10 +7,10 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
-import io.github.zenhelix.dependanger.cli.options.PipelineOptions
-import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.api.transitives
 import io.github.zenhelix.dependanger.api.versionConflicts
+import io.github.zenhelix.dependanger.cli.options.PipelineOptions
+import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettings
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
@@ -45,17 +45,19 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
         configure = {
             val strategy = parseEnum<ConflictResolutionStrategy>(conflictResolution, "conflict resolution strategy")
             preset(ProcessingPreset.STRICT)
-            withContextProperty(TransitiveResolutionSettingsKey, TransitiveResolutionSettings(
-                enabled = true,
-                maxDepth = depth,
-                includeOptional = includeOptional,
-                conflictResolution = strategy,
-                repositories = parseMavenRepositories(repositories) ?: emptyList(),
-                cacheTtlHours = if (offline) Long.MAX_VALUE else TransitiveResolutionSettings.DEFAULT_CACHE_TTL_HOURS,
-                maxTransitives = TransitiveResolutionSettings.DEFAULT.maxTransitives,
-                scopes = TransitiveResolutionSettings.DEFAULT.scopes,
-                cacheDirectory = null,
-            ))
+            withContextProperty(
+                TransitiveResolutionSettingsKey, TransitiveResolutionSettings(
+                    enabled = true,
+                    maxDepth = depth,
+                    includeOptional = includeOptional,
+                    conflictResolution = strategy,
+                    repositories = parseMavenRepositories(repositories) ?: emptyList(),
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else TransitiveResolutionSettings.DEFAULT_CACHE_TTL_HOURS,
+                    maxTransitives = TransitiveResolutionSettings.DEFAULT.maxTransitives,
+                    scopes = TransitiveResolutionSettings.DEFAULT.scopes,
+                    cacheDirectory = null,
+                )
+            )
         },
         handle = { result ->
             val trees = result.transitives

@@ -147,7 +147,14 @@ class ProcessingPipelineTest {
         fun `processors run in order and add diagnostics sequentially`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, diagnosticMessage = "msg-first"))
-                addProcessor(DiagnosticProcessor("second", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("first")), diagnosticMessage = "msg-second"))
+                addProcessor(
+                    DiagnosticProcessor(
+                        "second",
+                        ProcessingPhase.VALIDATION,
+                        constraints = setOf(OrderConstraint.runsAfter("first")),
+                        diagnosticMessage = "msg-second"
+                    )
+                )
             }
 
             val result = pipeline.process(context())
@@ -161,8 +168,22 @@ class ProcessingPipelineTest {
         fun `processor that does not support context is skipped`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(DiagnosticProcessor("first", ProcessingPhase.PROFILE, diagnosticMessage = "msg-first"))
-                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, constraints = setOf(OrderConstraint.runsAfter("first")), supported = false))
-                addProcessor(DiagnosticProcessor("third", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("skipped")), diagnosticMessage = "msg-third"))
+                addProcessor(
+                    FakeProcessor(
+                        "skipped",
+                        ProcessingPhase.METADATA_CONVERSION,
+                        constraints = setOf(OrderConstraint.runsAfter("first")),
+                        supported = false
+                    )
+                )
+                addProcessor(
+                    DiagnosticProcessor(
+                        "third",
+                        ProcessingPhase.VALIDATION,
+                        constraints = setOf(OrderConstraint.runsAfter("skipped")),
+                        diagnosticMessage = "msg-third"
+                    )
+                )
             }
 
             val result = pipeline.process(context())
@@ -175,7 +196,14 @@ class ProcessingPipelineTest {
         fun `processingInfo contains executed processor IDs excluding skipped`() = runTest {
             val pipeline = ProcessingPipeline {
                 addProcessor(FakeProcessor("p1", ProcessingPhase.PROFILE))
-                addProcessor(FakeProcessor("skipped", ProcessingPhase.METADATA_CONVERSION, constraints = setOf(OrderConstraint.runsAfter("p1")), supported = false))
+                addProcessor(
+                    FakeProcessor(
+                        "skipped",
+                        ProcessingPhase.METADATA_CONVERSION,
+                        constraints = setOf(OrderConstraint.runsAfter("p1")),
+                        supported = false
+                    )
+                )
                 addProcessor(FakeProcessor("p2", ProcessingPhase.VALIDATION, constraints = setOf(OrderConstraint.runsAfter("skipped"))))
             }
 

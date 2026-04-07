@@ -40,11 +40,13 @@ public class PluginsDsl {
                 require(parts[0].isNotBlank()) { "Plugin ID must not be blank in '$id'" }
                 Pair(parts[0], null)
             }
+
             2    -> {
                 require(parts[0].isNotBlank()) { "Plugin ID must not be blank in '$id'" }
                 require(parts[1].isNotBlank()) { "Plugin version must not be blank in '$id'" }
                 Pair(parts[0], VersionReference.Literal(parts[1]))
             }
+
             else -> throw IllegalArgumentException("Invalid plugin id: $id")
         }
     }

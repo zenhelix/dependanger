@@ -4,6 +4,10 @@ import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_PARALLELISM
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_TIMEOUT_MS
+import io.github.zenhelix.dependanger.feature.model.settings.common.NetworkCheckSettings
+import io.github.zenhelix.dependanger.feature.model.settings.common.NetworkCheckSettingsDsl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -17,7 +21,7 @@ public enum class DualLicensePolicy {
 
 @Serializable
 public data class LicenseCheckSettings(
-    val enabled: Boolean,
+    override val enabled: Boolean,
     val allowedLicenses: List<String>,
     val deniedLicenses: List<String>,
     val dualLicensePolicy: DualLicensePolicy,
@@ -28,14 +32,14 @@ public data class LicenseCheckSettings(
     val warnOnUnknown: Boolean,
     val ignoreLibraries: List<String>,
     val includeTransitives: Boolean,
-    val timeout: Long,
-    val parallelism: Int,
-    val cacheDirectory: String?,
-    val cacheTtlHours: Long,
-) {
+    override val timeout: Long,
+    override val parallelism: Int,
+    override val cacheDirectory: String?,
+    override val cacheTtlHours: Long,
+) : NetworkCheckSettings() {
     public companion object {
-        public const val DEFAULT_TIMEOUT_MS: Long = 30_000
-        public const val DEFAULT_PARALLELISM: Int = 10
+        public const val DEFAULT_TIMEOUT_MS: Long = NETWORK_DEFAULT_TIMEOUT_MS
+        public const val DEFAULT_PARALLELISM: Int = NETWORK_DEFAULT_PARALLELISM
         public const val DEFAULT_CACHE_TTL_HOURS: Long = 168
 
         public val DEFAULT: LicenseCheckSettings = LicenseCheckSettings(
@@ -65,8 +69,11 @@ public class LicenseCheckSettingsProvider : AbstractFeatureSettingsProvider<Lice
 )
 
 @DependangerDslMarker
-public class LicenseCheckSettingsDsl {
-    public var enabled: Boolean = LicenseCheckSettings.DEFAULT.enabled
+public class LicenseCheckSettingsDsl : NetworkCheckSettingsDsl() {
+    init {
+        cacheTtlHours = LicenseCheckSettings.DEFAULT_CACHE_TTL_HOURS
+    }
+
     public var allowedLicenses: List<String> = LicenseCheckSettings.DEFAULT.allowedLicenses
     public var deniedLicenses: List<String> = LicenseCheckSettings.DEFAULT.deniedLicenses
     public var dualLicensePolicy: DualLicensePolicy = LicenseCheckSettings.DEFAULT.dualLicensePolicy
@@ -77,10 +84,6 @@ public class LicenseCheckSettingsDsl {
     public var warnOnUnknown: Boolean = LicenseCheckSettings.DEFAULT.warnOnUnknown
     public var ignoreLibraries: List<String> = LicenseCheckSettings.DEFAULT.ignoreLibraries
     public var includeTransitives: Boolean = LicenseCheckSettings.DEFAULT.includeTransitives
-    public var timeout: Long = LicenseCheckSettings.DEFAULT.timeout
-    public var parallelism: Int = LicenseCheckSettings.DEFAULT.parallelism
-    public var cacheDirectory: String? = LicenseCheckSettings.DEFAULT.cacheDirectory
-    public var cacheTtlHours: Long = LicenseCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): LicenseCheckSettings = LicenseCheckSettings(
         enabled = enabled,

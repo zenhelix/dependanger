@@ -5,6 +5,10 @@ import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.spi.AbstractFeatureSettingsProvider
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_PARALLELISM
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_TIMEOUT_MS
+import io.github.zenhelix.dependanger.feature.model.settings.common.NetworkCheckSettings
+import io.github.zenhelix.dependanger.feature.model.settings.common.NetworkCheckSettingsDsl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -13,18 +17,18 @@ public val SecurityCheckSettingsKey: ProcessingContextKey<SecurityCheckSettings>
 
 @Serializable
 public data class SecurityCheckSettings(
-    val enabled: Boolean,
+    override val enabled: Boolean,
     val failOnVulnerability: Severity,
     val minSeverity: String,
     val ignoreVulnerabilities: List<String>,
-    val timeout: Long,
-    val parallelism: Int,
-    val cacheDirectory: String?,
-    val cacheTtlHours: Long,
-) {
+    override val timeout: Long,
+    override val parallelism: Int,
+    override val cacheDirectory: String?,
+    override val cacheTtlHours: Long,
+) : NetworkCheckSettings() {
     public companion object {
-        public const val DEFAULT_TIMEOUT_MS: Long = 30_000
-        public const val DEFAULT_PARALLELISM: Int = 10
+        public const val DEFAULT_TIMEOUT_MS: Long = NETWORK_DEFAULT_TIMEOUT_MS
+        public const val DEFAULT_PARALLELISM: Int = NETWORK_DEFAULT_PARALLELISM
         public const val DEFAULT_CACHE_TTL_HOURS: Long = 24
 
         public val DEFAULT: SecurityCheckSettings = SecurityCheckSettings(
@@ -47,15 +51,14 @@ public class SecurityCheckSettingsProvider : AbstractFeatureSettingsProvider<Sec
 )
 
 @DependangerDslMarker
-public class SecurityCheckSettingsDsl {
-    public var enabled: Boolean = SecurityCheckSettings.DEFAULT.enabled
+public class SecurityCheckSettingsDsl : NetworkCheckSettingsDsl() {
+    init {
+        cacheTtlHours = SecurityCheckSettings.DEFAULT_CACHE_TTL_HOURS
+    }
+
     public var failOnVulnerability: Severity = SecurityCheckSettings.DEFAULT.failOnVulnerability
     public var minSeverity: String = SecurityCheckSettings.DEFAULT.minSeverity
     public var ignoreVulnerabilities: List<String> = SecurityCheckSettings.DEFAULT.ignoreVulnerabilities
-    public var timeout: Long = SecurityCheckSettings.DEFAULT.timeout
-    public var parallelism: Int = SecurityCheckSettings.DEFAULT.parallelism
-    public var cacheDirectory: String? = SecurityCheckSettings.DEFAULT.cacheDirectory
-    public var cacheTtlHours: Long = SecurityCheckSettings.DEFAULT.cacheTtlHours
 
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(
         enabled = enabled,

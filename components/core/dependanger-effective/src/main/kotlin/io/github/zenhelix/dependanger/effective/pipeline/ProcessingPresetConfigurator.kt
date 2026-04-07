@@ -11,9 +11,9 @@ private val presetContributors: List<PresetContributor> by lazy {
 
 public fun ProcessingPreset.configure(builder: PipelineBuilder) {
     when (this) {
-        ProcessingPreset.DEFAULT      -> configureDefault(builder)
-        ProcessingPreset.MINIMAL      -> configureMinimal(builder)
-        ProcessingPreset.STRICT       -> configureStrict(builder)
+        ProcessingPreset.DEFAULT -> configureDefault(builder)
+        ProcessingPreset.MINIMAL -> configureMinimal(builder)
+        ProcessingPreset.STRICT  -> configureStrict(builder)
     }
     presetContributors.forEach { it.configure(this, builder) }
 }

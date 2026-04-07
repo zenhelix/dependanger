@@ -4,7 +4,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
-import com.github.ajalt.clikt.parameters.options.option
 import io.github.zenhelix.dependanger.cli.options.MetadataOptions
 import io.github.zenhelix.dependanger.cli.runner.MetadataRunner
 

@@ -6,9 +6,9 @@ import com.github.ajalt.clikt.core.ProgramResult
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
-import io.github.zenhelix.dependanger.api.licenseViolations
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
@@ -32,8 +32,9 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
     override fun run(): Unit = PipelineRunner(this, opts).run(
         configure = {
             preset(ProcessingPreset.STRICT)
-            withContextProperty(LicenseCheckSettingsKey, LicenseCheckSettings(
-                enabled = true,
+            withContextProperty(
+                LicenseCheckSettingsKey, LicenseCheckSettings(
+                    enabled = true,
                 allowedLicenses = allow?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.allowedLicenses,
                 deniedLicenses = deny?.let { parseCommaSeparated(it) } ?: LicenseCheckSettings.DEFAULT.deniedLicenses,
                 failOnDenied = failOnDenied,

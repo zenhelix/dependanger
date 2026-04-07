@@ -34,6 +34,7 @@ public class CompatibilityCheckProcessor : EffectiveMetadataProcessor {
         public const val PROCESSOR_ID: String = FeatureProcessorIds.COMPATIBILITY_ANALYSIS
         public val PHASE: ProcessingPhase = ProcessingPhase("COMPATIBILITY_ANALYSIS", ExecutionMode.SEQUENTIAL)
     }
+
     override fun supports(context: ProcessingContext): Boolean = true
 
     override suspend fun process(

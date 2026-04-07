@@ -27,10 +27,10 @@ class LicensePolicyComplianceTest {
         artifact = artifact,
         version = EffectiveVersion.Resolved(
             ResolvedVersion(
-            alias = "test-version",
-            value = version,
-            source = VersionSource.DECLARED,
-            originalRef = null,
+                alias = "test-version",
+                value = version,
+                source = VersionSource.DECLARED,
+                originalRef = null,
             )
         ),
         description = null,

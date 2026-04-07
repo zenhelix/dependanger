@@ -7,9 +7,9 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import io.github.zenhelix.dependanger.api.compatibilityIssues
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
-import io.github.zenhelix.dependanger.api.compatibilityIssues
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
@@ -31,13 +31,15 @@ public class AnalyzeCommand : CliktCommand(name = "analyze") {
     override fun run(): Unit = PipelineRunner(this, opts).run(
         configure = {
             preset(ProcessingPreset.STRICT)
-            withContextProperty(CompatibilityAnalysisSettingsKey, CompatibilityAnalysisSettings(
-                enabled = true,
-                targetJdk = targetJdk,
-                targetKotlin = CompatibilityAnalysisSettings.DEFAULT.targetKotlin,
-                minSeverity = CompatibilityAnalysisSettings.DEFAULT.minSeverity,
-                failOnErrors = CompatibilityAnalysisSettings.DEFAULT.failOnErrors,
-            ))
+            withContextProperty(
+                CompatibilityAnalysisSettingsKey, CompatibilityAnalysisSettings(
+                    enabled = true,
+                    targetJdk = targetJdk,
+                    targetKotlin = CompatibilityAnalysisSettings.DEFAULT.targetKotlin,
+                    minSeverity = CompatibilityAnalysisSettings.DEFAULT.minSeverity,
+                    failOnErrors = CompatibilityAnalysisSettings.DEFAULT.failOnErrors,
+                )
+            )
         },
         handle = { result ->
             val issues = result.compatibilityIssues

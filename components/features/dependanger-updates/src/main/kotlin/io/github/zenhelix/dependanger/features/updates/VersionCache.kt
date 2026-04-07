@@ -52,7 +52,6 @@ public class VersionCache(
 
     public fun put(group: String, artifact: String, result: VersionFetchResult) {
         val file = resolveCacheFile(group, artifact)
-        file.parentFile.mkdirs()
 
         val entry = VersionCacheEntry(
             versions = result.versions,

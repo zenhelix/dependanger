@@ -15,6 +15,8 @@ package io.github.zenhelix.dependanger.core.util
  */
 public object GlobMatcher {
 
+    private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
     /**
      * Проверяет совпадение координат "group:artifact" с glob-паттерном.
      *
@@ -40,21 +42,24 @@ public object GlobMatcher {
     public fun matchesGlob(pattern: String, value: String): Boolean {
         if (pattern == "*") return true
 
-        val regex = buildString {
-            append("^")
-            for (ch in pattern) {
-                when (ch) {
-                    '*'                                                         -> append(".*")
-                    '?'                                                         -> append(".")
-                    '.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\' ->
-                        append("\\").append(ch)
+        val regex = regexCache.getOrPut(pattern) {
+            val built = buildString {
+                append("^")
+                for (ch in pattern) {
+                    when (ch) {
+                        '*'                                                         -> append(".*")
+                        '?'                                                         -> append(".")
+                        '.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\' ->
+                            append("\\").append(ch)
 
-                    else                                                        -> append(ch)
+                        else                                                        -> append(ch)
+                    }
                 }
+                append("$")
             }
-            append("$")
+            Regex(built)
         }
-        return Regex(regex).matches(value)
+        return regex.matches(value)
     }
 
     /**

@@ -60,6 +60,7 @@ internal class MetadataConversionProcessor : EffectiveMetadataProcessor {
                 alias = plugin.alias,
                 id = plugin.id,
                 version = convertVersionReference(plugin.version),
+                tags = plugin.tags,
             )
         }
 

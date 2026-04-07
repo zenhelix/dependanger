@@ -22,6 +22,7 @@ public abstract class AbstractFileCache(
     }
 
     protected fun writeAtomic(target: File, content: String) {
+        target.parentFile.mkdirs()
         val tempFile = Files.createTempFile(target.parentFile.toPath(), "tmp-", ".tmp")
         try {
             Files.writeString(tempFile, content)

@@ -45,7 +45,6 @@ public class SecurityCache(
 
     public fun put(group: String, artifact: String, version: String, vulnerabilities: List<VulnerabilityInfo>) {
         val file = resolveCacheFile(group, artifact, version)
-        file.parentFile.mkdirs()
 
         val entry = SecurityCacheEntry(
             vulnerabilities = vulnerabilities,

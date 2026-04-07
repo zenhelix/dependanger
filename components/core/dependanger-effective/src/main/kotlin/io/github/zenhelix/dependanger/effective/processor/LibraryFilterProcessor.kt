@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveDistribution
 import io.github.zenhelix.dependanger.effective.spi.LibraryFiltersKey
 
 internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
@@ -31,7 +32,7 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
         context: ProcessingContext,
     ): EffectiveMetadata {
         val distName = metadata.distribution
-        val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
+        val distribution = context.resolveDistribution(distName)
         val spec = distribution?.librarySpec
 
         val customFilters = context[LibraryFiltersKey] ?: emptyList()

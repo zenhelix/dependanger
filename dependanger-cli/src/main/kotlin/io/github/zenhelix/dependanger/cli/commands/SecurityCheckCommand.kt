@@ -35,14 +35,6 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
         val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
         val sarifMode = sarif
 
-        val failOnSeverity = failOn?.let { value ->
-            try {
-                VulnerabilitySeverity.fromString(value)
-            } catch (e: IllegalArgumentException) {
-                throw CliException.InvalidArgument(e.message ?: "Invalid severity: $value")
-            }
-        }
-
         PipelineRunner(this, opts, jsonMode = jsonMode || sarifMode).run(
             configure = {
                 preset(ProcessingPreset.STRICT)
@@ -60,6 +52,14 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
                 )
             },
             handle = { result ->
+                val failOnSeverity = failOn?.let { value ->
+                    try {
+                        VulnerabilitySeverity.fromString(value)
+                    } catch (e: IllegalArgumentException) {
+                        throw CliException.InvalidArgument(e.message ?: "Invalid severity: $value")
+                    }
+                }
+
                 val vulnerabilities = result.vulnerabilities
 
                 val sarifOutput = if (sarifMode) renderSarif(vulnerabilities) else null

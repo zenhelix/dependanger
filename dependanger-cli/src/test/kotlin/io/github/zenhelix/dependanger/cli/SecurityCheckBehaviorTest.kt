@@ -83,7 +83,7 @@ class SecurityCheckBehaviorTest {
             )
 
             val result = CliTestSupport.runCli(
-                "check", "security", "--format", "sarif", "-i", metadataFile.toString(),
+                "check", "security", "--sarif", "-i", metadataFile.toString(),
             )
 
             assertThat(result.statusCode).isEqualTo(0)
@@ -131,7 +131,7 @@ class SecurityCheckBehaviorTest {
 
             val outputFile = tempDir.resolve("report.sarif.json")
             val result = CliTestSupport.runCli(
-                "check", "security", "--format", "sarif",
+                "check", "security", "--sarif",
                 "-i", metadataFile.toString(), "-o", outputFile.toString(),
             )
 

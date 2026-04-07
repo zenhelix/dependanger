@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveDistribution
 
 internal class BundleFilterProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.BUNDLE_FILTER
@@ -44,7 +45,7 @@ internal class BundleFilterProcessor : EffectiveMetadataProcessor {
         // 2. Apply BundleFilter from distribution
         val distName = metadata.distribution
         if (distName != null) {
-            val distribution = context.originalMetadata.distributions.find { it.name == distName }
+            val distribution = context.resolveDistribution(distName)
             val bundleFilter = distribution?.librarySpec?.byBundles
             if (bundleFilter != null) {
                 cleanedBundles = cleanedBundles.filter { (alias, _) ->

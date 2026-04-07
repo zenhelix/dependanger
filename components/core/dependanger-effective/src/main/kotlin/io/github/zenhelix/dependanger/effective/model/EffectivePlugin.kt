@@ -7,4 +7,5 @@ public data class EffectivePlugin(
     val alias: String,
     val id: String,
     val version: EffectiveVersion,
+    val tags: Set<String> = emptySet(),
 )

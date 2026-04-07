@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProces
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
+import io.github.zenhelix.dependanger.effective.pipeline.resolveDistribution
 import io.github.zenhelix.dependanger.effective.spi.PluginFiltersKey
 
 internal class PluginFilterProcessor : EffectiveMetadataProcessor {
@@ -23,7 +24,7 @@ internal class PluginFilterProcessor : EffectiveMetadataProcessor {
         context: ProcessingContext,
     ): EffectiveMetadata {
         val distName = metadata.distribution
-        val distribution = distName?.let { name -> context.originalMetadata.distributions.find { it.name == name } }
+        val distribution = context.resolveDistribution(distName)
         val pluginSpec = distribution?.pluginSpec
 
         val customFilters = context[PluginFiltersKey] ?: emptyList()
@@ -31,16 +32,13 @@ internal class PluginFilterProcessor : EffectiveMetadataProcessor {
         // Nothing to filter
         if (pluginSpec == null && customFilters.isEmpty()) return metadata
 
-        val originalPluginsIndex = context.originalMetadata.plugins.associateBy { it.alias }
         val diagnostics = Diagnostics.builder(metadata.diagnostics)
 
         val tagFilter = pluginSpec?.byTags
         val aliasFilter = pluginSpec?.byAliases
 
         val filtered = metadata.plugins.filter { (alias, plugin) ->
-            val tags = originalPluginsIndex[alias]?.tags ?: emptySet()
-
-            val passesTagFilter = tagFilter == null || passesTagFilter(tags, tagFilter)
+            val passesTagFilter = tagFilter == null || passesTagFilter(plugin.tags, tagFilter)
             val passesAliasFilter = aliasFilter == null || passesAliasFilter(alias, aliasFilter)
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, plugin, context) }
             val passes = passesTagFilter && passesAliasFilter && passesCustom

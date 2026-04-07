@@ -11,6 +11,7 @@ public data class ReportLibrary(
     val tags: Set<String>,
     val isDeprecated: Boolean,
     val isPlatform: Boolean,
+    val constraints: List<ReportConstraint>? = null,
 )
 
 @Serializable

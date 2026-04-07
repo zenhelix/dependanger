@@ -96,10 +96,14 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
 
             val rawTrees = builder.buildTrees(directInputs)
 
+            val perLibraryConstrained = rawTrees.zip(libraries).map { (tree, lib) ->
+                ConstraintApplier.applyToChildren(tree, lib.constraints)
+            }
+
             var updatedMetadata = metadata
 
             // Post-processing diagnostics: cycles
-            val cycles = TransitiveTreeBuilder.collectCycles(rawTrees)
+            val cycles = TransitiveTreeBuilder.collectCycles(perLibraryConstrained)
             for (cycle in cycles) {
                 updatedMetadata = updatedMetadata.withDiagnostic(
                     Diagnostics.warning(
@@ -132,15 +136,15 @@ public class TransitiveResolverProcessor : EffectiveMetadataProcessor {
                 )
             }
 
-            // Detect conflicts
+            // Detect conflicts (on trees after per-library constraints, before global)
             val conflicts = ConflictDetector.detectConflicts(
-                trees = rawTrees,
+                trees = perLibraryConstrained,
                 constraints = constraints,
                 strategy = settings.conflictResolution,
             )
 
-            // Apply constraints
-            val constrainedTrees = ConstraintApplier.apply(rawTrees, constraints)
+            // Global constraints: apply to all trees
+            val constrainedTrees = ConstraintApplier.apply(perLibraryConstrained, constraints)
 
             // Build flat list
             val flatList = FlatListBuilder.build(constrainedTrees, libraries)

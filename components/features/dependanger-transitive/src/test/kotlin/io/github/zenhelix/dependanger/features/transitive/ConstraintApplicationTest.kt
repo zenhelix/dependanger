@@ -240,6 +240,126 @@ class ConstraintApplicationTest {
     }
 
     @Nested
+    inner class `per-library scoped constraints apply to subtree only` {
+
+        @Test
+        fun `exclude removes child but not root`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree("org.slf4j", "slf4j-api", "1.7"),
+                    tree("org.jetbrains", "annotations", "24.0"),
+                )
+            )
+            val constraints = listOf(
+                Constraint.Exclude(group = "org.slf4j", artifact = "slf4j-api")
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, constraints)
+
+            assertThat(result.group).isEqualTo("io.ktor")
+            assertThat(result.children).hasSize(1)
+            assertThat(result.children[0].artifact).isEqualTo("annotations")
+        }
+
+        @Test
+        fun `exclude matching root coordinate does not remove root`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree("org.slf4j", "slf4j-api", "1.7"),
+                )
+            )
+            val constraints = listOf(
+                Constraint.Exclude(group = "io.ktor", artifact = "ktor-client")
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, constraints)
+
+            assertThat(result.group).isEqualTo("io.ktor")
+            assertThat(result.artifact).isEqualTo("ktor-client")
+            assertThat(result.children).hasSize(1)
+        }
+
+        @Test
+        fun `version constraint applied to nested child`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree("org.slf4j", "slf4j-api", "1.7"),
+                )
+            )
+            val constraints = listOf(
+                Constraint.VersionConstraintDef(
+                    coordinates = "org.slf4j:slf4j-api",
+                    version = VersionReference.Literal("2.0"),
+                    because = "upgrade",
+                )
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, constraints)
+
+            assertThat(result.children[0].version).isEqualTo("2.0")
+        }
+
+        @Test
+        fun `substitute applied to child`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree("javax.annotation", "javax.annotation-api", "1.3"),
+                )
+            )
+            val constraints = listOf(
+                Constraint.Substitute(
+                    from = "javax.annotation:javax.annotation-api",
+                    to = "jakarta.annotation:jakarta.annotation-api:2.0",
+                    because = "jakarta migration",
+                )
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, constraints)
+
+            val child = result.children[0]
+            assertThat(child.group).isEqualTo("jakarta.annotation")
+            assertThat(child.artifact).isEqualTo("jakarta.annotation-api")
+            assertThat(child.version).isEqualTo("2.0")
+        }
+
+        @Test
+        fun `empty constraints returns tree unchanged`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree("org.slf4j", "slf4j-api", "1.7"),
+                )
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, emptyList())
+
+            assertThat(result).isEqualTo(root)
+        }
+
+        @Test
+        fun `deeply nested exclude works`() {
+            val root = tree(
+                "io.ktor", "ktor-client", "2.0", children = listOf(
+                    tree(
+                        "io.ktor", "ktor-io", "2.0", children = listOf(
+                            tree("org.slf4j", "slf4j-api", "1.7"),
+                            tree("org.jetbrains", "annotations", "24.0"),
+                        )
+                    ),
+                )
+            )
+            val constraints = listOf(
+                Constraint.Exclude(group = "org.slf4j", artifact = "slf4j-api")
+            )
+
+            val result = ConstraintApplier.applyToChildren(root, constraints)
+
+            assertThat(result.children).hasSize(1)
+            assertThat(result.children[0].children).hasSize(1)
+            assertThat(result.children[0].children[0].artifact).isEqualTo("annotations")
+        }
+    }
+
+    @Nested
     inner class `nested tree constraints applied recursively` {
 
         @Test

@@ -18,6 +18,12 @@ internal object ConstraintApplier {
             }
         }
 
+    /** Applies [constraints] to [tree]'s children only, leaving the root untouched. */
+    fun applyToChildren(tree: TransitiveTree, constraints: List<Constraint>): TransitiveTree {
+        if (constraints.isEmpty()) return tree
+        return tree.copy(children = apply(tree.children, constraints))
+    }
+
     private fun applyVersionConstraint(
         trees: List<TransitiveTree>,
         constraint: Constraint.VersionConstraintDef,

@@ -230,6 +230,9 @@ internal object ReportDataMapper {
         tags = tags,
         isDeprecated = isDeprecated,
         isPlatform = isPlatform,
+        constraints = constraints
+            .ifEmpty { null }
+            ?.map { it.toReportConstraint() },
     )
 
     private fun EffectivePlugin.toReportPlugin(): ReportPlugin = ReportPlugin(

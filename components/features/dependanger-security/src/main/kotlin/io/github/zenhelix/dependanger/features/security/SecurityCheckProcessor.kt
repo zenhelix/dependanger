@@ -96,31 +96,11 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
             SecurityCheckContext(httpClientFactory = httpClientFactory, timeoutMs = settings.timeout).use { ctx ->
                 when (val result = ctx.osvClient.queryBatch(uncachedPackages)) {
                     is OsvBatchResult.Success -> {
-                        for ((i, osvVulns) in result.vulnerabilities.withIndex()) {
-                            val pkg = uncachedPackages[i]
-                            val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
-                            fetchedVulns.addAll(vulns)
-                            try {
-                                cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
-                            } catch (e: Exception) {
-                                logger.warn { "Failed to write security cache for ${pkg.group}:${pkg.artifact}:${pkg.version}: ${e.message}" }
-                            }
-                        }
+                        fetchedVulns.addAll(processSuccessfulVulnerabilities(result.vulnerabilities, uncachedPackages, cache))
                     }
 
                     is OsvBatchResult.PartialSuccess -> {
-                        // Process the successful results
-                        for ((i, osvVulns) in result.vulnerabilities.withIndex()) {
-                            val pkg = uncachedPackages[i]
-                            val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
-                            fetchedVulns.addAll(vulns)
-                            try {
-                                cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
-                            } catch (e: Exception) {
-                                logger.warn { "Failed to write security cache for ${pkg.group}:${pkg.artifact}:${pkg.version}: ${e.message}" }
-                            }
-                        }
-                        // Handle the failed portion
+                        fetchedVulns.addAll(processSuccessfulVulnerabilities(result.vulnerabilities, uncachedPackages, cache))
                         val failedPackages = uncachedPackages.drop(result.vulnerabilities.size)
                         val failureDiagCode = if (result.isTimeout) DiagnosticCodes.Security.TIMEOUT else DiagnosticCodes.Security.API_UNREACHABLE
                         val failureResult = handleApiFailure(cache, failedPackages, failureDiagCode, "Partial failure: ${result.error}")
@@ -161,6 +141,23 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         diagnostics.add(buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability))
 
         return ParallelResult(diagnostics.build(), mapOf(VulnerabilitiesExtensionKey to allVulns))
+    }
+
+    private fun processSuccessfulVulnerabilities(
+        vulnerabilities: List<List<OsvVulnerabilityData>>,
+        packages: List<OsvPackageQuery>,
+        cache: SecurityCache,
+    ): List<VulnerabilityInfo> = buildList {
+        for ((i, osvVulns) in vulnerabilities.withIndex()) {
+            val pkg = packages[i]
+            val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
+            addAll(vulns)
+            try {
+                cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
+            } catch (e: Exception) {
+                logger.warn { "Failed to write security cache for ${pkg.group}:${pkg.artifact}:${pkg.version}: ${e.message}" }
+            }
+        }
     }
 
     private data class ApiFailureResult(

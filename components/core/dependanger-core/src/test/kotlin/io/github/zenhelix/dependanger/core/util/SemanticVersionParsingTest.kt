@@ -271,5 +271,40 @@ class SemanticVersionParsingTest {
 
             assertThat(alpha).isLessThan(beta)
         }
+
+        @Test
+        fun `RC10 is greater than RC2 using natural comparison`() {
+            val rc2 = SemanticVersion(1, 0, 0, "RC2")
+            val rc10 = SemanticVersion(1, 0, 0, "RC10")
+
+            assertThat(rc10).isGreaterThan(rc2)
+        }
+
+        @Test
+        fun `alpha dot 10 is greater than alpha dot 2`() {
+            val alpha2 = SemanticVersion(1, 0, 0, "alpha.2")
+            val alpha10 = SemanticVersion(1, 0, 0, "alpha.10")
+
+            assertThat(alpha10).isGreaterThan(alpha2)
+        }
+
+        @Test
+        fun `qualifier comparison is case insensitive`() {
+            val lower = SemanticVersion(1, 0, 0, "rc1")
+            val upper = SemanticVersion(1, 0, 0, "RC1")
+
+            assertThat(lower.compareTo(upper)).isEqualTo(0)
+        }
+
+        @Test
+        fun `milestone qualifiers ordered naturally`() {
+            val m1 = SemanticVersion(1, 0, 0, "M1")
+            val m2 = SemanticVersion(1, 0, 0, "M2")
+            val m10 = SemanticVersion(1, 0, 0, "M10")
+
+            assertThat(m1).isLessThan(m2)
+            assertThat(m2).isLessThan(m10)
+            assertThat(m1).isLessThan(m10)
+        }
     }
 }

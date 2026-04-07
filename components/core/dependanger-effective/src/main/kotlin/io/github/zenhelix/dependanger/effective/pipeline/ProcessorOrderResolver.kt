@@ -154,7 +154,7 @@ internal object ProcessorOrderResolver {
         val allParallelIds = parallelByMode.values.flatten().map { it.id }
         val reachableFrom = computeReachability(edges, allParallelIds)
 
-        val result = sorted.toMutableList()
+        var result = sorted
 
         for ((mode, parallelProcessors) in parallelByMode) {
             if (parallelProcessors.size <= 1) continue
@@ -181,10 +181,15 @@ internal object ProcessorOrderResolver {
 
             if (canMerge) {
                 val lastProcId = result[lastIdx].id
-                val toMove = parallelProcessors.filter { it.id != lastProcId }
-                result.removeAll(toMove.toSet())
-                val insertPos = result.indexOfFirst { it.id == lastProcId }
-                result.addAll(insertPos, toMove)
+                val movedIds = parallelIds - lastProcId
+                val withoutMoved = result.filter { it.id !in movedIds }
+                val insertPos = withoutMoved.indexOfFirst { it.id == lastProcId }
+                val toInsert = parallelProcessors.filter { it.id != lastProcId }
+                result = buildList {
+                    addAll(withoutMoved.subList(0, insertPos))
+                    addAll(toInsert)
+                    addAll(withoutMoved.subList(insertPos, withoutMoved.size))
+                }
             } else {
                 logger.warn {
                     "Parallel processors with mode $mode are split into multiple groups " +

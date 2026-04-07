@@ -16,6 +16,7 @@ import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
 import io.github.zenhelix.dependanger.effective.model.VersionSource
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
+import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
@@ -34,12 +35,17 @@ private val logger = KotlinLogging.logger {}
 private const val MAX_BOM_DEPTH = 10
 
 public class BomImportProcessor : EffectiveMetadataProcessor {
-    override val id: String = ProcessorIds.BOM_IMPORT
-    override val phase: ProcessingPhase = ProcessingPhase.BOM_IMPORT
+    override val id: String = PROCESSOR_ID
+    override val phase: ProcessingPhase = PHASE
     override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.METADATA_CONVERSION))
     override val isOptional: Boolean = true
     override val description: String = "Imports dependencies from Maven BOM files"
     override fun supports(context: ProcessingContext): Boolean = true
+
+    public companion object {
+        public const val PROCESSOR_ID: String = ProcessorIds.BOM_IMPORT
+        public val PHASE: ProcessingPhase = ProcessingPhase("BOM_IMPORT", ExecutionMode.SEQUENTIAL)
+    }
 
     override suspend fun process(metadata: EffectiveMetadata, context: ProcessingContext): EffectiveMetadata {
         val bomImports = context.originalMetadata.bomImports

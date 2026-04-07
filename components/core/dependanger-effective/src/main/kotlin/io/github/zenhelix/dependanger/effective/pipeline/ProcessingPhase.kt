@@ -18,7 +18,6 @@ public open class ProcessingPhase(
         public val PROFILE: ProcessingPhase = ProcessingPhase("PROFILE", ExecutionMode.SEQUENTIAL)
         public val METADATA_CONVERSION: ProcessingPhase = ProcessingPhase("METADATA_CONVERSION", ExecutionMode.SEQUENTIAL)
         public val EXTRACTED_VERSIONS: ProcessingPhase = ProcessingPhase("EXTRACTED_VERSIONS", ExecutionMode.SEQUENTIAL)
-        public val BOM_IMPORT: ProcessingPhase = ProcessingPhase("BOM_IMPORT", ExecutionMode.SEQUENTIAL)
         public val LIBRARY_FILTER: ProcessingPhase = ProcessingPhase("LIBRARY_FILTER", ExecutionMode.SEQUENTIAL)
         public val VERSION_FALLBACK: ProcessingPhase = ProcessingPhase("VERSION_FALLBACK", ExecutionMode.SEQUENTIAL)
         public val VERSION_RESOLVER: ProcessingPhase = ProcessingPhase("VERSION_RESOLVER", ExecutionMode.SEQUENTIAL)

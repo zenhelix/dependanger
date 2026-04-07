@@ -61,7 +61,6 @@ public class AddDistributionCommand : CliktCommand(name = "distribution") {
                 byAliases = null,
                 byBundles = bundleFilter,
                 byDeprecated = null,
-                customFilters = emptyMap(),
             )
         } else {
             null

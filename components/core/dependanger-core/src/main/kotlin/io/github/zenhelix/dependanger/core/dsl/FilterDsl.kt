@@ -53,7 +53,6 @@ public class FilterDsl {
         byAliases = aliasFilter,
         byBundles = bundleFilter,
         byDeprecated = deprecatedFilter,
-        customFilters = emptyMap(),
     )
 }
 

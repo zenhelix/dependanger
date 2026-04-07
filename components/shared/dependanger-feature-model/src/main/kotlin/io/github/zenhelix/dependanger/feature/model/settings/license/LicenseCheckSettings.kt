@@ -38,8 +38,6 @@ public data class LicenseCheckSettings(
     override val cacheTtlHours: Long,
 ) : NetworkCheckSettings() {
     public companion object {
-        public const val DEFAULT_TIMEOUT_MS: Long = NETWORK_DEFAULT_TIMEOUT_MS
-        public const val DEFAULT_PARALLELISM: Int = NETWORK_DEFAULT_PARALLELISM
         public const val DEFAULT_CACHE_TTL_HOURS: Long = 168
 
         public val DEFAULT: LicenseCheckSettings = LicenseCheckSettings(
@@ -54,8 +52,8 @@ public data class LicenseCheckSettings(
             warnOnUnknown = true,
             ignoreLibraries = emptyList(),
             includeTransitives = false,
-            timeout = DEFAULT_TIMEOUT_MS,
-            parallelism = DEFAULT_PARALLELISM,
+            timeout = NETWORK_DEFAULT_TIMEOUT_MS,
+            parallelism = NETWORK_DEFAULT_PARALLELISM,
             cacheDirectory = null,
             cacheTtlHours = DEFAULT_CACHE_TTL_HOURS,
         )

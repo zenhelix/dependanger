@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public data class BundleFilter(
-    val includes: Set<String>,
-    val excludes: Set<String>,
-)
+    override val includes: Set<String>,
+    override val excludes: Set<String>,
+) : IncludeExcludeFilter

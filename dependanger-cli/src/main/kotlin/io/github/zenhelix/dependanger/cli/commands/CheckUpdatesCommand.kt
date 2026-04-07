@@ -11,6 +11,8 @@ import io.github.zenhelix.dependanger.api.updates
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_PARALLELISM
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_TIMEOUT_MS
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.updates.UpdateCheckSettingsKey
 import io.github.zenhelix.dependanger.feature.model.updates.UpdateAvailableInfo
@@ -37,9 +39,9 @@ public class CheckUpdatesCommand : CliktCommand(name = "updates") {
                     includePrerelease = includePrerelease,
                     excludePatterns = exclude,
                     repositories = parseMavenRepositories(repositories) ?: emptyList(),
-                    cacheTtlHours = if (offline) Long.MAX_VALUE else UpdateCheckSettings.DEFAULT_CACHE_TTL_HOURS,
-                    timeout = UpdateCheckSettings.DEFAULT_TIMEOUT_MS,
-                    parallelism = UpdateCheckSettings.DEFAULT_PARALLELISM,
+                    cacheTtlHours = if (offline) Long.MAX_VALUE else UpdateCheckSettings.DEFAULT.cacheTtlHours,
+                    timeout = NETWORK_DEFAULT_TIMEOUT_MS,
+                    parallelism = NETWORK_DEFAULT_PARALLELISM,
                     cacheDirectory = null,
                 )
             )

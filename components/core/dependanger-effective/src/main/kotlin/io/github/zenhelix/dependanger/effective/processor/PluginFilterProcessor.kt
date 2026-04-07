@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.filter.matchesExact
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -39,7 +40,7 @@ internal class PluginFilterProcessor : EffectiveMetadataProcessor {
 
         val filtered = metadata.plugins.filter { (alias, plugin) ->
             val passesTagFilter = tagFilter == null || passesTagFilter(plugin.tags, tagFilter)
-            val passesAliasFilter = aliasFilter == null || passesAliasFilter(alias, aliasFilter)
+            val passesAliasFilter = aliasFilter == null || aliasFilter.matchesExact(alias)
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, plugin, context) }
             val passes = passesTagFilter && passesAliasFilter && passesCustom
 

@@ -1,9 +1,9 @@
 package io.github.zenhelix.dependanger.metadata
 
+import io.github.zenhelix.dependanger.core.DependangerJson
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.spi.SerializationFormat
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -16,11 +16,7 @@ public class JsonSerializationFormat : SerializationFormat<String> {
     override val fileExtension: String = ".json"
     override val description: String = "JSON format via kotlinx-serialization"
 
-    private val json: Json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    private val json = DependangerJson
 
     override fun serialize(metadata: DependangerMetadata): String =
         json.encodeToString(DependangerMetadata.serializer(), metadata)

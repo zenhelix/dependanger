@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.filter.matchesExact
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -49,9 +50,7 @@ internal class BundleFilterProcessor : EffectiveMetadataProcessor {
             val bundleFilter = distribution?.librarySpec?.byBundles
             if (bundleFilter != null) {
                 cleanedBundles = cleanedBundles.filter { (alias, _) ->
-                    val passesIncludes = bundleFilter.includes.isEmpty() || alias in bundleFilter.includes
-                    val passesExcludes = bundleFilter.excludes.isEmpty() || alias !in bundleFilter.excludes
-                    passesIncludes && passesExcludes
+                    bundleFilter.matchesExact(alias)
                 }
             }
         }

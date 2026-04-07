@@ -15,6 +15,8 @@ import io.github.zenhelix.dependanger.cli.sarif.renderSarif
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_PARALLELISM
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_TIMEOUT_MS
 import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
@@ -42,11 +44,11 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
                     SecurityCheckSettingsKey, SecurityCheckSettings(
                         enabled = true,
                         ignoreVulnerabilities = ignore,
-                        cacheTtlHours = if (offline) Long.MAX_VALUE else SecurityCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                        cacheTtlHours = if (offline) Long.MAX_VALUE else SecurityCheckSettings.DEFAULT.cacheTtlHours,
                         failOnVulnerability = SecurityCheckSettings.DEFAULT.failOnVulnerability,
                         minSeverity = SecurityCheckSettings.DEFAULT.minSeverity,
-                        timeout = SecurityCheckSettings.DEFAULT_TIMEOUT_MS,
-                        parallelism = SecurityCheckSettings.DEFAULT_PARALLELISM,
+                        timeout = NETWORK_DEFAULT_TIMEOUT_MS,
+                        parallelism = NETWORK_DEFAULT_PARALLELISM,
                         cacheDirectory = null,
                     )
                 )

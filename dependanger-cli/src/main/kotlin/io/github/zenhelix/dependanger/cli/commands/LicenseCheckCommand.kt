@@ -12,6 +12,8 @@ import io.github.zenhelix.dependanger.cli.runner.PipelineRunner
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolation
 import io.github.zenhelix.dependanger.feature.model.license.LicenseViolationType
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_PARALLELISM
+import io.github.zenhelix.dependanger.feature.model.settings.common.NETWORK_DEFAULT_TIMEOUT_MS
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettings
 import io.github.zenhelix.dependanger.feature.model.settings.license.LicenseCheckSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
@@ -43,10 +45,10 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
                     warnOnCopyleft = LicenseCheckSettings.DEFAULT.warnOnCopyleft,
                     warnOnUnknown = LicenseCheckSettings.DEFAULT.warnOnUnknown,
                     ignoreLibraries = LicenseCheckSettings.DEFAULT.ignoreLibraries,
-                    timeout = LicenseCheckSettings.DEFAULT_TIMEOUT_MS,
-                    parallelism = LicenseCheckSettings.DEFAULT_PARALLELISM,
+                    timeout = NETWORK_DEFAULT_TIMEOUT_MS,
+                    parallelism = NETWORK_DEFAULT_PARALLELISM,
                     cacheDirectory = null,
-                    cacheTtlHours = LicenseCheckSettings.DEFAULT_CACHE_TTL_HOURS,
+                    cacheTtlHours = LicenseCheckSettings.DEFAULT.cacheTtlHours,
                 )
             )
         },

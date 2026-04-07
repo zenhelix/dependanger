@@ -1,11 +1,11 @@
 package io.github.zenhelix.dependanger.effective.serialization
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.core.DependangerJson
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ExtensionKey
 import io.github.zenhelix.dependanger.effective.spi.ExtensionSerializerProvider
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -30,11 +30,7 @@ public class EffectiveJsonFormat : EffectiveSerializationFormat<String> {
     private val knownKeys: Map<String, ExtensionKey<*>> =
         providers.flatMap { it.knownKeys().entries }.associate { it.key to it.value }
 
-    private val json: Json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    private val json = DependangerJson
 
     public override fun serialize(metadata: EffectiveMetadata): String {
         val baseJson = json.encodeToJsonElement(EffectiveMetadata.serializer(), metadata).jsonObject
@@ -58,7 +54,9 @@ public class EffectiveJsonFormat : EffectiveSerializationFormat<String> {
     public override fun deserialize(input: String): EffectiveMetadata = deserializeDetailed(input).metadata
 
     public override fun deserializeDetailed(input: String): DeserializationResult {
-        require(input.isNotBlank()) { "Input JSON string must not be blank" }
+        if (input.isBlank()) {
+            throw EffectiveMetadataReadException("Input JSON string must not be blank")
+        }
 
         val jsonObject = json.parseToJsonElement(input).jsonObject
         val base = json.decodeFromJsonElement(EffectiveMetadata.serializer(), jsonObject)
@@ -102,7 +100,7 @@ public class EffectiveJsonFormat : EffectiveSerializationFormat<String> {
 
     public override fun readDetailed(path: Path): DeserializationResult {
         if (!path.exists()) {
-            throw IllegalArgumentException("Effective metadata file not found: '$path'")
+            throw EffectiveMetadataReadException("Effective metadata file not found: '$path'")
         }
         val content = path.readText(Charsets.UTF_8)
         return deserializeDetailed(content)

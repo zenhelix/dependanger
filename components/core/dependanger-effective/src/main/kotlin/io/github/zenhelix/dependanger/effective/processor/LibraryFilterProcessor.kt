@@ -1,9 +1,10 @@
 package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.filter.BundleFilter
 import io.github.zenhelix.dependanger.core.model.filter.DeprecatedFilter
-import io.github.zenhelix.dependanger.core.model.filter.GroupFilter
+import io.github.zenhelix.dependanger.core.model.filter.matchesAny
+import io.github.zenhelix.dependanger.core.model.filter.matchesExact
+import io.github.zenhelix.dependanger.core.model.filter.matchesWithPredicate
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -41,22 +42,27 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
         if (spec == null && customFilters.isEmpty()) return metadata
 
         val diagnostics = Diagnostics.builder(metadata.diagnostics)
-        val bundleIndex = metadata.bundles
 
-        val libraryToBundles: Map<String, Set<String>> = buildMap<String, MutableSet<String>> {
-            bundleIndex.forEach { (bundleAlias, bundle) ->
-                bundle.libraries.forEach { libAlias ->
-                    getOrPut(libAlias) { mutableSetOf() }.add(bundleAlias)
+        val libraryToBundles: Map<String, Set<String>> = if (spec?.byBundles != null) {
+            buildMap<String, MutableSet<String>> {
+                metadata.bundles.forEach { (bundleAlias, bundle) ->
+                    bundle.libraries.forEach { libAlias ->
+                        getOrPut(libAlias) { mutableSetOf() }.add(bundleAlias)
+                    }
                 }
             }
+        } else {
+            emptyMap()
         }
 
         val filtered = metadata.libraries.filter { (alias, lib) ->
             val passesSpec = spec == null || (
                     (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
-                            && passesGroupFilter(lib, spec.byGroups)
-                            && (spec.byAliases?.let { passesAliasFilter(alias, it) } != false)
-                            && passesBundleFilter(libraryToBundles[alias] ?: emptySet(), spec.byBundles)
+                            && (spec.byGroups?.let {
+                        it.matchesWithPredicate("${lib.group}:${lib.artifact}", GlobMatcher::matchesCoordinate)
+                    } != false)
+                            && (spec.byAliases?.let { it.matchesExact(alias) } != false)
+                            && (spec.byBundles?.let { it.matchesAny(libraryToBundles[alias] ?: emptySet()) } != false)
                             && passesDeprecatedFilter(lib, spec.byDeprecated)
                     )
             val passesCustom = customFilters.all { filter -> filter.shouldInclude(alias, lib, context) }
@@ -74,34 +80,6 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
         }
 
         return metadata.copy(libraries = filtered, diagnostics = diagnostics.build())
-    }
-
-    private fun passesGroupFilter(lib: EffectiveLibrary, filter: GroupFilter?): Boolean {
-        if (filter == null) return true
-        val coordinate = "${lib.group}:${lib.artifact}"
-
-        val passesIncludes = filter.includes.isEmpty()
-                || filter.includes.any { pattern -> GlobMatcher.matchesCoordinate(pattern, coordinate) }
-
-        val passesExcludes = filter.excludes.isEmpty()
-                || filter.excludes.none { pattern -> GlobMatcher.matchesCoordinate(pattern, coordinate) }
-
-        return passesIncludes && passesExcludes
-    }
-
-    private fun passesBundleFilter(
-        memberOf: Set<String>,
-        filter: BundleFilter?,
-    ): Boolean {
-        if (filter == null) return true
-
-        val passesIncludes = filter.includes.isEmpty()
-                || (memberOf intersect filter.includes).isNotEmpty()
-
-        val passesExcludes = filter.excludes.isEmpty()
-                || (memberOf intersect filter.excludes).isEmpty()
-
-        return passesIncludes && passesExcludes
     }
 
     private fun passesDeprecatedFilter(lib: EffectiveLibrary, filter: DeprecatedFilter?): Boolean {

@@ -300,4 +300,86 @@ class DirBasedCacheTest {
 
         }
     }
+
+    @Nested
+    inner class FlatGroupArtifactVersionResolver {
+
+        private fun createFlatGavCache(tempDir: File): DirBasedCache<String> {
+            val cacheDir = tempDir.resolve("flat-gav-cache")
+            return DirBasedCache(
+                cacheDirectory = cacheDir.absolutePath,
+                ttlHours = TTL_HOURS,
+                ttlSnapshotHours = TTL_SNAPSHOT_HOURS,
+                contentSerializer = String.serializer(),
+                keyResolver = CacheKeyResolver.FlatGroupArtifactVersion,
+            )
+        }
+
+        @Test
+        fun `put then get with FlatGroupArtifactVersion resolver`(@TempDir tempDir: File) {
+            val cache = createFlatGavCache(tempDir)
+
+            cache.put("hello", listOf(GROUP, ARTIFACT, VERSION))
+            val result = cache.get(listOf(GROUP, ARTIFACT, VERSION))
+
+            assertThat(result).isInstanceOf(CacheResult.Hit::class.java)
+            assertThat((result as CacheResult.Hit).data).isEqualTo("hello")
+        }
+
+        @Test
+        fun `stores as single file at group-artifact-version path`(@TempDir tempDir: File) {
+            val cache = createFlatGavCache(tempDir)
+
+            cache.put("data", listOf(GROUP, ARTIFACT, VERSION))
+
+            val expectedFile = tempDir.resolve("flat-gav-cache").resolve(GROUP).resolve(ARTIFACT).resolve("$VERSION.json")
+            assertThat(expectedFile.exists()).isTrue()
+            // No metadata.json — single file layout
+            assertThat(expectedFile.parentFile.resolve("metadata.json").exists()).isFalse()
+        }
+    }
+
+    @Nested
+    inner class FlatGroupArtifactResolver {
+
+        private fun createFlatGaCache(tempDir: File): DirBasedCache<String> {
+            val cacheDir = tempDir.resolve("flat-ga-cache")
+            return DirBasedCache(
+                cacheDirectory = cacheDir.absolutePath,
+                ttlHours = TTL_HOURS,
+                ttlSnapshotHours = TTL_SNAPSHOT_HOURS,
+                contentSerializer = String.serializer(),
+                keyResolver = CacheKeyResolver.FlatGroupArtifact,
+            )
+        }
+
+        @Test
+        fun `put then get with FlatGroupArtifact resolver`(@TempDir tempDir: File) {
+            val cache = createFlatGaCache(tempDir)
+
+            cache.put("versions-data", listOf(GROUP, ARTIFACT))
+            val result = cache.get(listOf(GROUP, ARTIFACT))
+
+            assertThat(result).isInstanceOf(CacheResult.Hit::class.java)
+            assertThat((result as CacheResult.Hit).data).isEqualTo("versions-data")
+        }
+
+        @Test
+        fun `stores as single file at group-artifact path`(@TempDir tempDir: File) {
+            val cache = createFlatGaCache(tempDir)
+
+            cache.put("data", listOf(GROUP, ARTIFACT))
+
+            val expectedFile = tempDir.resolve("flat-ga-cache").resolve(GROUP).resolve("$ARTIFACT.json")
+            assertThat(expectedFile.exists()).isTrue()
+        }
+
+        @Test
+        fun `wrong segment count throws`(@TempDir tempDir: File) {
+            val cache = createFlatGaCache(tempDir)
+
+            assertThatThrownBy { cache.get(listOf(GROUP, ARTIFACT, VERSION)) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+    }
 }

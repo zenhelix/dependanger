@@ -33,7 +33,7 @@ class GeneratorRegistryTest {
 
     @Test
     fun `ids returns all registered generator ids`() {
-        val ids = GeneratorRegistry.ids()
+        val ids = GeneratorRegistry.ids
         assertThat(ids).contains("toml-version-catalog", "maven-bom")
     }
 }

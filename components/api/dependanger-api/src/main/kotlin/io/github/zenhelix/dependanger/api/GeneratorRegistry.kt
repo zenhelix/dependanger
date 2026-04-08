@@ -18,5 +18,5 @@ public object GeneratorRegistry {
     public fun findById(id: String): ArtifactGenerator<*>? =
         generators.firstOrNull { it.generatorId == id }
 
-    public fun ids(): List<String> = generators.map { it.generatorId }
+    public val ids: List<String> by lazy { generators.map { it.generatorId } }
 }

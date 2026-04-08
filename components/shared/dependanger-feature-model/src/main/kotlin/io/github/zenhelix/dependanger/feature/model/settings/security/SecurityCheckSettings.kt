@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.feature.model.settings.security
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDslMarker
+import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import io.github.zenhelix.dependanger.core.dsl.SettingsDsl
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
@@ -19,7 +20,7 @@ public val SecurityCheckSettingsKey: ProcessingContextKey<SecurityCheckSettings>
 public data class SecurityCheckSettings(
     override val enabled: Boolean,
     val failOnVulnerability: Severity,
-    val minSeverity: String,
+    val minSeverity: VulnerabilitySeverity,
     val ignoreVulnerabilities: List<String>,
     override val timeout: Long,
     override val parallelism: Int,
@@ -32,7 +33,7 @@ public data class SecurityCheckSettings(
         public val DEFAULT: SecurityCheckSettings = SecurityCheckSettings(
             enabled = false,
             failOnVulnerability = Severity.ERROR,
-            minSeverity = "HIGH",
+            minSeverity = VulnerabilitySeverity.HIGH,
             ignoreVulnerabilities = emptyList(),
             timeout = NETWORK_DEFAULT_TIMEOUT_MS,
             parallelism = NETWORK_DEFAULT_PARALLELISM,
@@ -55,7 +56,7 @@ public class SecurityCheckSettingsDsl : NetworkCheckSettingsDsl() {
     }
 
     public var failOnVulnerability: Severity = SecurityCheckSettings.DEFAULT.failOnVulnerability
-    public var minSeverity: String = SecurityCheckSettings.DEFAULT.minSeverity
+    public var minSeverity: VulnerabilitySeverity = SecurityCheckSettings.DEFAULT.minSeverity
     public var ignoreVulnerabilities: List<String> = SecurityCheckSettings.DEFAULT.ignoreVulnerabilities
 
     public fun toSettings(): SecurityCheckSettings = SecurityCheckSettings(

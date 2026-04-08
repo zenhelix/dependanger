@@ -56,7 +56,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         settings: SecurityCheckSettings,
         httpClientFactory: HttpClientFactory,
     ): ParallelResult {
-        val minSeverity = parseMinSeverity(settings.minSeverity)
+        val minSeverity = settings.minSeverity
 
         val candidates = metadata.libraries.values.filter { it.version.isResolved }
 
@@ -252,13 +252,6 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         return result
     }
 
-    private fun parseMinSeverity(value: String): VulnerabilitySeverity =
-        try {
-            VulnerabilitySeverity.fromString(value)
-        } catch (e: IllegalArgumentException) {
-            logger.warn { "Invalid minSeverity value '$value', falling back to HIGH: ${e.message}" }
-            VulnerabilitySeverity.HIGH
-        }
 }
 
 private fun mapToVulnerabilityInfo(vuln: OsvVulnerabilityData, pkg: OsvPackageQuery): VulnerabilityInfo =

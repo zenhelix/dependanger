@@ -56,8 +56,6 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         settings: SecurityCheckSettings,
         httpClientFactory: HttpClientFactory,
     ): ParallelResult {
-        val minSeverity = settings.minSeverity
-
         val candidates = metadata.libraries.values.filter { it.version.isResolved }
 
         if (candidates.isEmpty()) {
@@ -144,7 +142,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
             vuln.id !in ignoreSet && vuln.aliases.none { it in ignoreSet }
         }
 
-        diagnostics.add(buildScanDiagnostics(allVulns, candidates.size, minSeverity, settings.failOnVulnerability))
+        diagnostics.add(buildScanDiagnostics(allVulns, candidates.size, settings.minSeverity, settings.failOnVulnerability))
 
         return ParallelResult(diagnostics.build(), mapOf(VulnerabilitiesExtensionKey to allVulns))
     }

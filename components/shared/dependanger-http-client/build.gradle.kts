@@ -1,5 +1,6 @@
 plugins {
     id("dependanger.base")
+    id("dependanger.serialization")
     id("dependanger.publishing")
 }
 

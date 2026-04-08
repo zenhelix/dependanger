@@ -1,7 +1,9 @@
 package io.github.zenhelix.dependanger.features.security
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheKeyResolver
 import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Severity
@@ -23,6 +25,7 @@ import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCh
 import io.github.zenhelix.dependanger.feature.support.AbstractParallelFeatureProcessor
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.osv.client.OsvClient
+import kotlinx.serialization.builtins.ListSerializer
 import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
 import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
 import io.github.zenhelix.dependanger.osv.client.model.OsvPackageQuery
@@ -63,9 +66,12 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
 
         val cacheDir = settings.cacheDirectory
             ?: DependangerPaths.resolveInUserHome(DependangerPaths.SECURITY_CACHE_DIR)
-        val cache = SecurityCache(
+        val cache = DirBasedCache(
             cacheDirectory = cacheDir,
             ttlHours = settings.cacheTtlHours,
+            ttlSnapshotHours = settings.cacheTtlHours,
+            contentSerializer = ListSerializer(VulnerabilityInfo.serializer()),
+            keyResolver = CacheKeyResolver.FlatGroupArtifactVersion,
         )
 
         val cachedVulns = mutableListOf<VulnerabilityInfo>()
@@ -146,7 +152,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
     private fun processSuccessfulVulnerabilities(
         vulnerabilities: List<List<OsvVulnerabilityData>>,
         packages: List<OsvPackageQuery>,
-        cache: SecurityCache,
+        cache: DirBasedCache<List<VulnerabilityInfo>>,
     ): List<VulnerabilityInfo> = buildList {
         for ((i, osvVulns) in vulnerabilities.withIndex()) {
             val pkg = packages[i]
@@ -166,7 +172,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
     )
 
     private fun handleApiFailure(
-        cache: SecurityCache,
+        cache: DirBasedCache<List<VulnerabilityInfo>>,
         failedPackages: List<OsvPackageQuery>,
         fallbackDiagnosticCode: String,
         fallbackMessage: String,

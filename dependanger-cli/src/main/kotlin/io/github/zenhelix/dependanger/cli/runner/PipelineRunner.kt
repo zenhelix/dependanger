@@ -13,6 +13,7 @@ import io.github.zenhelix.dependanger.cli.OutputFormatter
 import io.github.zenhelix.dependanger.cli.options.PipelineOptions
 import io.github.zenhelix.dependanger.cli.withErrorHandling
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
 import java.nio.file.Path
 import kotlin.io.path.writeText
 
@@ -66,6 +67,26 @@ public class PipelineHandlerContext(
             val outputPath = Path.of(outputFile)
             outputPath.writeText(content)
             formatter.success("Report written to $outputPath")
+        }
+    }
+
+    public fun <T> renderItems(
+        items: List<T>,
+        serializer: KSerializer<T>,
+        headers: List<String>,
+        rowMapper: (T) -> List<String>,
+        emptyMessage: String,
+        itemNoun: String,
+    ) {
+        if (formatter.jsonMode) {
+            formatter.renderJson(items, ListSerializer(serializer))
+        } else {
+            if (items.isEmpty()) {
+                formatter.success(emptyMessage)
+            } else {
+                formatter.renderTable(headers, items.map(rowMapper))
+                formatter.info("${items.size} $itemNoun")
+            }
         }
     }
 }

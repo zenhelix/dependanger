@@ -76,7 +76,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         val uncachedPackages = mutableListOf<OsvPackageQuery>()
 
         for (lib in candidates) {
-            val version = lib.version.valueOrNull!!
+            val version = lib.version.requireValue()
             when (val cacheResult = cache.get(lib.group, lib.artifact, version)) {
                 is CacheResult.Hit       -> {
                     cachedVulns.addAll(cacheResult.data)

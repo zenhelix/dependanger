@@ -55,29 +55,22 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
         handle = { result ->
             val violations = result.licenseViolations
 
-            val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
-
-            if (jsonMode) {
-                formatter.renderJson(violations, ListSerializer(LicenseViolation.serializer()))
-            } else {
-                if (violations.isEmpty()) {
-                    formatter.success("No license violations found")
-                } else {
-                    formatter.renderTable(
-                        headers = listOf("Library", "License", "Category", "Violation", "Message"),
-                        rows = violations.map { violation ->
-                            listOf(
-                                "${violation.group}:${violation.artifact}",
-                                violation.detectedLicense ?: "unknown",
-                                violation.category.name,
-                                violation.violationType.name,
-                                violation.message,
-                            )
-                        }
+            renderItems(
+                items = violations,
+                serializer = LicenseViolation.serializer(),
+                headers = listOf("Library", "License", "Category", "Violation", "Message"),
+                rowMapper = { violation ->
+                    listOf(
+                        "${violation.group}:${violation.artifact}",
+                        violation.detectedLicense ?: "unknown",
+                        violation.category.name,
+                        violation.violationType.name,
+                        violation.message,
                     )
-                    formatter.info("${violations.size} license violation(s) found")
-                }
-            }
+                },
+                emptyMessage = "No license violations found",
+                itemNoun = "license violation(s) found",
+            )
 
             writeOutputIfRequested(output, violations, ListSerializer(LicenseViolation.serializer()))
 

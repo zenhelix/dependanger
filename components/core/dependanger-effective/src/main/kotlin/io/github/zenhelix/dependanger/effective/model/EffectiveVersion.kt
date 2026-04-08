@@ -60,4 +60,11 @@ public sealed class EffectiveVersion {
 
     /** Returns [VersionRange] if this is [Range], null otherwise. */
     public val rangeOrNull: VersionRange? get() = (this as? Range)?.range
+
+    /**
+     * Returns the version string value, throwing if no concrete value is available.
+     * Use after verifying [isResolved] or when the version is guaranteed to be [Resolved] or [Inline].
+     */
+    public fun requireValue(): String =
+        valueOrNull ?: error("Expected a concrete version value but was $this")
 }

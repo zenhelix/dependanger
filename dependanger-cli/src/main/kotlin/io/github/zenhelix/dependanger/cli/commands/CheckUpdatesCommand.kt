@@ -54,28 +54,21 @@ public class CheckUpdatesCommand : CliktCommand(name = "updates") {
                 updates.filter { it.updateType.name in allowedTypes }
             } ?: updates
 
-            val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
-
-            if (jsonMode) {
-                formatter.renderJson(filteredUpdates, ListSerializer(UpdateAvailableInfo.serializer()))
-            } else {
-                if (filteredUpdates.isEmpty()) {
-                    formatter.success("All libraries are up to date")
-                } else {
-                    formatter.renderTable(
-                        headers = listOf("Library", "Current", "Available", "Type"),
-                        rows = filteredUpdates.map { update ->
-                            listOf(
-                                "${update.group}:${update.artifact}",
-                                update.currentVersion,
-                                update.latestVersion,
-                                update.updateType.name,
-                            )
-                        }
+            renderItems(
+                items = filteredUpdates,
+                serializer = UpdateAvailableInfo.serializer(),
+                headers = listOf("Library", "Current", "Available", "Type"),
+                rowMapper = { update ->
+                    listOf(
+                        "${update.group}:${update.artifact}",
+                        update.currentVersion,
+                        update.latestVersion,
+                        update.updateType.name,
                     )
-                    formatter.info("${filteredUpdates.size} update(s) available")
-                }
-            }
+                },
+                emptyMessage = "All libraries are up to date",
+                itemNoun = "update(s) available",
+            )
 
             writeOutputIfRequested(output, filteredUpdates, ListSerializer(UpdateAvailableInfo.serializer()))
 

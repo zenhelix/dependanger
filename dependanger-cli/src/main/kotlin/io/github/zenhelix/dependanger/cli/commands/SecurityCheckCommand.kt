@@ -68,30 +68,23 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
 
                 if (sarifOutput != null) {
                     formatter.println(sarifOutput)
-                } else if (jsonMode) {
-                    formatter.renderJson(vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
-                } else {
-                    if (vulnerabilities.isEmpty()) {
-                        formatter.success("No vulnerabilities found")
-                    } else {
-                        formatter.renderTable(
-                            headers = listOf("Library", "CVE ID", "Severity", "Summary"),
-                            rows = vulnerabilities.map { vuln ->
-                                listOf(
-                                    "${vuln.affectedGroup}:${vuln.affectedArtifact}",
-                                    vuln.id,
-                                    vuln.severity.name,
-                                    vuln.summary,
-                                )
-                            }
-                        )
-                        formatter.info("${vulnerabilities.size} vulnerability(ies) found")
-                    }
-                }
-
-                if (sarifOutput != null) {
                     writeOutputIfRequested(output, sarifOutput)
                 } else {
+                    renderItems(
+                        items = vulnerabilities,
+                        serializer = VulnerabilityInfo.serializer(),
+                        headers = listOf("Library", "CVE ID", "Severity", "Summary"),
+                        rowMapper = { vuln ->
+                            listOf(
+                                "${vuln.affectedGroup}:${vuln.affectedArtifact}",
+                                vuln.id,
+                                vuln.severity.name,
+                                vuln.summary,
+                            )
+                        },
+                        emptyMessage = "No vulnerabilities found",
+                        itemNoun = "vulnerability(ies) found",
+                    )
                     writeOutputIfRequested(output, vulnerabilities, ListSerializer(VulnerabilityInfo.serializer()))
                 }
 

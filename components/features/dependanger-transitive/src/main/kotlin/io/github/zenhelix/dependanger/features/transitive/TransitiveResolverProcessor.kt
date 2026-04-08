@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.DiagnosticsBuilder
 import io.github.zenhelix.dependanger.core.model.Repository
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
@@ -17,7 +18,10 @@ import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettings
 import io.github.zenhelix.dependanger.feature.model.settings.transitive.TransitiveResolutionSettingsKey
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependenciesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
+import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitivesExtensionKey
+import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflict
 import io.github.zenhelix.dependanger.feature.model.transitive.VersionConflictsExtensionKey
 import io.github.zenhelix.dependanger.feature.support.AbstractSequentialNetworkProcessor
 import io.github.zenhelix.dependanger.feature.support.NetworkProcessorInfrastructure
@@ -95,7 +99,7 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
                 DirectDependencyInput(
                     group = lib.group,
                     artifact = lib.artifact,
-                    version = lib.version.valueOrNull!!,
+                    version = lib.version.requireValue(),
                 )
             }
 
@@ -105,108 +109,107 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
                 ConstraintApplier.applyToChildren(tree, lib.constraints)
             }
 
-            var updatedMetadata = metadata
-
-            // Post-processing diagnostics: cycles
-            val cycles = TransitiveTreeBuilder.collectCycles(perLibraryConstrained)
-            for (cycle in cycles) {
-                updatedMetadata = updatedMetadata.withDiagnostic(
-                    Diagnostics.warning(
-                        DiagnosticCodes.Transitive.CYCLE_DETECTED,
-                        "Cyclic dependency detected: ${cycle.group}:${cycle.artifact}:${cycle.version}",
-                        id, mapOf("coordinate" to "${cycle.group}:${cycle.artifact}:${cycle.version}"),
-                    )
-                )
-            }
-
-            // Post-processing diagnostics: tree size
-            val totalNodes = builder.totalNodes
-            if (totalNodes > LARGE_TREE_THRESHOLD && !builder.isLimitExceeded) {
-                updatedMetadata = updatedMetadata.withDiagnostic(
-                    Diagnostics.warning(
-                        DiagnosticCodes.Transitive.LARGE_TREE,
-                        "Large dependency tree: $totalNodes transitive nodes (consider reviewing dependencies)",
-                        id, mapOf("count" to totalNodes.toString()),
-                    )
-                )
-            }
-
-            if (builder.isLimitExceeded) {
-                updatedMetadata = updatedMetadata.withDiagnostic(
-                    Diagnostics.error(
-                        DiagnosticCodes.Transitive.MAX_EXCEEDED,
-                        "Transitive dependency limit exceeded: $totalNodes >= $effectiveMaxTransitives, resolution was truncated",
-                        id, mapOf("count" to totalNodes.toString(), "limit" to effectiveMaxTransitives.toString()),
-                    )
-                )
-            }
-
-            // Detect conflicts (on trees after per-library constraints, before global)
             val conflicts = ConflictDetector.detectConflicts(
                 trees = perLibraryConstrained,
                 constraints = constraints,
                 strategy = settings.conflictResolution,
             )
 
-            // Global constraints: apply to all trees
             val constrainedTrees = ConstraintApplier.apply(perLibraryConstrained, constraints)
-
-            // Build flat list
             val flatList = FlatListBuilder.build(constrainedTrees, libraries)
 
-            // Check for SNAPSHOT transitives
-            val snapshotDeps = flatList.filter { !it.isDirectDependency && it.version.endsWith("-SNAPSHOT") }
-            for (dep in snapshotDeps) {
-                updatedMetadata = updatedMetadata.withDiagnostic(
-                    Diagnostics.warning(
-                        DiagnosticCodes.Transitive.SNAPSHOT,
-                        "Transitive dependency on SNAPSHOT version: ${dep.group}:${dep.artifact}:${dep.version}",
-                        id, mapOf("coordinate" to "${dep.group}:${dep.artifact}:${dep.version}"),
-                    )
-                )
-            }
+            val diagnostics = Diagnostics.builder(metadata.diagnostics)
+            emitTreeDiagnostics(diagnostics, perLibraryConstrained, builder.totalNodes, builder.isLimitExceeded, effectiveMaxTransitives)
+            emitSnapshotDiagnostics(diagnostics, flatList)
+            emitConflictDiagnostics(diagnostics, conflicts)
+            emitSummaryDiagnostic(diagnostics, libraries.size, flatList, conflicts)
 
-            // Store results
-            updatedMetadata = updatedMetadata
+            return metadata
+                .copy(diagnostics = diagnostics.build())
                 .withExtension(TransitivesExtensionKey, constrainedTrees)
                 .withExtension(FlatDependenciesExtensionKey, flatList)
                 .withExtension(VersionConflictsExtensionKey, conflicts)
+        }
+    }
 
-            // Summary diagnostic
-            val transitiveCount = flatList.count { !it.isDirectDependency }
-            updatedMetadata = updatedMetadata.withDiagnostic(
-                Diagnostics.info(
-                    DiagnosticCodes.Transitive.RESOLVED,
-                    "Resolved ${libraries.size} direct, $transitiveCount transitive dependencies, ${conflicts.size} conflicts",
-                    id,
-                    mapOf(
-                        "direct" to libraries.size.toString(),
-                        "transitive" to transitiveCount.toString(),
-                        "conflicts" to conflicts.size.toString(),
-                    ),
-                )
+    private fun emitTreeDiagnostics(
+        diagnostics: DiagnosticsBuilder,
+        trees: List<TransitiveTree>,
+        totalNodes: Int,
+        isLimitExceeded: Boolean,
+        maxTransitives: Int,
+    ) {
+        val cycles = TransitiveTreeBuilder.collectCycles(trees)
+        for (cycle in cycles) {
+            diagnostics.warning(
+                DiagnosticCodes.Transitive.CYCLE_DETECTED,
+                "Cyclic dependency detected: ${cycle.group}:${cycle.artifact}:${cycle.version}",
+                id, mapOf("coordinate" to "${cycle.group}:${cycle.artifact}:${cycle.version}"),
             )
+        }
 
-            // Conflict diagnostics
-            for (conflict in conflicts) {
-                updatedMetadata = updatedMetadata.withDiagnostic(
-                    Diagnostics.warning(
-                        DiagnosticCodes.Transitive.CONFLICT,
-                        "Version conflict: ${conflict.group}:${conflict.artifact} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})",
-                        id,
-                        mapOf(
-                            "coordinate" to "${conflict.group}:${conflict.artifact}",
-                            "versions" to conflict.requestedVersions.joinToString(","),
-                            "resolved" to conflict.resolvedVersion,
-                            "strategy" to conflict.resolution.name,
-                        ),
-                    )
+        if (totalNodes > LARGE_TREE_THRESHOLD && !isLimitExceeded) {
+            diagnostics.warning(
+                DiagnosticCodes.Transitive.LARGE_TREE,
+                "Large dependency tree: $totalNodes transitive nodes (consider reviewing dependencies)",
+                id, mapOf("count" to totalNodes.toString()),
+            )
+        }
+
+        if (isLimitExceeded) {
+            diagnostics.error(
+                DiagnosticCodes.Transitive.MAX_EXCEEDED,
+                "Transitive dependency limit exceeded: $totalNodes >= $maxTransitives, resolution was truncated",
+                id, mapOf("count" to totalNodes.toString(), "limit" to maxTransitives.toString()),
+            )
+        }
+    }
+
+    private fun emitSnapshotDiagnostics(diagnostics: DiagnosticsBuilder, flatList: List<FlatDependency>) {
+        for (dep in flatList) {
+            if (!dep.isDirectDependency && dep.version.endsWith("-SNAPSHOT")) {
+                diagnostics.warning(
+                    DiagnosticCodes.Transitive.SNAPSHOT,
+                    "Transitive dependency on SNAPSHOT version: ${dep.group}:${dep.artifact}:${dep.version}",
+                    id, mapOf("coordinate" to "${dep.group}:${dep.artifact}:${dep.version}"),
                 )
             }
-
-            logger.info { "Transitive resolution complete: ${libraries.size} direct, $transitiveCount transitive, ${conflicts.size} conflicts" }
-
-            return updatedMetadata
         }
+    }
+
+    private fun emitConflictDiagnostics(diagnostics: DiagnosticsBuilder, conflicts: List<VersionConflict>) {
+        for (conflict in conflicts) {
+            diagnostics.warning(
+                DiagnosticCodes.Transitive.CONFLICT,
+                "Version conflict: ${conflict.group}:${conflict.artifact} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})",
+                id,
+                mapOf(
+                    "coordinate" to "${conflict.group}:${conflict.artifact}",
+                    "versions" to conflict.requestedVersions.joinToString(","),
+                    "resolved" to conflict.resolvedVersion,
+                    "strategy" to conflict.resolution.name,
+                ),
+            )
+        }
+    }
+
+    private fun emitSummaryDiagnostic(
+        diagnostics: DiagnosticsBuilder,
+        directCount: Int,
+        flatList: List<FlatDependency>,
+        conflicts: List<VersionConflict>,
+    ) {
+        val transitiveCount = flatList.count { !it.isDirectDependency }
+        diagnostics.info(
+            DiagnosticCodes.Transitive.RESOLVED,
+            "Resolved $directCount direct, $transitiveCount transitive dependencies, ${conflicts.size} conflicts",
+            id,
+            mapOf(
+                "direct" to directCount.toString(),
+                "transitive" to transitiveCount.toString(),
+                "conflicts" to conflicts.size.toString(),
+            ),
+        )
+        logger.info { "Transitive resolution complete: $directCount direct, $transitiveCount transitive, ${conflicts.size} conflicts" }
     }
 }

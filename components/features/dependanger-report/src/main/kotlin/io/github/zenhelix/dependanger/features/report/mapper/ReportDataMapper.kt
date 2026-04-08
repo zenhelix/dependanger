@@ -50,87 +50,13 @@ internal object ReportDataMapper {
         originalMetadata: DependangerMetadata?,
         summaryOnly: Boolean,
     ): ReportData {
+        fun <T> section(section: ReportSection, block: () -> T?): T? =
+            if (!summaryOnly && section in sections) block() else null
+
         val allUpdates = effective.updates
         val allVulnerabilities = effective.vulnerabilities
         val allCompatIssues = effective.compatibilityIssues
         val allLicenseViolations = effective.licenseViolations
-
-        val libraries = if (!summaryOnly && ReportSection.LIBRARIES in sections) {
-            effective.libraries.values.map { it.toReportLibrary() }
-        } else {
-            null
-        }
-
-        val plugins = if (!summaryOnly && ReportSection.PLUGINS in sections) {
-            effective.plugins.values.map { it.toReportPlugin() }
-        } else {
-            null
-        }
-
-        val bundles = if (!summaryOnly && ReportSection.BUNDLES in sections) {
-            effective.bundles.values.map { ReportBundle(alias = it.alias, libraries = it.libraries) }
-        } else {
-            null
-        }
-
-        val versions = if (!summaryOnly && ReportSection.VERSIONS in sections) {
-            buildVersions(effective, originalMetadata)
-        } else {
-            null
-        }
-
-        val updates = if (!summaryOnly && ReportSection.UPDATES in sections) {
-            allUpdates.ifEmpty { null }?.map { it.toReportUpdate() }
-        } else {
-            null
-        }
-
-        val compatibility = if (!summaryOnly && ReportSection.COMPATIBILITY in sections) {
-            allCompatIssues.ifEmpty { null }?.map { it.toReportCompatibilityIssue() }
-        } else {
-            null
-        }
-
-        val vulnerabilities = if (!summaryOnly && ReportSection.VULNERABILITIES in sections) {
-            allVulnerabilities.ifEmpty { null }?.map { it.toReportVulnerability() }
-        } else {
-            null
-        }
-
-        val deprecated = if (!summaryOnly && ReportSection.DEPRECATED in sections) {
-            effective.libraries.values
-                .filter { it.isDeprecated }
-                .map { it.toReportDeprecated() }
-                .ifEmpty { null }
-        } else {
-            null
-        }
-
-        val licenses = if (!summaryOnly && ReportSection.LICENSES in sections) {
-            allLicenseViolations.ifEmpty { null }?.map { it.toReportLicense() }
-        } else {
-            null
-        }
-
-        val transitives = if (!summaryOnly && ReportSection.TRANSITIVES in sections) {
-            buildTransitives(effective)
-        } else {
-            null
-        }
-
-        val constraints = if (!summaryOnly && ReportSection.CONSTRAINTS in sections && originalMetadata != null) {
-            originalMetadata.constraints
-                .map { it.toReportConstraint() }
-                .ifEmpty { null }
-        } else {
-            null
-        }
-
-        val validation = if (!summaryOnly && ReportSection.VALIDATION in sections) {
-            buildValidation(effective)
-        } else {
-            null
-        }
 
         val summary = buildSummary(
             effective = effective,
@@ -145,18 +71,47 @@ internal object ReportDataMapper {
             generatedAt = utcFormatter.format(Instant.now()),
             distribution = effective.distribution,
             summary = summary,
-            libraries = libraries,
-            plugins = plugins,
-            bundles = bundles,
-            versions = versions,
-            updates = updates,
-            compatibility = compatibility,
-            vulnerabilities = vulnerabilities,
-            deprecated = deprecated,
-            licenses = licenses,
-            transitives = transitives,
-            constraints = constraints,
-            validation = validation,
+            libraries = section(ReportSection.LIBRARIES) {
+                effective.libraries.values.map { it.toReportLibrary() }
+            },
+            plugins = section(ReportSection.PLUGINS) {
+                effective.plugins.values.map { it.toReportPlugin() }
+            },
+            bundles = section(ReportSection.BUNDLES) {
+                effective.bundles.values.map { ReportBundle(alias = it.alias, libraries = it.libraries) }
+            },
+            versions = section(ReportSection.VERSIONS) {
+                buildVersions(effective, originalMetadata)
+            },
+            updates = section(ReportSection.UPDATES) {
+                allUpdates.ifEmpty { null }?.map { it.toReportUpdate() }
+            },
+            compatibility = section(ReportSection.COMPATIBILITY) {
+                allCompatIssues.ifEmpty { null }?.map { it.toReportCompatibilityIssue() }
+            },
+            vulnerabilities = section(ReportSection.VULNERABILITIES) {
+                allVulnerabilities.ifEmpty { null }?.map { it.toReportVulnerability() }
+            },
+            deprecated = section(ReportSection.DEPRECATED) {
+                effective.libraries.values
+                    .filter { it.isDeprecated }
+                    .map { it.toReportDeprecated() }
+                    .ifEmpty { null }
+            },
+            licenses = section(ReportSection.LICENSES) {
+                allLicenseViolations.ifEmpty { null }?.map { it.toReportLicense() }
+            },
+            transitives = section(ReportSection.TRANSITIVES) {
+                buildTransitives(effective)
+            },
+            constraints = section(ReportSection.CONSTRAINTS) {
+                originalMetadata?.constraints
+                    ?.map { it.toReportConstraint() }
+                    ?.ifEmpty { null }
+            },
+            validation = section(ReportSection.VALIDATION) {
+                buildValidation(effective)
+            },
         )
     }
 
@@ -206,7 +161,7 @@ internal object ReportDataMapper {
         if (flatDeps.isEmpty() && conflicts.isEmpty()) return null
 
         val directCount = flatDeps.count { it.isDirectDependency }
-        val transitiveCount = flatDeps.count { !it.isDirectDependency }
+        val transitiveCount = flatDeps.size - directCount
 
         return ReportTransitives(
             directCount = directCount,

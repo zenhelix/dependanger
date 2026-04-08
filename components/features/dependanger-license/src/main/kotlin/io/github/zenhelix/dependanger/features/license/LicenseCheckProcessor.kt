@@ -7,7 +7,6 @@ import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
-import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.pipeline.ExecutionMode
 import io.github.zenhelix.dependanger.effective.pipeline.OrderConstraint
@@ -119,7 +118,7 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
                 candidates = candidates,
                 resolver = ctx.resolver,
                 semaphore = semaphore,
-                extractCoordinates = { lib -> Triple(lib.group, lib.artifact, lib.version.valueOrNull!!) },
+                extractCoordinates = { lib -> Triple(lib.group, lib.artifact, lib.version.requireValue()) },
                 extractDeclaredLicense = { lib -> lib.license?.id },
             )
 

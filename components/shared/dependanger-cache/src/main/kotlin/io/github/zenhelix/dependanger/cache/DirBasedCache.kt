@@ -95,10 +95,9 @@ public class DirBasedCache<T>(
 
         writeAtomic(contentFile, cacheJson.encodeToString(contentSerializer, content))
 
-        val version = segments.getOrNull(2)
         val meta = CacheMetadata(
             fetchedAt = Clock.System.now(),
-            isSnapshot = version?.endsWith("-SNAPSHOT") == true,
+            isSnapshot = isSnapshot(segments),
         )
         writeAtomic(metaFile, cacheJson.encodeToString(CacheMetadata.serializer(), meta))
     }
@@ -152,8 +151,11 @@ public class DirBasedCache<T>(
         return resolved
     }
 
-    private fun selectTtl(segments: List<String>): Long {
-        val version = if (keyResolver.segmentCount >= 3) segments.getOrNull(2) else null
-        return if (version?.endsWith("-SNAPSHOT") == true) ttlSnapshotHours else ttlHours
+    private fun isSnapshot(segments: List<String>): Boolean {
+        if (keyResolver.segmentCount < 3) return false
+        return segments.getOrNull(2)?.endsWith("-SNAPSHOT") == true
     }
+
+    private fun selectTtl(segments: List<String>): Long =
+        if (isSnapshot(segments)) ttlSnapshotHours else ttlHours
 }

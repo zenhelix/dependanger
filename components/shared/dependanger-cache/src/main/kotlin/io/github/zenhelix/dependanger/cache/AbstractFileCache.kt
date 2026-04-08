@@ -33,14 +33,6 @@ public abstract class AbstractFileCache(
         }
     }
 
-    protected fun validateSegments(vararg segments: String) {
-        for (segment in segments) {
-            require(!segment.contains("..")) {
-                "Invalid path segment containing path traversal: $segment"
-            }
-        }
-    }
-
     protected fun validateSegments(segments: List<String>) {
         for (segment in segments) {
             require(!segment.contains("..")) {

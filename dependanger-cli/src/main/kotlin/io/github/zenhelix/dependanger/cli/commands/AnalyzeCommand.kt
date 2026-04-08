@@ -16,8 +16,6 @@ import io.github.zenhelix.dependanger.effective.model.CompatibilityIssue
 import io.github.zenhelix.dependanger.feature.model.settings.analysis.CompatibilityAnalysisSettings
 import io.github.zenhelix.dependanger.feature.model.settings.analysis.CompatibilityAnalysisSettingsKey
 import kotlinx.serialization.builtins.ListSerializer
-import java.nio.file.Path
-import kotlin.io.path.writeText
 
 public class AnalyzeCommand : CliktCommand(name = "analyze") {
     override fun help(context: Context): String = "Analyze library compatibility"
@@ -49,35 +47,23 @@ public class AnalyzeCommand : CliktCommand(name = "analyze") {
                 issues.filter { it.ruleId in allowedRules }
             } ?: issues
 
-            val jsonMode = opts.format == CliDefaults.OUTPUT_FORMAT_JSON
-
-            if (jsonMode) {
-                formatter.renderJson(filteredIssues, ListSerializer(CompatibilityIssue.serializer()))
-            } else {
-                if (filteredIssues.isEmpty()) {
-                    formatter.success("No compatibility issues found")
-                } else {
-                    formatter.renderTable(
-                        headers = listOf("Rule", "Severity", "Message", "Affected Libraries"),
-                        rows = filteredIssues.map { issue ->
-                            listOf(
-                                issue.ruleId,
-                                issue.severity.name,
-                                issue.message,
-                                issue.affectedLibraries.joinToString(", "),
-                            )
-                        }
+            renderItems(
+                items = filteredIssues,
+                serializer = CompatibilityIssue.serializer(),
+                headers = listOf("Rule", "Severity", "Message", "Affected Libraries"),
+                rowMapper = { issue ->
+                    listOf(
+                        issue.ruleId,
+                        issue.severity.name,
+                        issue.message,
+                        issue.affectedLibraries.joinToString(", "),
                     )
-                    formatter.info("${filteredIssues.size} compatibility issue(s) found")
-                }
-            }
+                },
+                emptyMessage = "No compatibility issues found",
+                itemNoun = "compatibility issue(s) found",
+            )
 
-            output?.let { outputFile ->
-                val outputPath = Path.of(outputFile)
-                val jsonString = CliDefaults.CLI_JSON.encodeToString(ListSerializer(CompatibilityIssue.serializer()), filteredIssues)
-                outputPath.writeText(jsonString)
-                formatter.success("Report written to $outputPath")
-            }
+            writeOutputIfRequested(output, filteredIssues, ListSerializer(CompatibilityIssue.serializer()))
 
             if (failOnError && filteredIssues.any { it.severity == Severity.ERROR }) {
                 throw ProgramResult(1)

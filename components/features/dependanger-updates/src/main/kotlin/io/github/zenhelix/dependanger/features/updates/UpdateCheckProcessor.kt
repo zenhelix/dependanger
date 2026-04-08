@@ -133,7 +133,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
         ctx: UpdateCheckContext,
         includePrerelease: Boolean,
     ): UpdateCheckResult {
-        val currentVersionStr = lib.version.valueOrNull!!
+        val currentVersionStr = lib.version.requireValue()
         val coordinate = "${lib.group}:${lib.artifact}"
 
         val currentVersion = VersionComparator.parse(currentVersionStr)

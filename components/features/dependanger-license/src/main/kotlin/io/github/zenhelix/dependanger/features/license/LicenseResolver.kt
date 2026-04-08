@@ -95,7 +95,7 @@ public class LicenseResolver(
     private fun resolveDeclared(declaredLicenseId: String): List<LicenseResult> {
         val spdxId = SpdxLicenseMapper.normalize(declaredLicenseId) ?: declaredLicenseId
         val category = SpdxLicenseMapper.categorize(spdxId)
-        return listOf(createLicenseResult(spdxId = spdxId, licenseName = declaredLicenseId, source = LicenseSource.DECLARED, category = category))
+        return listOf(LicenseResult(spdxId = spdxId, licenseName = declaredLicenseId, source = LicenseSource.DECLARED, category = category))
     }
 
     private suspend fun resolveFromCustom(
@@ -121,7 +121,7 @@ public class LicenseResolver(
                 return resolved.map { rl ->
                     val spdxId = if (rl.spdxId != null) SpdxLicenseMapper.normalize(rl.spdxId) ?: rl.spdxId else null
                     val category = SpdxLicenseMapper.categorize(spdxId, rl.name)
-                    createLicenseResult(spdxId = spdxId, licenseName = rl.name, source = LicenseSource.CUSTOM, category = category)
+                    LicenseResult(spdxId = spdxId, licenseName = rl.name, source = LicenseSource.CUSTOM, category = category)
                 }
             }
         }
@@ -155,7 +155,7 @@ public class LicenseResolver(
                     val licenseName = pomLicense.name
                     val spdxId = if (licenseName != null) SpdxLicenseMapper.normalize(licenseName) else null
                     val category = SpdxLicenseMapper.categorize(spdxId, licenseName)
-                    createLicenseResult(spdxId = spdxId, licenseName = licenseName, source = LicenseSource.MAVEN_POM, category = category)
+                    LicenseResult(spdxId = spdxId, licenseName = licenseName, source = LicenseSource.MAVEN_POM, category = category)
                 }
             }
 
@@ -190,7 +190,7 @@ public class LicenseResolver(
                 licenseIds.map { licenseId ->
                     val spdxId = SpdxLicenseMapper.normalize(licenseId) ?: licenseId
                     val category = SpdxLicenseMapper.categorize(spdxId)
-                    createLicenseResult(spdxId = spdxId, licenseName = licenseId, source = LicenseSource.CLEARLY_DEFINED, category = category)
+                    LicenseResult(spdxId = spdxId, licenseName = licenseId, source = LicenseSource.CLEARLY_DEFINED, category = category)
                 }
             }
 
@@ -205,16 +205,4 @@ public class LicenseResolver(
             }
         }
     }
-
-    private fun createLicenseResult(
-        spdxId: String?,
-        licenseName: String?,
-        source: LicenseSource,
-        category: LicenseCategory,
-    ): LicenseResult = LicenseResult(
-        spdxId = spdxId,
-        licenseName = licenseName,
-        source = source,
-        category = category,
-    )
 }

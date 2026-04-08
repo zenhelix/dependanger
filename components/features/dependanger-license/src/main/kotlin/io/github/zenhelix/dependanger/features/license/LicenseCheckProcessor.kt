@@ -212,20 +212,23 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
             }
         }
 
-        if (settings.failOnUnknown) {
-            val unknownCount = allResults.count { licenses -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
-            if (unknownCount > 0) {
+        if (settings.failOnUnknown || settings.failOnCopyleft) {
+            var unknownCount = 0
+            var copyleftCount = 0
+            for (licenses in allResults) {
+                if (licenses.all { it.category == LicenseCategory.UNKNOWN }) unknownCount++
+                if (licenses.any { it.category.isCopyleft }) copyleftCount++
+            }
+
+            if (settings.failOnUnknown && unknownCount > 0) {
                 diagnostics.error(
                     DiagnosticCodes.License.UNKNOWN_FOUND,
                     "Unknown licenses found in $unknownCount library(ies)",
                     id, mapOf("count" to unknownCount.toString()),
                 )
             }
-        }
 
-        if (settings.failOnCopyleft) {
-            val copyleftCount = allResults.count { licenses -> licenses.any { it.category.isCopyleft } }
-            if (copyleftCount > 0) {
+            if (settings.failOnCopyleft && copyleftCount > 0) {
                 diagnostics.error(
                     DiagnosticCodes.License.COPYLEFT_FOUND,
                     "Copyleft licenses found in $copyleftCount library(ies)",

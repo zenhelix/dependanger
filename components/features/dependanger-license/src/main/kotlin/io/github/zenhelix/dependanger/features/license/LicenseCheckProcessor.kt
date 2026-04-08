@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.license
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.DiagnosticsBuilder
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
@@ -114,41 +115,21 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
         ).use { ctx ->
             val semaphore = Semaphore(settings.parallelism)
 
-            val directResults: List<Pair<EffectiveLibrary, List<LicenseResult>>> = coroutineScope {
-                candidates.map { lib ->
-                    async {
-                        semaphore.withPermit {
-                            val licenses = ctx.resolver.resolve(
-                                group = lib.group,
-                                artifact = lib.artifact,
-                                version = lib.version.valueOrNull!!,
-                                declaredLicenseId = lib.license?.id,
-                            )
-                            lib to licenses
-                        }
-                    }
-                }.awaitAll()
-            }
+            val directResults = resolveLicensesInParallel(
+                candidates = candidates,
+                resolver = ctx.resolver,
+                semaphore = semaphore,
+                extractCoordinates = { lib -> Triple(lib.group, lib.artifact, lib.version.valueOrNull!!) },
+                extractDeclaredLicense = { lib -> lib.license?.id },
+            )
 
-            val transitiveResults: List<Pair<FlatDependency, List<LicenseResult>>> = if (transitiveCandidates.isNotEmpty()) {
-                coroutineScope {
-                    transitiveCandidates.map { dep ->
-                        async {
-                            semaphore.withPermit {
-                                val licenses = ctx.resolver.resolve(
-                                    group = dep.group,
-                                    artifact = dep.artifact,
-                                    version = dep.version,
-                                    declaredLicenseId = null,
-                                )
-                                dep to licenses
-                            }
-                        }
-                    }.awaitAll()
-                }
-            } else {
-                emptyList()
-            }
+            val transitiveResults = resolveLicensesInParallel(
+                candidates = transitiveCandidates,
+                resolver = ctx.resolver,
+                semaphore = semaphore,
+                extractCoordinates = { dep -> Triple(dep.group, dep.artifact, dep.version) },
+                extractDeclaredLicense = { null },
+            )
 
             val allViolations = mutableListOf<LicenseViolation>()
 
@@ -181,40 +162,76 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
                 )
             }
 
-            if (settings.failOnDenied) {
-                val deniedCount = allViolations.count { it.violationType == LicenseViolationType.DENIED }
-                if (deniedCount > 0) {
-                    diagnostics.error(
-                        DiagnosticCodes.License.DENIED_FOUND,
-                        "Denied licenses found in $deniedCount library(ies)",
-                        id, mapOf("count" to deniedCount.toString()),
-                    )
-                }
-            }
-
-            if (settings.failOnUnknown) {
-                val unknownCount = allResults.count { licenses -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
-                if (unknownCount > 0) {
-                    diagnostics.error(
-                        DiagnosticCodes.License.UNKNOWN_FOUND,
-                        "Unknown licenses found in $unknownCount library(ies)",
-                        id, mapOf("count" to unknownCount.toString()),
-                    )
-                }
-            }
-
-            if (settings.failOnCopyleft) {
-                val copyleftCount = allResults.count { licenses -> licenses.any { it.category.isCopyleft } }
-                if (copyleftCount > 0) {
-                    diagnostics.error(
-                        DiagnosticCodes.License.COPYLEFT_FOUND,
-                        "Copyleft licenses found in $copyleftCount library(ies)",
-                        id, mapOf("count" to copyleftCount.toString()),
-                    )
-                }
-            }
+            reportPolicyViolations(allViolations, allResults, settings, diagnostics)
 
             return ParallelResult(diagnostics.build(), mapOf(LicenseViolationsExtensionKey to allViolations))
+        }
+    }
+
+    private suspend fun <T> resolveLicensesInParallel(
+        candidates: List<T>,
+        resolver: LicenseResolver,
+        semaphore: Semaphore,
+        extractCoordinates: (T) -> Triple<String, String, String>,
+        extractDeclaredLicense: (T) -> String?,
+    ): List<Pair<T, List<LicenseResult>>> = if (candidates.isEmpty()) {
+        emptyList()
+    } else {
+        coroutineScope {
+            candidates.map { candidate ->
+                async {
+                    semaphore.withPermit {
+                        val (group, artifact, version) = extractCoordinates(candidate)
+                        val licenses = resolver.resolve(
+                            group = group,
+                            artifact = artifact,
+                            version = version,
+                            declaredLicenseId = extractDeclaredLicense(candidate),
+                        )
+                        candidate to licenses
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    private fun reportPolicyViolations(
+        allViolations: List<LicenseViolation>,
+        allResults: List<List<LicenseResult>>,
+        settings: LicenseCheckSettings,
+        diagnostics: DiagnosticsBuilder,
+    ) {
+        if (settings.failOnDenied) {
+            val deniedCount = allViolations.count { it.violationType == LicenseViolationType.DENIED }
+            if (deniedCount > 0) {
+                diagnostics.error(
+                    DiagnosticCodes.License.DENIED_FOUND,
+                    "Denied licenses found in $deniedCount library(ies)",
+                    id, mapOf("count" to deniedCount.toString()),
+                )
+            }
+        }
+
+        if (settings.failOnUnknown) {
+            val unknownCount = allResults.count { licenses -> licenses.all { it.category == LicenseCategory.UNKNOWN } }
+            if (unknownCount > 0) {
+                diagnostics.error(
+                    DiagnosticCodes.License.UNKNOWN_FOUND,
+                    "Unknown licenses found in $unknownCount library(ies)",
+                    id, mapOf("count" to unknownCount.toString()),
+                )
+            }
+        }
+
+        if (settings.failOnCopyleft) {
+            val copyleftCount = allResults.count { licenses -> licenses.any { it.category.isCopyleft } }
+            if (copyleftCount > 0) {
+                diagnostics.error(
+                    DiagnosticCodes.License.COPYLEFT_FOUND,
+                    "Copyleft licenses found in $copyleftCount library(ies)",
+                    id, mapOf("count" to copyleftCount.toString()),
+                )
+            }
         }
     }
 }

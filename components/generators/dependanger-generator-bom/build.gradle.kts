@@ -11,5 +11,4 @@ dependencies {
     api(projects.components.shared.dependangerMavenPom)
     implementation(libs.kotlin.logging.jvm)
 
-    testRuntimeOnly(libs.slf4j.simple)
 }

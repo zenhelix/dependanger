@@ -10,5 +10,4 @@ dependencies {
     api(projects.components.core.dependangerEffective)
     implementation(libs.kotlin.logging.jvm)
 
-    testRuntimeOnly(libs.slf4j.simple)
 }

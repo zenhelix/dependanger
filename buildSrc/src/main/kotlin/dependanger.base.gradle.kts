@@ -49,4 +49,5 @@ dependencies {
     testRuntimeOnly(libs.findLibrary("junit-platform-launcher").get())
     testImplementation(libs.findLibrary("assertj-core").get())
     testImplementation(libs.findLibrary("mockk").get())
+    testRuntimeOnly(libs.findLibrary("slf4j-simple").get())
 }

@@ -1,19 +1,11 @@
 plugins {
-    id("dependanger.base")
-    id("dependanger.serialization")
-    id("dependanger.publishing")
+    id("dependanger.feature")
 }
 
 description = "Dependanger Maven Resolver - BOM import resolution processor"
 
 dependencies {
-    implementation(projects.components.core.dependangerCore)
-    implementation(projects.components.core.dependangerEffective)
     implementation(projects.components.shared.integrations.dependangerMavenHttpClient)
     implementation(projects.components.shared.dependangerCache)
-    implementation(libs.kotlin.logging.jvm)
     implementation(libs.kotlinx.datetime)
-
-    testImplementation(libs.ktor.client.mock)
-    testImplementation(libs.kotlinx.coroutines.test)
 }

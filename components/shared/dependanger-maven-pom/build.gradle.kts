@@ -8,5 +8,4 @@ description = "Dependanger Maven POM - Shared Maven POM parsing and writing"
 
 dependencies {
     api(libs.kotlinx.serialization.core)
-    testRuntimeOnly(libs.slf4j.simple)
 }

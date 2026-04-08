@@ -26,7 +26,6 @@ dependencies {
     // Generators needed at compile+runtime for tests that call toToml()/toBom()
     testImplementation(projects.components.generators.dependangerGeneratorToml)
     testImplementation(projects.components.generators.dependangerGeneratorBom)
-    testRuntimeOnly(libs.slf4j.simple)
     // Feature modules for integration tests — discovered via ServiceLoader at runtime
     testRuntimeOnly(projects.components.features.dependangerMavenResolver)
     testRuntimeOnly(projects.components.features.dependangerUpdates)

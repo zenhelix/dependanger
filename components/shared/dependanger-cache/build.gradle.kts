@@ -11,5 +11,4 @@ dependencies {
     api(libs.kotlinx.datetime)
     implementation(libs.kotlin.logging.jvm)
 
-    testRuntimeOnly(libs.slf4j.simple)
 }

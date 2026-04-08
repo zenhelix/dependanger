@@ -42,7 +42,6 @@ dependencies {
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.clikt)
 
-    testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.test {

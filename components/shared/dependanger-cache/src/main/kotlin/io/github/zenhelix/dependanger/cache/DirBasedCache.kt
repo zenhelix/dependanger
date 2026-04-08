@@ -146,14 +146,14 @@ public class DirBasedCache<T>(
     // --- Shared helpers ---
 
     private fun resolveLocation(segments: List<String>): File {
-        validateSegments(*segments.toTypedArray())
+        validateSegments(segments)
         val resolved = keyResolver.resolve(File(cacheDirectory), segments)
         validateWithinCacheDir(resolved)
         return resolved
     }
 
     private fun selectTtl(segments: List<String>): Long {
-        val version = segments.lastOrNull()
+        val version = if (keyResolver.segmentCount >= 3) segments.getOrNull(2) else null
         return if (version?.endsWith("-SNAPSHOT") == true) ttlSnapshotHours else ttlHours
     }
 }

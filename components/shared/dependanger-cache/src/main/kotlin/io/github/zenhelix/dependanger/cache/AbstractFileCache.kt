@@ -41,6 +41,14 @@ public abstract class AbstractFileCache(
         }
     }
 
+    protected fun validateSegments(segments: List<String>) {
+        for (segment in segments) {
+            require(!segment.contains("..")) {
+                "Invalid path segment containing path traversal: $segment"
+            }
+        }
+    }
+
     protected fun validateWithinCacheDir(resolved: File) {
         val canonical = resolved.canonicalFile
         val cacheCanonical = File(cacheDirectory).canonicalFile

@@ -25,11 +25,11 @@ import io.github.zenhelix.dependanger.feature.model.settings.security.SecurityCh
 import io.github.zenhelix.dependanger.feature.support.AbstractParallelFeatureProcessor
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.osv.client.OsvClient
-import kotlinx.serialization.builtins.ListSerializer
 import io.github.zenhelix.dependanger.osv.client.OsvClientConfig
 import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
 import io.github.zenhelix.dependanger.osv.client.model.OsvPackageQuery
 import io.github.zenhelix.dependanger.osv.client.model.OsvVulnerabilityData
+import kotlinx.serialization.builtins.ListSerializer
 
 private val logger = KotlinLogging.logger {}
 

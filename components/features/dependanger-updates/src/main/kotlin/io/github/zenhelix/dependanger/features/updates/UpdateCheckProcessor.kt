@@ -1,7 +1,9 @@
 package io.github.zenhelix.dependanger.features.updates
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.zenhelix.dependanger.cache.CacheKeyResolver
 import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
@@ -196,7 +198,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
     ): FetchOutcome {
         val coordinate = "$group:$artifact"
 
-        when (val cached = ctx.cache.get(group, artifact)) {
+        when (val cached = ctx.cache.get(listOf(group, artifact))) {
             is CacheResult.Hit  -> return FetchOutcome(cached.data, Diagnostics.EMPTY)
             is CacheResult.Corrupted -> logger.warn { "Corrupted version cache for $coordinate: ${cached.error}" }
             is CacheResult.Miss -> { /* proceed to fetch */
@@ -207,7 +209,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
             is MetadataFetchResult.Success     -> {
                 val result = VersionFetchResult(versions = fetchResult.versions, repository = fetchResult.repository)
                 try {
-                    ctx.cache.put(group, artifact, result)
+                    ctx.cache.put(result, listOf(group, artifact))
                 } catch (e: Exception) {
                     logger.warn { "Failed to write version cache for $coordinate: ${e.message}" }
                 }
@@ -215,7 +217,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
             }
 
             is MetadataFetchResult.NotFound    -> {
-                val stale = ctx.cache.getStale(group, artifact)
+                val stale = ctx.cache.getStale(listOf(group, artifact))
                 if (stale != null) {
                     logger.debug { "Using stale version cache for $coordinate" }
                     FetchOutcome(stale, Diagnostics.EMPTY)
@@ -237,7 +239,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                     "Rate limited when checking updates for $coordinate",
                     id, mapOf("library" to coordinate)
                 )
-                FetchOutcome(ctx.cache.getStale(group, artifact), diag)
+                FetchOutcome(ctx.cache.getStale(listOf(group, artifact)), diag)
             }
 
             is MetadataFetchResult.TimedOut    -> {
@@ -247,11 +249,11 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                     "Timeout when checking updates for $coordinate",
                     id, mapOf("library" to coordinate)
                 )
-                FetchOutcome(ctx.cache.getStale(group, artifact), diag)
+                FetchOutcome(ctx.cache.getStale(listOf(group, artifact)), diag)
             }
 
             is MetadataFetchResult.Failed      -> {
-                val stale = ctx.cache.getStale(group, artifact)
+                val stale = ctx.cache.getStale(listOf(group, artifact))
                 if (stale != null) {
                     logger.debug { "Using stale version cache for $coordinate after fetch failure" }
                     FetchOutcome(stale, Diagnostics.EMPTY)
@@ -288,9 +290,12 @@ private class UpdateCheckContext(
     readTimeoutMs: Long,
 ) : AutoCloseable {
 
-    val cache: VersionCache = VersionCache(
+    val cache: DirBasedCache<VersionFetchResult> = DirBasedCache(
         cacheDirectory = cacheDirectory,
         ttlHours = cacheTtlHours,
+        ttlSnapshotHours = cacheTtlHours,
+        contentSerializer = VersionFetchResult.serializer(),
+        keyResolver = CacheKeyResolver.FlatGroupArtifact,
     )
 
     val fetcher: MavenMetadataService = MavenMetadataService(

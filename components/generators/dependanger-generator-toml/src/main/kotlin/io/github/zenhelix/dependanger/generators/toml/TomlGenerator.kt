@@ -12,7 +12,7 @@ import io.github.zenhelix.dependanger.effective.spi.ArtifactGenerator
 import io.github.zenhelix.dependanger.effective.spi.writeStringArtifact
 import java.nio.file.Path
 
-public class TomlGenerator(private val config: TomlConfig) : ArtifactGenerator<String> {
+public class TomlGenerator(private val config: TomlConfig = TomlConfig.DEFAULT) : ArtifactGenerator<String> {
     override val generatorId: String = GENERATOR_ID
     override val description: String = "Generates Gradle Version Catalog TOML file"
     override val fileExtension: String = "toml"

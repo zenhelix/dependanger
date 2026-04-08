@@ -19,5 +19,17 @@ public data class BomConfig(
 
     public companion object {
         public const val DEFAULT_FILENAME: String = "bom.pom.xml"
+
+        public val DEFAULT: BomConfig = BomConfig(
+            groupId = "com.example",
+            artifactId = "bom",
+            version = "0.0.0",
+            name = null,
+            description = null,
+            filename = DEFAULT_FILENAME,
+            includeOptionalDependencies = false,
+            prettyPrint = true,
+            includeDeprecationComments = true,
+        )
     }
 }

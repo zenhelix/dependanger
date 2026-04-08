@@ -16,7 +16,7 @@ import io.github.zenhelix.dependanger.maven.pom.writer.PomWriter
 import io.github.zenhelix.dependanger.maven.pom.writer.PomWriterConfig
 import java.nio.file.Path
 
-public class BomGenerator(private val config: BomConfig) : ArtifactGenerator<String> {
+public class BomGenerator(private val config: BomConfig = BomConfig.DEFAULT) : ArtifactGenerator<String> {
     override val generatorId: String = GENERATOR_ID
     override val description: String = "Generates Maven BOM (Bill of Materials) POM file"
     override val fileExtension: String = "xml"

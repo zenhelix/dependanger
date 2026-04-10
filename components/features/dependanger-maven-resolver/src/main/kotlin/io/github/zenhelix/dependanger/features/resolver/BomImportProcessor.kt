@@ -1,16 +1,13 @@
 package io.github.zenhelix.dependanger.features.resolver
 
-import io.github.oshai.kotlinlogging.KotlinLogging
-import io.github.zenhelix.dependanger.cache.CacheResult
-import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
-import io.github.zenhelix.dependanger.core.model.CredentialsProvider
+import io.github.zenhelix.dependanger.core.model.BomImport
 import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
-import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
+import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
@@ -22,17 +19,7 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingContext
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 import io.github.zenhelix.dependanger.effective.pipeline.resolveMavenRepositories
 import io.github.zenhelix.dependanger.http.client.DefaultHttpClientFactory
-import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.HttpClientFactoryKey
-import io.github.zenhelix.dependanger.maven.client.MavenClientConfig
-import io.github.zenhelix.dependanger.maven.client.MavenPomService
-import io.github.zenhelix.dependanger.maven.client.PomXmlParser
-import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
-import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
-
-private val logger = KotlinLogging.logger {}
-
-private const val MAX_BOM_DEPTH = 10
 
 public class BomImportProcessor : EffectiveMetadataProcessor {
     override val id: String = PROCESSOR_ID
@@ -66,8 +53,8 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             ttlHours = bomCache.ttlHours,
             ttlSnapshotHours = bomCache.ttlSnapshotHours,
         ).use { resolutionCtx ->
+            val resolver = BomTreeResolver(resolutionCtx, id)
             val resolvedBoms = mutableListOf<BomContent>()
-            val resolvedCache = mutableMapOf<String, BomContent>()
             var diagnostics = metadata.diagnostics
 
             for (bomImport in bomImports) {
@@ -83,18 +70,11 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                     )
                 }
 
-                val state = ResolutionState(
-                    pathStack = mutableSetOf(),
-                    resolvedCache = resolvedCache,
-                )
-                val result = resolveBomRecursive(
+                val result = resolver.resolve(
                     group = bomImport.group,
                     artifact = bomImport.artifact,
                     version = resolvedVersion,
-                    ctx = resolutionCtx,
-                    state = state,
                     diagnostics = diagnostics,
-                    depth = 0,
                 )
                 resolvedBoms.add(result.content)
                 diagnostics = result.diagnostics
@@ -111,7 +91,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     }
 
     private fun resolveVersionReference(
-        bomImport: io.github.zenhelix.dependanger.core.model.BomImport,
+        bomImport: BomImport,
         context: ProcessingContext,
     ): Pair<String?, Diagnostics> = when (val v = bomImport.version) {
         is VersionReference.Literal   -> v.version to Diagnostics.EMPTY
@@ -139,7 +119,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
     private fun buildBomVersionMap(
         resolvedBoms: List<BomContent>,
-        bomImports: List<io.github.zenhelix.dependanger.core.model.BomImport>,
+        bomImports: List<BomImport>,
     ): Map<String, Pair<String, String>> {
         val versionMap = mutableMapOf<String, Pair<String, String>>()
         for ((index, bom) in resolvedBoms.withIndex()) {
@@ -158,10 +138,10 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     }
 
     private fun enrichLibraries(
-        libraries: Map<String, io.github.zenhelix.dependanger.effective.model.EffectiveLibrary>,
+        libraries: Map<String, EffectiveLibrary>,
         versionMap: Map<String, Pair<String, String>>,
         diagnostics: Diagnostics,
-    ): Pair<Map<String, io.github.zenhelix.dependanger.effective.model.EffectiveLibrary>, Diagnostics> {
+    ): Pair<Map<String, EffectiveLibrary>, Diagnostics> {
         val currentDiagnostics = Diagnostics.builder(diagnostics)
         val updatedLibraries = libraries.mapValues { (_, lib) ->
             if (lib.version.isResolved) return@mapValues lib
@@ -184,241 +164,5 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
             )
         }
         return updatedLibraries to currentDiagnostics.build()
-    }
-
-    private suspend fun resolveBomRecursive(
-        group: String,
-        artifact: String,
-        version: String,
-        ctx: BomResolutionContext,
-        state: ResolutionState,
-        diagnostics: Diagnostics,
-        depth: Int,
-    ): BomResolveResult {
-        val key = "$group:$artifact:$version"
-
-        if (key in state.pathStack) {
-            return BomResolveResult(
-                content = BomContent.EMPTY,
-                diagnostics = diagnostics + Diagnostics.error(
-                    DiagnosticCodes.Bom.CIRCULAR, "Circular BOM dependency detected: $key", id, emptyMap()
-                ),
-            )
-        }
-        if (depth > MAX_BOM_DEPTH) {
-            return BomResolveResult(
-                content = BomContent.EMPTY,
-                diagnostics = diagnostics + Diagnostics.warning(
-                    DiagnosticCodes.Bom.DEPTH_EXCEEDED, "BOM parent hierarchy > $MAX_BOM_DEPTH levels for $key", id, emptyMap()
-                ),
-            )
-        }
-
-        state.resolvedCache[key]?.let { return BomResolveResult(content = it, diagnostics = diagnostics) }
-
-        state.pathStack.add(key)
-        try {
-            var currentDiagnostics = diagnostics
-
-            when (val cached = ctx.cache.get(group, artifact, version)) {
-                is CacheResult.Hit       -> {
-                    state.resolvedCache[key] = cached.data
-                    return BomResolveResult(content = cached.data, diagnostics = currentDiagnostics)
-                }
-
-                is CacheResult.Corrupted -> {
-                    currentDiagnostics += Diagnostics.warning(
-                        DiagnosticCodes.Bom.CACHE_CORRUPT,
-                        "Cache corrupted for $key, will re-fetch: ${cached.error}",
-                        id, emptyMap()
-                    )
-                }
-
-                is CacheResult.Miss      -> { /* proceed to download */
-                }
-            }
-
-            val pomXml = when (val downloadResult = ctx.downloader.downloadPom(group, artifact, version)) {
-                is DownloadResult.Success -> downloadResult.content
-                is DownloadResult.NotFound,
-                is DownloadResult.AuthRequired,
-                is DownloadResult.Failed  -> {
-                    val stale = ctx.cache.getStale(group, artifact, version)
-                    if (stale != null) {
-                        state.resolvedCache[key] = stale
-                        return BomResolveResult(
-                            content = stale,
-                            diagnostics = currentDiagnostics + Diagnostics.warning(
-                                DiagnosticCodes.Bom.STALE_CACHE, "Using stale cache for BOM $key", id, emptyMap()
-                            ),
-                        )
-                    }
-                    val (errorCode, errorMessage) = downloadErrorDiagnostic(downloadResult, key)
-                    return BomResolveResult(
-                        content = BomContent.EMPTY,
-                        diagnostics = currentDiagnostics + Diagnostics.error(errorCode, errorMessage, id, emptyMap()),
-                    )
-                }
-            }
-
-            val parseResult = try {
-                ctx.parser.parseBomContent(pomXml)
-            } catch (e: Exception) {
-                return BomResolveResult(
-                    content = BomContent.EMPTY,
-                    diagnostics = currentDiagnostics + Diagnostics.error(
-                        DiagnosticCodes.Bom.INVALID_XML, "Failed to parse BOM XML for $key: ${e.message}", id, emptyMap()
-                    ),
-                )
-            }
-
-            var mergedProperties = parseResult.properties
-            val mergedDependencies = mutableListOf<BomDependency>()
-
-            if (parseResult.dependencies.isEmpty() && parseResult.parent == null) {
-                currentDiagnostics += Diagnostics.warning(
-                    DiagnosticCodes.Bom.NO_DEPS, "BOM $key contains no dependencyManagement", id, emptyMap()
-                )
-            }
-
-            parseResult.parent?.let { parent ->
-                val parentResult = resolveBomRecursive(
-                    group = parent.group,
-                    artifact = parent.artifact,
-                    version = parent.version,
-                    ctx = ctx,
-                    state = state,
-                    diagnostics = currentDiagnostics,
-                    depth = depth + 1,
-                )
-                mergedProperties = parentResult.content.properties + mergedProperties
-                mergedDependencies.addAll(parentResult.content.dependencies)
-                currentDiagnostics = parentResult.diagnostics
-            }
-
-            val seen = mutableSetOf<String>()
-            for (rawDep in parseResult.dependencies) {
-                if (rawDep.scope == "import" && rawDep.type == "pom") {
-                    val resolved = resolveRawDependency(ctx.parser, rawDep, mergedProperties, currentDiagnostics)
-                    currentDiagnostics = resolved.diagnostics
-                    val dep = resolved.dependency ?: continue
-                    val importResult = resolveBomRecursive(
-                        group = dep.group,
-                        artifact = dep.artifact,
-                        version = dep.version,
-                        ctx = ctx,
-                        state = state,
-                        diagnostics = currentDiagnostics,
-                        depth = depth + 1,
-                    )
-                    mergedDependencies.addAll(importResult.content.dependencies)
-                    currentDiagnostics = importResult.diagnostics
-                } else {
-                    val resolved = resolveRawDependency(ctx.parser, rawDep, mergedProperties, currentDiagnostics)
-                    currentDiagnostics = resolved.diagnostics
-                    resolved.dependency?.let { dep ->
-                        val depKey = "${dep.group}:${dep.artifact}"
-                        if (!seen.add(depKey)) {
-                            currentDiagnostics += Diagnostics.warning(
-                                DiagnosticCodes.Bom.DUPLICATE_ENTRY,
-                                "Duplicate dependency $depKey in BOM $key, last definition wins",
-                                id, emptyMap()
-                            )
-                        }
-                        mergedDependencies.add(dep)
-                    }
-                }
-            }
-
-            val content = BomContent(dependencies = mergedDependencies, properties = mergedProperties)
-            try {
-                ctx.cache.put(group, artifact, version, content)
-            } catch (e: Exception) {
-                logger.warn { "Failed to write BOM cache for $key: ${e.message}" }
-                currentDiagnostics += Diagnostics.warning(
-                    DiagnosticCodes.Bom.CACHE_READONLY, "Cannot write cache for $key: ${e.message}", id, emptyMap()
-                )
-            }
-            state.resolvedCache[key] = content
-
-            return BomResolveResult(content = content, diagnostics = currentDiagnostics)
-        } finally {
-            state.pathStack.remove(key)
-        }
-    }
-
-    private fun downloadErrorDiagnostic(result: DownloadResult, key: String): Pair<String, String> = when (result) {
-        is DownloadResult.AuthRequired -> DiagnosticCodes.Bom.AUTH_REQUIRED to
-                "Authentication required to fetch BOM $key from ${result.url} (HTTP ${result.statusCode})"
-
-        is DownloadResult.NotFound     -> DiagnosticCodes.Bom.FETCH_FAILED to
-                "BOM not found in any repository: $key"
-
-        is DownloadResult.Failed       -> DiagnosticCodes.Bom.FETCH_FAILED to
-                "Cannot fetch BOM $key: ${result.error}"
-
-        is DownloadResult.Success      -> error("Success is not an error")
-    }
-
-    private fun resolveRawDependency(
-        parser: PomXmlParser,
-        rawDep: RawBomDependency,
-        properties: Map<String, String>,
-        diagnostics: Diagnostics,
-    ): DependencyResolutionResult = try {
-        DependencyResolutionResult(
-            dependency = BomDependency(
-                group = parser.resolveProperty(rawDep.group, properties),
-                artifact = parser.resolveProperty(rawDep.artifact, properties),
-                version = parser.resolveProperty(rawDep.version, properties),
-            ),
-            diagnostics = diagnostics,
-        )
-    } catch (e: IllegalStateException) {
-        DependencyResolutionResult(
-            dependency = null,
-            diagnostics = diagnostics + Diagnostics.error(
-                DiagnosticCodes.Bom.UNRESOLVED_PROPERTY,
-                "${e.message} in ${rawDep.group}:${rawDep.artifact}:${rawDep.version}",
-                id, emptyMap()
-            ),
-        )
-    }
-}
-
-private data class ResolutionState(
-    val pathStack: MutableSet<String>,
-    val resolvedCache: MutableMap<String, BomContent>,
-)
-
-private class BomResolutionContext(
-    repositories: List<MavenRepository>,
-    credentialsProvider: CredentialsProvider?,
-    httpClientFactory: HttpClientFactory,
-    cacheDirectory: String,
-    ttlHours: Long,
-    ttlSnapshotHours: Long,
-) : AutoCloseable {
-
-    val cache: DirBasedCache<BomContent> = DirBasedCache(
-        cacheDirectory = cacheDirectory,
-        ttlHours = ttlHours,
-        ttlSnapshotHours = ttlSnapshotHours,
-        contentSerializer = BomContent.serializer(),
-        contentFileName = "bom-content.json",
-    )
-
-    val downloader: MavenPomService = MavenPomService(
-        MavenClientConfig(
-            repositories = repositories,
-            credentialsProvider = credentialsProvider,
-        ),
-        httpClientFactory,
-    )
-
-    val parser: PomXmlParser = PomXmlParser()
-
-    override fun close() {
-        downloader.close()
     }
 }

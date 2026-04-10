@@ -212,14 +212,14 @@ internal class MarkdownReportRenderer : ReportRenderer {
             appendLine("### Errors (${validation.errors.size})")
             appendLine()
             for (e in validation.errors) {
-                appendLine("- \u274C [${e.code.escapeCell()}] ${e.message.escapeCell()}")
+                appendLine("- $ICON_ERROR [${e.code.escapeCell()}] ${e.message.escapeCell()}")
             }
         }
         if (validation.warnings.isNotEmpty()) {
             appendLine("### Warnings (${validation.warnings.size})")
             appendLine()
             for (w in validation.warnings) {
-                appendLine("- \u26A0\uFE0F [${w.code.escapeCell()}] ${w.message.escapeCell()}")
+                appendLine("- $ICON_WARNING [${w.code.escapeCell()}] ${w.message.escapeCell()}")
             }
         }
         if (validation.errors.isEmpty() && validation.warnings.isEmpty()) {
@@ -228,6 +228,8 @@ internal class MarkdownReportRenderer : ReportRenderer {
     }
 
     private companion object {
+        private const val ICON_ERROR = "\u274C"
+        private const val ICON_WARNING = "\u26A0\uFE0F"
 
         private fun String.escapeCell(): String =
             replace("|", "\\|").replace("\n", " ")

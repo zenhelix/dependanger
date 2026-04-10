@@ -27,7 +27,7 @@ public abstract class AbstractFileCache(
         try {
             Files.writeString(tempFile, content)
             Files.move(tempFile, target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             Files.deleteIfExists(tempFile)
             throw IOException("Failed to write cache file: $target", e)
         }

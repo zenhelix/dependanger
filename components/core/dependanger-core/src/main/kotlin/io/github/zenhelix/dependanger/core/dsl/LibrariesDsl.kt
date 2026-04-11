@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Library
 import io.github.zenhelix.dependanger.core.model.LicenseInfo
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Requirements
 import io.github.zenhelix.dependanger.core.model.VersionReference
 
@@ -15,10 +16,10 @@ public class LibrariesDsl {
 
     public fun library(alias: String, coordinates: String) {
         requireUniqueAlias(alias, "Library alias", _aliases)
-        val (group, artifact, version) = parseCoordinates(coordinates)
+        val (coordinate, version) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
-                alias = alias, group = group, artifact = artifact, version = version,
+                alias = alias, coordinate = coordinate, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
                 license = null, constraints = emptyList(), isPlatform = false, ignoreUpdates = false,
             )
@@ -27,10 +28,10 @@ public class LibrariesDsl {
 
     public fun library(alias: String, coordinates: String, version: VersionReference) {
         requireUniqueAlias(alias, "Library alias", _aliases)
-        val (group, artifact, _) = parseCoordinates(coordinates)
+        val (coordinate, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
-                alias = alias, group = group, artifact = artifact, version = version,
+                alias = alias, coordinate = coordinate, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
                 license = null, constraints = emptyList(), isPlatform = false, ignoreUpdates = false,
             )
@@ -39,44 +40,44 @@ public class LibrariesDsl {
 
     public fun library(alias: String, coordinates: String, block: LibraryDsl.() -> Unit) {
         requireUniqueAlias(alias, "Library alias", _aliases)
-        val (group, artifact, version) = parseCoordinates(coordinates)
+        val (coordinate, version) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        _libraries.add(dsl.toLibrary(alias, group, artifact))
+        _libraries.add(dsl.toLibrary(alias, coordinate))
     }
 
     public fun library(alias: String, coordinates: String, version: VersionReference, block: LibraryDsl.() -> Unit) {
         requireUniqueAlias(alias, "Library alias", _aliases)
-        val (group, artifact, _) = parseCoordinates(coordinates)
+        val (coordinate, _) = parseCoordinates(coordinates)
         val dsl = LibraryDsl(version).apply(block)
-        _libraries.add(dsl.toLibrary(alias, group, artifact))
+        _libraries.add(dsl.toLibrary(alias, coordinate))
     }
 
     public fun platformLibrary(alias: String, coordinates: String, version: VersionReference) {
         requireUniqueAlias(alias, "Library alias", _aliases)
-        val (group, artifact, _) = parseCoordinates(coordinates)
+        val (coordinate, _) = parseCoordinates(coordinates)
         _libraries.add(
             Library(
-                alias = alias, group = group, artifact = artifact, version = version,
+                alias = alias, coordinate = coordinate, version = version,
                 description = null, tags = emptySet(), requires = null, deprecation = null,
                 license = null, constraints = emptyList(), isPlatform = true, ignoreUpdates = false,
             )
         )
     }
 
-    private fun parseCoordinates(raw: String): Triple<String, String, VersionReference?> {
+    private fun parseCoordinates(raw: String): Pair<MavenCoordinate, VersionReference?> {
         val parts = raw.split(":")
         return when (parts.size) {
             2    -> {
                 require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
                 require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
-                Triple(parts[0], parts[1], null)
+                MavenCoordinate(parts[0], parts[1]) to null
             }
 
             3    -> {
                 require(parts[0].isNotBlank()) { "Group must not be blank in coordinates '$raw'" }
                 require(parts[1].isNotBlank()) { "Artifact must not be blank in coordinates '$raw'" }
                 require(parts[2].isNotBlank()) { "Version must not be blank in coordinates '$raw'" }
-                Triple(parts[0], parts[1], VersionReference.Literal(parts[2]))
+                MavenCoordinate(parts[0], parts[1]) to VersionReference.Literal(parts[2])
             }
 
             else -> throw IllegalArgumentException("Invalid coordinates: $raw")
@@ -124,10 +125,9 @@ public class LibraryDsl(private var version: VersionReference? = null) {
         _constraints.addAll(dsl.constraints)
     }
 
-    public fun toLibrary(alias: String, group: String, artifact: String): Library = Library(
+    public fun toLibrary(alias: String, coordinate: MavenCoordinate): Library = Library(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = coordinate,
         version = version,
         description = description,
         tags = tags,

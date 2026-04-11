@@ -82,8 +82,8 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
                         headers = listOf("Group", "Artifact", "Requested Versions", "Resolved", "Strategy"),
                         rows = conflicts.map { conflict ->
                             listOf(
-                                conflict.group,
-                                conflict.artifact,
+                                conflict.coordinate.group,
+                                conflict.coordinate.artifact,
                                 conflict.requestedVersions.joinToString(", "),
                                 conflict.resolvedVersion,
                                 conflict.resolution.name,
@@ -107,7 +107,7 @@ public class ResolveTransitivesCommand : CliktCommand(name = "resolve-transitive
         }
         val markerSuffix = if (markers.isNotEmpty()) " [${markers.joinToString(", ")}]" else ""
 
-        formatter.println("$prefix${tree.group}:${tree.artifact}:$version$scope$markerSuffix")
+        formatter.println("$prefix${tree.coordinate}:$version$scope$markerSuffix")
 
         if (!tree.isDuplicate && !tree.isCycle) {
             tree.children.forEach { child ->

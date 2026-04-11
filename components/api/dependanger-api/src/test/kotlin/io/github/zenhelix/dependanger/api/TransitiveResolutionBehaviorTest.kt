@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
@@ -33,8 +34,7 @@ class TransitiveResolutionBehaviorTest {
         fun `transitives accessible via result transitives`() = runTest {
             val fakeTree = listOf(
                 TransitiveTree(
-                    group = "io.ktor",
-                    artifact = "ktor-client-core",
+                    coordinate = MavenCoordinate("io.ktor", "ktor-client-core"),
                     version = "3.1.0",
                     scope = "implementation",
                     children = emptyList(),
@@ -53,8 +53,8 @@ class TransitiveResolutionBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat(result.transitives).hasSize(1)
-            assertThat(result.transitives[0].group).isEqualTo("io.ktor")
-            assertThat(result.transitives[0].artifact).isEqualTo("ktor-client-core")
+            assertThat(result.transitives[0].coordinate.group).isEqualTo("io.ktor")
+            assertThat(result.transitives[0].coordinate.artifact).isEqualTo("ktor-client-core")
             assertThat(result.transitives[0].version).isEqualTo("3.1.0")
             assertThat(result.transitives[0].scope).isEqualTo("implementation")
             assertThat(result.transitives[0].isDuplicate).isFalse()
@@ -65,20 +65,17 @@ class TransitiveResolutionBehaviorTest {
         fun `nested transitive tree with children renders correctly`() = runTest {
             val nestedTree = listOf(
                 TransitiveTree(
-                    group = "com.example",
-                    artifact = "parent-lib",
+                    coordinate = MavenCoordinate("com.example", "parent-lib"),
                     version = "1.0.0",
                     scope = "implementation",
                     children = listOf(
                         TransitiveTree(
-                            group = "com.example",
-                            artifact = "child-lib",
+                            coordinate = MavenCoordinate("com.example", "child-lib"),
                             version = "2.0.0",
                             scope = "runtime",
                             children = listOf(
                                 TransitiveTree(
-                                    group = "com.example",
-                                    artifact = "grandchild-lib",
+                                    coordinate = MavenCoordinate("com.example", "grandchild-lib"),
                                     version = "3.0.0",
                                     scope = "runtime",
                                     children = emptyList(),
@@ -90,8 +87,7 @@ class TransitiveResolutionBehaviorTest {
                             isCycle = false,
                         ),
                         TransitiveTree(
-                            group = "com.example",
-                            artifact = "duplicate-lib",
+                            coordinate = MavenCoordinate("com.example", "duplicate-lib"),
                             version = "1.5.0",
                             scope = "runtime",
                             children = emptyList(),
@@ -115,16 +111,16 @@ class TransitiveResolutionBehaviorTest {
             assertThat(result.transitives).hasSize(1)
 
             val root = result.transitives[0]
-            assertThat(root.artifact).isEqualTo("parent-lib")
+            assertThat(root.coordinate.artifact).isEqualTo("parent-lib")
             assertThat(root.children).hasSize(2)
 
             val child = root.children[0]
-            assertThat(child.artifact).isEqualTo("child-lib")
+            assertThat(child.coordinate.artifact).isEqualTo("child-lib")
             assertThat(child.children).hasSize(1)
-            assertThat(child.children[0].artifact).isEqualTo("grandchild-lib")
+            assertThat(child.children[0].coordinate.artifact).isEqualTo("grandchild-lib")
 
             val duplicate = root.children[1]
-            assertThat(duplicate.artifact).isEqualTo("duplicate-lib")
+            assertThat(duplicate.coordinate.artifact).isEqualTo("duplicate-lib")
             assertThat(duplicate.isDuplicate).isTrue()
         }
 
@@ -146,8 +142,7 @@ class TransitiveResolutionBehaviorTest {
         fun `version conflicts accessible via result versionConflicts`() = runTest {
             val fakeConflicts = listOf(
                 VersionConflict(
-                    group = "com.example",
-                    artifact = "shared-lib",
+                    coordinate = MavenCoordinate("com.example", "shared-lib"),
                     requestedVersions = listOf("1.0.0", "2.0.0"),
                     resolvedVersion = "2.0.0",
                     resolution = ConflictResolutionStrategy.HIGHEST,
@@ -163,8 +158,8 @@ class TransitiveResolutionBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat(result.versionConflicts).hasSize(1)
-            assertThat(result.versionConflicts[0].group).isEqualTo("com.example")
-            assertThat(result.versionConflicts[0].artifact).isEqualTo("shared-lib")
+            assertThat(result.versionConflicts[0].coordinate.group).isEqualTo("com.example")
+            assertThat(result.versionConflicts[0].coordinate.artifact).isEqualTo("shared-lib")
             assertThat(result.versionConflicts[0].requestedVersions).containsExactly("1.0.0", "2.0.0")
             assertThat(result.versionConflicts[0].resolvedVersion).isEqualTo("2.0.0")
             assertThat(result.versionConflicts[0].resolution).isEqualTo(ConflictResolutionStrategy.HIGHEST)
@@ -174,15 +169,13 @@ class TransitiveResolutionBehaviorTest {
         fun `conflict with multiple requested versions`() = runTest {
             val fakeConflicts = listOf(
                 VersionConflict(
-                    group = "org.slf4j",
-                    artifact = "slf4j-api",
+                    coordinate = MavenCoordinate("org.slf4j", "slf4j-api"),
                     requestedVersions = listOf("1.7.36", "2.0.0", "2.0.9"),
                     resolvedVersion = "2.0.9",
                     resolution = ConflictResolutionStrategy.HIGHEST,
                 ),
                 VersionConflict(
-                    group = "com.google.guava",
-                    artifact = "guava",
+                    coordinate = MavenCoordinate("com.google.guava", "guava"),
                     requestedVersions = listOf("31.0-jre", "32.1-jre"),
                     resolvedVersion = "31.0-jre",
                     resolution = ConflictResolutionStrategy.FIRST,
@@ -202,11 +195,11 @@ class TransitiveResolutionBehaviorTest {
             assertThat(result.isSuccess).isTrue()
             assertThat(result.versionConflicts).hasSize(2)
 
-            val slf4jConflict = result.versionConflicts.first { it.artifact == "slf4j-api" }
+            val slf4jConflict = result.versionConflicts.first { it.coordinate.artifact == "slf4j-api" }
             assertThat(slf4jConflict.requestedVersions).hasSize(3)
             assertThat(slf4jConflict.resolution).isEqualTo(ConflictResolutionStrategy.HIGHEST)
 
-            val guavaConflict = result.versionConflicts.first { it.artifact == "guava" }
+            val guavaConflict = result.versionConflicts.first { it.coordinate.artifact == "guava" }
             assertThat(guavaConflict.requestedVersions).hasSize(2)
             assertThat(guavaConflict.resolution).isEqualTo(ConflictResolutionStrategy.FIRST)
         }
@@ -245,8 +238,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeTransitiveResolver { metadata ->
                     metadata.libraries.values.map { lib ->
                         TransitiveTree(
-                            group = lib.group,
-                            artifact = lib.artifact,
+                            coordinate = lib.coordinate,
                             version = lib.version.valueOrNull,
                             scope = "implementation",
                             children = emptyList(),
@@ -259,8 +251,8 @@ class TransitiveResolutionBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             assertThat(result.transitives).hasSize(1)
-            assertThat(result.transitives[0].group).isEqualTo("com.android")
-            assertThat(result.transitives[0].artifact).isEqualTo("lib")
+            assertThat(result.transitives[0].coordinate.group).isEqualTo("com.android")
+            assertThat(result.transitives[0].coordinate.artifact).isEqualTo("lib")
         }
     }
 
@@ -276,7 +268,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeUpdateCheck {
                     listOf(
                         UpdateAvailableInfo(
-                            alias = "lib", group = "com.example", artifact = "lib",
+                            alias = "lib", coordinate = MavenCoordinate("com.example", "lib"),
                             currentVersion = "1.0.0", latestVersion = "2.0.0",
                             updateType = UpdateType.MAJOR,
                         ),
@@ -288,15 +280,15 @@ class TransitiveResolutionBehaviorTest {
                             id = "CVE-2024-1111", aliases = emptyList(),
                             summary = "Test vulnerability", severity = VulnerabilitySeverity.HIGH,
                             cvssScore = 7.5, cvssVersion = "3.1", fixedVersion = "2.0.0",
-                            url = null, affectedGroup = "com.example",
-                            affectedArtifact = "lib", affectedVersion = "1.0.0",
+                            url = null, affectedCoordinate = MavenCoordinate("com.example", "lib"),
+                            affectedVersion = "1.0.0",
                         ),
                     )
                 })
                 addProcessor(fakeLicenseCheck {
                     listOf(
                         LicenseViolation(
-                            alias = "lib", group = "com.example", artifact = "lib",
+                            alias = "lib", coordinate = MavenCoordinate("com.example", "lib"),
                             detectedLicense = "GPL-3.0",
                             category = LicenseCategory.STRONG_COPYLEFT,
                             violationType = LicenseViolationType.DENIED,
@@ -307,7 +299,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeTransitiveResolver {
                     listOf(
                         TransitiveTree(
-                            group = "com.example", artifact = "lib", version = "1.0.0",
+                            coordinate = MavenCoordinate("com.example", "lib"), version = "1.0.0",
                             scope = "implementation", children = emptyList(),
                             isDuplicate = false, isCycle = false,
                         ),
@@ -316,7 +308,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeConflictDetector {
                     listOf(
                         VersionConflict(
-                            group = "com.example", artifact = "lib",
+                            coordinate = MavenCoordinate("com.example", "lib"),
                             requestedVersions = listOf("1.0.0", "1.1.0"),
                             resolvedVersion = "1.1.0",
                             resolution = ConflictResolutionStrategy.HIGHEST,
@@ -345,7 +337,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeUpdateCheck {
                     listOf(
                         UpdateAvailableInfo(
-                            alias = "lib-a", group = "com.a", artifact = "lib",
+                            alias = "lib-a", coordinate = MavenCoordinate("com.a", "lib"),
                             currentVersion = "1.0", latestVersion = "1.1",
                             updateType = UpdateType.MINOR,
                         ),
@@ -354,7 +346,7 @@ class TransitiveResolutionBehaviorTest {
                 addProcessor(fakeTransitiveResolver { metadata ->
                     metadata.libraries.values.map { lib ->
                         TransitiveTree(
-                            group = lib.group, artifact = lib.artifact,
+                            coordinate = lib.coordinate,
                             version = lib.version.valueOrNull, scope = "implementation",
                             children = emptyList(), isDuplicate = false, isCycle = false,
                         )
@@ -368,7 +360,7 @@ class TransitiveResolutionBehaviorTest {
             assertThat(result.updates[0].alias).isEqualTo("lib-a")
 
             assertThat(result.transitives).hasSize(2)
-            assertThat(result.transitives.map { it.group }).containsExactlyInAnyOrder("com.a", "com.b")
+            assertThat(result.transitives.map { it.coordinate.group }).containsExactlyInAnyOrder("com.a", "com.b")
 
             assertThat(result.vulnerabilities).isEmpty()
             assertThat(result.licenseViolations).isEmpty()

@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.cli
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -30,11 +31,13 @@ class MigrateDeprecatedTest {
                 } else {
                     lib
                 }
-            } + base.libraries.first().copy(
-                alias = "stdlib-jdk8",
-                artifact = "kotlin-stdlib-jdk8",
-                deprecation = null,
-            ),
+            } + base.libraries.first().let { first ->
+                first.copy(
+                    alias = "stdlib-jdk8",
+                    coordinate = MavenCoordinate(first.coordinate.group, "kotlin-stdlib-jdk8"),
+                    deprecation = null,
+                )
+            },
         )
     }
 

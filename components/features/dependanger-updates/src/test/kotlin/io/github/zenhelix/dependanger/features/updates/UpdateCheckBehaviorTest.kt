@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.updates
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.core.util.VersionComparator
@@ -234,8 +235,7 @@ class UpdateCheckBehaviorTest {
 
             val info = UpdateAvailableInfo(
                 alias = "kotlin-stdlib",
-                group = "org.jetbrains.kotlin",
-                artifact = "kotlin-stdlib",
+                coordinate = MavenCoordinate("org.jetbrains.kotlin", "kotlin-stdlib"),
                 currentVersion = "1.0.0",
                 latestVersion = "1.1.0",
                 latestStable = "1.1.0",

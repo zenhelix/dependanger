@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.security
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilityInfo
 import io.github.zenhelix.dependanger.feature.model.security.VulnerabilitySeverity
 import io.github.zenhelix.dependanger.osv.client.model.OsvBatchResult
@@ -214,8 +215,7 @@ class SecurityCheckBehaviorTest {
             cvssVersion = "CVSS_V3",
             fixedVersion = null,
             url = null,
-            affectedGroup = "com.example",
-            affectedArtifact = "test-lib",
+            affectedCoordinate = MavenCoordinate("com.example", "test-lib"),
             affectedVersion = "1.0.0",
         )
     }
@@ -311,8 +311,7 @@ class SecurityCheckBehaviorTest {
                 cvssVersion = "CVSS_V3",
                 fixedVersion = "3.2.1",
                 url = "https://example.com/advisory",
-                affectedGroup = "org.example",
-                affectedArtifact = "template-engine",
+                affectedCoordinate = MavenCoordinate("org.example", "template-engine"),
                 affectedVersion = "3.1.0",
             )
 
@@ -341,8 +340,7 @@ class SecurityCheckBehaviorTest {
             cvssVersion = "CVSS_V3",
             fixedVersion = fixedVersion,
             url = null,
-            affectedGroup = "com.example",
-            affectedArtifact = "lib",
+            affectedCoordinate = MavenCoordinate("com.example", "lib"),
             affectedVersion = "1.0.0",
         )
     }
@@ -409,13 +407,12 @@ class SecurityCheckBehaviorTest {
         @Test
         fun `package query holds Maven coordinates`() {
             val query = OsvPackageQuery(
-                group = "org.springframework.boot",
-                artifact = "spring-boot-starter",
+                coordinate = MavenCoordinate("org.springframework.boot", "spring-boot-starter"),
                 version = "3.4.0",
             )
 
-            assertThat(query.group).isEqualTo("org.springframework.boot")
-            assertThat(query.artifact).isEqualTo("spring-boot-starter")
+            assertThat(query.coordinate.group).isEqualTo("org.springframework.boot")
+            assertThat(query.coordinate.artifact).isEqualTo("spring-boot-starter")
             assertThat(query.version).isEqualTo("3.4.0")
         }
     }

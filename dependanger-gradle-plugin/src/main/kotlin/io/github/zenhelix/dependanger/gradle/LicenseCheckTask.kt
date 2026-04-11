@@ -22,8 +22,8 @@ public abstract class LicenseCheckTask : AbstractDependangerTask() {
             if (denied.isEmpty() && notAllowed.isEmpty()) {
                 logger.lifecycle("Dependanger: All library licenses are compliant.")
             } else {
-                denied.forEach { logger.error("Dependanger LICENSE DENIED: ${it.group}:${it.artifact} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
-                notAllowed.forEach { logger.warn("Dependanger LICENSE NOT_ALLOWED: ${it.group}:${it.artifact} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
+                denied.forEach { logger.error("Dependanger LICENSE DENIED: ${it.coordinate} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
+                notAllowed.forEach { logger.warn("Dependanger LICENSE NOT_ALLOWED: ${it.coordinate} - ${it.detectedLicense ?: "unknown"} (${it.message})") }
             }
 
             if (denied.isNotEmpty() && failOnError) {

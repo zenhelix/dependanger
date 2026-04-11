@@ -5,8 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class Library(
     val alias: String,
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: VersionReference?,
     val description: String?,
     val tags: Set<String>,

@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.license
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.effective.model.ResolvedVersion
@@ -23,8 +24,7 @@ class LicensePolicyComplianceTest {
         version: String = "1.0.0",
     ): EffectiveLibrary = EffectiveLibrary(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         version = EffectiveVersion.Resolved(
             ResolvedVersion(
                 alias = "test-version",
@@ -382,8 +382,8 @@ class LicensePolicyComplianceTest {
 
             val violation = result.violations[0]
             assertThat(violation.alias).isEqualTo("my-lib")
-            assertThat(violation.group).isEqualTo("org.example")
-            assertThat(violation.artifact).isEqualTo("core")
+            assertThat(violation.coordinate.group).isEqualTo("org.example")
+            assertThat(violation.coordinate.artifact).isEqualTo("core")
             assertThat(violation.detectedLicense).isEqualTo("GPL-3.0-only")
             assertThat(violation.category).isEqualTo(LicenseCategory.STRONG_COPYLEFT)
         }

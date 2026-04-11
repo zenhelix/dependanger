@@ -1,5 +1,7 @@
 package io.github.zenhelix.dependanger.maven.client
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
+import io.github.zenhelix.dependanger.core.model.MavenGAV
 import io.github.zenhelix.dependanger.maven.client.model.ParentPom
 import io.github.zenhelix.dependanger.maven.client.model.PomParseResult
 import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
@@ -30,9 +32,10 @@ public class PomXmlParser {
     private fun toPomParseResult(project: PomProject): PomParseResult {
         val parent = project.parent?.let {
             ParentPom(
-                group = it.coordinates.groupId,
-                artifact = it.coordinates.artifactId,
-                version = it.coordinates.version,
+                gav = MavenGAV(
+                    coordinate = MavenCoordinate(it.coordinates.groupId, it.coordinates.artifactId),
+                    version = it.coordinates.version,
+                ),
             )
         }
 
@@ -42,8 +45,10 @@ public class PomXmlParser {
 
         val rawDependencies = project.dependencyManagement?.dependencies?.map {
             RawBomDependency(
-                group = it.groupId,
-                artifact = it.artifactId,
+                coordinate = MavenCoordinate(
+                    group = it.groupId,
+                    artifact = it.artifactId,
+                ),
                 version = it.version ?: "",
                 scope = it.scope,
                 type = it.type,

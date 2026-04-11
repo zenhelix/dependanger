@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.versionRef
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -49,8 +50,7 @@ class FeatureProcessorIntegrationTest {
             val fakeUpdates = listOf(
                 UpdateAvailableInfo(
                     alias = "ktor-core",
-                    group = "io.ktor",
-                    artifact = "ktor-client-core",
+                    coordinate = MavenCoordinate("io.ktor", "ktor-client-core"),
                     currentVersion = "3.1.0",
                     latestVersion = "3.1.1",
                     latestStable = "3.1.1",
@@ -90,8 +90,7 @@ class FeatureProcessorIntegrationTest {
                     metadata.libraries.values.map { lib ->
                         UpdateAvailableInfo(
                             alias = lib.alias,
-                            group = lib.group,
-                            artifact = lib.artifact,
+                            coordinate = lib.coordinate,
                             currentVersion = lib.version.valueOrNull ?: "unknown",
                             latestVersion = "3.1.1",
                             updateType = UpdateType.MINOR,
@@ -137,8 +136,7 @@ class FeatureProcessorIntegrationTest {
                     metadata.libraries.values.map { lib ->
                         UpdateAvailableInfo(
                             alias = lib.alias,
-                            group = lib.group,
-                            artifact = lib.artifact,
+                            coordinate = lib.coordinate,
                             currentVersion = lib.version.valueOrNull ?: "unknown",
                             latestVersion = "9.9.9",
                             updateType = UpdateType.MAJOR,
@@ -168,8 +166,7 @@ class FeatureProcessorIntegrationTest {
                     cvssVersion = "3.1",
                     fixedVersion = "2.0.0",
                     url = "https://github.com/advisories/GHSA-abc-123",
-                    affectedGroup = "com.example",
-                    affectedArtifact = "example-lib",
+                    affectedCoordinate = MavenCoordinate("com.example", "example-lib"),
                     affectedVersion = "1.0.0",
                 ),
             )
@@ -186,7 +183,7 @@ class FeatureProcessorIntegrationTest {
             assertThat(result.vulnerabilities[0].id).isEqualTo("GHSA-abc-123")
             assertThat(result.vulnerabilities[0].severity).isEqualTo(VulnerabilitySeverity.CRITICAL)
             assertThat(result.vulnerabilities[0].cvssScore).isEqualTo(9.8)
-            assertThat(result.vulnerabilities[0].affectedArtifact).isEqualTo("example-lib")
+            assertThat(result.vulnerabilities[0].affectedCoordinate.artifact).isEqualTo("example-lib")
         }
 
         @Test
@@ -210,8 +207,7 @@ class FeatureProcessorIntegrationTest {
                                 cvssVersion = "3.1",
                                 fixedVersion = null,
                                 url = null,
-                                affectedGroup = lib.group,
-                                affectedArtifact = lib.artifact,
+                                affectedCoordinate = lib.coordinate,
                                 affectedVersion = lib.version.valueOrNull ?: "",
                             )
                         )
@@ -251,7 +247,7 @@ class FeatureProcessorIntegrationTest {
                 addProcessor(fakeUpdateCheck {
                     listOf(
                         UpdateAvailableInfo(
-                            alias = "lib", group = "com.example", artifact = "lib",
+                            alias = "lib", coordinate = MavenCoordinate("com.example", "lib"),
                             currentVersion = "1.0.0", latestVersion = "2.0.0",
                             updateType = UpdateType.MAJOR,
                         )
@@ -263,8 +259,7 @@ class FeatureProcessorIntegrationTest {
                             id = "CVE-2024-9999", aliases = emptyList(),
                             summary = "Critical vuln", severity = VulnerabilitySeverity.CRITICAL,
                             cvssScore = 9.0, cvssVersion = "3.1", fixedVersion = "2.0.0",
-                            url = null, affectedGroup = "com.example",
-                            affectedArtifact = "lib", affectedVersion = "1.0.0",
+                            url = null, affectedCoordinate = MavenCoordinate("com.example", "lib"), affectedVersion = "1.0.0",
                         )
                     )
                 })
@@ -289,7 +284,7 @@ class FeatureProcessorIntegrationTest {
                 addProcessor(fakeUpdateCheck { metadata ->
                     metadata.libraries.values.map { lib ->
                         UpdateAvailableInfo(
-                            alias = lib.alias, group = lib.group, artifact = lib.artifact,
+                            alias = lib.alias, coordinate = lib.coordinate,
                             currentVersion = lib.version.valueOrNull ?: "", latestVersion = "2.2.0",
                             updateType = UpdateType.MINOR,
                         )

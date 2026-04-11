@@ -1,11 +1,11 @@
 package io.github.zenhelix.dependanger.features.resolver
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.Serializable
 
 @Serializable
 public data class BomDependency(
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: String,
 )
 

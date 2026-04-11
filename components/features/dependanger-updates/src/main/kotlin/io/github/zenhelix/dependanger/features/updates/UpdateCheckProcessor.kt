@@ -7,6 +7,7 @@ import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.Repository
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
@@ -69,7 +70,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
         val candidates = metadata.libraries.values.filter { lib ->
             !lib.ignoreUpdates
                     && lib.version.isResolved
-                    && settings.excludePatterns.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) }
+                    && settings.excludePatterns.none { pattern -> GlobMatcher.matches(pattern, lib.coordinate) }
         }
 
         if (candidates.isEmpty()) {
@@ -134,7 +135,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
         includePrerelease: Boolean,
     ): UpdateCheckResult {
         val currentVersionStr = lib.version.requireValue()
-        val coordinate = "${lib.group}:${lib.artifact}"
+        val coordinate = lib.coordinate
 
         val currentVersion = VersionComparator.parse(currentVersionStr)
         if (currentVersion == null) {
@@ -143,12 +144,12 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                 diagnostics = Diagnostics.warning(
                     DiagnosticCodes.Update.INVALID_VERSION,
                     "Cannot parse version '$currentVersionStr' for $coordinate",
-                    id, mapOf("library" to coordinate, "version" to currentVersionStr)
+                    id, mapOf("library" to coordinate.toString(), "version" to currentVersionStr)
                 ),
             )
         }
 
-        val fetchOutcome = fetchVersions(lib.group, lib.artifact, ctx)
+        val fetchOutcome = fetchVersions(coordinate, ctx)
         if (fetchOutcome.result == null) {
             return UpdateCheckResult(update = null, diagnostics = fetchOutcome.diagnostics)
         }
@@ -178,8 +179,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
         return UpdateCheckResult(
             update = UpdateAvailableInfo(
                 alias = lib.alias,
-                group = lib.group,
-                artifact = lib.artifact,
+                coordinate = lib.coordinate,
                 currentVersion = currentVersionStr,
                 latestVersion = target,
                 latestStable = latestStable,
@@ -192,12 +192,10 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
     }
 
     private suspend fun fetchVersions(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         ctx: UpdateCheckContext,
     ): FetchOutcome {
-        val coordinate = "$group:$artifact"
-        val cacheKey = listOf(group, artifact)
+        val cacheKey = listOf(coordinate.group, coordinate.artifact)
 
         when (val cached = ctx.cache.get(cacheKey)) {
             is CacheResult.Hit  -> return FetchOutcome(cached.data, Diagnostics.EMPTY)
@@ -206,7 +204,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
             }
         }
 
-        return when (val fetchResult = ctx.fetcher.fetchVersions(group, artifact)) {
+        return when (val fetchResult = ctx.fetcher.fetchVersions(coordinate.group, coordinate.artifact)) {
             is MetadataFetchResult.Success     -> {
                 val result = VersionFetchResult(versions = fetchResult.versions, repository = fetchResult.repository)
                 try {
@@ -227,7 +225,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                     val diag = Diagnostics.warning(
                         DiagnosticCodes.Update.LIB_NOT_FOUND,
                         "Library $coordinate not found in any configured repository",
-                        id, mapOf("library" to coordinate)
+                        id, mapOf("library" to coordinate.toString())
                     )
                     FetchOutcome(null, diag)
                 }
@@ -238,7 +236,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                 val diag = Diagnostics.warning(
                     DiagnosticCodes.Update.RATE_LIMITED,
                     "Rate limited when checking updates for $coordinate",
-                    id, mapOf("library" to coordinate)
+                    id, mapOf("library" to coordinate.toString())
                 )
                 FetchOutcome(ctx.cache.getStale(cacheKey), diag)
             }
@@ -248,7 +246,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                 val diag = Diagnostics.warning(
                     DiagnosticCodes.Update.TIMEOUT,
                     "Timeout when checking updates for $coordinate",
-                    id, mapOf("library" to coordinate)
+                    id, mapOf("library" to coordinate.toString())
                 )
                 FetchOutcome(ctx.cache.getStale(cacheKey), diag)
             }
@@ -263,7 +261,7 @@ public class UpdateCheckProcessor : AbstractParallelMavenProcessor<UpdateCheckSe
                     val diag = Diagnostics.warning(
                         DiagnosticCodes.Update.REPO_UNREACHABLE,
                         "Failed to fetch versions for $coordinate: ${fetchResult.error}",
-                        id, mapOf("library" to coordinate, "error" to fetchResult.error)
+                        id, mapOf("library" to coordinate.toString(), "error" to fetchResult.error)
                     )
                     FetchOutcome(null, diag)
                 }

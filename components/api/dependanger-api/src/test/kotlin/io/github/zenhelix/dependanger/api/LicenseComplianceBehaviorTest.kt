@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
@@ -29,8 +30,7 @@ class LicenseComplianceBehaviorTest {
         fun `denied license violation accessible via result licenseViolations`() = runTest {
             val violation = LicenseViolation(
                 alias = "gpl-lib",
-                group = "com.example",
-                artifact = "gpl-lib",
+                coordinate = MavenCoordinate("com.example", "gpl-lib"),
                 detectedLicense = "GPL-3.0",
                 category = LicenseCategory.STRONG_COPYLEFT,
                 violationType = LicenseViolationType.DENIED,
@@ -64,8 +64,7 @@ class LicenseComplianceBehaviorTest {
                     metadata.libraries.values.map { lib ->
                         LicenseViolation(
                             alias = lib.alias,
-                            group = lib.group,
-                            artifact = lib.artifact,
+                            coordinate = lib.coordinate,
                             detectedLicense = "AGPL-3.0",
                             category = LicenseCategory.STRONG_COPYLEFT,
                             violationType = LicenseViolationType.DENIED,
@@ -108,8 +107,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "mit-lib",
-                            group = "com.example",
-                            artifact = "mit-lib",
+                            coordinate = MavenCoordinate("com.example", "mit-lib"),
                             detectedLicense = "MIT",
                             category = LicenseCategory.PERMISSIVE,
                             violationType = LicenseViolationType.NOT_ALLOWED,
@@ -134,8 +132,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "gpl-lib",
-                            group = "com.example",
-                            artifact = "gpl-lib",
+                            coordinate = MavenCoordinate("com.example", "gpl-lib"),
                             detectedLicense = "GPL-3.0-only",
                             category = LicenseCategory.STRONG_COPYLEFT,
                             violationType = LicenseViolationType.DENIED,
@@ -160,8 +157,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "mystery-lib",
-                            group = "com.example",
-                            artifact = "mystery-lib",
+                            coordinate = MavenCoordinate("com.example", "mystery-lib"),
                             detectedLicense = null,
                             category = LicenseCategory.UNKNOWN,
                             violationType = LicenseViolationType.NOT_ALLOWED,
@@ -191,8 +187,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "denied-lib",
-                            group = "com.denied",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.denied", "lib"),
                             detectedLicense = "SSPL-1.0",
                             category = LicenseCategory.PROPRIETARY,
                             violationType = LicenseViolationType.DENIED,
@@ -218,8 +213,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "restricted-lib",
-                            group = "com.restricted",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.restricted", "lib"),
                             detectedLicense = "LGPL-2.1",
                             category = LicenseCategory.WEAK_COPYLEFT,
                             violationType = LicenseViolationType.NOT_ALLOWED,
@@ -249,8 +243,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "lib",
-                            group = "com.example",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.example", "lib"),
                             detectedLicense = "GPL-2.0",
                             category = LicenseCategory.STRONG_COPYLEFT,
                             violationType = LicenseViolationType.DENIED,
@@ -262,8 +255,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         UpdateAvailableInfo(
                             alias = "lib",
-                            group = "com.example",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.example", "lib"),
                             currentVersion = "1.0.0",
                             latestVersion = "2.0.0",
                             updateType = UpdateType.MAJOR,
@@ -289,8 +281,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "vuln-lib",
-                            group = "com.vuln",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.vuln", "lib"),
                             detectedLicense = "AGPL-3.0",
                             category = LicenseCategory.STRONG_COPYLEFT,
                             violationType = LicenseViolationType.DENIED,
@@ -309,8 +300,7 @@ class LicenseComplianceBehaviorTest {
                             cvssVersion = "3.1",
                             fixedVersion = "1.1.0",
                             url = null,
-                            affectedGroup = "com.vuln",
-                            affectedArtifact = "lib",
+                            affectedCoordinate = MavenCoordinate("com.vuln", "lib"),
                             affectedVersion = "1.0.0",
                         )
                     )
@@ -334,8 +324,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         LicenseViolation(
                             alias = "multi-lib",
-                            group = "com.multi",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.multi", "lib"),
                             detectedLicense = "BSD-3-Clause",
                             category = LicenseCategory.PERMISSIVE,
                             violationType = LicenseViolationType.NOT_ALLOWED,
@@ -347,8 +336,7 @@ class LicenseComplianceBehaviorTest {
                     listOf(
                         UpdateAvailableInfo(
                             alias = "multi-lib",
-                            group = "com.multi",
-                            artifact = "lib",
+                            coordinate = MavenCoordinate("com.multi", "lib"),
                             currentVersion = "1.0.0",
                             latestVersion = "1.2.0",
                             updateType = UpdateType.MINOR,
@@ -366,8 +354,7 @@ class LicenseComplianceBehaviorTest {
                             cvssVersion = "3.1",
                             fixedVersion = "1.1.0",
                             url = "https://github.com/advisories/GHSA-xyz-789",
-                            affectedGroup = "com.multi",
-                            affectedArtifact = "lib",
+                            affectedCoordinate = MavenCoordinate("com.multi", "lib"),
                             affectedVersion = "1.0.0",
                         )
                     )

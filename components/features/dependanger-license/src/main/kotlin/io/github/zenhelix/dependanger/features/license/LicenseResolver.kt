@@ -5,6 +5,8 @@ import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.clearlydefined.client.ClearlyDefinedClient
 import io.github.zenhelix.dependanger.clearlydefined.client.model.ClearlyDefinedResult
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
+import io.github.zenhelix.dependanger.core.model.MavenGAV
 import io.github.zenhelix.dependanger.feature.model.license.LicenseCategory
 import io.github.zenhelix.dependanger.features.license.model.LicenseResult
 import io.github.zenhelix.dependanger.features.license.model.LicenseSource
@@ -23,59 +25,58 @@ public class LicenseResolver(
 ) {
 
     public suspend fun resolve(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         declaredLicenseId: String?,
     ): List<LicenseResult> {
-        val coordinate = "$group:$artifact:$version"
+        val gav = MavenGAV(coordinate, version)
 
-        when (val cacheResult = cache.get(group, artifact, version)) {
+        when (val cacheResult = cache.get(coordinate, version)) {
             is CacheResult.Hit       -> {
-                logger.debug { "Cache hit for $coordinate" }
+                logger.debug { "Cache hit for $coordinate:$version" }
                 return cacheResult.data
             }
 
             is CacheResult.Corrupted -> {
-                logger.warn { "Corrupted cache for $coordinate: ${cacheResult.error}" }
+                logger.warn { "Corrupted cache for $coordinate:$version: ${cacheResult.error}" }
             }
 
             is CacheResult.Miss      -> {
-                logger.debug { "Cache miss for $coordinate" }
+                logger.debug { "Cache miss for $coordinate:$version" }
             }
         }
 
         if (!declaredLicenseId.isNullOrBlank()) {
             val results = resolveDeclared(declaredLicenseId)
-            cache.put(group, artifact, version, results)
-            logger.info { "Resolved $coordinate from declared license: $declaredLicenseId" }
+            cache.put(coordinate, version, results)
+            logger.info { "Resolved $coordinate:$version from declared license: $declaredLicenseId" }
             return results
         }
 
-        val customResults = resolveFromCustom(group, artifact, version)
+        val customResults = resolveFromCustom(gav)
         if (customResults != null) {
-            cache.put(group, artifact, version, customResults)
-            logger.info { "Resolved $coordinate from custom source (${customResults.size} license(s))" }
+            cache.put(coordinate, version, customResults)
+            logger.info { "Resolved $coordinate:$version from custom source (${customResults.size} license(s))" }
             return customResults
         }
 
-        val pomResults = resolveFromPom(group, artifact, version)
+        val pomResults = resolveFromPom(gav)
         if (pomResults != null) {
-            cache.put(group, artifact, version, pomResults)
-            logger.info { "Resolved $coordinate from Maven POM (${pomResults.size} license(s))" }
+            cache.put(coordinate, version, pomResults)
+            logger.info { "Resolved $coordinate:$version from Maven POM (${pomResults.size} license(s))" }
             return pomResults
         }
 
-        val clearlyDefinedResults = resolveFromClearlyDefined(group, artifact, version)
+        val clearlyDefinedResults = resolveFromClearlyDefined(gav)
         if (clearlyDefinedResults != null) {
-            cache.put(group, artifact, version, clearlyDefinedResults)
-            logger.info { "Resolved $coordinate from ClearlyDefined (${clearlyDefinedResults.size} license(s))" }
+            cache.put(coordinate, version, clearlyDefinedResults)
+            logger.info { "Resolved $coordinate:$version from ClearlyDefined (${clearlyDefinedResults.size} license(s))" }
             return clearlyDefinedResults
         }
 
-        val stale = cache.getStale(group, artifact, version)
+        val stale = cache.getStale(coordinate, version)
         if (stale != null) {
-            logger.info { "Using stale cache for $coordinate" }
+            logger.info { "Using stale cache for $coordinate:$version" }
             return stale
         }
 
@@ -87,8 +88,8 @@ public class LicenseResolver(
                 category = LicenseCategory.UNKNOWN,
             )
         )
-        cache.put(group, artifact, version, unknown)
-        logger.warn { "Could not resolve license for $coordinate, returning UNKNOWN" }
+        cache.put(coordinate, version, unknown)
+        logger.warn { "Could not resolve license for $coordinate:$version, returning UNKNOWN" }
         return unknown
     }
 
@@ -98,26 +99,21 @@ public class LicenseResolver(
         return listOf(LicenseResult(spdxId = spdxId, licenseName = declaredLicenseId, source = LicenseSource.DECLARED, category = category))
     }
 
-    private suspend fun resolveFromCustom(
-        group: String,
-        artifact: String,
-        version: String,
-    ): List<LicenseResult>? {
+    private suspend fun resolveFromCustom(gav: MavenGAV): List<LicenseResult>? {
         if (customProviders.isEmpty()) return null
 
-        val coordinate = "$group:$artifact:$version"
         val sorted = customProviders.sortedBy { it.priority }
 
         for (provider in sorted) {
             val resolved = try {
-                provider.resolve(group, artifact, version)
+                provider.resolve(gav.coordinate.group, gav.coordinate.artifact, gav.version)
             } catch (e: Exception) {
-                logger.warn(e) { "Custom provider '${provider.sourceId}' failed for $coordinate" }
+                logger.warn(e) { "Custom provider '${provider.sourceId}' failed for $gav" }
                 continue
             }
 
             if (resolved != null) {
-                logger.debug { "Custom provider '${provider.sourceId}' resolved $coordinate (${resolved.size} license(s))" }
+                logger.debug { "Custom provider '${provider.sourceId}' resolved $gav (${resolved.size} license(s))" }
                 return resolved.map { rl ->
                     val spdxId = if (rl.spdxId != null) SpdxLicenseMapper.normalize(rl.spdxId) ?: rl.spdxId else null
                     val category = SpdxLicenseMapper.categorize(spdxId, rl.name)
@@ -129,25 +125,19 @@ public class LicenseResolver(
         return null
     }
 
-    private suspend fun resolveFromPom(
-        group: String,
-        artifact: String,
-        version: String,
-    ): List<LicenseResult>? {
-        val coordinate = "$group:$artifact:$version"
-
-        return when (val downloadResult = pomService.downloadPom(group, artifact, version)) {
+    private suspend fun resolveFromPom(gav: MavenGAV): List<LicenseResult>? {
+        return when (val downloadResult = pomService.downloadPom(gav.coordinate.group, gav.coordinate.artifact, gav.version)) {
             is DownloadResult.Success      -> {
                 val pomProject = try {
                     PomParser.parse(downloadResult.content)
                 } catch (e: Exception) {
-                    logger.warn(e) { "Failed to parse POM for $coordinate" }
+                    logger.warn(e) { "Failed to parse POM for $gav" }
                     return null
                 }
 
                 val pomLicenses = pomProject.licenses
                 if (pomLicenses.isEmpty()) {
-                    logger.debug { "No licenses found in POM for $coordinate" }
+                    logger.debug { "No licenses found in POM for $gav" }
                     return null
                 }
 
@@ -160,30 +150,24 @@ public class LicenseResolver(
             }
 
             is DownloadResult.NotFound     -> {
-                logger.debug { "POM not found for $coordinate" }
+                logger.debug { "POM not found for $gav" }
                 null
             }
 
             is DownloadResult.AuthRequired -> {
-                logger.warn { "Authentication required to download POM for $coordinate (${downloadResult.url})" }
+                logger.warn { "Authentication required to download POM for $gav (${downloadResult.url})" }
                 null
             }
 
             is DownloadResult.Failed       -> {
-                logger.warn { "Failed to download POM for $coordinate: ${downloadResult.error}" }
+                logger.warn { "Failed to download POM for $gav: ${downloadResult.error}" }
                 null
             }
         }
     }
 
-    private suspend fun resolveFromClearlyDefined(
-        group: String,
-        artifact: String,
-        version: String,
-    ): List<LicenseResult>? {
-        val coordinate = "$group:$artifact:$version"
-
-        return when (val result = clearlyDefinedClient.fetchLicense(group, artifact, version)) {
+    private suspend fun resolveFromClearlyDefined(gav: MavenGAV): List<LicenseResult>? {
+        return when (val result = clearlyDefinedClient.fetchLicense(gav.coordinate.group, gav.coordinate.artifact, gav.version)) {
             is ClearlyDefinedResult.Found -> {
                 val licenseIds = SpdxExpressionParser.parse(result.declaredExpression)
                 if (licenseIds.isEmpty()) return null
@@ -195,12 +179,12 @@ public class LicenseResolver(
             }
 
             is ClearlyDefinedResult.NotFound -> {
-                logger.debug { "No ClearlyDefined data for $coordinate" }
+                logger.debug { "No ClearlyDefined data for $gav" }
                 null
             }
 
             is ClearlyDefinedResult.Failed   -> {
-                logger.warn { "ClearlyDefined lookup failed for $coordinate: ${result.error}" }
+                logger.warn { "ClearlyDefined lookup failed for $gav: ${result.error}" }
                 null
             }
         }

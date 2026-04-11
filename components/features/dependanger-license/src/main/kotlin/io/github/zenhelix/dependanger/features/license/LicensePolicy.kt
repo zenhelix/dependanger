@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.license
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.feature.model.FeatureProcessorIds
@@ -35,8 +36,7 @@ internal object LicensePolicy {
         settings: LicenseCheckSettings,
     ): PolicyCheckResult = checkComplianceInternal(
         displayName = lib.alias,
-        group = lib.group,
-        artifact = lib.artifact,
+        coordinate = lib.coordinate,
         versionDisplay = lib.version.valueOrNull,
         licenses = licenses,
         settings = settings,
@@ -47,11 +47,10 @@ internal object LicensePolicy {
         licenses: List<LicenseResult>,
         settings: LicenseCheckSettings,
     ): PolicyCheckResult {
-        val coordinate = "${dep.group}:${dep.artifact}:${dep.version}"
+        val displayName = "${dep.coordinate}:${dep.version}"
         return checkComplianceInternal(
-            displayName = coordinate,
-            group = dep.group,
-            artifact = dep.artifact,
+            displayName = displayName,
+            coordinate = dep.coordinate,
             versionDisplay = dep.version,
             licenses = licenses,
             settings = settings,
@@ -75,8 +74,7 @@ internal object LicensePolicy {
      */
     private fun checkComplianceInternal(
         displayName: String,
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         versionDisplay: String?,
         licenses: List<LicenseResult>,
         settings: LicenseCheckSettings,
@@ -105,8 +103,7 @@ internal object LicensePolicy {
                 violations.add(
                     LicenseViolation(
                         alias = displayName,
-                        group = group,
-                        artifact = artifact,
+                        coordinate = coordinate,
                         detectedLicense = licenseExpression,
                         category = worstCategory,
                         violationType = LicenseViolationType.DENIED,
@@ -130,8 +127,7 @@ internal object LicensePolicy {
                 violations.add(
                     LicenseViolation(
                         alias = displayName,
-                        group = group,
-                        artifact = artifact,
+                        coordinate = coordinate,
                         detectedLicense = licenseExpression,
                         category = worstCategory,
                         violationType = LicenseViolationType.NOT_ALLOWED,
@@ -155,12 +151,12 @@ internal object LicensePolicy {
 
         // 4. Unknown warning
         if (settings.warnOnUnknown && licenses.all { it.category == LicenseCategory.UNKNOWN }) {
-            val coordinate = "$group:$artifact:$versionDisplay"
+            val gav = "$coordinate:$versionDisplay"
             diagnostics.warning(
                 DiagnosticCodes.License.UNKNOWN_WARNING,
-                "${prefix}License for library '$displayName' ($coordinate) is unknown",
+                "${prefix}License for library '$displayName' ($gav) is unknown",
                 PROCESSOR_ID,
-                mapOf("library" to displayName, "coordinate" to coordinate),
+                mapOf("library" to displayName, "coordinate" to gav),
             )
         }
 

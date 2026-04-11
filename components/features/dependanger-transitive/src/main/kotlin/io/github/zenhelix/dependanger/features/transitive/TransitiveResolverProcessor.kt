@@ -97,8 +97,7 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
 
             val directInputs = libraries.map { lib ->
                 DirectDependencyInput(
-                    group = lib.group,
-                    artifact = lib.artifact,
+                    coordinate = lib.coordinate,
                     version = lib.version.requireValue(),
                 )
             }
@@ -143,8 +142,8 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
         for (cycle in cycles) {
             diagnostics.warning(
                 DiagnosticCodes.Transitive.CYCLE_DETECTED,
-                "Cyclic dependency detected: ${cycle.group}:${cycle.artifact}:${cycle.version}",
-                id, mapOf("coordinate" to "${cycle.group}:${cycle.artifact}:${cycle.version}"),
+                "Cyclic dependency detected: ${cycle.coordinate}:${cycle.version}",
+                id, mapOf("coordinate" to "${cycle.coordinate}:${cycle.version}"),
             )
         }
 
@@ -170,8 +169,8 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
             if (!dep.isDirectDependency && dep.version.endsWith("-SNAPSHOT")) {
                 diagnostics.warning(
                     DiagnosticCodes.Transitive.SNAPSHOT,
-                    "Transitive dependency on SNAPSHOT version: ${dep.group}:${dep.artifact}:${dep.version}",
-                    id, mapOf("coordinate" to "${dep.group}:${dep.artifact}:${dep.version}"),
+                    "Transitive dependency on SNAPSHOT version: ${dep.coordinate}:${dep.version}",
+                    id, mapOf("coordinate" to "${dep.coordinate}:${dep.version}"),
                 )
             }
         }
@@ -181,10 +180,10 @@ public class TransitiveResolverProcessor : AbstractSequentialNetworkProcessor<Tr
         for (conflict in conflicts) {
             diagnostics.warning(
                 DiagnosticCodes.Transitive.CONFLICT,
-                "Version conflict: ${conflict.group}:${conflict.artifact} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})",
+                "Version conflict: ${conflict.coordinate} versions ${conflict.requestedVersions.joinToString(", ")} -> resolved ${conflict.resolvedVersion} (${conflict.resolution})",
                 id,
                 mapOf(
-                    "coordinate" to "${conflict.group}:${conflict.artifact}",
+                    "coordinate" to conflict.coordinate.toString(),
                     "versions" to conflict.requestedVersions.joinToString(","),
                     "resolved" to conflict.resolvedVersion,
                     "strategy" to conflict.resolution.name,

@@ -59,7 +59,7 @@ internal class DefaultOsvClient(
                     OsvQuery(
                         version = pkg.version,
                         pkg = OsvPackage(
-                            name = "${pkg.group}:${pkg.artifact}",
+                            name = pkg.coordinate.toString(),
                             ecosystem = OSV_MAVEN_ECOSYSTEM,
                         ),
                     )

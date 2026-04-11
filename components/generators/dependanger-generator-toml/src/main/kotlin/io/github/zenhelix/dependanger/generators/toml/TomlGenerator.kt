@@ -73,8 +73,8 @@ public class TomlGenerator(private val config: TomlConfig = TomlConfig.DEFAULT) 
         lib: EffectiveLibrary,
         versions: Map<String, ResolvedVersion>,
     ): String {
-        val group = escapeTomlValue(lib.group)
-        val name = escapeTomlValue(lib.artifact)
+        val group = escapeTomlValue(lib.coordinate.group)
+        val name = escapeTomlValue(lib.coordinate.artifact)
         val versionPart = lib.version.rangeOrNull?.let { formatRangeVersion(it) }
             ?: resolveVersionPart(lib.version.resolvedOrNull, versions) { alias ->
                 logger.warn { "Library '${lib.alias}' version alias '$alias' not found in [versions], falling back to inline version" }

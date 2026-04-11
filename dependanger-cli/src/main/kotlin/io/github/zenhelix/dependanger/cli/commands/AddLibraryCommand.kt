@@ -35,8 +35,7 @@ public class AddLibraryCommand : CliktCommand(name = "library") {
 
         val newLibrary = Library(
             alias = alias,
-            group = coords.group,
-            artifact = coords.artifact,
+            coordinate = coords.coordinate,
             version = resolvedVersion,
             description = null,
             tags = parseCommaSeparated(tags).toSet(),

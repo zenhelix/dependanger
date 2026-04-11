@@ -22,7 +22,7 @@ public abstract class SecurityCheckTask : AbstractDependangerTask() {
             } else {
                 logger.lifecycle("Dependanger: Found ${vulnerabilities.size} vulnerabilities:")
                 vulnerabilities.forEach { vuln ->
-                    logger.warn("  ${vuln.affectedGroup}:${vuln.affectedArtifact}:${vuln.affectedVersion} (${vuln.id}): ${vuln.severity} - ${vuln.summary}")
+                    logger.warn("  ${vuln.affectedCoordinate}:${vuln.affectedVersion} (${vuln.id}): ${vuln.severity} - ${vuln.summary}")
                 }
             }
 

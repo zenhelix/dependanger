@@ -20,7 +20,7 @@ public class AddBomCommand : CliktCommand(name = "bom") {
 
     override fun run(): Unit = MetadataRunner(this, opts).run { metadata ->
         val coords = parseMavenCoordinates(coordinates)
-        val resolvedAlias = alias ?: coords.artifact
+        val resolvedAlias = alias ?: coords.coordinate.artifact
         val resolvedVersion = version?.let { parseVersionRef(it) }
             ?: coords.version?.let { VersionReference.Literal(version = it) }
             ?: throw CliException.InvalidArgument("BOM version is required")
@@ -31,8 +31,7 @@ public class AddBomCommand : CliktCommand(name = "bom") {
 
         val newBom = BomImport(
             alias = resolvedAlias,
-            group = coords.group,
-            artifact = coords.artifact,
+            coordinate = coords.coordinate,
             version = resolvedVersion,
         )
         val updated = metadata.copy(bomImports = metadata.bomImports + newBom)

@@ -160,8 +160,8 @@ class DslEdgeCasesBehaviorTest {
             assertThat(result.isSuccess).isTrue()
             assertThat((result as DependangerResult.Success).effective.libraries).containsKey("bom-managed")
             assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.version.isResolved).isFalse()
-            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.group).isEqualTo("com.example")
-            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.artifact).isEqualTo("bom-managed")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.coordinate.group).isEqualTo("com.example")
+            assertThat((result as DependangerResult.Success).effective.libraries["bom-managed"]!!.coordinate.artifact).isEqualTo("bom-managed")
         }
 
         @Test
@@ -206,8 +206,8 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["assertj"]!!
-            assertThat(lib.group).isEqualTo("org.assertj")
-            assertThat(lib.artifact).isEqualTo("assertj-core")
+            assertThat(lib.coordinate.group).isEqualTo("org.assertj")
+            assertThat(lib.coordinate.artifact).isEqualTo("assertj-core")
             assertThat(lib.version.valueOrNull).isEqualTo("3.27.3")
         }
 
@@ -219,8 +219,8 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["managed-lib"]!!
-            assertThat(lib.group).isEqualTo("com.example")
-            assertThat(lib.artifact).isEqualTo("managed-lib")
+            assertThat(lib.coordinate.group).isEqualTo("com.example")
+            assertThat(lib.coordinate.artifact).isEqualTo("managed-lib")
             assertThat(lib.version.isResolved).isFalse()
         }
 
@@ -233,8 +233,8 @@ class DslEdgeCasesBehaviorTest {
 
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["ktor-core"]!!
-            assertThat(lib.group).isEqualTo("io.ktor")
-            assertThat(lib.artifact).isEqualTo("ktor-client-core")
+            assertThat(lib.coordinate.group).isEqualTo("io.ktor")
+            assertThat(lib.coordinate.artifact).isEqualTo("ktor-client-core")
             assertThat(lib.version.valueOrNull).isEqualTo("3.1.1")
         }
     }
@@ -254,8 +254,8 @@ class DslEdgeCasesBehaviorTest {
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["kotlin-bom"]!!
             assertThat(lib.isPlatform).isTrue()
-            assertThat(lib.group).isEqualTo("org.jetbrains.kotlin")
-            assertThat(lib.artifact).isEqualTo("kotlin-bom")
+            assertThat(lib.coordinate.group).isEqualTo("org.jetbrains.kotlin")
+            assertThat(lib.coordinate.artifact).isEqualTo("kotlin-bom")
             assertThat(lib.version.valueOrNull).isEqualTo("2.1.20")
         }
 
@@ -350,8 +350,8 @@ class DslEdgeCasesBehaviorTest {
             assertThat(result.isSuccess).isTrue()
             val lib = (result as DependangerResult.Success).effective.libraries["no-tags"]!!
             assertThat(lib.tags).isEmpty()
-            assertThat(lib.group).isEqualTo("com.example")
-            assertThat(lib.artifact).isEqualTo("no-tags")
+            assertThat(lib.coordinate.group).isEqualTo("com.example")
+            assertThat(lib.coordinate.artifact).isEqualTo("no-tags")
         }
     }
 }

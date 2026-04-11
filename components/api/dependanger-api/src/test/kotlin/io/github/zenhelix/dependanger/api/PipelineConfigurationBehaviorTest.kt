@@ -305,8 +305,7 @@ class PipelineConfigurationBehaviorTest {
 
             (dslResult as DependangerResult.Success).effective.libraries.forEach { (alias, dslLib) ->
                 val metaLib = (metadataResult as DependangerResult.Success).effective.libraries[alias]!!
-                assertThat(metaLib.group).isEqualTo(dslLib.group)
-                assertThat(metaLib.artifact).isEqualTo(dslLib.artifact)
+                assertThat(metaLib.coordinate).isEqualTo(dslLib.coordinate)
                 assertThat(metaLib.version.valueOrNull).isEqualTo(dslLib.version.valueOrNull)
             }
         }

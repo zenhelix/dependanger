@@ -8,6 +8,7 @@ import io.github.zenhelix.dependanger.api.DependangerResult
 import io.github.zenhelix.dependanger.core.model.Bundle
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Library
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Plugin
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.Version
@@ -60,8 +61,7 @@ object CliTestSupport {
         libraries = listOf(
             Library(
                 alias = "stdlib",
-                group = "org.jetbrains.kotlin",
-                artifact = "kotlin-stdlib",
+                coordinate = MavenCoordinate("org.jetbrains.kotlin", "kotlin-stdlib"),
                 version = VersionReference.Reference(name = "kotlin"),
                 description = null,
                 tags = setOf("kotlin", "core"),
@@ -73,8 +73,7 @@ object CliTestSupport {
             ),
             Library(
                 alias = "coroutines",
-                group = "org.jetbrains.kotlinx",
-                artifact = "kotlinx-coroutines-core",
+                coordinate = MavenCoordinate("org.jetbrains.kotlinx", "kotlinx-coroutines-core"),
                 version = VersionReference.Reference(name = "coroutines"),
                 description = null,
                 tags = setOf("kotlin"),
@@ -140,8 +139,7 @@ object CliTestSupport {
         updateType: UpdateType = UpdateType.MINOR,
     ): UpdateAvailableInfo = UpdateAvailableInfo(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         currentVersion = currentVersion,
         latestVersion = latestVersion,
         latestStable = latestVersion,
@@ -167,8 +165,7 @@ object CliTestSupport {
         cvssVersion = "3.1",
         fixedVersion = "2.0.0",
         url = "https://example.com/advisory",
-        affectedGroup = group,
-        affectedArtifact = artifact,
+        affectedCoordinate = MavenCoordinate(group, artifact),
         affectedVersion = version,
     )
 
@@ -181,8 +178,7 @@ object CliTestSupport {
         violationType: LicenseViolationType = LicenseViolationType.DENIED,
     ): LicenseViolation = LicenseViolation(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         detectedLicense = license,
         category = category,
         violationType = violationType,
@@ -206,14 +202,12 @@ object CliTestSupport {
         artifact: String = "kotlin-stdlib",
         version: String = "2.1.20",
     ): TransitiveTree = TransitiveTree(
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         version = version,
         scope = "compile",
         children = listOf(
             TransitiveTree(
-                group = "org.jetbrains",
-                artifact = "annotations",
+                coordinate = MavenCoordinate("org.jetbrains", "annotations"),
                 version = "24.0.0",
                 scope = "compile",
                 children = emptyList(),
@@ -226,8 +220,7 @@ object CliTestSupport {
     )
 
     fun sampleVersionConflict(): VersionConflict = VersionConflict(
-        group = "org.jetbrains",
-        artifact = "annotations",
+        coordinate = MavenCoordinate("org.jetbrains", "annotations"),
         requestedVersions = listOf("23.0.0", "24.0.0"),
         resolvedVersion = "24.0.0",
         resolution = ConflictResolutionStrategy.HIGHEST,

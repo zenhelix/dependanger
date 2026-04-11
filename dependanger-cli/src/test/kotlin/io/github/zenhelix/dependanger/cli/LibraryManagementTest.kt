@@ -33,8 +33,8 @@ class LibraryManagementTest {
             assertThat(result.statusCode).isEqualTo(0)
             val lib = CliTestSupport.readMetadata(metadataFile).libraries.find { it.alias == "ktor-core" }
             assertThat(lib).isNotNull
-            assertThat(lib!!.group).isEqualTo("io.ktor")
-            assertThat(lib.artifact).isEqualTo("ktor-client-core")
+            assertThat(lib!!.coordinate.group).isEqualTo("io.ktor")
+            assertThat(lib.coordinate.artifact).isEqualTo("ktor-client-core")
             assertThat(lib.version).isEqualTo(VersionReference.Literal(version = "3.1.1"))
         }
 

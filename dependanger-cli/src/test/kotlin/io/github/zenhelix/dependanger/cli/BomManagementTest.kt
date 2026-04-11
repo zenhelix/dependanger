@@ -32,8 +32,8 @@ class BomManagementTest {
             assertThat(result.statusCode).isEqualTo(0)
             val bom = CliTestSupport.readMetadata(metadataFile).bomImports.find { it.alias == "spring-boot-dependencies" }
             assertThat(bom).isNotNull
-            assertThat(bom!!.group).isEqualTo("org.springframework.boot")
-            assertThat(bom.artifact).isEqualTo("spring-boot-dependencies")
+            assertThat(bom!!.coordinate.group).isEqualTo("org.springframework.boot")
+            assertThat(bom.coordinate.artifact).isEqualTo("spring-boot-dependencies")
             assertThat(bom.version).isEqualTo(VersionReference.Literal(version = "3.4.0"))
         }
 

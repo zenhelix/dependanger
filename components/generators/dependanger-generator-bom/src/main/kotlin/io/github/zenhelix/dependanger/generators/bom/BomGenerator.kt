@@ -57,14 +57,14 @@ public class BomGenerator(private val config: BomConfig = BomConfig.DEFAULT) : A
             logger.warn { "Skipping ${noVersion.size} libraries without version: ${noVersion.map { it.alias }}" }
         }
 
-        return includable.sortedWith(compareBy({ it.group }, { it.artifact }))
+        return includable.sortedWith(compareBy({ it.coordinate.group }, { it.coordinate.artifact }))
     }
 
     private fun buildXml(dependencies: List<EffectiveLibrary>): String {
         val pomDependencies = dependencies.map { lib ->
             PomDependency(
-                groupId = lib.group,
-                artifactId = lib.artifact,
+                groupId = lib.coordinate.group,
+                artifactId = lib.coordinate.artifact,
                 version = when (val v = lib.version) {
                     is EffectiveVersion.Resolved -> v.version.value
                     is EffectiveVersion.Range -> (v.range as VersionRange.Simple).notation

@@ -7,21 +7,21 @@ import kotlinx.serialization.Serializable
 public sealed class Constraint {
     @Serializable @SerialName("versionConstraintDef")
     public data class VersionConstraintDef(
-        val coordinates: String,
+        val coordinate: MavenCoordinate,
         val version: VersionReference?,
         val because: String?,
     ) : Constraint()
 
     @Serializable @SerialName("exclude")
     public data class Exclude(
-        val group: String,
-        val artifact: String,
+        val coordinate: MavenCoordinate,
     ) : Constraint()
 
     @Serializable @SerialName("substitute")
     public data class Substitute(
-        val from: String,
-        val to: String,
+        val from: MavenCoordinate,
+        val to: MavenCoordinate,
+        val toVersion: String?,
         val because: String?,
     ) : Constraint()
 }

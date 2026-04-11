@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.report
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
@@ -32,8 +33,7 @@ internal fun sampleLibrary(
     isPlatform: Boolean = false,
 ): EffectiveLibrary = EffectiveLibrary(
     alias = alias,
-    group = group,
-    artifact = artifact,
+    coordinate = MavenCoordinate(group, artifact),
     version = EffectiveVersion.Resolved(ResolvedVersion(alias = "${alias}-version", value = version, source = VersionSource.DECLARED, originalRef = null)),
     description = null,
     tags = tags,

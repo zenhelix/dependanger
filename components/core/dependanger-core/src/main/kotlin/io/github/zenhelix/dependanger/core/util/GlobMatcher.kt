@@ -1,5 +1,7 @@
 package io.github.zenhelix.dependanger.core.util
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
+
 /**
  * Glob-matcher для Maven-координат и строковых паттернов.
  *
@@ -63,15 +65,13 @@ public object GlobMatcher {
     }
 
     /**
-     * Проверяет совпадение строки координат "group:artifact" с glob-паттерном.
-     * Удобный метод для случаев, когда координаты уже объединены.
+     * Проверяет совпадение координат [MavenCoordinate] с glob-паттерном.
+     *
+     * @param pattern glob-паттерн в формате "groupPattern:artifactPattern"
+     * @param coordinate Maven-координата библиотеки
+     * @return true если координаты соответствуют паттерну
      */
-    public fun matchesCoordinate(pattern: String, coordinate: String): Boolean {
-        val parts = coordinate.split(":", limit = 2)
-        return if (parts.size == 2) {
-            matches(pattern, parts[0], parts[1])
-        } else {
-            matchesGlob(pattern, coordinate)
-        }
-    }
+    public fun matches(pattern: String, coordinate: MavenCoordinate): Boolean =
+        matches(pattern, coordinate.group, coordinate.artifact)
+
 }

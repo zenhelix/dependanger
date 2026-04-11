@@ -77,18 +77,18 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
 
         for (lib in candidates) {
             val version = lib.version.requireValue()
-            when (val cacheResult = cache.get(lib.group, lib.artifact, version)) {
+            when (val cacheResult = cache.get(lib.coordinate, version)) {
                 is CacheResult.Hit       -> {
                     cachedVulns.addAll(cacheResult.data)
                 }
 
                 is CacheResult.Corrupted -> {
-                    logger.warn { "Corrupted security cache for ${lib.group}:${lib.artifact}:$version" }
-                    uncachedPackages.add(OsvPackageQuery(group = lib.group, artifact = lib.artifact, version = version))
+                    logger.warn { "Corrupted security cache for ${lib.coordinate}:$version" }
+                    uncachedPackages.add(OsvPackageQuery(coordinate = lib.coordinate, version = version))
                 }
 
                 is CacheResult.Miss      -> {
-                    uncachedPackages.add(OsvPackageQuery(group = lib.group, artifact = lib.artifact, version = version))
+                    uncachedPackages.add(OsvPackageQuery(coordinate = lib.coordinate, version = version))
                 }
             }
         }
@@ -157,9 +157,9 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
             val vulns = osvVulns.map { mapToVulnerabilityInfo(it, pkg) }
             addAll(vulns)
             try {
-                cache.put(pkg.group, pkg.artifact, pkg.version, vulns)
+                cache.put(pkg.coordinate, pkg.version, vulns)
             } catch (e: Exception) {
-                logger.warn { "Failed to write security cache for ${pkg.group}:${pkg.artifact}:${pkg.version}: ${e.message}" }
+                logger.warn { "Failed to write security cache for ${pkg.coordinate}:${pkg.version}: ${e.message}" }
             }
         }
     }
@@ -176,7 +176,7 @@ public class SecurityCheckProcessor : AbstractParallelFeatureProcessor<SecurityC
         fallbackMessage: String,
     ): ApiFailureResult {
         val staleVulns = failedPackages.flatMap { pkg ->
-            cache.getStale(pkg.group, pkg.artifact, pkg.version) ?: emptyList()
+            cache.getStale(pkg.coordinate, pkg.version) ?: emptyList()
         }
         val diagnostics = Diagnostics.builder()
         diagnostics.warning(
@@ -262,8 +262,7 @@ private fun mapToVulnerabilityInfo(vuln: OsvVulnerabilityData, pkg: OsvPackageQu
         cvssVersion = vuln.cvssVersion,
         fixedVersion = vuln.fixedVersion,
         url = vuln.referenceUrl,
-        affectedGroup = pkg.group,
-        affectedArtifact = pkg.artifact,
+        affectedCoordinate = pkg.coordinate,
         affectedVersion = pkg.version,
     )
 

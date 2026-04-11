@@ -3,14 +3,14 @@ package io.github.zenhelix.dependanger.effective.model
 import io.github.zenhelix.dependanger.core.model.Constraint
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.LicenseInfo
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Requirements
 import kotlinx.serialization.Serializable
 
 @Serializable
 public data class EffectiveLibrary(
     val alias: String,
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: EffectiveVersion,
     val description: String?,
     val tags: Set<String>,

@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.generators.bom
 
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.VersionReference.VersionRange
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
@@ -55,8 +56,7 @@ class BomGeneratorTest {
         isPlatform: Boolean = false,
     ): EffectiveLibrary = EffectiveLibrary(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         version = version?.let { EffectiveVersion.Resolved(it) } ?: EffectiveVersion.None,
         description = null,
         tags = emptySet(),
@@ -75,8 +75,7 @@ class BomGeneratorTest {
         isPlatform: Boolean = false,
     ): EffectiveLibrary = EffectiveLibrary(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = MavenCoordinate(group, artifact),
         version = EffectiveVersion.Range(range),
         description = null,
         tags = emptySet(),

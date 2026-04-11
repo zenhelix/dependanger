@@ -177,22 +177,22 @@ internal class ValidationProcessor : EffectiveMetadataProcessor {
     private fun validateCoordinates(metadata: EffectiveMetadata): Diagnostics {
         val issues = metadata.libraries.flatMap { (alias, lib) ->
             buildList {
-                if (lib.group.isBlank() || lib.artifact.isBlank()) {
+                if (lib.coordinate.group.isBlank() || lib.coordinate.artifact.isBlank()) {
                     add(
                         DiagnosticMessage(
                             code = DiagnosticCodes.Validation.INVALID_COORDINATES,
-                            message = "Library '$alias': empty group or artifact (group='${lib.group}', artifact='${lib.artifact}')",
+                            message = "Library '$alias': empty group or artifact (group='${lib.coordinate.group}', artifact='${lib.coordinate.artifact}')",
                             severity = Severity.ERROR,
                             processorId = id,
                             context = emptyMap(),
                         )
                     )
                 }
-                if (":" in lib.group || ":" in lib.artifact) {
+                if (":" in lib.coordinate.group || ":" in lib.coordinate.artifact) {
                     add(
                         DiagnosticMessage(
                             code = DiagnosticCodes.Validation.INVALID_COORDINATES,
-                            message = "Library '$alias': group or artifact contains ':' (group='${lib.group}', artifact='${lib.artifact}')",
+                            message = "Library '$alias': group or artifact contains ':' (group='${lib.coordinate.group}', artifact='${lib.coordinate.artifact}')",
                             severity = Severity.ERROR,
                             processorId = id,
                             context = emptyMap(),

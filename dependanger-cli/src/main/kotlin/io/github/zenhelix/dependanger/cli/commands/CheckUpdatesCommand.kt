@@ -60,7 +60,7 @@ public class CheckUpdatesCommand : CliktCommand(name = "updates") {
                 headers = listOf("Library", "Current", "Available", "Type"),
                 rowMapper = { update ->
                     listOf(
-                        "${update.group}:${update.artifact}",
+                        update.coordinate.toString(),
                         update.currentVersion,
                         update.latestVersion,
                         update.updateType.name,

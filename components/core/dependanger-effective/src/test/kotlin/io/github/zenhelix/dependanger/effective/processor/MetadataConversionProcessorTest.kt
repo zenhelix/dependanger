@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.effective.processor
 
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.Library
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Plugin
 import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.VersionReference
@@ -66,8 +67,7 @@ class MetadataConversionProcessorTest {
             val range = VersionRange.Simple("[1.0,2.0)")
             val lib = Library(
                 alias = "mylib",
-                group = "com.example",
-                artifact = "mylib",
+                coordinate = MavenCoordinate("com.example", "mylib"),
                 version = VersionReference.Range(range),
                 description = null,
                 tags = emptySet(),
@@ -98,8 +98,7 @@ class MetadataConversionProcessorTest {
             )
             val lib = Library(
                 alias = "richlib",
-                group = "com.example",
-                artifact = "richlib",
+                coordinate = MavenCoordinate("com.example", "richlib"),
                 version = VersionReference.Range(range),
                 description = null,
                 tags = emptySet(),

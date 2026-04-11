@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.cache
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.KSerializer
 import java.io.File
 
@@ -24,24 +25,24 @@ public class DirBasedCache<T>(
         return layout.read(location, key) { fetchedAt -> isExpired(fetchedAt, selectTtl(segments)) }
     }
 
-    public fun get(group: String, artifact: String, version: String): CacheResult<T> =
-        get(listOf(group, artifact, version))
+    public fun get(coordinate: MavenCoordinate, version: String): CacheResult<T> =
+        get(listOf(coordinate.group, coordinate.artifact, version))
 
     public fun getStale(segments: List<String>): T? {
         val location = resolveLocation(segments)
         return layout.readStale(location)
     }
 
-    public fun getStale(group: String, artifact: String, version: String): T? =
-        getStale(listOf(group, artifact, version))
+    public fun getStale(coordinate: MavenCoordinate, version: String): T? =
+        getStale(listOf(coordinate.group, coordinate.artifact, version))
 
     public fun put(content: T, segments: List<String>) {
         val location = resolveLocation(segments)
         layout.write(location, content, isSnapshot(segments))
     }
 
-    public fun put(group: String, artifact: String, version: String, content: T) {
-        put(content, listOf(group, artifact, version))
+    public fun put(coordinate: MavenCoordinate, version: String, content: T) {
+        put(content, listOf(coordinate.group, coordinate.artifact, version))
     }
 
     public fun invalidate(segments: List<String>) {
@@ -49,8 +50,8 @@ public class DirBasedCache<T>(
         layout.delete(location)
     }
 
-    public fun invalidate(group: String, artifact: String, version: String) {
-        invalidate(listOf(group, artifact, version))
+    public fun invalidate(coordinate: MavenCoordinate, version: String) {
+        invalidate(listOf(coordinate.group, coordinate.artifact, version))
     }
 
     private fun resolveLocation(segments: List<String>): File {

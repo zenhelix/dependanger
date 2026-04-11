@@ -1,5 +1,7 @@
 package io.github.zenhelix.dependanger.core.model.filter
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
+
 /**
  * Common contract for filters with include/exclude sets.
  *
@@ -37,15 +39,13 @@ public fun IncludeExcludeFilter.matchesAny(values: Set<String>): Boolean {
 }
 
 /**
- * Predicate-based match: uses [predicate] to test each pattern against the [value].
- *
- * Useful for glob/regex patterns where exact string equality is insufficient (e.g., GroupFilter).
+ * Predicate-based match using [MavenCoordinate]: uses [predicate] to test each pattern against the coordinate.
  */
 public fun IncludeExcludeFilter.matchesWithPredicate(
-    value: String,
-    predicate: (pattern: String, value: String) -> Boolean,
+    coordinate: MavenCoordinate,
+    predicate: (pattern: String, coordinate: MavenCoordinate) -> Boolean,
 ): Boolean {
-    val passesIncludes = includes.isEmpty() || includes.any { predicate(it, value) }
-    val passesExcludes = excludes.isEmpty() || excludes.none { predicate(it, value) }
+    val passesIncludes = includes.isEmpty() || includes.any { predicate(it, coordinate) }
+    val passesExcludes = excludes.isEmpty() || excludes.none { predicate(it, coordinate) }
     return passesIncludes && passesExcludes
 }

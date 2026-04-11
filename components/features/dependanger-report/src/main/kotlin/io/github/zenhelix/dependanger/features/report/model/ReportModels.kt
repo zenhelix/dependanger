@@ -1,12 +1,12 @@
 package io.github.zenhelix.dependanger.features.report.model
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.Serializable
 
 @Serializable
 public data class ReportLibrary(
     val alias: String,
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: String?,
     val tags: Set<String>,
     val isDeprecated: Boolean,
@@ -85,7 +85,7 @@ public data class ReportTransitives(
 
 @Serializable
 public data class ReportConflict(
-    val artifact: String,
+    val coordinate: String,
     val versions: List<String>,
 )
 

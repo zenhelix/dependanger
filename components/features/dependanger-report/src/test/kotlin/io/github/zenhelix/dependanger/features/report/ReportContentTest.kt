@@ -3,6 +3,7 @@ package io.github.zenhelix.dependanger.features.report
 import io.github.zenhelix.dependanger.core.model.DeprecationInfo
 import io.github.zenhelix.dependanger.core.model.DiagnosticMessage
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.model.EffectiveBundle
@@ -152,8 +153,7 @@ class ReportContentTest {
                 cvssVersion = "3.1",
                 fixedVersion = "6.1.1",
                 url = null,
-                affectedGroup = "org.springframework",
-                affectedArtifact = "spring-core",
+                affectedCoordinate = MavenCoordinate("org.springframework", "spring-core"),
                 affectedVersion = "6.1.0",
             )
             val metadata = emptyMetadata().copy(
@@ -300,8 +300,7 @@ class ReportContentTest {
             val updates = listOf(
                 UpdateAvailableInfo(
                     alias = "spring-core",
-                    group = "org.springframework",
-                    artifact = "spring-core",
+                    coordinate = MavenCoordinate("org.springframework", "spring-core"),
                     currentVersion = "6.1.0",
                     latestVersion = "6.2.0",
                     updateType = UpdateType.MINOR,

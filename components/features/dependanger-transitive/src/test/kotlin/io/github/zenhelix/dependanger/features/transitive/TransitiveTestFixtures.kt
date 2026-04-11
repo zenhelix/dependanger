@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.transitive
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.effective.model.EffectiveVersion
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
@@ -13,8 +14,7 @@ internal fun tree(
     isDuplicate: Boolean = false,
     isCycle: Boolean = false,
 ): TransitiveTree = TransitiveTree(
-    group = group,
-    artifact = artifact,
+    coordinate = MavenCoordinate(group, artifact),
     version = version,
     scope = scope,
     children = children,
@@ -27,8 +27,7 @@ internal fun effectiveLibrary(
     artifact: String,
 ): EffectiveLibrary = EffectiveLibrary(
     alias = "$group:$artifact",
-    group = group,
-    artifact = artifact,
+    coordinate = MavenCoordinate(group, artifact),
     version = EffectiveVersion.None,
     description = null,
     tags = emptySet(),

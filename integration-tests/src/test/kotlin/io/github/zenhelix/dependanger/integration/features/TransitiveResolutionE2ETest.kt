@@ -65,11 +65,11 @@ class TransitiveResolutionE2ETest : IntegrationTestBase() {
             assertThat(result.transitives).isNotEmpty()
 
             val parentTree = result.transitives.find {
-                it.group == "com.example" && it.artifact == "parent-lib"
+                it.coordinate.group == "com.example" && it.coordinate.artifact == "parent-lib"
             }
             assertThat(parentTree).isNotNull
             assertThat(parentTree!!.children).hasSize(2)
-            assertThat(parentTree.children.map { it.artifact })
+            assertThat(parentTree.children.map { it.coordinate.artifact })
                 .containsExactlyInAnyOrder("child-a", "child-b")
         }
 
@@ -120,15 +120,15 @@ class TransitiveResolutionE2ETest : IntegrationTestBase() {
             assertThat(result.transitives).isNotEmpty()
 
             val treeA = result.transitives.find {
-                it.group == "com.a" && it.artifact == "lib-a"
+                it.coordinate.group == "com.a" && it.coordinate.artifact == "lib-a"
             }
             assertThat(treeA).isNotNull
             assertThat(treeA!!.children).hasSize(1)
 
             val treeB = treeA.children.first()
-            assertThat(treeB.artifact).isEqualTo("lib-b")
+            assertThat(treeB.coordinate.artifact).isEqualTo("lib-b")
             assertThat(treeB.children).hasSize(1)
-            assertThat(treeB.children.first().artifact).isEqualTo("lib-c")
+            assertThat(treeB.children.first().coordinate.artifact).isEqualTo("lib-c")
         }
 
         @Test
@@ -183,7 +183,7 @@ class TransitiveResolutionE2ETest : IntegrationTestBase() {
             assertThat(result.versionConflicts).isNotEmpty()
 
             val conflict = result.versionConflicts.find {
-                it.group == "com.shared" && it.artifact == "common"
+                it.coordinate.group == "com.shared" && it.coordinate.artifact == "common"
             }
             assertThat(conflict).isNotNull
             assertThat(conflict!!.requestedVersions).containsExactlyInAnyOrder("1.0.0", "2.0.0")

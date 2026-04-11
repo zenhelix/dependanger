@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.api
 
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.dsl.versionRef
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.util.UpdateType
 import io.github.zenhelix.dependanger.effective.spi.ReportFormat
@@ -101,8 +102,7 @@ class ReportGenerationBehaviorTest {
             val fakeUpdates = listOf(
                 UpdateAvailableInfo(
                     alias = "ktor-core",
-                    group = "io.ktor",
-                    artifact = "ktor-client-core",
+                    coordinate = MavenCoordinate("io.ktor", "ktor-client-core"),
                     currentVersion = "3.1.0",
                     latestVersion = "3.1.1",
                     latestStable = "3.1.1",
@@ -139,8 +139,7 @@ class ReportGenerationBehaviorTest {
                     cvssVersion = "3.1",
                     fixedVersion = "2.0.0",
                     url = "https://github.com/advisories/GHSA-abc-123",
-                    affectedGroup = "com.example",
-                    affectedArtifact = "example-lib",
+                    affectedCoordinate = MavenCoordinate("com.example", "example-lib"),
                     affectedVersion = "1.0.0",
                 ),
             )
@@ -169,7 +168,7 @@ class ReportGenerationBehaviorTest {
                 addProcessor(fakeUpdateCheck {
                     listOf(
                         UpdateAvailableInfo(
-                            alias = "lib", group = "com.example", artifact = "lib",
+                            alias = "lib", coordinate = MavenCoordinate("com.example", "lib"),
                             currentVersion = "1.0.0", latestVersion = "2.0.0",
                             updateType = UpdateType.MAJOR,
                         )
@@ -181,8 +180,7 @@ class ReportGenerationBehaviorTest {
                             id = "CVE-2024-9999", aliases = emptyList(),
                             summary = "Critical vuln", severity = VulnerabilitySeverity.CRITICAL,
                             cvssScore = 9.0, cvssVersion = "3.1", fixedVersion = "2.0.0",
-                            url = null, affectedGroup = "com.example",
-                            affectedArtifact = "lib", affectedVersion = "1.0.0",
+                            url = null, affectedCoordinate = MavenCoordinate("com.example", "lib"), affectedVersion = "1.0.0",
                         )
                     )
                 })

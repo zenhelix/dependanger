@@ -206,7 +206,7 @@ class UpdateCheckE2ETest : IntegrationTestBase() {
             }.process()
 
             assertThat(result.isSuccess).isTrue()
-            assertThat(result.updates).noneMatch { it.group == "org.jetbrains.kotlin" }
+            assertThat(result.updates).noneMatch { it.coordinate.group == "org.jetbrains.kotlin" }
             assertThat(result.updates).anyMatch { it.alias == "example-lib" }
         }
     }

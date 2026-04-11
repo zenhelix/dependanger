@@ -22,7 +22,7 @@ class FlatDependencyListTest {
 
             val result = FlatListBuilder.build(trees, emptyList())
 
-            assertThat(result.map { "${it.group}:${it.artifact}" })
+            assertThat(result.map { "${it.coordinate}" })
                 .containsExactly("com.root:app", "org.lib:a", "org.lib:b")
         }
 
@@ -43,7 +43,7 @@ class FlatDependencyListTest {
             val result = FlatListBuilder.build(trees, emptyList())
 
             assertThat(result).hasSize(3)
-            assertThat(result.map { it.artifact })
+            assertThat(result.map { it.coordinate.artifact })
                 .containsExactly("app", "layer", "leaf")
         }
     }
@@ -68,7 +68,7 @@ class FlatDependencyListTest {
 
             val result = FlatListBuilder.build(trees, emptyList())
 
-            val commons = result.filter { it.artifact == "commons" }
+            val commons = result.filter { it.coordinate.artifact == "commons" }
             assertThat(commons).hasSize(1)
             assertThat(commons[0].version).isEqualTo("1.0")
         }
@@ -87,7 +87,7 @@ class FlatDependencyListTest {
             val result = FlatListBuilder.build(trees, emptyList())
 
             assertThat(result).hasSize(1)
-            assertThat(result[0].artifact).isEqualTo("a")
+            assertThat(result[0].coordinate.artifact).isEqualTo("a")
         }
 
         @Test
@@ -119,7 +119,7 @@ class FlatDependencyListTest {
             val result = FlatListBuilder.build(trees, emptyList())
 
             assertThat(result).hasSize(1)
-            assertThat(result[0].artifact).isEqualTo("b")
+            assertThat(result[0].coordinate.artifact).isEqualTo("b")
         }
     }
 
@@ -141,8 +141,8 @@ class FlatDependencyListTest {
 
             val result = FlatListBuilder.build(trees, directLibraries)
 
-            val direct = result.first { it.artifact == "direct-dep" }
-            val transitive = result.first { it.artifact == "transitive-dep" }
+            val direct = result.first { it.coordinate.artifact == "direct-dep" }
+            val transitive = result.first { it.coordinate.artifact == "transitive-dep" }
             assertThat(direct.isDirectDependency).isTrue()
             assertThat(transitive.isDirectDependency).isFalse()
         }

@@ -83,7 +83,7 @@ internal class MarkdownReportRenderer : ReportRenderer {
         appendLine("|-------|------------|---------|------|")
         for (lib in libraries) {
             val tags = lib.tags.joinToString(", ").ifEmpty { "-" }
-            appendLine("| ${lib.alias.escapeCell()} | ${lib.group}:${lib.artifact} | ${lib.version?.escapeCell() ?: "N/A"} | ${tags.escapeCell()} |")
+            appendLine("| ${lib.alias.escapeCell()} | ${lib.coordinate} | ${lib.version?.escapeCell() ?: "N/A"} | ${tags.escapeCell()} |")
         }
     }
 
@@ -190,7 +190,7 @@ internal class MarkdownReportRenderer : ReportRenderer {
             appendLine("| Artifact | Versions |")
             appendLine("|----------|----------|")
             for (c in transitives.conflicts) {
-                appendLine("| ${c.artifact.escapeCell()} | ${c.versions.joinToString(" vs ").escapeCell()} |")
+                appendLine("| ${c.coordinate.escapeCell()} | ${c.versions.joinToString(" vs ").escapeCell()} |")
             }
         }
     }

@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.analysis
 
 import io.github.zenhelix.dependanger.core.model.CompatibilityRule
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.Settings
 import io.github.zenhelix.dependanger.core.model.Severity
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
@@ -141,8 +142,7 @@ class CompatibilityAnalysisTest {
             val original = buildMetadata(compatibility = listOf(rule))
             val library = mockk<EffectiveLibrary> {
                 every { alias } returns "lib-a"
-                every { group } returns "com.example"
-                every { artifact } returns "lib-a"
+                every { coordinate } returns MavenCoordinate("com.example", "lib-a")
             }
             val metadata = buildEffectiveMetadata(libraries = mapOf("lib-a" to library))
 

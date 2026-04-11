@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.cache.CacheResult
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
 import io.github.zenhelix.dependanger.maven.client.model.DownloadResult
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
@@ -22,7 +23,7 @@ internal class TransitiveTreeBuilder(
     private val includeOptional: Boolean,
 ) {
     private val parentPomResolver: ParentPomResolver = ParentPomResolver(ctx.pomDownloader)
-    private val sessionSeen: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val sessionSeen: MutableSet<MavenCoordinate> = ConcurrentHashMap.newKeySet()
     private val nodeCounter: AtomicInteger = AtomicInteger(0)
 
     val totalNodes: Int get() = nodeCounter.get()
@@ -34,56 +35,52 @@ internal class TransitiveTreeBuilder(
         libraries.map { lib ->
             async {
                 resolveTree(
-                    group = lib.group,
-                    artifact = lib.artifact,
+                    coordinate = lib.coordinate,
                     version = lib.version,
                     scope = null,
                     depth = 0,
-                    visited = setOf("${lib.group}:${lib.artifact}"),
+                    visited = setOf(lib.coordinate),
                 )
             }
         }.awaitAll()
     }
 
     private suspend fun resolveTree(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         scope: String?,
         depth: Int,
-        visited: Set<String>,
+        visited: Set<MavenCoordinate>,
     ): TransitiveTree {
-        val coordinate = "$group:$artifact"
-
         if (nodeCounter.get() >= maxTransitives) {
-            return leaf(group = group, artifact = artifact, version = version, scope = scope)
+            return leaf(coordinate = coordinate, version = version, scope = scope)
         }
 
         if (depth >= maxDepth) {
             logger.warn { "Max depth $maxDepth reached for $coordinate:$version, branch truncated" }
-            return leaf(group = group, artifact = artifact, version = version, scope = scope)
+            return leaf(coordinate = coordinate, version = version, scope = scope)
         }
 
         val isDuplicate = !sessionSeen.add(coordinate)
         if (isDuplicate) {
-            val cached = ctx.cache.getStale(group, artifact, version)
+            val cached = ctx.cache.getStale(coordinate, version)
             return cached?.copy(isDuplicate = true, isCycle = false, children = emptyList(), scope = scope)
-                ?: leaf(group = group, artifact = artifact, version = version, scope = scope, isDuplicate = true)
+                ?: leaf(coordinate = coordinate, version = version, scope = scope, isDuplicate = true)
         }
 
         nodeCounter.incrementAndGet()
 
-        when (val cacheResult = ctx.cache.get(group, artifact, version)) {
+        when (val cacheResult = ctx.cache.get(coordinate, version)) {
             is CacheResult.Hit       -> return cacheResult.data.copy(isDuplicate = false, scope = scope)
             is CacheResult.Corrupted -> logger.warn { "Corrupted cache for $coordinate:$version" }
             is CacheResult.Miss      -> { /* proceed with resolution */
             }
         }
 
-        val rawPomProject = downloadAndParsePom(group, artifact, version)
+        val rawPomProject = downloadAndParsePom(coordinate, version)
         if (rawPomProject == null) {
-            val tree = leaf(group = group, artifact = artifact, version = version, scope = scope)
-            ctx.cache.put(group, artifact, version, tree)
+            val tree = leaf(coordinate = coordinate, version = version, scope = scope)
+            ctx.cache.put(coordinate, version, tree)
             return tree
         }
 
@@ -93,19 +90,17 @@ internal class TransitiveTreeBuilder(
         val children = coroutineScope {
             pomDependencies.map { dep ->
                 async {
-                    val childCoordinate = "${dep.group}:${dep.artifact}"
+                    val childCoordinate = MavenCoordinate(dep.group, dep.artifact)
                     if (childCoordinate in visited) {
                         leaf(
-                            group = dep.group,
-                            artifact = dep.artifact,
+                            coordinate = childCoordinate,
                             version = dep.version,
                             scope = dep.scope,
                             isCycle = true,
                         )
                     } else {
                         resolveTree(
-                            group = dep.group,
-                            artifact = dep.artifact,
+                            coordinate = childCoordinate,
                             version = dep.version ?: "UNKNOWN",
                             scope = dep.scope,
                             depth = depth + 1,
@@ -117,8 +112,7 @@ internal class TransitiveTreeBuilder(
         }
 
         val tree = TransitiveTree(
-            group = group,
-            artifact = artifact,
+            coordinate = coordinate,
             version = version,
             scope = scope,
             children = children,
@@ -126,42 +120,41 @@ internal class TransitiveTreeBuilder(
             isCycle = false,
         )
 
-        ctx.cache.put(group, artifact, version, tree)
+        ctx.cache.put(coordinate, version, tree)
         return tree
     }
 
     private suspend fun downloadAndParsePom(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
     ): io.github.zenhelix.dependanger.maven.pom.model.PomProject? {
-        val coordinate = "$group:$artifact:$version"
+        val gav = "$coordinate:$version"
 
-        return when (val result = ctx.pomDownloader.downloadPom(group, artifact, version)) {
+        return when (val result = ctx.pomDownloader.downloadPom(coordinate.group, coordinate.artifact, version)) {
             is DownloadResult.Success      -> {
                 try {
                     PomParser.parse(result.content)
                 } catch (e: PomParseException) {
-                    logger.warn(e) { "Failed to parse POM for $coordinate" }
+                    logger.warn(e) { "Failed to parse POM for $gav" }
                     null
                 } catch (e: Exception) {
-                    logger.warn(e) { "Unexpected error parsing POM for $coordinate" }
+                    logger.warn(e) { "Unexpected error parsing POM for $gav" }
                     null
                 }
             }
 
             is DownloadResult.NotFound     -> {
-                logger.debug { "POM not found for $coordinate" }
+                logger.debug { "POM not found for $gav" }
                 null
             }
 
             is DownloadResult.AuthRequired -> {
-                logger.warn { "Authentication required to download POM for $coordinate (${result.url})" }
+                logger.warn { "Authentication required to download POM for $gav (${result.url})" }
                 null
             }
 
             is DownloadResult.Failed       -> {
-                logger.warn { "Failed to download POM for $coordinate: ${result.error}" }
+                logger.warn { "Failed to download POM for $gav: ${result.error}" }
                 null
             }
         }
@@ -179,15 +172,13 @@ internal class TransitiveTreeBuilder(
         }
 
         private fun leaf(
-            group: String,
-            artifact: String,
+            coordinate: MavenCoordinate,
             version: String?,
             scope: String?,
             isDuplicate: Boolean = false,
             isCycle: Boolean = false,
         ): TransitiveTree = TransitiveTree(
-            group = group,
-            artifact = artifact,
+            coordinate = coordinate,
             version = version,
             scope = scope,
             children = emptyList(),
@@ -198,7 +189,6 @@ internal class TransitiveTreeBuilder(
 }
 
 internal data class DirectDependencyInput(
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: String,
 )

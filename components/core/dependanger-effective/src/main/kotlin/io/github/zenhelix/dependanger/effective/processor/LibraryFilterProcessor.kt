@@ -59,7 +59,7 @@ internal class LibraryFilterProcessor : EffectiveMetadataProcessor {
             val passesSpec = spec == null || (
                     (spec.byTags?.let { passesTagFilter(lib.tags, it) } != false)
                             && (spec.byGroups?.let {
-                        it.matchesWithPredicate("${lib.group}:${lib.artifact}", GlobMatcher::matchesCoordinate)
+                        it.matchesWithPredicate(lib.coordinate, GlobMatcher::matches)
                     } != false)
                             && (spec.byAliases?.let { it.matchesExact(alias) } != false)
                             && (spec.byBundles?.let { it.matchesAny(libraryToBundles[alias] ?: emptySet()) } != false)

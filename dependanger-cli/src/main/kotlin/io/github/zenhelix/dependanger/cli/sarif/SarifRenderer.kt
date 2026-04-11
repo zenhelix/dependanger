@@ -24,7 +24,7 @@ public fun renderSarif(vulnerabilities: List<VulnerabilityInfo>): String {
             ruleId = vuln.id,
             level = mapSeverityToLevel(vuln.severity),
             message = SarifMessage(
-                text = "${vuln.summary} in ${vuln.affectedGroup}:${vuln.affectedArtifact}:${vuln.affectedVersion}"
+                text = "${vuln.summary} in ${vuln.affectedCoordinate}:${vuln.affectedVersion}"
             ),
             locations = listOf(
                 SarifLocation(
@@ -76,7 +76,7 @@ private fun defaultSeverityScore(severity: VulnerabilitySeverity): String = when
 }
 
 private fun buildHelpText(vuln: VulnerabilityInfo): String = buildString {
-    append("Vulnerability ${vuln.id} affects ${vuln.affectedGroup}:${vuln.affectedArtifact}:${vuln.affectedVersion}.")
+    append("Vulnerability ${vuln.id} affects ${vuln.affectedCoordinate}:${vuln.affectedVersion}.")
     vuln.fixedVersion?.let { append(" Fixed in version $it.") }
     vuln.url?.let { append(" Details: $it") }
 }

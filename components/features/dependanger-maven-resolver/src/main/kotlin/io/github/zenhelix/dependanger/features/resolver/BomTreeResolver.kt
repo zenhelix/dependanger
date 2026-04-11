@@ -5,6 +5,7 @@ import io.github.zenhelix.dependanger.cache.CacheResult
 import io.github.zenhelix.dependanger.cache.DirBasedCache
 import io.github.zenhelix.dependanger.core.model.CredentialsProvider
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
@@ -32,24 +33,22 @@ internal class BomTreeResolver(
     private val resolvedCache = mutableMapOf<String, BomContent>()
 
     suspend fun resolve(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         diagnostics: Diagnostics,
     ): BomResolveResult {
         val pathStack = mutableSetOf<String>()
-        return resolveRecursive(group, artifact, version, pathStack, diagnostics, depth = 0)
+        return resolveRecursive(coordinate, version, pathStack, diagnostics, depth = 0)
     }
 
     private suspend fun resolveRecursive(
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         pathStack: MutableSet<String>,
         diagnostics: Diagnostics,
         depth: Int,
     ): BomResolveResult {
-        val key = "$group:$artifact:$version"
+        val key = "$coordinate:$version"
 
         if (key in pathStack) {
             return BomResolveResult(
@@ -74,7 +73,7 @@ internal class BomTreeResolver(
         try {
             var currentDiagnostics = diagnostics
 
-            when (val cached = ctx.cache.get(group, artifact, version)) {
+            when (val cached = ctx.cache.get(coordinate, version)) {
                 is CacheResult.Hit       -> {
                     resolvedCache[key] = cached.data
                     return BomResolveResult(content = cached.data, diagnostics = currentDiagnostics)
@@ -91,7 +90,7 @@ internal class BomTreeResolver(
                 is CacheResult.Miss      -> {}
             }
 
-            val pomXml = when (val fetchOutcome = fetchBomPom(key, group, artifact, version, currentDiagnostics)) {
+            val pomXml = when (val fetchOutcome = fetchBomPom(key, coordinate, version, currentDiagnostics)) {
                 is FetchOutcome.Resolved   -> {
                     fetchOutcome.result.content.takeIf { it !== BomContent.EMPTY }?.let { resolvedCache[key] = it }
                     return fetchOutcome.result
@@ -116,7 +115,7 @@ internal class BomTreeResolver(
             }
 
             val mergeResult = mergeWithParentAndImports(parseResult, key, pathStack, currentDiagnostics, depth)
-            val finalDiagnostics = writeToDiskCache(key, group, artifact, version, mergeResult.content, mergeResult.diagnostics)
+            val finalDiagnostics = writeToDiskCache(key, coordinate, version, mergeResult.content, mergeResult.diagnostics)
 
             resolvedCache[key] = mergeResult.content
             return BomResolveResult(content = mergeResult.content, diagnostics = finalDiagnostics)
@@ -127,17 +126,16 @@ internal class BomTreeResolver(
 
     private suspend fun fetchBomPom(
         key: String,
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         diagnostics: Diagnostics,
     ): FetchOutcome {
-        val pomXml = when (val downloadResult = ctx.downloader.downloadPom(group, artifact, version)) {
+        val pomXml = when (val downloadResult = ctx.downloader.downloadPom(coordinate.group, coordinate.artifact, version)) {
             is DownloadResult.Success -> downloadResult.content
             is DownloadResult.NotFound,
             is DownloadResult.AuthRequired,
             is DownloadResult.Failed  -> {
-                val stale = ctx.cache.getStale(group, artifact, version)
+                val stale = ctx.cache.getStale(coordinate, version)
                 if (stale != null) {
                     return FetchOutcome.Resolved(
                         BomResolveResult(
@@ -180,9 +178,8 @@ internal class BomTreeResolver(
 
         parseResult.parent?.let { parent ->
             val parentResult = resolveRecursive(
-                group = parent.group,
-                artifact = parent.artifact,
-                version = parent.version,
+                coordinate = parent.gav.coordinate,
+                version = parent.gav.version,
                 pathStack = pathStack,
                 diagnostics = currentDiagnostics,
                 depth = depth + 1,
@@ -192,15 +189,14 @@ internal class BomTreeResolver(
             currentDiagnostics = parentResult.diagnostics
         }
 
-        val seen = mutableSetOf<String>()
+        val seen = mutableSetOf<MavenCoordinate>()
         for (rawDep in parseResult.dependencies) {
             if (rawDep.scope == "import" && rawDep.type == "pom") {
                 val resolved = resolveRawDependency(rawDep, mergedProperties, currentDiagnostics)
                 currentDiagnostics = resolved.diagnostics
                 val dep = resolved.dependency ?: continue
                 val importResult = resolveRecursive(
-                    group = dep.group,
-                    artifact = dep.artifact,
+                    coordinate = dep.coordinate,
                     version = dep.version,
                     pathStack = pathStack,
                     diagnostics = currentDiagnostics,
@@ -212,11 +208,10 @@ internal class BomTreeResolver(
                 val resolved = resolveRawDependency(rawDep, mergedProperties, currentDiagnostics)
                 currentDiagnostics = resolved.diagnostics
                 resolved.dependency?.let { dep ->
-                    val depKey = "${dep.group}:${dep.artifact}"
-                    if (!seen.add(depKey)) {
+                    if (!seen.add(dep.coordinate)) {
                         currentDiagnostics += Diagnostics.warning(
                             DiagnosticCodes.Bom.DUPLICATE_ENTRY,
-                            "Duplicate dependency $depKey in BOM $key, last definition wins",
+                            "Duplicate dependency ${dep.coordinate} in BOM $key, last definition wins",
                             processorId, emptyMap()
                         )
                     }
@@ -231,13 +226,12 @@ internal class BomTreeResolver(
 
     private fun writeToDiskCache(
         key: String,
-        group: String,
-        artifact: String,
+        coordinate: MavenCoordinate,
         version: String,
         content: BomContent,
         diagnostics: Diagnostics,
     ): Diagnostics = try {
-        ctx.cache.put(group, artifact, version, content)
+        ctx.cache.put(coordinate, version, content)
         diagnostics
     } catch (e: Exception) {
         if (e is CancellationException) throw e
@@ -267,8 +261,10 @@ internal class BomTreeResolver(
     ): DependencyResolutionResult = try {
         DependencyResolutionResult(
             dependency = BomDependency(
-                group = ctx.parser.resolveProperty(rawDep.group, properties),
-                artifact = ctx.parser.resolveProperty(rawDep.artifact, properties),
+                coordinate = MavenCoordinate(
+                    group = ctx.parser.resolveProperty(rawDep.coordinate.group, properties),
+                    artifact = ctx.parser.resolveProperty(rawDep.coordinate.artifact, properties),
+                ),
                 version = ctx.parser.resolveProperty(rawDep.version, properties),
             ),
             diagnostics = diagnostics,
@@ -278,7 +274,7 @@ internal class BomTreeResolver(
             dependency = null,
             diagnostics = diagnostics + Diagnostics.error(
                 DiagnosticCodes.Bom.UNRESOLVED_PROPERTY,
-                "${e.message} in ${rawDep.group}:${rawDep.artifact}:${rawDep.version}",
+                "${e.message} in ${rawDep.coordinate}:${rawDep.version}",
                 processorId, emptyMap()
             ),
         )

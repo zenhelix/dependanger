@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.osv.client
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.http.client.HttpClientConfig
 import io.github.zenhelix.dependanger.http.client.HttpClientFactory
 import io.github.zenhelix.dependanger.http.client.RetryConfig
@@ -125,7 +126,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0.0"))
                 )
 
                 assertThat(capturedUrls).hasSize(1)
@@ -173,8 +174,8 @@ class DefaultOsvClientTest {
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
                     listOf(
-                        OsvPackageQuery(group = "com.safe", artifact = "lib1", version = "1.0.0"),
-                        OsvPackageQuery(group = "com.safe", artifact = "lib2", version = "2.0.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.safe", "lib1"), version = "1.0.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.safe", "lib2"), version = "2.0.0"),
                     )
                 )
 
@@ -221,9 +222,9 @@ class DefaultOsvClientTest {
             OsvClient(config, factory).use { client ->
                 val result = client.queryBatch(
                     listOf(
-                        OsvPackageQuery(group = "com.example", artifact = "a", version = "1.0"),
-                        OsvPackageQuery(group = "com.example", artifact = "b", version = "1.0"),
-                        OsvPackageQuery(group = "com.example", artifact = "c", version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "a"), version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "b"), version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "c"), version = "1.0"),
                     )
                 )
 
@@ -251,7 +252,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0.0"))
                 )
 
                 assertThat(result).isInstanceOf(OsvBatchResult.Timeout::class.java)
@@ -283,8 +284,8 @@ class DefaultOsvClientTest {
             OsvClient(config, factory).use { client ->
                 val result = client.queryBatch(
                     listOf(
-                        OsvPackageQuery(group = "com.example", artifact = "a", version = "1.0"),
-                        OsvPackageQuery(group = "com.example", artifact = "b", version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "a"), version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "b"), version = "1.0"),
                     )
                 )
 
@@ -312,7 +313,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0.0"))
                 )
 
                 assertThat(result).isInstanceOf(OsvBatchResult.Failed::class.java)
@@ -338,7 +339,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0.0"))
                 )
 
                 // 429 is retried by the HTTP layer; after exhausting retries, it becomes Failed
@@ -366,8 +367,8 @@ class DefaultOsvClientTest {
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
                     listOf(
-                        OsvPackageQuery(group = "com.example", artifact = "a", version = "1.0"),
-                        OsvPackageQuery(group = "com.example", artifact = "b", version = "2.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "a"), version = "1.0"),
+                        OsvPackageQuery(coordinate = MavenCoordinate("com.example", "b"), version = "2.0"),
                     )
                 )
 
@@ -401,7 +402,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -428,7 +429,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -456,7 +457,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -487,7 +488,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -515,7 +516,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -555,7 +556,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -586,7 +587,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -615,7 +616,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -641,7 +642,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success
@@ -667,7 +668,7 @@ class DefaultOsvClientTest {
 
             OsvClient(defaultConfig, factory).use { client ->
                 val result = client.queryBatch(
-                    listOf(OsvPackageQuery(group = "com.example", artifact = "lib", version = "1.0"))
+                    listOf(OsvPackageQuery(coordinate = MavenCoordinate("com.example", "lib"), version = "1.0"))
                 )
 
                 val success = result as OsvBatchResult.Success

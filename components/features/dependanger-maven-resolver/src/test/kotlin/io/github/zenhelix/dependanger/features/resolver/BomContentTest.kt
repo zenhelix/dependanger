@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.resolver
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
@@ -33,8 +34,8 @@ class BomContentTest {
         fun `BomContent survives JSON serialization and deserialization`() {
             val original = BomContent(
                 dependencies = listOf(
-                    BomDependency(group = "com.example", artifact = "lib-a", version = "1.0.0"),
-                    BomDependency(group = "org.test", artifact = "lib-b", version = "2.3.4"),
+                    BomDependency(coordinate = MavenCoordinate("com.example", "lib-a"), version = "1.0.0"),
+                    BomDependency(coordinate = MavenCoordinate("org.test", "lib-b"), version = "2.3.4"),
                 ),
                 properties = mapOf("spring.version" to "6.1.0", "jackson.version" to "2.15.0"),
             )
@@ -56,8 +57,7 @@ class BomContentTest {
         @Test
         fun `BomDependency survives JSON serialization and deserialization`() {
             val original = BomDependency(
-                group = "io.ktor",
-                artifact = "ktor-client-core",
+                coordinate = MavenCoordinate("io.ktor", "ktor-client-core"),
                 version = "2.3.7",
             )
 
@@ -73,7 +73,7 @@ class BomContentTest {
 
         @Test
         fun `two BomContent instances with same data are equal`() {
-            val deps = listOf(BomDependency("g", "a", "1.0"))
+            val deps = listOf(BomDependency(coordinate = MavenCoordinate("g", "a"), version = "1.0"))
             val props = mapOf("key" to "value")
 
             val first = BomContent(dependencies = deps, properties = props)
@@ -86,11 +86,11 @@ class BomContentTest {
         @Test
         fun `BomContent with different dependencies are not equal`() {
             val first = BomContent(
-                dependencies = listOf(BomDependency("g", "a", "1.0")),
+                dependencies = listOf(BomDependency(coordinate = MavenCoordinate("g", "a"), version = "1.0")),
                 properties = emptyMap(),
             )
             val second = BomContent(
-                dependencies = listOf(BomDependency("g", "b", "1.0")),
+                dependencies = listOf(BomDependency(coordinate = MavenCoordinate("g", "b"), version = "1.0")),
                 properties = emptyMap(),
             )
 

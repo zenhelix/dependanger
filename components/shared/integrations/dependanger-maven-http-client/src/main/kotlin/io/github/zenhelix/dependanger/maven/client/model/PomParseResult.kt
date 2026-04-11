@@ -1,5 +1,8 @@
 package io.github.zenhelix.dependanger.maven.client.model
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
+import io.github.zenhelix.dependanger.core.model.MavenGAV
+
 public data class PomParseResult(
     val properties: Map<String, String>,
     val parent: ParentPom?,
@@ -7,14 +10,11 @@ public data class PomParseResult(
 )
 
 public data class ParentPom(
-    val group: String,
-    val artifact: String,
-    val version: String,
+    val gav: MavenGAV,
 )
 
 public data class RawBomDependency(
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: String,
     val scope: String?,
     val type: String?,

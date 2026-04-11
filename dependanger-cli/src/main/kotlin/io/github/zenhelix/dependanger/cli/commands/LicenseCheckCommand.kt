@@ -61,7 +61,7 @@ public class LicenseCheckCommand : CliktCommand(name = "license") {
                 headers = listOf("Library", "License", "Category", "Violation", "Message"),
                 rowMapper = { violation ->
                     listOf(
-                        "${violation.group}:${violation.artifact}",
+                        violation.coordinate.toString(),
                         violation.detectedLicense ?: "unknown",
                         violation.category.name,
                         violation.violationType.name,

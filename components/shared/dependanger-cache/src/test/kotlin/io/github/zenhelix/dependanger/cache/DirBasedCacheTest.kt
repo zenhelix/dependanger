@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.cache
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
@@ -20,6 +21,7 @@ class DirBasedCacheTest {
         private const val ARTIFACT = "some-lib"
         private const val VERSION = "1.0.0"
         private const val SNAPSHOT_VERSION = "1.0.0-SNAPSHOT"
+        private val COORDINATE = MavenCoordinate(GROUP, ARTIFACT)
     }
 
     private fun createCache(tempDir: File): DirBasedCache<String> {
@@ -67,8 +69,8 @@ class DirBasedCacheTest {
             val cache = createCache(tempDir)
             val content = "hello world"
 
-            cache.put(GROUP, ARTIFACT, VERSION, content)
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            cache.put(COORDINATE, VERSION, content)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isInstanceOf(CacheResult.Hit::class.java)
             assertThat((result as CacheResult.Hit).data).isEqualTo(content)
@@ -78,7 +80,7 @@ class DirBasedCacheTest {
         fun `get from empty cache returns Miss`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isEqualTo(CacheResult.Miss)
         }
@@ -87,9 +89,9 @@ class DirBasedCacheTest {
         fun `put overwrites existing entry`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            cache.put(GROUP, ARTIFACT, VERSION, "first")
-            cache.put(GROUP, ARTIFACT, VERSION, "second")
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            cache.put(COORDINATE, VERSION, "first")
+            cache.put(COORDINATE, VERSION, "second")
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isInstanceOf(CacheResult.Hit::class.java)
             assertThat((result as CacheResult.Hit).data).isEqualTo("second")
@@ -107,7 +109,7 @@ class DirBasedCacheTest {
             writeContent(dir, "cached-value")
             writeExpiredMetadata(dir)
 
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isEqualTo(CacheResult.Miss)
         }
@@ -117,8 +119,8 @@ class DirBasedCacheTest {
             val cache = createCache(tempDir)
             val content = "fresh-value"
 
-            cache.put(GROUP, ARTIFACT, VERSION, content)
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            cache.put(COORDINATE, VERSION, content)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isInstanceOf(CacheResult.Hit::class.java)
             assertThat((result as CacheResult.Hit).data).isEqualTo(content)
@@ -137,7 +139,7 @@ class DirBasedCacheTest {
             val json = Json.encodeToString(CacheMetadata.serializer(), meta)
             dir.resolve("metadata.json").writeText(json)
 
-            val result = cache.get(GROUP, ARTIFACT, SNAPSHOT_VERSION)
+            val result = cache.get(COORDINATE, SNAPSHOT_VERSION)
 
             assertThat(result).isEqualTo(CacheResult.Miss)
         }
@@ -154,7 +156,7 @@ class DirBasedCacheTest {
             writeContent(dir, "stale-value")
             writeExpiredMetadata(dir)
 
-            val result = cache.getStale(GROUP, ARTIFACT, VERSION)
+            val result = cache.getStale(COORDINATE, VERSION)
 
             assertThat(result).isEqualTo("stale-value")
         }
@@ -163,7 +165,7 @@ class DirBasedCacheTest {
         fun `getStale returns null when no entry exists`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            val result = cache.getStale(GROUP, ARTIFACT, VERSION)
+            val result = cache.getStale(COORDINATE, VERSION)
 
             assertThat(result).isNull()
         }
@@ -175,7 +177,7 @@ class DirBasedCacheTest {
             dir.mkdirs()
             dir.resolve(CONTENT_FILE_NAME).writeText("not valid json {{{")
 
-            val result = cache.getStale(GROUP, ARTIFACT, VERSION)
+            val result = cache.getStale(COORDINATE, VERSION)
 
             assertThat(result).isNull()
         }
@@ -188,9 +190,9 @@ class DirBasedCacheTest {
         fun `invalidate removes entry, subsequent get returns Miss`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            cache.put(GROUP, ARTIFACT, VERSION, "to-be-removed")
-            cache.invalidate(GROUP, ARTIFACT, VERSION)
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            cache.put(COORDINATE, VERSION, "to-be-removed")
+            cache.invalidate(COORDINATE, VERSION)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isEqualTo(CacheResult.Miss)
         }
@@ -199,7 +201,7 @@ class DirBasedCacheTest {
         fun `invalidate on non-existent entry does not throw`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            cache.invalidate(GROUP, ARTIFACT, VERSION)
+            cache.invalidate(COORDINATE, VERSION)
 
 
         }
@@ -212,7 +214,7 @@ class DirBasedCacheTest {
         fun `path traversal in group segment throws`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            assertThatThrownBy { cache.get("../etc", ARTIFACT, VERSION) }
+            assertThatThrownBy { cache.get(listOf("../etc", ARTIFACT, VERSION)) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("path traversal")
         }
@@ -221,7 +223,7 @@ class DirBasedCacheTest {
         fun `path traversal in artifact segment throws`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            assertThatThrownBy { cache.get(GROUP, "../secret", VERSION) }
+            assertThatThrownBy { cache.get(listOf(GROUP, "../secret", VERSION)) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("path traversal")
         }
@@ -230,7 +232,7 @@ class DirBasedCacheTest {
         fun `path traversal in version segment throws`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            assertThatThrownBy { cache.get(GROUP, ARTIFACT, "..") }
+            assertThatThrownBy { cache.get(listOf(GROUP, ARTIFACT, "..")) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("path traversal")
         }
@@ -247,7 +249,7 @@ class DirBasedCacheTest {
             dir.resolve(CONTENT_FILE_NAME).writeText(Json.encodeToString(String.serializer(), "valid"))
             dir.resolve("metadata.json").writeText("not-json{{")
 
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isInstanceOf(CacheResult.Corrupted::class.java)
             assertThat(dir.exists()).isFalse()
@@ -261,7 +263,7 @@ class DirBasedCacheTest {
             writeValidMetadata(dir)
             dir.resolve(CONTENT_FILE_NAME).writeText("corrupted{{{content")
 
-            val result = cache.get(GROUP, ARTIFACT, VERSION)
+            val result = cache.get(COORDINATE, VERSION)
 
             assertThat(result).isInstanceOf(CacheResult.Corrupted::class.java)
             assertThat(dir.exists()).isFalse()
@@ -275,7 +277,7 @@ class DirBasedCacheTest {
         fun `clear removes entire cache directory`(@TempDir tempDir: File) {
             val cache = createCache(tempDir)
 
-            cache.put(GROUP, ARTIFACT, VERSION, "some-data")
+            cache.put(COORDINATE, VERSION, "some-data")
             val cacheDir = tempDir.resolve("cache")
             assertThat(cacheDir.exists()).isTrue()
 

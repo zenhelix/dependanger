@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.zenhelix.dependanger.core.model.Constraint
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
@@ -18,7 +19,7 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:commons",
+                    coordinate = MavenCoordinate("org.lib", "commons"),
                     version = VersionReference.Literal("2.0"),
                     because = null,
                 )
@@ -38,7 +39,7 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:commons",
+                    coordinate = MavenCoordinate("org.lib", "commons"),
                     version = VersionReference.Literal("2.0"),
                     because = null,
                 )
@@ -57,7 +58,7 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:commons",
+                    coordinate = MavenCoordinate("org.lib", "commons"),
                     version = VersionReference.Reference("some-ref"),
                     because = null,
                 )
@@ -79,13 +80,13 @@ class ConstraintApplicationTest {
                 tree("org.lib", "utils", "2.0"),
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "org.lib", artifact = "commons")
+                Constraint.Exclude(coordinate = MavenCoordinate("org.lib", "commons"))
             )
 
             val result = ConstraintApplier.apply(trees, constraints)
 
             assertThat(result).hasSize(1)
-            assertThat(result[0].artifact).isEqualTo("utils")
+            assertThat(result[0].coordinate.artifact).isEqualTo("utils")
         }
 
         @Test
@@ -99,14 +100,14 @@ class ConstraintApplicationTest {
                 ),
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "org.lib", artifact = "commons")
+                Constraint.Exclude(coordinate = MavenCoordinate("org.lib", "commons"))
             )
 
             val result = ConstraintApplier.apply(trees, constraints)
 
             assertThat(result).hasSize(1)
             assertThat(result[0].children).hasSize(1)
-            assertThat(result[0].children[0].artifact).isEqualTo("utils")
+            assertThat(result[0].children[0].coordinate.artifact).isEqualTo("utils")
         }
     }
 
@@ -120,16 +121,17 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.Substitute(
-                    from = "org.old:lib",
-                    to = "org.new:lib-renamed",
+                    from = MavenCoordinate("org.old", "lib"),
+                    to = MavenCoordinate("org.new", "lib-renamed"),
+                    toVersion = null,
                     because = "migration",
                 )
             )
 
             val result = ConstraintApplier.apply(trees, constraints)
 
-            assertThat(result[0].group).isEqualTo("org.new")
-            assertThat(result[0].artifact).isEqualTo("lib-renamed")
+            assertThat(result[0].coordinate.group).isEqualTo("org.new")
+            assertThat(result[0].coordinate.artifact).isEqualTo("lib-renamed")
             assertThat(result[0].version).isEqualTo("1.0")
         }
 
@@ -140,16 +142,17 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.Substitute(
-                    from = "org.old:lib",
-                    to = "org.new:lib-renamed:5.0",
+                    from = MavenCoordinate("org.old", "lib"),
+                    to = MavenCoordinate("org.new", "lib-renamed"),
+                    toVersion = "5.0",
                     because = null,
                 )
             )
 
             val result = ConstraintApplier.apply(trees, constraints)
 
-            assertThat(result[0].group).isEqualTo("org.new")
-            assertThat(result[0].artifact).isEqualTo("lib-renamed")
+            assertThat(result[0].coordinate.group).isEqualTo("org.new")
+            assertThat(result[0].coordinate.artifact).isEqualTo("lib-renamed")
             assertThat(result[0].version).isEqualTo("5.0")
         }
 
@@ -164,8 +167,9 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.Substitute(
-                    from = "org.old:lib",
-                    to = "org.new:lib-v2",
+                    from = MavenCoordinate("org.old", "lib"),
+                    to = MavenCoordinate("org.new", "lib-v2"),
+                    toVersion = null,
                     because = null,
                 )
             )
@@ -173,69 +177,8 @@ class ConstraintApplicationTest {
             val result = ConstraintApplier.apply(trees, constraints)
 
             val child = result[0].children[0]
-            assertThat(child.group).isEqualTo("org.new")
-            assertThat(child.artifact).isEqualTo("lib-v2")
-        }
-    }
-
-    @Nested
-    inner class `invalid coordinate format is handled gracefully` {
-
-        @Test
-        fun `version constraint with invalid coordinates returns trees unchanged`() {
-            val trees = listOf(
-                tree("org.lib", "commons", "1.0"),
-            )
-            val constraints = listOf(
-                Constraint.VersionConstraintDef(
-                    coordinates = "invalid-no-colon",
-                    version = VersionReference.Literal("9.0"),
-                    because = null,
-                )
-            )
-
-            val result = ConstraintApplier.apply(trees, constraints)
-
-            assertThat(result).hasSize(1)
-            assertThat(result[0].version).isEqualTo("1.0")
-        }
-
-        @Test
-        fun `substitute with invalid from coordinate returns trees unchanged`() {
-            val trees = listOf(
-                tree("org.lib", "commons", "1.0"),
-            )
-            val constraints = listOf(
-                Constraint.Substitute(
-                    from = "no-colon",
-                    to = "org.new:lib",
-                    because = null,
-                )
-            )
-
-            val result = ConstraintApplier.apply(trees, constraints)
-
-            assertThat(result).hasSize(1)
-            assertThat(result[0].group).isEqualTo("org.lib")
-        }
-
-        @Test
-        fun `substitute with invalid to coordinate returns trees unchanged`() {
-            val trees = listOf(
-                tree("org.lib", "commons", "1.0"),
-            )
-            val constraints = listOf(
-                Constraint.Substitute(
-                    from = "org.lib:commons",
-                    to = "no-colon",
-                    because = null,
-                )
-            )
-
-            val result = ConstraintApplier.apply(trees, constraints)
-
-            assertThat(result).hasSize(1)
-            assertThat(result[0].group).isEqualTo("org.lib")
+            assertThat(child.coordinate.group).isEqualTo("org.new")
+            assertThat(child.coordinate.artifact).isEqualTo("lib-v2")
         }
     }
 
@@ -251,14 +194,14 @@ class ConstraintApplicationTest {
                 )
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "org.slf4j", artifact = "slf4j-api")
+                Constraint.Exclude(coordinate = MavenCoordinate("org.slf4j", "slf4j-api"))
             )
 
             val result = ConstraintApplier.applyToChildren(root, constraints)
 
-            assertThat(result.group).isEqualTo("io.ktor")
+            assertThat(result.coordinate.group).isEqualTo("io.ktor")
             assertThat(result.children).hasSize(1)
-            assertThat(result.children[0].artifact).isEqualTo("annotations")
+            assertThat(result.children[0].coordinate.artifact).isEqualTo("annotations")
         }
 
         @Test
@@ -269,13 +212,13 @@ class ConstraintApplicationTest {
                 )
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "io.ktor", artifact = "ktor-client")
+                Constraint.Exclude(coordinate = MavenCoordinate("io.ktor", "ktor-client"))
             )
 
             val result = ConstraintApplier.applyToChildren(root, constraints)
 
-            assertThat(result.group).isEqualTo("io.ktor")
-            assertThat(result.artifact).isEqualTo("ktor-client")
+            assertThat(result.coordinate.group).isEqualTo("io.ktor")
+            assertThat(result.coordinate.artifact).isEqualTo("ktor-client")
             assertThat(result.children).hasSize(1)
         }
 
@@ -288,7 +231,7 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.slf4j:slf4j-api",
+                    coordinate = MavenCoordinate("org.slf4j", "slf4j-api"),
                     version = VersionReference.Literal("2.0"),
                     because = "upgrade",
                 )
@@ -308,8 +251,9 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.Substitute(
-                    from = "javax.annotation:javax.annotation-api",
-                    to = "jakarta.annotation:jakarta.annotation-api:2.0",
+                    from = MavenCoordinate("javax.annotation", "javax.annotation-api"),
+                    to = MavenCoordinate("jakarta.annotation", "jakarta.annotation-api"),
+                    toVersion = "2.0",
                     because = "jakarta migration",
                 )
             )
@@ -317,8 +261,8 @@ class ConstraintApplicationTest {
             val result = ConstraintApplier.applyToChildren(root, constraints)
 
             val child = result.children[0]
-            assertThat(child.group).isEqualTo("jakarta.annotation")
-            assertThat(child.artifact).isEqualTo("jakarta.annotation-api")
+            assertThat(child.coordinate.group).isEqualTo("jakarta.annotation")
+            assertThat(child.coordinate.artifact).isEqualTo("jakarta.annotation-api")
             assertThat(child.version).isEqualTo("2.0")
         }
 
@@ -348,14 +292,14 @@ class ConstraintApplicationTest {
                 )
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "org.slf4j", artifact = "slf4j-api")
+                Constraint.Exclude(coordinate = MavenCoordinate("org.slf4j", "slf4j-api"))
             )
 
             val result = ConstraintApplier.applyToChildren(root, constraints)
 
             assertThat(result.children).hasSize(1)
             assertThat(result.children[0].children).hasSize(1)
-            assertThat(result.children[0].children[0].artifact).isEqualTo("annotations")
+            assertThat(result.children[0].children[0].coordinate.artifact).isEqualTo("annotations")
         }
     }
 
@@ -377,7 +321,7 @@ class ConstraintApplicationTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:deep",
+                    coordinate = MavenCoordinate("org.lib", "deep"),
                     version = VersionReference.Literal("9.0"),
                     because = null,
                 )
@@ -404,14 +348,14 @@ class ConstraintApplicationTest {
                 ),
             )
             val constraints = listOf(
-                Constraint.Exclude(group = "org.lib", artifact = "to-remove")
+                Constraint.Exclude(coordinate = MavenCoordinate("org.lib", "to-remove"))
             )
 
             val result = ConstraintApplier.apply(trees, constraints)
 
             val midChildren = result[0].children[0].children
             assertThat(midChildren).hasSize(1)
-            assertThat(midChildren[0].artifact).isEqualTo("to-keep")
+            assertThat(midChildren[0].coordinate.artifact).isEqualTo("to-keep")
         }
     }
 

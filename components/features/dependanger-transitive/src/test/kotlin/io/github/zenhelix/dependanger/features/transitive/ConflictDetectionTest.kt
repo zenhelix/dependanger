@@ -1,6 +1,7 @@
 package io.github.zenhelix.dependanger.features.transitive
 
 import io.github.zenhelix.dependanger.core.model.Constraint
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.feature.model.transitive.ConflictResolutionStrategy
 import org.assertj.core.api.Assertions.assertThat
@@ -32,8 +33,8 @@ class ConflictDetectionTest {
             )
 
             assertThat(conflicts).hasSize(1)
-            assertThat(conflicts[0].group).isEqualTo("org.lib")
-            assertThat(conflicts[0].artifact).isEqualTo("commons")
+            assertThat(conflicts[0].coordinate.group).isEqualTo("org.lib")
+            assertThat(conflicts[0].coordinate.artifact).isEqualTo("commons")
             assertThat(conflicts[0].requestedVersions).containsExactly("1.0", "2.0")
         }
 
@@ -59,7 +60,7 @@ class ConflictDetectionTest {
             )
 
             assertThat(conflicts).hasSize(2)
-            assertThat(conflicts.map { "${it.group}:${it.artifact}" })
+            assertThat(conflicts.map { "${it.coordinate}" })
                 .containsExactlyInAnyOrder("org.lib:x", "org.lib:y")
         }
     }
@@ -165,7 +166,7 @@ class ConflictDetectionTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:commons",
+                    coordinate = MavenCoordinate("org.lib", "commons"),
                     version = VersionReference.Literal("1.5"),
                     because = "pinned by policy",
                 )
@@ -196,7 +197,7 @@ class ConflictDetectionTest {
             )
             val constraints = listOf(
                 Constraint.VersionConstraintDef(
-                    coordinates = "org.lib:commons",
+                    coordinate = MavenCoordinate("org.lib", "commons"),
                     version = VersionReference.Reference("commons-version"),
                     because = null,
                 )

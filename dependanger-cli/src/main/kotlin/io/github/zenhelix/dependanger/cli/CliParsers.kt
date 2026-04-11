@@ -1,19 +1,19 @@
 package io.github.zenhelix.dependanger.cli
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.MavenRepository
 import io.github.zenhelix.dependanger.core.model.VersionReference
 
-public data class MavenCoordinates(
-    val group: String,
-    val artifact: String,
+public data class ParsedCoordinates(
+    val coordinate: MavenCoordinate,
     val version: String?,
 )
 
-public fun parseMavenCoordinates(raw: String): MavenCoordinates {
+public fun parseMavenCoordinates(raw: String): ParsedCoordinates {
     val parts = raw.split(":")
     return when (parts.size) {
-        2    -> MavenCoordinates(group = parts[0], artifact = parts[1], version = null)
-        3    -> MavenCoordinates(group = parts[0], artifact = parts[1], version = parts[2].ifBlank { null })
+        2 -> ParsedCoordinates(coordinate = MavenCoordinate(parts[0], parts[1]), version = null)
+        3 -> ParsedCoordinates(coordinate = MavenCoordinate(parts[0], parts[1]), version = parts[2].ifBlank { null })
         else -> throw CliException.InvalidArgument(
             "Invalid Maven coordinates '$raw': expected format 'group:artifact' or 'group:artifact:version'"
         )

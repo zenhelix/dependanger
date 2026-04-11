@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.feature.model.license
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,8 +11,7 @@ public enum class LicenseViolationType {
 @Serializable
 public data class LicenseViolation(
     val alias: String,
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val detectedLicense: String?,
     val category: LicenseCategory,
     val violationType: LicenseViolationType,

@@ -26,7 +26,7 @@ public abstract class ResolveTransitivesTask : AbstractDependangerTask() {
                 logger.lifecycle("")
                 logger.lifecycle("  Conflicts:")
                 conflicts.forEach { conflict ->
-                    logger.warn("    ${conflict.group}:${conflict.artifact}: ${conflict.requestedVersions.joinToString(" vs ")} (resolved: ${conflict.resolvedVersion})")
+                    logger.warn("    ${conflict.coordinate}: ${conflict.requestedVersions.joinToString(" vs ")} (resolved: ${conflict.resolvedVersion})")
                 }
             }
         }

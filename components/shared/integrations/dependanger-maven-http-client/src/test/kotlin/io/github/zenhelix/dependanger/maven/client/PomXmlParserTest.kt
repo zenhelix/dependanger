@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.maven.client
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.maven.client.model.RawBomDependency
 import io.github.zenhelix.dependanger.maven.pom.parser.PomParseException
 import org.assertj.core.api.Assertions.assertThat
@@ -46,8 +47,7 @@ class PomXmlParserTest {
             assertThat(result.dependencies).hasSize(2)
             assertThat(result.dependencies[0]).isEqualTo(
                 RawBomDependency(
-                    group = "org.apache",
-                    artifact = "commons-lang",
+                    coordinate = MavenCoordinate("org.apache", "commons-lang"),
                     version = "3.12.0",
                     scope = null,
                     type = null,
@@ -55,8 +55,7 @@ class PomXmlParserTest {
             )
             assertThat(result.dependencies[1]).isEqualTo(
                 RawBomDependency(
-                    group = "com.google",
-                    artifact = "guava",
+                    coordinate = MavenCoordinate("com.google", "guava"),
                     version = "31.1-jre",
                     scope = null,
                     type = null,
@@ -214,9 +213,9 @@ class PomXmlParserTest {
             val result = parser.parseBomContent(pomXml)
 
             assertThat(result.parent).isNotNull
-            assertThat(result.parent!!.group).isEqualTo("com.example.parent")
-            assertThat(result.parent!!.artifact).isEqualTo("parent-pom")
-            assertThat(result.parent!!.version).isEqualTo("1.0.0")
+            assertThat(result.parent!!.gav.coordinate.group).isEqualTo("com.example.parent")
+            assertThat(result.parent!!.gav.coordinate.artifact).isEqualTo("parent-pom")
+            assertThat(result.parent!!.gav.version).isEqualTo("1.0.0")
         }
 
         @Test

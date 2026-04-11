@@ -3,6 +3,7 @@ package io.github.zenhelix.dependanger.features.license
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.DiagnosticsBuilder
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.core.util.GlobMatcher
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
@@ -66,7 +67,7 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
 
         val candidates = metadata.libraries.values.filter { lib ->
             lib.version.isResolved
-                    && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, lib.group, lib.artifact) }
+                    && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, lib.coordinate) }
         }
 
         val transitiveCandidates: List<FlatDependency> = if (settings.includeTransitives) {
@@ -80,11 +81,11 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
                 )
                 emptyList()
             } else {
-                val directCoordinates = candidates.map { "${it.group}:${it.artifact}" }.toSet()
+                val directCoordinates = candidates.map { it.coordinate }.toSet()
                 flatDeps.filter { dep ->
                     !dep.isDirectDependency
-                            && "${dep.group}:${dep.artifact}" !in directCoordinates
-                            && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, dep.group, dep.artifact) }
+                            && dep.coordinate !in directCoordinates
+                            && settings.ignoreLibraries.none { pattern -> GlobMatcher.matches(pattern, dep.coordinate) }
                 }.also { transitives ->
                     logger.info { "Including ${transitives.size} transitive dependencies in license check" }
                 }
@@ -118,7 +119,7 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
                 candidates = candidates,
                 resolver = ctx.resolver,
                 semaphore = semaphore,
-                extractCoordinates = { lib -> Triple(lib.group, lib.artifact, lib.version.requireValue()) },
+                extractCoordinates = { lib -> lib.coordinate to lib.version.requireValue() },
                 extractDeclaredLicense = { lib -> lib.license?.id },
             )
 
@@ -126,7 +127,7 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
                 candidates = transitiveCandidates,
                 resolver = ctx.resolver,
                 semaphore = semaphore,
-                extractCoordinates = { dep -> Triple(dep.group, dep.artifact, dep.version) },
+                extractCoordinates = { dep -> dep.coordinate to dep.version },
                 extractDeclaredLicense = { null },
             )
 
@@ -171,7 +172,7 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
         candidates: List<T>,
         resolver: LicenseResolver,
         semaphore: Semaphore,
-        extractCoordinates: (T) -> Triple<String, String, String>,
+        extractCoordinates: (T) -> Pair<MavenCoordinate, String>,
         extractDeclaredLicense: (T) -> String?,
     ): List<Pair<T, List<LicenseResult>>> = if (candidates.isEmpty()) {
         emptyList()
@@ -180,10 +181,9 @@ public class LicenseCheckProcessor : AbstractParallelMavenProcessor<LicenseCheck
             candidates.map { candidate ->
                 async {
                     semaphore.withPermit {
-                        val (group, artifact, version) = extractCoordinates(candidate)
+                        val (coordinate, version) = extractCoordinates(candidate)
                         val licenses = resolver.resolve(
-                            group = group,
-                            artifact = artifact,
+                            coordinate = coordinate,
                             version = version,
                             declaredLicenseId = extractDeclaredLicense(candidate),
                         )

@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class BomImport(
     val alias: String,
-    val group: String,
-    val artifact: String,
+    val coordinate: MavenCoordinate,
     val version: VersionReference,
 )

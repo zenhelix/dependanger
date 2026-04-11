@@ -179,8 +179,7 @@ internal object ReportDataMapper {
 
     private fun EffectiveLibrary.toReportLibrary(): ReportLibrary = ReportLibrary(
         alias = alias,
-        group = group,
-        artifact = artifact,
+        coordinate = coordinate,
         version = version.valueOrNull,
         tags = tags,
         isDeprecated = isDeprecated,
@@ -222,7 +221,7 @@ internal object ReportDataMapper {
         return ReportVulnerability(
             id = id,
             cveId = cveAlias,
-            library = "$affectedGroup:$affectedArtifact:$affectedVersion",
+            library = "$affectedCoordinate:$affectedVersion",
             severity = severity.name,
             cvssScore = cvssScore,
             fixedVersion = fixedVersion,
@@ -231,30 +230,30 @@ internal object ReportDataMapper {
     }
 
     private fun LicenseViolation.toReportLicense(): ReportLicense = ReportLicense(
-        library = "$group:$artifact",
+        library = "$coordinate",
         licenseName = detectedLicense ?: "Unknown",
         status = violationType.name,
     )
 
     private fun VersionConflict.toReportConflict(): ReportConflict = ReportConflict(
-        artifact = "$group:$artifact",
+        coordinate = this.coordinate.toString(),
         versions = requestedVersions,
     )
 
     private fun Constraint.toReportConstraint(): ReportConstraint = when (this) {
         is Constraint.VersionConstraintDef -> ReportConstraint(
             type = "version",
-            description = "${coordinates}${because?.let { " ($it)" } ?: ""}",
+            description = "${coordinate}${because?.let { " ($it)" } ?: ""}",
         )
 
         is Constraint.Exclude              -> ReportConstraint(
             type = "exclude",
-            description = "$group:$artifact",
+            description = "$coordinate",
         )
 
         is Constraint.Substitute           -> ReportConstraint(
             type = "substitute",
-            description = "$from -> $to${because?.let { " ($it)" } ?: ""}",
+            description = "$from -> $to${toVersion?.let { ":$it" } ?: ""}${because?.let { " ($it)" } ?: ""}",
         )
     }
 }

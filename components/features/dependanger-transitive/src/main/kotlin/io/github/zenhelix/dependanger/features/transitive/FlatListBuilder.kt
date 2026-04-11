@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.features.transitive
 
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.effective.model.EffectiveLibrary
 import io.github.zenhelix.dependanger.feature.model.transitive.FlatDependency
 import io.github.zenhelix.dependanger.feature.model.transitive.TransitiveTree
@@ -11,19 +12,18 @@ internal object FlatListBuilder {
         directLibraries: Collection<EffectiveLibrary>,
     ): List<FlatDependency> {
         val directCoordinates = directLibraries
-            .map { "${it.group}:${it.artifact}" }
+            .map { it.coordinate }
             .toSet()
-        val seen = linkedMapOf<String, FlatDependency>()
+        val seen = linkedMapOf<MavenCoordinate, FlatDependency>()
 
         fun traverse(tree: TransitiveTree) {
             if (tree.isCycle) return
 
-            val coordinate = "${tree.group}:${tree.artifact}"
+            val coordinate = tree.coordinate
             val version = tree.version
             if (coordinate !in seen && version != null) {
                 seen[coordinate] = FlatDependency(
-                    group = tree.group,
-                    artifact = tree.artifact,
+                    coordinate = coordinate,
                     version = version,
                     scope = tree.scope,
                     isDirectDependency = coordinate in directCoordinates,

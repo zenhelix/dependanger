@@ -4,6 +4,7 @@ import io.github.zenhelix.dependanger.core.DependangerPaths
 import io.github.zenhelix.dependanger.core.model.BomImport
 import io.github.zenhelix.dependanger.core.model.CredentialsProviderKey
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.MavenCoordinate
 import io.github.zenhelix.dependanger.core.model.VersionReference
 import io.github.zenhelix.dependanger.effective.DiagnosticCodes
 import io.github.zenhelix.dependanger.effective.ProcessorIds
@@ -71,8 +72,7 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
                 }
 
                 val result = resolver.resolve(
-                    group = bomImport.group,
-                    artifact = bomImport.artifact,
+                    coordinate = bomImport.coordinate,
                     version = resolvedVersion,
                     diagnostics = diagnostics,
                 )
@@ -120,14 +120,14 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
     private fun buildBomVersionMap(
         resolvedBoms: List<BomContent>,
         bomImports: List<BomImport>,
-    ): Map<String, Pair<String, String>> {
-        val versionMap = mutableMapOf<String, Pair<String, String>>()
+    ): Map<MavenCoordinate, Pair<String, String>> {
+        val versionMap = mutableMapOf<MavenCoordinate, Pair<String, String>>()
         for ((index, bom) in resolvedBoms.withIndex()) {
             val bomAlias = bomImports[index].alias
             // Within a resolved BOM: last definition wins (child overrides parent, Maven behavior)
-            val bomVersions = mutableMapOf<String, Pair<String, String>>()
+            val bomVersions = mutableMapOf<MavenCoordinate, Pair<String, String>>()
             for (dep in bom.dependencies) {
-                bomVersions["${dep.group}:${dep.artifact}"] = dep.version to bomAlias
+                bomVersions[dep.coordinate] = dep.version to bomAlias
             }
             // Across BOMs: first BOM wins
             for ((key, value) in bomVersions) {
@@ -139,17 +139,16 @@ public class BomImportProcessor : EffectiveMetadataProcessor {
 
     private fun enrichLibraries(
         libraries: Map<String, EffectiveLibrary>,
-        versionMap: Map<String, Pair<String, String>>,
+        versionMap: Map<MavenCoordinate, Pair<String, String>>,
         diagnostics: Diagnostics,
     ): Pair<Map<String, EffectiveLibrary>, Diagnostics> {
         val currentDiagnostics = Diagnostics.builder(diagnostics)
         val updatedLibraries = libraries.mapValues { (_, lib) ->
             if (lib.version.isResolved) return@mapValues lib
-            val key = "${lib.group}:${lib.artifact}"
-            val (version, bomAlias) = versionMap[key] ?: return@mapValues lib
+            val (version, bomAlias) = versionMap[lib.coordinate] ?: return@mapValues lib
             currentDiagnostics.info(
                 DiagnosticCodes.Bom.VERSION_IMPORTED,
-                "Version $version imported from BOM '$bomAlias' for ${lib.group}:${lib.artifact}",
+                "Version $version imported from BOM '$bomAlias' for ${lib.coordinate}",
                 id, emptyMap()
             )
             lib.copy(

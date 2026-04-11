@@ -76,7 +76,7 @@ public class SecurityCheckCommand : CliktCommand(name = "security") {
                         headers = listOf("Library", "CVE ID", "Severity", "Summary"),
                         rowMapper = { vuln ->
                             listOf(
-                                "${vuln.affectedGroup}:${vuln.affectedArtifact}",
+                                vuln.affectedCoordinate.toString(),
                                 vuln.id,
                                 vuln.severity.name,
                                 vuln.summary,

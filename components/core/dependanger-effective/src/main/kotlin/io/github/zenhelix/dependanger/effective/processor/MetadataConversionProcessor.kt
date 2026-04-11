@@ -41,8 +41,7 @@ internal class MetadataConversionProcessor : EffectiveMetadataProcessor {
         val libraries = original.libraries.associate { lib ->
             lib.alias to EffectiveLibrary(
                 alias = lib.alias,
-                group = lib.group,
-                artifact = lib.artifact,
+                coordinate = lib.coordinate,
                 version = convertVersionReference(lib.version),
                 description = lib.description,
                 tags = lib.tags,

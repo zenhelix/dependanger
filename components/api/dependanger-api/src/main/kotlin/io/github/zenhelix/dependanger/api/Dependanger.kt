@@ -1,5 +1,6 @@
 package io.github.zenhelix.dependanger.api
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.Diagnostics
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
@@ -23,6 +24,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.util.ServiceLoader
+
+private val logger = KotlinLogging.logger {}
 
 private fun EffectiveMetadata.toResult(): DependangerResult =
     if (diagnostics.hasErrors) {
@@ -66,11 +69,19 @@ public class Dependanger internal constructor(
     private val contextProperties: Map<ProcessingContextKey<*>, Any>,
 ) {
     private val featureSettingsProviders: List<FeatureSettingsProvider> by lazy {
-        ServiceLoader.load(FeatureSettingsProvider::class.java).toList()
+        ServiceLoader.load(FeatureSettingsProvider::class.java).toList().also { providers ->
+            if (providers.isEmpty()) {
+                logger.warn { "No FeatureSettingsProviders discovered via SPI" }
+            }
+        }
     }
 
     private val contextContributors: List<ContextContributor> by lazy {
-        ServiceLoader.load(ContextContributor::class.java).toList()
+        ServiceLoader.load(ContextContributor::class.java).toList().also { contributors ->
+            if (contributors.isEmpty()) {
+                logger.warn { "No ContextContributors discovered via SPI" }
+            }
+        }
     }
 
     public suspend fun process(

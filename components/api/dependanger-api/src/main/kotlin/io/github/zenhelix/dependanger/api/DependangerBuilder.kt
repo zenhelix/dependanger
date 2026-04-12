@@ -1,13 +1,17 @@
 package io.github.zenhelix.dependanger.api
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.dsl.DependangerDsl
 import io.github.zenhelix.dependanger.core.model.ProcessingPreset
 import io.github.zenhelix.dependanger.core.model.metadata.DependangerMetadata
 import io.github.zenhelix.dependanger.core.pipeline.ProcessingContextKey
 import io.github.zenhelix.dependanger.effective.pipeline.EffectiveMetadataProcessor
 import io.github.zenhelix.dependanger.effective.pipeline.PipelineBuilder
+import io.github.zenhelix.dependanger.effective.pipeline.PipelineConfigurationException
 import io.github.zenhelix.dependanger.effective.pipeline.ProcessingEnvironment
 import java.util.ServiceLoader
+
+private val logger = KotlinLogging.logger {}
 
 public class DependangerBuilder {
     private var metadata: DependangerMetadata? = null
@@ -73,7 +77,18 @@ public class DependangerBuilder {
             metadata = resolvedMetadata,
             preset = preset,
             environment = environment,
-            discoveredProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList(),
+            discoveredProcessors = ServiceLoader.load(EffectiveMetadataProcessor::class.java).toList().also { processors ->
+                if (processors.isEmpty()) {
+                    logger.warn { "No feature processors discovered via SPI. Only core processors will be used." }
+                }
+                processors.forEach { processor ->
+                    if (processor.id.isBlank()) {
+                        throw PipelineConfigurationException(
+                            "Processor ${processor.javaClass.name} has blank id"
+                        )
+                    }
+                }
+            },
             additionalProcessors = additionalProcessors.toList(),
             disabledProcessorIds = disabledProcessorIds.toSet(),
             pipelineCustomizer = pipelineCustomizer,

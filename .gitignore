@@ -4,8 +4,6 @@ build/
 !**/src/main/**
 !**/src/test/**
 
-/.kotlin
-
 ### IntelliJ IDEA ###
 .idea
 *.iws
@@ -13,9 +11,40 @@ build/
 *.ipr
 out/
 
-### Eclipse ###
-.project
-.settings/
-.classpath
+### Eclipse template
+.metadata
 bin/
+tmp/
+*.tmp
+*.bak
+local.properties
+.settings/
+.project
+.classpath
 
+### Kotlin template
+.kotlin
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
+### macOS template
+# General
+.DS_Store
+.AppleDouble
+.LSOverride

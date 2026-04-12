@@ -11,19 +11,11 @@ public class CircuitBreakerOpenException(
 ) : IOException("Circuit breaker is open for host: $host")
 
 public class CircuitBreakerPluginConfig {
-    public var failureThreshold: Int = CircuitBreakerConfig.DEFAULT_FAILURE_THRESHOLD
-    public var openDurationMs: Long = CircuitBreakerConfig.DEFAULT_OPEN_DURATION_MS
-    public var halfOpenMaxProbes: Int = CircuitBreakerConfig.DEFAULT_HALF_OPEN_MAX_PROBES
-
-    internal fun toConfig(): CircuitBreakerConfig = CircuitBreakerConfig(
-        failureThreshold = failureThreshold,
-        openDurationMs = openDurationMs,
-        halfOpenMaxProbes = halfOpenMaxProbes,
-    )
+    public var config: CircuitBreakerConfig = CircuitBreakerConfig()
 }
 
 public val CircuitBreakerPlugin: ClientPlugin<CircuitBreakerPluginConfig> = createClientPlugin("CircuitBreaker", ::CircuitBreakerPluginConfig) {
-    val config = pluginConfig.toConfig()
+    val config = pluginConfig.config
     val states = ConcurrentHashMap<String, CircuitBreakerState>()
 
     fun stateFor(host: String): CircuitBreakerState =

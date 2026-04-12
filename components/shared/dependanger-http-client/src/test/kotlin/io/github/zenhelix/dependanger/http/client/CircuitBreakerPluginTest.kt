@@ -31,9 +31,7 @@ class CircuitBreakerPluginTest {
             )
         }) {
             install(CircuitBreakerPlugin) {
-                failureThreshold = config.failureThreshold
-                openDurationMs = config.openDurationMs
-                halfOpenMaxProbes = config.halfOpenMaxProbes
+                this.config = config
             }
         }
         return client to requestCount
@@ -61,11 +59,9 @@ class CircuitBreakerPluginTest {
         fun `circuit opens after failure threshold and rejects requests`() = runTest {
             val (client, count) = mockClient { HttpStatusCode.InternalServerError }
 
-            // Trigger 2 failures to open circuit
             runCatching { client.get("https://api.example.com/data") }
             runCatching { client.get("https://api.example.com/data") }
 
-            // Third request should be rejected by circuit breaker
             val result = runCatching { client.get("https://api.example.com/data") }
             assertThat(result.isFailure).isTrue()
             assertThat(result.exceptionOrNull()).isInstanceOf(CircuitBreakerOpenException::class.java)

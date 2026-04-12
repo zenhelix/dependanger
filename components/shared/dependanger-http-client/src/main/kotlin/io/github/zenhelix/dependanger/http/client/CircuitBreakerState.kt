@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-public enum class CircuitBreakerStatus { CLOSED, OPEN, HALF_OPEN }
+internal enum class CircuitBreakerStatus { CLOSED, OPEN, HALF_OPEN }
 
 internal class CircuitBreakerState(private val config: CircuitBreakerConfig) {
 
@@ -15,14 +15,14 @@ internal class CircuitBreakerState(private val config: CircuitBreakerConfig) {
 
     val status: CircuitBreakerStatus get() = _status.get()
 
+    @Synchronized
     fun canAttempt(): Boolean = when (_status.get()) {
         CircuitBreakerStatus.CLOSED    -> true
         CircuitBreakerStatus.OPEN      -> {
             val elapsed = System.currentTimeMillis() - openedAt.get()
             if (elapsed >= config.openDurationMs) {
-                if (_status.compareAndSet(CircuitBreakerStatus.OPEN, CircuitBreakerStatus.HALF_OPEN)) {
-                    probeCount.set(0)
-                }
+                _status.set(CircuitBreakerStatus.HALF_OPEN)
+                probeCount.set(0)
                 probeCount.incrementAndGet() <= config.halfOpenMaxProbes
             } else {
                 false
@@ -33,12 +33,14 @@ internal class CircuitBreakerState(private val config: CircuitBreakerConfig) {
         }
     }
 
+    @Synchronized
     fun recordSuccess() {
         consecutiveFailures.set(0)
         probeCount.set(0)
         _status.set(CircuitBreakerStatus.CLOSED)
     }
 
+    @Synchronized
     fun recordFailure() {
         val failures = consecutiveFailures.incrementAndGet()
         if (_status.get() == CircuitBreakerStatus.HALF_OPEN) {

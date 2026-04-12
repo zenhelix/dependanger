@@ -19,9 +19,7 @@ public object DefaultHttpClientFactory : HttpClientFactory {
         val config = HttpClientConfig().apply(block)
         return HttpClient(CIO) {
             install(CircuitBreakerPlugin) {
-                failureThreshold = config.circuitBreakerConfig.failureThreshold
-                openDurationMs = config.circuitBreakerConfig.openDurationMs
-                halfOpenMaxProbes = config.circuitBreakerConfig.halfOpenMaxProbes
+                this.config = config.circuitBreakerConfig
             }
             install(HttpRequestRetry) {
                 maxRetries = config.retryConfig.maxRetries

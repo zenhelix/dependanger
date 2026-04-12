@@ -89,7 +89,7 @@ class CircuitBreakerStateTest {
             val state = CircuitBreakerState(config)
             repeat(3) { state.recordFailure() }
             Thread.sleep(150)
-            state.canAttempt() // triggers HALF_OPEN transition
+            state.canAttempt()
 
             state.recordSuccess()
 
@@ -102,7 +102,7 @@ class CircuitBreakerStateTest {
             val state = CircuitBreakerState(config)
             repeat(3) { state.recordFailure() }
             Thread.sleep(150)
-            state.canAttempt() // triggers HALF_OPEN transition
+            state.canAttempt()
 
             state.recordFailure()
 

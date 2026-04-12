@@ -13,13 +13,13 @@ private val logger = KotlinLogging.logger {}
 
 public suspend fun HttpClient.getWithRetry(
     url: String,
-    retryConfig: RetryConfig = RetryConfig(),
+    @Suppress("UNUSED_PARAMETER") retryConfig: RetryConfig = RetryConfig(),
     requestBuilder: HttpRequestBuilder.() -> Unit = {},
 ): HttpResult<String> = executeWithMapping(url) { get(url, requestBuilder) }
 
 public suspend fun HttpClient.postWithRetry(
     url: String,
-    retryConfig: RetryConfig = RetryConfig(),
+    @Suppress("UNUSED_PARAMETER") retryConfig: RetryConfig = RetryConfig(),
     requestBuilder: HttpRequestBuilder.() -> Unit = {},
 ): HttpResult<String> = executeWithMapping(url) { post(url, requestBuilder) }
 

@@ -5,6 +5,8 @@ public data class HttpClientConfig(
     public var requestTimeoutMs: Long = DEFAULT_REQUEST_TIMEOUT_MS,
     public var keepAliveMs: Long = DEFAULT_KEEP_ALIVE_MS,
     public var jsonIgnoreUnknownKeys: Boolean = true,
+    public var retryConfig: RetryConfig = RetryConfig(),
+    public var circuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
 ) {
     public companion object {
         public const val DEFAULT_CONNECT_TIMEOUT_MS: Long = 30_000L

@@ -48,7 +48,7 @@ public abstract class GenerateEffectiveTask : AbstractDependangerTask() {
 
             when (result) {
                 is DependangerResult.Success, is DependangerResult.CompletedWithErrors -> {
-                    val effective = result.effectiveOrNull()!!
+                    val effective = checkNotNull(result.effectiveOrNull()) { "Effective result expected for ${result::class.simpleName}" }
                     val outputFile = effectiveFile.get().asFile
                     outputFile.parentFile?.mkdirs()
                     val effectiveFormat = EffectiveJsonFormat()

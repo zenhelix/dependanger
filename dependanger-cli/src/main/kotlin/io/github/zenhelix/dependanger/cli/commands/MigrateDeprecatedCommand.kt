@@ -55,8 +55,8 @@ public class MigrateDeprecatedCommand : CliktCommand(name = "migrate-deprecated"
 
             val deprecatedAliases = deprecated.map { it.alias }.toSet()
             val replacementMap = deprecated
-                .filter { it.deprecation?.replacedBy != null }
-                .associate { it.alias to it.deprecation!!.replacedBy!! }
+                .mapNotNull { lib -> lib.deprecation?.replacedBy?.let { lib.alias to it } }
+                .toMap()
 
             val updatedBundles = metadata.bundles.map { bundle ->
                 val updatedLibraries = bundle.libraries.flatMap { libAlias ->

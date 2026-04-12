@@ -39,7 +39,7 @@ internal object ProcessorOrderResolver {
             val mode = processor.phase.executionMode
             if (mode != currentMode) {
                 if (currentProcessors.isNotEmpty()) {
-                    groups.add(ProcessorGroup(currentMode!!, currentProcessors))
+                    groups.add(ProcessorGroup(checkNotNull(currentMode) { "ExecutionMode must be set when processors are present" }, currentProcessors))
                 }
                 currentMode = mode
                 currentProcessors = mutableListOf()
@@ -47,7 +47,7 @@ internal object ProcessorOrderResolver {
             currentProcessors.add(processor)
         }
         if (currentProcessors.isNotEmpty()) {
-            groups.add(ProcessorGroup(currentMode!!, currentProcessors))
+            groups.add(ProcessorGroup(checkNotNull(currentMode) { "ExecutionMode must be set when processors are present" }, currentProcessors))
         }
         return groups
     }
@@ -110,8 +110,8 @@ internal object ProcessorOrderResolver {
 
         val result = mutableListOf<EffectiveMetadataProcessor>()
         while (queue.isNotEmpty()) {
-            val current = queue.pollFirst()!!
-            result.add(byId[current]!!)
+            val current = checkNotNull(queue.pollFirst()) { "Queue must not be empty inside while-isNotEmpty loop" }
+            result.add(checkNotNull(byId[current]) { "Processor '$current' must exist in byId map" })
             for (neighbor in edges[current].orEmpty()) {
                 val newDeg = (inDegree[neighbor] ?: 1) - 1
                 inDegree[neighbor] = newDeg
@@ -161,7 +161,7 @@ internal object ProcessorOrderResolver {
 
             val parallelIds = parallelProcessors.map { it.id }.toSet()
             val idToIndex = result.withIndex().associate { (i, p) -> p.id to i }
-            val indices = parallelProcessors.map { idToIndex[it.id]!! }.sorted()
+            val indices = parallelProcessors.map { checkNotNull(idToIndex[it.id]) { "Processor '${it.id}' must have an index in result" } }.sorted()
             val firstIdx = indices.first()
             val lastIdx = indices.last()
 

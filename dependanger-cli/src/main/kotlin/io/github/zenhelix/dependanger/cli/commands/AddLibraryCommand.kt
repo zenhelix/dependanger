@@ -24,8 +24,8 @@ public class AddLibraryCommand : CliktCommand(name = "library") {
         val coords = parseMavenCoordinates(coordinates)
 
         val resolvedVersion: VersionReference? = when {
-            versionRef != null -> VersionReference.Reference(name = versionRef!!)
-            version != null    -> VersionReference.Literal(version = version!!)
+            versionRef != null -> VersionReference.Reference(name = checkNotNull(versionRef))
+            version != null    -> VersionReference.Literal(version = checkNotNull(version))
             else               -> coords.version?.let { VersionReference.Literal(version = it) }
         }
 

@@ -13,7 +13,7 @@ public object CliDefaults {
     public const val PROCESSING_PRESET_DEFAULT: String = "DEFAULT"
     public const val EFFECTIVE_OUTPUT_FILE: String = "effective.json"
     public const val TOML_FILENAME: String = "libs.versions.toml"
-    public const val TOOL_VERSION: String = "1.0"
+    public val TOOL_VERSION: String = BuildInfo.VERSION
 
     public val CLI_JSON: Json = Json {
         prettyPrint = true

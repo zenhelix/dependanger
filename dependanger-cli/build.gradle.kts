@@ -54,3 +54,32 @@ tasks.jar {
         attributes["Main-Class"] = "io.github.zenhelix.dependanger.cli.DependangerCliKt"
     }
 }
+
+val generateBuildInfo by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/buildinfo")
+    val projectVersion = project.version.toString()
+    outputs.dir(outputDir)
+    inputs.property("version", projectVersion)
+
+    doLast {
+        val dir = outputDir.get().asFile.resolve("io/github/zenhelix/dependanger/cli")
+        dir.mkdirs()
+        dir.resolve("BuildInfo.kt").writeText(
+            """
+            |package io.github.zenhelix.dependanger.cli
+            |
+            |internal object BuildInfo {
+            |    const val VERSION: String = "$projectVersion"
+            |}
+            """.trimMargin()
+        )
+    }
+}
+
+sourceSets.main {
+    kotlin.srcDir(generateBuildInfo.map { it.outputs.files.singleFile })
+}
+
+tasks.named("compileKotlin") {
+    dependsOn(generateBuildInfo)
+}

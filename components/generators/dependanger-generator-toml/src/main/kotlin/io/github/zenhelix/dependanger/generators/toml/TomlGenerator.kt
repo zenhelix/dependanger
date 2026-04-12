@@ -22,6 +22,11 @@ public class TomlGenerator(private val config: TomlConfig = TomlConfig.DEFAULT) 
     override fun generate(effective: EffectiveMetadata): String {
         logger.info { "Generating TOML version catalog (generatorId=$generatorId)" }
 
+        effective.versions.values.forEach { validateTomlAlias(it.alias) }
+        effective.libraries.values.forEach { validateTomlAlias(it.alias) }
+        effective.bundles.values.forEach { validateTomlAlias(it.alias) }
+        effective.plugins.values.forEach { validateTomlAlias(it.alias) }
+
         val result = buildString {
             if (config.includeComments) {
                 appendLine(HEADER_COMMENT)
@@ -163,12 +168,30 @@ public class TomlGenerator(private val config: TomlConfig = TomlConfig.DEFAULT) 
         }
     }
 
-    private fun escapeTomlValue(value: String): String = value
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
+    private fun escapeTomlValue(value: String): String = buildString(value.length) {
+        for (ch in value) {
+            when (ch) {
+                '\\' -> append("\\\\")
+                '"'  -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (ch.code > 0x7E || ch.code < 0x20) {
+                    append("\\u${ch.code.toString(16).padStart(4, '0')}")
+                } else {
+                    append(ch)
+                }
+            }
+        }
+    }
+
+    private fun validateTomlAlias(alias: String) {
+        require(alias.matches(TOML_KEY_PATTERN)) {
+            "Invalid TOML key '$alias': must contain only [A-Za-z0-9_-]"
+        }
+    }
+
+    private val TOML_KEY_PATTERN: Regex = Regex("^[A-Za-z0-9_-]+$")
 
     public companion object {
         private const val GENERATOR_ID: String = "toml-version-catalog"

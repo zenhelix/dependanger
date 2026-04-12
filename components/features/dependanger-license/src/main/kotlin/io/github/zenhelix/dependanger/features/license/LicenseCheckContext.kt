@@ -15,47 +15,61 @@ import kotlinx.serialization.builtins.ListSerializer
 
 private const val DEFAULT_SNAPSHOT_TTL_HOURS = 24L
 
-internal class LicenseCheckContext(
-    repositories: List<MavenRepository>,
-    credentialsProvider: CredentialsProvider?,
-    httpClientFactory: HttpClientFactory,
-    cacheDirectory: String?,
-    cacheTtlHours: Long,
-    readTimeoutMs: Long,
-    customProviders: List<LicenseSourceProvider> = emptyList(),
+internal class LicenseCheckContext private constructor(
+    val cache: DirBasedCache<List<LicenseResult>>,
+    val pomService: MavenPomService,
+    val clearlyDefinedClient: ClearlyDefinedClient,
+    val resolver: LicenseResolver,
 ) : AutoCloseable {
-
-    val cache: DirBasedCache<List<LicenseResult>> = DirBasedCache(
-        cacheDirectory = cacheDirectory ?: DependangerPaths.resolveInUserHome(DependangerPaths.LICENSES_CACHE_DIR),
-        ttlHours = cacheTtlHours,
-        ttlSnapshotHours = DEFAULT_SNAPSHOT_TTL_HOURS,
-        contentSerializer = ListSerializer(LicenseResult.serializer()),
-        contentFileName = "license-content.json",
-    )
-
-    val pomService: MavenPomService = MavenPomService(
-        config = MavenClientConfig(
-            repositories = repositories,
-            credentialsProvider = credentialsProvider,
-            readTimeoutMs = readTimeoutMs,
-        ),
-        httpClientFactory = httpClientFactory,
-    )
-
-    val clearlyDefinedClient: ClearlyDefinedClient = ClearlyDefinedClient(
-        config = ClearlyDefinedClientConfig(timeoutMs = readTimeoutMs),
-        httpClientFactory = httpClientFactory,
-    )
-
-    val resolver: LicenseResolver = LicenseResolver(
-        cache = cache,
-        pomService = pomService,
-        clearlyDefinedClient = clearlyDefinedClient,
-        customProviders = customProviders,
-    )
 
     override fun close() {
         pomService.close()
         clearlyDefinedClient.close()
+    }
+
+    companion object {
+        operator fun invoke(
+            repositories: List<MavenRepository>,
+            credentialsProvider: CredentialsProvider?,
+            httpClientFactory: HttpClientFactory,
+            cacheDirectory: String?,
+            cacheTtlHours: Long,
+            readTimeoutMs: Long,
+            customProviders: List<LicenseSourceProvider> = emptyList(),
+        ): LicenseCheckContext {
+            val cache = DirBasedCache<List<LicenseResult>>(
+                cacheDirectory = cacheDirectory ?: DependangerPaths.resolveInUserHome(DependangerPaths.LICENSES_CACHE_DIR),
+                ttlHours = cacheTtlHours,
+                ttlSnapshotHours = DEFAULT_SNAPSHOT_TTL_HOURS,
+                contentSerializer = ListSerializer(LicenseResult.serializer()),
+                contentFileName = "license-content.json",
+            )
+
+            val mavenClientConfig = MavenClientConfig(
+                repositories = repositories,
+                credentialsProvider = credentialsProvider,
+                readTimeoutMs = readTimeoutMs,
+            )
+
+            val pomService = MavenPomService(config = mavenClientConfig, httpClientFactory = httpClientFactory)
+            val clearlyDefinedClient = try {
+                ClearlyDefinedClient(
+                    config = ClearlyDefinedClientConfig(timeoutMs = readTimeoutMs),
+                    httpClientFactory = httpClientFactory,
+                )
+            } catch (e: Throwable) {
+                pomService.close()
+                throw e
+            }
+
+            val resolver = LicenseResolver(
+                cache = cache,
+                pomService = pomService,
+                clearlyDefinedClient = clearlyDefinedClient,
+                customProviders = customProviders,
+            )
+
+            return LicenseCheckContext(cache, pomService, clearlyDefinedClient, resolver)
+        }
     }
 }

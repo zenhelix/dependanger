@@ -49,13 +49,14 @@ internal object PomDependencyExtractor {
     private fun buildManagedVersions(pomProject: PomProject, resolver: PropertyResolver): Map<String, String> {
         val dm = pomProject.dependencyManagement ?: return emptyMap()
         return dm.dependencies
-            .filter { it.version != null }
-            .associate { dep ->
+            .mapNotNull { dep ->
+                val rawVersion = dep.version ?: return@mapNotNull null
                 val group = resolver.resolveOrNull(dep.groupId) ?: dep.groupId
                 val artifact = resolver.resolveOrNull(dep.artifactId) ?: dep.artifactId
-                val version = resolver.resolveOrNull(dep.version!!) ?: dep.version!!
+                val version = resolver.resolveOrNull(rawVersion) ?: rawVersion
                 "$group:$artifact" to version
             }
+            .toMap()
     }
 
     private fun toResolvedDependency(

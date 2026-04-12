@@ -102,3 +102,9 @@ public class DiagnosticsBuilder(base: Diagnostics = Diagnostics.EMPTY) {
         infos = infos.toList(),
     )
 }
+
+public fun Diagnostics.deduplicate(): Diagnostics = Diagnostics(
+    errors = errors.distinct(),
+    warnings = warnings.distinct(),
+    infos = infos.distinct(),
+)

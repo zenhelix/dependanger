@@ -214,7 +214,9 @@ class PresetVariationsE2ETest : IntegrationTestBase() {
         fun `processor can be disabled`() = runTest {
             val result = io.github.zenhelix.dependanger.api.Dependanger
                 .fromDsl(TestCatalogs.minimal())
-                .disableProcessor(ProcessorIds.VALIDATION)
+                .disableProcessor(ProcessorIds.VALIDATION_DUPLICATES)
+                .disableProcessor(ProcessorIds.VALIDATION_REFERENCES)
+                .disableProcessor(ProcessorIds.VALIDATION_CIRCULAR)
                 .build()
                 .process()
 

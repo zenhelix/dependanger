@@ -22,7 +22,11 @@ import io.github.zenhelix.dependanger.effective.pipeline.ProcessingPhase
 internal class CompatRulesProcessor : EffectiveMetadataProcessor {
     override val id: String = ProcessorIds.COMPAT_RULES
     override val phase: ProcessingPhase = ProcessingPhase.COMPAT_RULES
-    override val constraints: Set<OrderConstraint> = setOf(OrderConstraint.runsAfter(ProcessorIds.VALIDATION))
+    override val constraints: Set<OrderConstraint> = setOf(
+        OrderConstraint.runsAfter(ProcessorIds.VALIDATION_DUPLICATES),
+        OrderConstraint.runsAfter(ProcessorIds.VALIDATION_REFERENCES),
+        OrderConstraint.runsAfter(ProcessorIds.VALIDATION_CIRCULAR),
+    )
     override val isOptional: Boolean = false
     override val description: String = "Checks compatibility rules between libraries"
     override fun supports(context: ProcessingContext): Boolean = true

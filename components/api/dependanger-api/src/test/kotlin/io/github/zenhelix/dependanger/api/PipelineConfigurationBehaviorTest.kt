@@ -124,7 +124,9 @@ class PipelineConfigurationBehaviorTest {
                                      }) {
                 preset(ProcessingPreset.DEFAULT)
                 disableProcessor(ProcessorIds.USED_VERSIONS)
-                disableProcessor(ProcessorIds.VALIDATION)
+                disableProcessor(ProcessorIds.VALIDATION_DUPLICATES)
+                disableProcessor(ProcessorIds.VALIDATION_REFERENCES)
+                disableProcessor(ProcessorIds.VALIDATION_CIRCULAR)
                 disableProcessor(ProcessorIds.COMPAT_RULES)
             }.process()
 

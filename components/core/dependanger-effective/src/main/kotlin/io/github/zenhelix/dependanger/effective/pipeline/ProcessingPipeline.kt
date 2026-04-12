@@ -2,6 +2,7 @@ package io.github.zenhelix.dependanger.effective.pipeline
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.zenhelix.dependanger.core.model.Diagnostics
+import io.github.zenhelix.dependanger.core.model.deduplicate
 import io.github.zenhelix.dependanger.effective.model.EffectiveMetadata
 import io.github.zenhelix.dependanger.effective.model.ProcessingInfo
 import kotlinx.coroutines.async
@@ -144,13 +145,17 @@ public class ProcessingPipeline(
     private fun mergeParallelResults(
         base: EffectiveMetadata,
         results: List<ParallelResult>,
-    ): EffectiveMetadata =
-        results.fold(base) { merged, result ->
+    ): EffectiveMetadata {
+        val combined = results.fold(base) { merged, result ->
             merged.copy(
                 diagnostics = merged.diagnostics + result.diagnostics,
                 extensions = merged.extensions + result.extensions,
             )
         }
+        return combined.copy(
+            diagnostics = combined.diagnostics.deduplicate(),
+        )
+    }
 
     /**
      * Collects diagnostics added since [base] by computing the diff.

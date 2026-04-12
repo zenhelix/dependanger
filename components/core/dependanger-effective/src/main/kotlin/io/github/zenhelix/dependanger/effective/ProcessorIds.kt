@@ -14,6 +14,8 @@ public object ProcessorIds {
     public const val BUNDLE_FILTER: String = "bundle-filter"
     public const val PLUGIN_FILTER: String = "plugin-filter"
     public const val USED_VERSIONS: String = "used-versions"
-    public const val VALIDATION: String = "validation"
+    public const val VALIDATION_DUPLICATES: String = "validation-duplicates"
+    public const val VALIDATION_REFERENCES: String = "validation-references"
+    public const val VALIDATION_CIRCULAR: String = "validation-circular"
     public const val COMPAT_RULES: String = "compat-rules"
 }

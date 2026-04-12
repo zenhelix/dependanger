@@ -35,7 +35,9 @@ private fun EffectiveMetadata.toResult(): DependangerResult =
     }
 
 private val PREVIEW_EXCLUDED_PROCESSORS: Set<String> = setOf(
-    ProcessorIds.VALIDATION,
+    ProcessorIds.VALIDATION_DUPLICATES,
+    ProcessorIds.VALIDATION_REFERENCES,
+    ProcessorIds.VALIDATION_CIRCULAR,
     ProcessorIds.COMPAT_RULES,
     ProcessorIds.USED_VERSIONS,
 )
@@ -177,7 +179,9 @@ public class Dependanger internal constructor(
     private fun buildValidationPipeline(): ProcessingPipeline = ProcessingPipeline {
         addCoreProcessors()
         preset.configure(this)
-        enableOptional(ProcessorIds.VALIDATION)
+        enableOptional(ProcessorIds.VALIDATION_DUPLICATES)
+        enableOptional(ProcessorIds.VALIDATION_REFERENCES)
+        enableOptional(ProcessorIds.VALIDATION_CIRCULAR)
     }
 
     private fun buildPipeline(

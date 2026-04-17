@@ -1,0 +1,38 @@
+source:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/main/**/*.kt'
+          - 'src/main/**/*.java'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/test/**/*'
+          - 'src/functionalTest/**/*'
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'build.gradle.kts'
+          - 'settings.gradle.kts'
+          - 'gradle.properties'
+          - 'gradle/**/*'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - '*.adoc'
+          - 'docs/**/*'
+          - 'LICENSE'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'build.gradle.kts'
+          - 'gradle/libs.versions.toml'
